@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import { desduplicarCabecalhos } from './toa'
 
 export interface Leitura {
@@ -16,6 +15,7 @@ export interface Leitura {
  * "pela chave": mais de uma delas repete nome de coluna.
  */
 export async function lerPlanilha(arquivo: File, aba?: string): Promise<Leitura> {
+  const XLSX = await import('xlsx')
   const wb = XLSX.read(await arquivo.arrayBuffer(), { type: 'array', cellDates: true })
   const nome = aba && wb.SheetNames.includes(aba) ? aba : wb.SheetNames[0]
   const ws = wb.Sheets[nome]

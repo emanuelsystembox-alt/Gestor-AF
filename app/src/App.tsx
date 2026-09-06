@@ -1,12 +1,14 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import Login from './pages/Login'
-import Controle from './pages/Controle'
-import Servicos from './pages/Servicos'
-import Equipes from './pages/Equipes'
-import Importacao from './pages/Importacao'
-import Campo from './pages/Campo'
-import Visita from './pages/Visita'
+const Controle = lazy(() => import('./pages/Controle'))
+const Servicos = lazy(() => import('./pages/Servicos'))
+const Equipes = lazy(() => import('./pages/Equipes'))
+const VisitaDetalhe = lazy(() => import('./pages/VisitaDetalhe'))
+const Importacao = lazy(() => import('./pages/Importacao'))
+const Campo = lazy(() => import('./pages/Campo'))
+const Visita = lazy(() => import('./pages/Visita'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -46,6 +48,7 @@ function Raiz() {
 export default function App() {
   return (
     <AuthProvider>
+      <Suspense fallback={<Carregando />}>
       <Routes>
         <Route path="/" element={<Raiz />} />
         <Route path="/entrar" element={<Login />} />
@@ -54,6 +57,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Controle /></Protegida>} />
         <Route path="/controle/servicos" element={
           <Protegida exige="GESTAO"><Servicos /></Protegida>} />
+        <Route path="/controle/visita/:id" element={
+          <Protegida exige="GESTAO"><VisitaDetalhe /></Protegida>} />
         <Route path="/controle/equipes" element={
           <Protegida exige="GESTAO"><Equipes /></Protegida>} />
         <Route path="/controle/importar" element={
@@ -66,6 +71,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </AuthProvider>
   )
 }

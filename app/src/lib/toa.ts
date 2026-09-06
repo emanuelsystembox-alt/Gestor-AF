@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 
 /**
  * Leitor da planilha de atividades do TOA (Oracle Field Service) da CLARO.
@@ -69,6 +68,7 @@ function celulaParaTexto(v: unknown): string {
 
 export async function lerPlanilhaTOA(arquivo: File): Promise<ResultadoLeitura> {
   const buffer = await arquivo.arrayBuffer()
+  const XLSX = await import('xlsx')
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
   if (!ws) throw new Error('A planilha não tem nenhuma aba legível.')

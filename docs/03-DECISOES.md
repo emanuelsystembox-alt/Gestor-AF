@@ -278,3 +278,40 @@ Consequências para o modelo:
   outra credenciada pode operar com outro tempo
 - exige o **último evento por equipe**, não por visita: uma equipe pode ter
   concluído a visita A e ainda não ter tocado a B
+
+## 2026-09-06 — Detalhe do contrato
+
+### D-027 · Sub-falha é o segundo nível da causa
+O código de baixa diz *o quê* (`107 - Entrada Não Autorizada`); a
+sub-falha diz *por quê* (`RESTRIÇÃO HORÁRIO CONDOMÍNIO`). Sem ela, a
+improdutiva vira estatística sem tratativa possível.
+
+Fonte: `CONSOLIDADO_SUBFALHAS_CLARO_2026.xlsx`, que traz **dois
+conjuntos**:
+- `CASO 1` — 114 códigos, 534 pares
+- `NÍVEL HARD` — 155 códigos, 933 pares, 17 categorias
+
+Guardamos os dois com rótulo de conjunto e `empresa.conjunto_sub_falha`
+marca qual vale. **A escolha é do Emanuel, não minha.**
+
+### D-028 · O histórico carimba a EQUIPE do momento
+`visita_evento.equipe_id` é preenchido por trigger com a equipe corrente
+da visita. É o que permite reconstruir uma transferência: o histórico
+mostra `014 → 001`, como no sistema atual.
+
+`transferir_visita()` registra origem, destino, quem transferiu e o
+motivo — e grava o evento com a equipe **antiga**, porque era ela a
+responsável naquele instante.
+
+### D-029 · Carregamento sob demanda por causa do técnico
+O pacote inicial tinha 254 kB comprimidos, dos quais 143 kB eram a
+biblioteca de planilha — que só as telas de importação usam e o técnico
+**nunca** abre.
+
+Passou a ser carregada sob demanda, e cada tela virou um pedaço próprio.
+Carga inicial caiu para **115 kB** (−55%). O app do técnico agora são
+1,65 kB (agenda) e 3,08 kB (execução) sobre o núcleo.
+
+> Decisão tomada pensando em quem usa 4G em campo, não em métrica de
+> build. Sem modo offline (D-008), o tamanho do primeiro carregamento é o
+> que separa "abriu" de "não abriu".

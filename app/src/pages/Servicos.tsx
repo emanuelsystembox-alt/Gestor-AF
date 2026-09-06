@@ -267,16 +267,17 @@ export default function Servicos() {
                   <th className="px-3 py-2 font-medium">Área</th>
                   <th className="px-3 py-2 text-center font-medium">O.S.</th>
                   <th className="px-3 py-2 font-medium">Contrato</th>
+                  <th className="px-3 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {carregando && (
-                  <tr><td colSpan={9} className="px-3 py-10 text-center text-graf-400">
+                  <tr><td colSpan={10} className="px-3 py-10 text-center text-graf-400">
                     Carregando…</td></tr>
                 )}
 
                 {!carregando && visiveis.length === 0 && (
-                  <tr><td colSpan={9}>
+                  <tr><td colSpan={10}>
                     <Vazio titulo="Nenhuma visita para este filtro"
                       descricao={linhas.length === 0
                         ? 'Não há visitas neste período.'
@@ -348,11 +349,18 @@ export default function Servicos() {
                         <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-500">
                           {v.contrato ?? '—'}
                         </td>
+                        <td className="px-3 py-2 text-right">
+                          <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
+                            className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
+                                       text-graf-400 hover:border-af-600 hover:text-af-400">
+                            abrir
+                          </Link>
+                        </td>
                       </tr>
 
                       {exp && (
                         <tr className="border-b border-graf-800 bg-graf-900">
-                          <td colSpan={9} className="px-3 py-3">
+                          <td colSpan={10} className="px-3 py-3">
                             <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-graf-400">
                               {v.cliente_nome && <span>Cliente: <span className="text-graf-200">{v.cliente_nome}</span></span>}
                               {v.node && <span>Node: <span className="text-graf-200">{v.node}</span></span>}
