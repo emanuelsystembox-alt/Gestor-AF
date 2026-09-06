@@ -18,11 +18,11 @@ const ENTRADA: Item[] = [
 ]
 const AJUSTES: Item[] = [
   { para: '/controle/configuracoes', rotulo: 'Configurações' },
+  { para: '/controle/administracao', rotulo: 'Administração' },
 ]
 const FUTURO: Item[] = [
   { para: '/estoque', rotulo: 'Estoque', futuro: true },
   { para: '/frota', rotulo: 'Frota', futuro: true },
-  { para: '/admin', rotulo: 'Administração', futuro: true },
 ]
 
 function Grupo({ titulo, itens }: { titulo: string; itens: Item[] }) {

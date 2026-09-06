@@ -686,3 +686,72 @@ e o motivo.
 
 ### D-048 · Na tela de Equipes o cartão inteiro abre o contrato
 O botão "abrir" era ruído: o cartão já é o alvo natural do clique.
+
+### D-049 · Papel é a barreira; permissão é a granularidade
+As 66 policies decidem por **papel** (`tem_papel`). Isso não mudou: as
+caixinhas de permissão da tela de Administração são camada **adicional**,
+checada nas RPCs e na interface. Elas **restringem, nunca ampliam** —
+quem não tem o papel não passa do RLS, mesmo com tudo marcado.
+
+Reescrever 66 policies para consultar permissão fina numa sessão só seria
+o jeito mais rápido de abrir buraco sem perceber. Fica para quando houver
+teste automatizado de policy.
+
+ADMIN passa em tudo por definição, senão o primeiro admin se trancaria
+para fora ao criar o primeiro perfil de acesso.
+
+`perfil_acesso` guarda o papel correspondente; ao criar um usuário, o
+papel vem do perfil escolhido.
+
+### D-050 · Autoedição não pode mudar o que dá poder
+A policy `perfil_autoedicao` (migration 005) libera `UPDATE` onde
+`id = auth.uid()` — para a pessoa arrumar o próprio telefone.
+
+**Só que RLS não restringe coluna.** Com ela, qualquer usuário podia
+trocar o próprio `perfil_acesso_id` e se dar todas as permissões, ou
+mudar `empresa_id` e enxergar outra credenciada.
+
+Passou despercebido por 27 migrations porque só existia um usuário, e ele
+era ADMIN. Viraria buraco no dia em que o primeiro técnico logasse.
+
+O trigger `perfil_protege_campos` barra `empresa_id`, `base_id`, `ativo`,
+`perfil_acesso_id`, `cargo_id`, `tecnico_id` e `email` para quem não é
+ADMIN. O resto segue livre.
+
+**Testado com um usuário técnico de verdade**, logado com senha:
+
+| tentativa | resultado |
+|---|---|
+| trocar o próprio perfil de acesso para Administrador | **403** — trigger |
+| inserir `usuario_papel` com ADMIN | **403** — RLS |
+| chamar `definir_papeis` para si | **403** — checagem na função |
+| chamar a Edge Function de criar usuário | **403** — não é ADMIN |
+| chamar a Edge Function sem login | **401** |
+| mudar o próprio telefone | **204**, como deve ser |
+| listar perfis | vê **só o próprio** |
+
+### D-051 · Criar login passa por Edge Function
+Criar conta em `auth.users` exige a `service_role`, que nunca pode ir
+para o navegador. A função `admin-usuarios` guarda a chave no servidor e
+só age depois de conferir, **com o JWT de quem chamou e consultando o
+banco**, que a pessoa é ADMIN. A tela não é a barreira.
+
+A senha é gerada no servidor e devolvida **uma vez**, para o admin
+repassar. Se o INSERT do perfil falhar, a função desfaz o usuário do auth
+— acesso órfão em `auth.users` é login sem dono.
+
+### D-052 · `usuario_papel.escopo` é obrigatório e não tem default
+A primeira versão de `definir_papeis` não passava escopo. O insert morria
+em not-null e **o usuário nascia sem papel nenhum** — um login que entra
+e não enxerga nada, sem erro visível na tela. Peguei ao conferir o
+primeiro usuário criado.
+
+`escopo_padrao()`: ADMIN e COP → `GLOBAL`; TECNICO → `PROPRIO`; demais →
+`BASE`, com a base do próprio perfil.
+
+### D-053 · Usuário não se apaga, se desativa
+Apagar levaria junto a autoria de cada baixa, marcador, transferência e
+exclusão de contrato que a pessoa fez. `definir_situacao_usuario()`
+desativa, e o banco recusa dois casos: desativar a si mesmo, e deixar a
+empresa sem nenhum ADMIN ativo. **Testado**: tirar o papel do único ADMIN
+retorna "Este e o ultimo ADMIN ativo".

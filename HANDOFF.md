@@ -38,7 +38,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — onde estamos, com números
-3. **`docs/03-DECISOES.md`** — as 43 decisões e o porquê de cada uma
+3. **`docs/03-DECISOES.md`** — as 52 decisões e o porquê de cada uma
 4. **`supabase/README.md`** — banco, conferências e dívida de migrations
 5. **`docs/06-PONTUACAO.md`** — o que está bloqueado e por quê
 
@@ -71,7 +71,8 @@ zero função `SECURITY DEFINER` alcançável pelo `anon`.
 | `/controle/importar` | importação do TOA com prévia |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
 | `/controle/relatorios` | relatório por contrato e por O.S., com CSV |
-| `/controle/configuracoes` | status (cor, rótulo, alerta) e indicadores de qualidade |
+| `/controle/configuracoes` | status, indicadores de qualidade e tabela de pontuação |
+| `/controle/administracao` | usuários, cargos, perfis de acesso e permissões |
 | `/campo` e `/campo/visita/:id` | agenda e execução do técnico |
 
 **Dados:** 470 visitas, 564 O.S., 89 equipes, 104 técnicos, 18 praças,
@@ -157,7 +158,7 @@ Ordem acertada com o Emanuel:
 | Dívida | Onde |
 |---|---|
 | ~~8 O.S. recusadas~~ **resolvido**: era reatendimento, não duplicata | D-041 |
-| Administração de usuários, cargos e permissões | não iniciado — é o maior pedaço que falta |
+| ~~Administração de usuários~~ **feita** (D-049 a D-053) | falta reescrever policies para permissão fina |
 | 7 migrations aplicadas sem arquivo local | `supabase/README.md` explica como sincronizar |
 | 12 lacunas de modelo (skill, marcadores, geo cerca…) | `docs/07-TELAS-DETALHADAS.md` |
 | Frota, almoxarifado, produtividade, aferição | não iniciados |
