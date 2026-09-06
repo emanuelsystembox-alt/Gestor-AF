@@ -135,3 +135,30 @@ questionar.
 7. **Escopo:** só Manaus, ou o sistema precisa nascer multi-praça?
 8. **Desconto de Retorno de Credenciada:** é abatido do faturamento do
    mês, da equipe que causou, ou dos dois?
+
+---
+
+## Evidência adicional (06/09/2026, tela Serviços)
+
+Na lista de serviços, a pontuação aparece como **etiqueta por contrato**,
+junto ao nome do cliente:
+
+- contrato `227015022` (ADESÃO) → `1.2925`
+- contrato `227014085` (ADESÃO) → `1.4648`
+- contrato `226559991` (**RETORNO DE CREDENCIADA**) → **sem etiqueta**
+
+Coerente com a LPU: Retorno de Credenciada é item de **desconto**, então
+não gera pontuação positiva. Reforça a pergunta 8 — o desconto é abatido
+de onde?
+
+Também aparece a etiqueta **`TEC1 - COM PADRAO`** em várias linhas, e as
+etiquetas de evidência: `GEO LOCALIZAÇÃO`, `VALIDAÇÃO COP`,
+`OS DIGITAL ANEXO`, `TESTE DE VELOCIDADE`, `NR-35`, `CERTIDÃO OK`.
+Essas são exigências de comprovação por tipo de serviço — provavelmente
+o que a aba *Evidências \ Tipos de Anexo* configura. Ainda não levantado.
+
+## Ainda não levantado
+
+**Regras de Comissionamento** — o Emanuel confirmou que a comissão da
+equipe sai daí, aplicada por **fatores**. Não consegui abrir a tela nesta
+sessão. É o próximo passo antes de modelar comissão.
