@@ -104,16 +104,30 @@ cd app && npm install && cp .env.example .env && npm run dev
 Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.
 Sempre `npx tsc --noEmit` antes de commitar.
 
-## Estado atual (06/09/2026)
+## Estado atual — 06/09/2026
 
-**Pronto:** importação do TOA com upsert · visita→O.S. · 166 códigos de
-baixa classificados por responsabilidade · RLS em tudo · painel do
-controlador · lista de serviços · cadastro de equipes com importação ·
-telas de campo (agenda, execução, baixa por O.S.).
+> **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
+> reais do banco, as 21 migrations, as 26 decisões, o que já corrigimos do
+> sistema atual e o que está pendente. Este arquivo aqui é o *como
+> trabalhar*; aquele é o *onde estamos*.
 
-**Em aberto:** pontuação/faturamento (ver `docs/06-PONTUACAO.md`) ·
-frota · almoxarifado · produtividade · aferição.
+Resumo: 25 tabelas, 48 policies, **zero tabela sem RLS**. 470 visitas,
+564 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa
+classificados. Sete telas no ar.
 
-**Sabido e não resolvido:** o AFLINE 360 (outro Supabase, `BANCO PRO`)
-tem 3 tabelas sem RLS, uma delas com 183 nomes de técnico expostos.
-Decisão do Emanuel, registrada, ainda pendente.
+**Pendência principal:** pontuação e faturamento — bloqueada por 8
+perguntas em `docs/06-PONTUACAO.md`. Não implemente sem respondê-las.
+
+## Índice da documentação
+
+| Arquivo | Para quê |
+|---|---|
+| `docs/08-ESTADO-DO-PROJETO.md` | **comece por aqui** — onde estamos |
+| `docs/03-DECISOES.md` | as 26 decisões, com o porquê de cada uma |
+| `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
+| `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
+| `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |
+| `docs/07-TELAS-DETALHADAS.md` | telas destrinchadas + 12 lacunas |
+| `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |
+| `docs/04-DESCOBERTA-AFLINE-360.md` | o outro Supabase, fora de escopo |
+| `supabase/README.md` | ordem das migrations e conferências |

@@ -265,3 +265,16 @@ corretamente não têm equipe.
 
 > Lição para o repositório: quando um identificador externo pode trocar de
 > dono, guardar só o valor atual é bug de dado, não simplificação.
+
+### D-026 · OCIOSO = 10 min após concluir, sem novo status
+Definição do Emanuel: a equipe entra em **OCIOSO** quando passam
+**10 minutos** desde a conclusão do contrato anterior **sem que ela
+registre novo status**.
+
+Consequências para o modelo:
+- é **derivado**, não armazenado: `now() - último evento da equipe > 10 min`
+  **e** a última situação registrada é terminal (concluída/cancelada)
+- o parâmetro `10` vira configuração por empresa, não número no código —
+  outra credenciada pode operar com outro tempo
+- exige o **último evento por equipe**, não por visita: uma equipe pode ter
+  concluído a visita A e ainda não ter tocado a B
