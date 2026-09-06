@@ -1,5 +1,7 @@
 # Gestor AF — guia para quem (ou o que) for trabalhar neste repositório
 
+**Assumindo o projeto agora? Leia `HANDOFF.md` primeiro.**
+
 Leia isto antes de mexer em qualquer coisa. Este arquivo existe para que
 outra pessoa — ou outra IA — entre no projeto sem repetir descobertas que
 já custaram caro.
@@ -122,7 +124,8 @@ perguntas em `docs/06-PONTUACAO.md`. Não implemente sem respondê-las.
 
 | Arquivo | Para quê |
 |---|---|
-| `docs/08-ESTADO-DO-PROJETO.md` | **comece por aqui** — onde estamos |
+| `HANDOFF.md` | **comece por aqui** — passagem de bastão |
+| `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 26 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |

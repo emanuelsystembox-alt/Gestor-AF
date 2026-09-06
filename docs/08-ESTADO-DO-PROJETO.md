@@ -1,5 +1,8 @@
 # Estado do projeto — 06/09/2026
 
+> Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
+> raiz. Este documento é o inventário; aquele é o mapa.
+
 Consolidação de tudo que existe. Levantado **consultando o banco e o
 repositório**, não de memória.
 
@@ -32,7 +35,8 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**25 tabelas · 2 views · 32 funções · 13 triggers · 48 policies · zero tabela sem RLS**
+**26 tabelas · 2 views · 35 funções · 50 policies · zero tabela sem RLS ·
+zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 ### Estrutura
 
@@ -64,6 +68,7 @@ Domínios: `tipo_atividade` · `tipo_servico` · `tipo_os` · `codigo_baixa` ·
 | Códigos de baixa | **168** classificados |
 | Tipos de O.S. | 37 · Tipos de atividade 20 · Grupos de serviço 8 |
 | Login TOA mapeado | 9 equipes |
+| Sub-falhas | tabela criada, dados a importar |
 | Eventos de auditoria | 472 |
 
 **339 das 470 visitas têm equipe.** As 131 restantes: 124 são jornada sem
@@ -91,6 +96,7 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | 019 | **Isolamento por praça** |
 | 020 | Técnicos fora do cadastro + `vw_equipe_resumo` |
 | 021 | **Login TOA da equipe, com histórico por período** |
+| 022 | Sub-falha, histórico completo e transferência de equipe |
 
 ---
 
@@ -104,17 +110,19 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | `/controle/equipes` | Equipes e técnicos, produtividade do dia, agrupamento por supervisor/área, aviso de recurso fora do cadastro |
 | `/controle/importar` | Upload da planilha do TOA com prévia |
 | `/campo` | Agenda do técnico (clara, alto contraste) |
+| `/controle/visita/:id` | **Detalhe do contrato**: cliente, atendimento, O.S. com responsável, histórico com sub-falha, anexos, serviços anteriores, transferência |
 | `/campo/visita/:id` | Execução: rota, baixa por O.S., mudança de situação com GPS |
 
 ---
 
-## As 26 decisões, resumidas
+## As 29 decisões, resumidas
 
 **Modelagem**
 D-001 visita 1→N O.S. · D-005 atribuição à equipe com responsável ·
 D-009 consumo de material por O.S. (novo) · D-013 cabeçalho repetido lido
 por posição · D-019 multi-empresa · D-021 isolamento em dois cercos ·
-D-024/D-025 login TOA é da equipe e muda de dono
+D-024/D-025 login TOA é da equipe e muda de dono · D-027 sub-falha é o
+segundo nível da causa · D-028 o histórico carimba a equipe do momento
 
 **Operação**
 D-002 login individual · D-003 Monitor = Controlador · D-004 importação
@@ -122,7 +130,7 @@ várias vezes ao dia · D-006 o campo vence o TOA · D-007 o que o técnico
 não vê · D-008 sem modo offline · D-026 ocioso = 10 min
 
 **Produto**
-D-011 duas linguagens visuais · D-012 MVP = núcleo de O.S. ·
+D-029 carga sob demanda por causa do técnico no 4G · D-011 duas linguagens visuais · D-012 MVP = núcleo de O.S. ·
 D-014 a trava só arma em ação de campo
 
 **Segurança**
