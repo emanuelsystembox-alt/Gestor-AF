@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import Login from './pages/Login'
 import Controle from './pages/Controle'
+import Servicos from './pages/Servicos'
 import Importacao from './pages/Importacao'
 import Campo from './pages/Campo'
 import Visita from './pages/Visita'
@@ -50,6 +51,8 @@ export default function App() {
 
         <Route path="/controle" element={
           <Protegida exige="GESTAO"><Controle /></Protegida>} />
+        <Route path="/controle/servicos" element={
+          <Protegida exige="GESTAO"><Servicos /></Protegida>} />
         <Route path="/controle/importar" element={
           <Protegida exige="GESTAO"><Importacao /></Protegida>} />
 
