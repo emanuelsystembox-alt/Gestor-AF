@@ -162,3 +162,46 @@ o que a aba *Evidências \ Tipos de Anexo* configura. Ainda não levantado.
 **Regras de Comissionamento** — o Emanuel confirmou que a comissão da
 equipe sai daí, aplicada por **fatores**. Não consegui abrir a tela nesta
 sessão. É o próximo passo antes de modelar comissão.
+
+---
+
+## ⚠ Bloqueio descoberto em 06/09: a fonte não tem as dimensões da regra
+
+A regra de pontuação é
+**tabela de preço × tipo de pessoa × edificação × tipo de O.S.**
+
+Conferido nas 470 visitas importadas:
+
+| Campo | Preenchido | Existe no arquivo do TOA? |
+|---|--:|---|
+| Endereço | 325 | sim |
+| Contrato | 325 | sim |
+| **Cliente (nome)** | **0** | **não** |
+| **Tipo de pessoa** | **0** | **não** |
+| **Edificação (casa/apto)** | **0** | **não** |
+| **Telefones** | **0** | **não** |
+
+**O export do TOA não traz nenhum desses campos.** Ele traz o *trabalho*
+(atividade, O.S., endereço, janela, área, node). Quem traz o *cliente* é o
+export do ngestor: `Cliente`, `Telefones`, `TipoDePessoa`,
+`Tipo De Residência`.
+
+### Consequência
+
+Não dá para calcular pontuação só com o arquivo do TOA. Faltam duas das
+quatro dimensões da regra.
+
+### Caminhos possíveis — decisão do Emanuel
+
+1. **Importar também o export do ngestor**, cruzando pela WO. Funciona
+   hoje, mas cria dependência do sistema que queremos abandonar.
+2. **Buscar a origem real** desses campos. O ngestor os obtém de algum
+   lugar — provavelmente NETSMS ou outra extração da CLARO. Se
+   conseguirmos a mesma fonte, ficamos independentes.
+3. **O técnico informa em campo.** Ele vê se é casa ou apartamento. Serve
+   como complemento, não como fonte principal — pessoa física/jurídica
+   ele não tem como saber.
+
+> Enquanto isso não se resolve, a tela de detalhe mostra esses campos
+> vazios de propósito, em vez de escondê-los. Campo vazio que deveria ter
+> valor é informação; campo escondido é problema invisível.
