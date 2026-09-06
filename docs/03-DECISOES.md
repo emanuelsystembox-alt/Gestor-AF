@@ -755,3 +755,64 @@ exclusão de contrato que a pessoa fez. `definir_situacao_usuario()`
 desativa, e o banco recusa dois casos: desativar a si mesmo, e deixar a
 empresa sem nenhum ADMIN ativo. **Testado**: tirar o papel do único ADMIN
 retorna "Este e o ultimo ADMIN ativo".
+
+### D-054 · Teste de policy vem antes de mexer em policy
+`testar_policies()` cria usuários reais (auth + perfil) de cada papel,
+troca o role da sessão para `authenticated`, roda a bateria e apaga tudo
+no fim — inclusive se estourar no meio.
+
+**A primeira versão não testava nada.** Era `SECURITY DEFINER`, e função
+definer roda como o owner, que tem `BYPASSRLS`. Todos os cenários
+"passavam" porque o RLS nem chegava a ser consultado. Um teste de policy
+que roda como superusuário é pior que nenhum: dá confiança falsa.
+
+A versão boa é INVOKER + `set local role authenticated`. **16 cenários,
+todos verdes.** Um deles é o oposto dos outros: o técnico *precisa*
+conseguir mudar o próprio telefone. Sem esse, o teste só provaria que
+está tudo trancado, não que está certo.
+
+```sql
+select * from testar_policies();   -- esperado: passou = true em tudo
+```
+
+### D-055 · A permissão fina entra nas RPCs, não nas policies
+Com o teste no lugar, dava para reescrever as 74 policies. Não reescrevi,
+e o motivo é técnico:
+
+Policy roda em **toda linha de toda consulta**. Trocar `tem_papel('X')`
+por uma subconsulta em `perfil_acesso_permissao` multiplica o custo do
+RLS na tabela mais lida do sistema (`visita`) — e o ganho é **zero**,
+porque permissão sem papel não abre nada.
+
+O lugar certo é a **entrada da ação**: a RPC, que roda uma vez por
+operação. É lá que a granularidade importa — um CONTROLADOR que pode
+baixar mas não pode excluir, por exemplo.
+
+> **Papel = quem entra na sala. Permissão = o que faz lá dentro.**
+
+`excluir_visita` e `baixar_os` passaram a exigir as duas coisas.
+`visita_marcador` teve a policy de escrita afinada com
+`tem_permissao('servicos.marcadores')` — essa é barata, porque a tabela é
+pequena e só é escrita por ação humana.
+
+Efeito colateral que o teste pegou na hora: usuário **com** o papel e
+**sem** perfil de acesso perde as ações. É o comportamento certo, e virou
+cenário fixo da bateria.
+
+### D-056 · O contrato abre em janela, não em linha expandida
+A expansão empurrava a lista inteira para baixo e, mesmo assim, não cabia
+o que o COP precisa ver. A janela abre no clique, mostra detalhe,
+histórico, marcadores e as quatro ações, e fecha sem mexer no scroll de
+quem está trabalhando na lista.
+
+As duas baixas aparecem lado a lado e **rotuladas por extenso** —
+"Baixa da operadora (TOA)" e "Baixa da AFLINE (ngestor)". Na linha da
+lista viraram `Baixa TOA` e `Baixa ngestor`: abreviar num campo que
+significa dinheiro é economia errada.
+
+### D-057 · O painel mostra volume E pontos, porque são leituras diferentes
+DESCONEXÃO faz volume e quase não pontua; ADESÃO faz menos volume e
+carrega o faturamento. Um painel que só mostra volume engana quem decide.
+
+A tabela de tipos de serviço tem as duas abas, e os cartões de situação
+usam a cor do cadastro (D-036) — a mesma da lista, do modal e do painel.

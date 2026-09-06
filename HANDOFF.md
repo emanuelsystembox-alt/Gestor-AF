@@ -38,7 +38,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — onde estamos, com números
-3. **`docs/03-DECISOES.md`** — as 52 decisões e o porquê de cada uma
+3. **`docs/03-DECISOES.md`** — as 56 decisões e o porquê de cada uma
 4. **`supabase/README.md`** — banco, conferências e dívida de migrations
 5. **`docs/06-PONTUACAO.md`** — o que está bloqueado e por quê
 
@@ -158,7 +158,9 @@ Ordem acertada com o Emanuel:
 | Dívida | Onde |
 |---|---|
 | ~~8 O.S. recusadas~~ **resolvido**: era reatendimento, não duplicata | D-041 |
-| ~~Administração de usuários~~ **feita** (D-049 a D-053) | falta reescrever policies para permissão fina |
+| ~~Administração de usuários~~ **feita** (D-049 a D-053) | e a permissão fina entrou nas RPCs, com teste (D-054/D-055) |
+| **`pontos_equipe` vazio** — sem ele não há margem nem comissão | depende das Regras de Comissionamento, que só o Emanuel levanta |
+| Modal de baixa sem Equipamento/Miscelânea | depende do módulo de almoxarifado |
 | 7 migrations aplicadas sem arquivo local | `supabase/README.md` explica como sincronizar |
 | 12 lacunas de modelo (skill, marcadores, geo cerca…) | `docs/07-TELAS-DETALHADAS.md` |
 | Frota, almoxarifado, produtividade, aferição | não iniciados |

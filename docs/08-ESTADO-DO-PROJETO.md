@@ -103,6 +103,7 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | 026 | **Reatendimento** (D-041), **dupla baixa** TOA×AFLINE com sub-falha (D-042), exclusão arquivada (D-043) |
 | 027 | **Pontuação por combinação de O.S. × edificação** (D-045): 546 combinações, 1.021 regras, 95,1% de cobertura |
 | 028 | **Administração**: cargo, perfil de acesso, 26 permissões, e o **fecho da escalada de privilégio** (D-050) |
+| 029 | **`testar_policies()`**: 16 cenários verdes + permissão fina nas RPCs (D-054/D-055) |
 
 ---
 
@@ -125,7 +126,7 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 
 ---
 
-## As 52 decisões, resumidas
+## As 56 decisões, resumidas
 
 > D-030 (a dependência do ngestor é aceita e permanente) e D-031 (a tela
 > de sub-falhas não escolhe o conjunto por ninguém) foram tomadas em

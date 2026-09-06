@@ -78,6 +78,7 @@ conta a história.
 | 026 | Reatendimento (O.S. em N visitas), dupla baixa TOA×AFLINE, exclusão com motivo | ✓ |
 | 027 | **Pontuação por combinação de O.S.** × edificação + log de alteração | ✓ |
 | 028 | **Administração**: cargos, perfis de acesso, permissões e a trava de escalada (D-050) | ✓ |
+| 029 | **Bateria de teste de policy** (16 cenários) + permissão fina nas RPCs | ✓ |
 
 ---
 
