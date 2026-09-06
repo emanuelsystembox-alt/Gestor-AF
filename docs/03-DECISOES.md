@@ -231,3 +231,37 @@ botão que cadastra e religa as visitas dele num clique.
 
 > É o tipo de diferença que o Emanuel pediu: não é a mesma tela mais
 > bonita, é a tela respondendo uma pergunta que a outra não faz.
+
+## 2026-09-06 — Correção: o login do TOA é da EQUIPE
+
+### D-024 · Eu estava errado sobre os "técnicos fora do cadastro"
+Ontem apontei 5 matrículas como técnicos trabalhando sem cadastro. As
+capturas da tela de Equipes mostraram que **três delas são o Login TOA das
+equipes 001, 004 e 010**.
+
+No OFSC o "recurso" é a EQUIPE, não a pessoa — a AFLINE trabalha em dupla
+e quem loga é a equipe. O campo se chama `Login do Técnico`, o que induz
+ao erro; o `ID do Recurso` na mesma planilha é o mesmo para a dupla.
+
+Funcionou para 298 visitas porque, na maioria das equipes, o login da
+equipe **é** o login do técnico líder. As 5 exceções eram logins novos,
+criados depois da planilha de equipes.
+
+### D-025 · O login do TOA MUDA de equipe ao longo do tempo
+`Equipes.xlsx` diz que a equipe 001 usa `Z565249`. A tela de hoje mostra
+`Z688266`. Guardar só o valor corrente corromperia o histórico em
+silêncio: uma visita de agosto seria atribuída à equipe que usa aquele
+login **hoje**, e a produtividade passada mudaria sozinha.
+
+Modelado com `equipe_login_toa (equipe, login, inicio, fim)`. A resolução
+`equipe_do_login(base, login, data)` tenta, nesta ordem:
+1. histórico válido **naquela data**
+2. login corrente da equipe
+3. matrícula de técnico (quando o recurso é pessoal)
+
+Resultado: visitas com equipe subiram de 298 para **339**. Restou um
+único login sem dono, `Z690579`, e as 124 de jornada sem login — que
+corretamente não têm equipe.
+
+> Lição para o repositório: quando um identificador externo pode trocar de
+> dono, guardar só o valor atual é bug de dado, não simplificação.
