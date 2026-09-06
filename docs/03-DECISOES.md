@@ -120,3 +120,38 @@ Testado com dados reais de 04/09/2026 (15 visitas / 23 O.S.):
 > Há 15 visitas de teste no banco. Para limpar:
 > `delete from importacao where id = '11111111-1111-1111-1111-111111111111';`
 > (as visitas caem junto por cascade)
+
+## 2026-09-05 — Endurecimento de segurança
+
+### D-015 · `SECURITY DEFINER` exige checagem de papel POR DENTRO
+`importar_toa` ignora o RLS por definição. Revogar acesso do `anon` não
+resolvia: qualquer usuário logado — **inclusive um técnico** — poderia
+disparar a importação da planilha.
+
+Solução: a implementação virou `importar_toa_interno`, fora do alcance da
+API. A porta de entrada `importar_toa` confere `eh_gestor() or
+tem_papel('CONTROLADOR')` antes de delegar.
+
+### D-016 · `revoke from public` NÃO remove concessão nominal
+O Supabase concede `EXECUTE` **nominalmente** a `anon` e `authenticated` em
+toda função criada no schema `public`. `revoke ... from public` não mexe
+nisso — tem que ser `revoke ... from anon`.
+
+Detalhe que me enganou: **`CREATE OR REPLACE` preserva a ACL**, mas função
+criada do zero (depois de um `RENAME`, por exemplo) recebe as concessões
+padrão de novo. Foi assim que o `importar_toa` voltou a ficar aberto ao
+`anon` mesmo depois de eu ter revogado.
+
+> Regra para o time: depois de mexer em função, **não confie no lint** —
+> pergunte ao banco com `has_function_privilege('anon', oid, 'EXECUTE')`.
+
+### D-017 · `search_path` fixo em toda função
+Sem isso, um schema malicioso no caminho pode sequestrar a resolução de
+nomes dentro da função. `unaccent` também saiu do `public` para o schema
+`extensions`, e o `norm_txt` passou a declarar os dois no `search_path`.
+
+### Pendência do Emanuel (não é código)
+**Proteção contra senha vazada está desligada.** O Supabase pode conferir
+toda senha nova contra o HaveIBeenPwned. Ligar em:
+*Authentication → Policies → Password protection*.
+Com técnico usando senha simples em campo, isso vale muito.
