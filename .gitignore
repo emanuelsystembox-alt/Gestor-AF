@@ -1,0 +1,30 @@
+# dependências
+node_modules/
+app/node_modules/
+
+# build
+app/dist/
+app/.vite/
+*.tsbuildinfo
+
+# ambiente — NUNCA versionar chaves
+.env
+.env.local
+.env.*.local
+app/.env
+app/.env.local
+
+# sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# planilhas com dado de cliente (LGPD) — não vão para o repositório
+*.xlsx
+*.xls
+*.csv
+!docs/exemplos/**/*.csv
+
+# temporários
+*.log
+.cache/
