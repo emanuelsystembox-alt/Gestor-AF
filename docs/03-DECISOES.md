@@ -194,3 +194,40 @@ consegue gravar sem tenant, e ninguém precisa lembrar de preencher.
 Confirmado pelo Emanuel: a comissão da equipe **não** está na tabela de
 pontuação. Vem do menu *Regras de Comissionamento*, aplicada por
 **fatores**. Ainda não levantado — ver `docs/06-PONTUACAO.md`.
+
+## 2026-09-06 — Isolamento por praça e cadastro importado
+
+### D-021 · Isolamento é em DOIS cercos concêntricos
+Regra do Emanuel: *"time de uma cidade não pode ver outra cidade"*.
+O isolamento por empresa (D-019) não cobre isso — um controlador de
+Manaus e um de São Luís são da **mesma** empresa.
+
+Toda policy agora passa por:
+1. `empresa_id = minha_empresa()` — não vê outra credenciada
+2. `base_id in (bases_visiveis())` — não vê outra praça
+
+`bases_visiveis()`: quem tem papel com escopo `GLOBAL` enxerga todas as
+praças **da própria empresa**; os demais veem `perfil.base_id` mais o que
+estiver em `usuario_base` (para supervisor regional e cobertura de férias).
+
+### D-022 · Cadastro importado: 89 equipes, 104 técnicos, 5 supervisores
+A planilha tinha 604 linhas, mas só 103 preenchidas — o resto era vazio.
+Todas de Manaus. Zero equipes sem área.
+
+Das 470 visitas, 298 ficaram com equipe. As 172 restantes se explicam:
+- **124** são jornada (`Na Base`, `Refeição`) **sem login** no TOA —
+  corretamente sem equipe
+- **48** são de **5 técnicos que trabalham em campo mas não estão na
+  planilha**: `Z687967` `Z688266` `Z689678` `Z690579` `Z690580`
+
+### D-023 · Cadastro que envelhece vira aviso, não silêncio
+A planilha de equipes desatualiza: técnico contratado depois dela aparece
+executando no TOA sem estar cadastrado, e o sistema atual simplesmente
+mostra "sem equipe".
+
+A tela de Equipes agora abre com um aviso listando quem está nessa
+situação, quantas visitas fez, em que período e **em qual área** — e um
+botão que cadastra e religa as visitas dele num clique.
+
+> É o tipo de diferença que o Emanuel pediu: não é a mesma tela mais
+> bonita, é a tela respondendo uma pergunta que a outra não faz.
