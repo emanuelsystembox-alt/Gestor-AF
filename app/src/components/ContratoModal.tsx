@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
 
 /**
@@ -15,6 +15,7 @@ import { Alerta, Pill } from './ui'
 
 interface OS {
   id: string; sequencia: number; numero_os: string | null
+  descricao: string | null; origem: string | null
   status_operadora: string | null; ponto: string | null; produto: string | null
   baixa_em: string | null; baixa_observacao: string | null
   tipo_os: { codigo: number; descricao: string } | null
@@ -26,6 +27,7 @@ interface OS {
 }
 interface Evento {
   id: number; tipo: string; criado_em: string; observacao: string | null
+  login: string | null
   de: Record<string, unknown> | null; para: Record<string, unknown> | null
   usuario: { nome: string } | null
   equipe: { codigo: string } | null
@@ -64,8 +66,8 @@ const SELECT = `
   equipe:equipe_id ( id, codigo, nome, supervisor_nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula ),
   ordem_servico (
-    id, sequencia, numero_os, status_operadora, ponto, produto,
-    baixa_em, baixa_observacao,
+    id, sequencia, numero_os, descricao, origem, status_operadora,
+    ponto, produto, baixa_em, baixa_observacao,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao, natureza, responsabilidade ),
@@ -73,7 +75,7 @@ const SELECT = `
   ),
   visita_marcador ( id, indicador_id ),
   visita_evento (
-    id, tipo, criado_em, observacao, de, para,
+    id, tipo, criado_em, observacao, login, de, para,
     usuario:usuario_id ( nome ),
     equipe:equipe_id ( codigo ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao ),
@@ -86,6 +88,43 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null)
 const quando = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+
+/**
+ * O histórico é o que o sistema atual mostra em "Histórico": uma linha
+ * por etapa, com quem fez. `tipo` é código; a operação lê nome.
+ */
+const EVENTO_ROTULO: Record<string, string> = {
+  IMPORTADA:       'Entrada — importada do TOA',
+  SITUACAO:        'Mudança de situação',
+  CONFLITO_TOA:    'Conflito com o TOA',
+  BAIXA:           'Baixa de serviço',
+  TRANSFERENCIA:   'Transferência de equipe',
+  REVERSAO:        'Contrato voltado',
+  EXCLUIDA:        'Excluído',
+  RESTAURADA:      'Restaurado',
+  CADASTRO_MANUAL: 'Cadastrado à mão',
+  EDICAO_CADASTRO: 'Edição de cadastro',
+  OS_ADICIONADA:   'O.S. acrescentada',
+  OS_REMOVIDA:     'O.S. removida',
+  DESLOCAMENTO:    'Saiu para o endereço',
+  CHECKIN:         'Chegou e iniciou',
+  IMPEDIMENTO:     'Registrou impedimento',
+  CONCLUSAO:       'Finalizou a visita',
+}
+
+/** "de → para" legível. Situação vira rótulo; o resto sai como está. */
+function transicao(e: { de: Record<string, unknown> | null
+                        para: Record<string, unknown> | null }): string | null {
+  const rot = (o: Record<string, unknown> | null) => {
+    if (!o) return null
+    const s = o.situacao
+    if (typeof s === 'string') return SITUACAO_INFO[s as Situacao]?.label ?? s
+    return Object.entries(o).map(([k, x]) => `${k}: ${String(x)}`).join(', ')
+  }
+  const a = rot(e.de), b = rot(e.para)
+  if (a && b) return `${a} → ${b}`
+  return b ?? a
+}
 
 function corBaixa(n: string | null | undefined) {
   if (n === 'SUCESSO') return 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/40'
@@ -121,7 +160,8 @@ export function ContratoModal({
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
-  const [acao, setAcao] = useState<'baixar' | 'transferir' | 'excluir' | null>(null)
+  const [acao, setAcao] = useState<
+    'baixar' | 'transferir' | 'excluir' | 'editar' | 'voltar' | 'nova_os' | null>(null)
 
   // baixa
   const [osAlvo, setOsAlvo] = useState('')
@@ -134,6 +174,16 @@ export function ContratoModal({
   const [motivoT, setMotivoT] = useState('')
   // exclusão
   const [motivoE, setMotivoE] = useState('')
+  // edição do cadastro — o que o sistema atual não deixa fazer
+  const [ed, setEd] = useState<Record<string, string>>({})
+  // voltar contrato
+  const [situacaoAlvo, setSituacaoAlvo] = useState<Situacao | ''>('')
+  const [motivoV, setMotivoV] = useState('')
+  // nova O.S. no contrato existente
+  const [tiposOS, setTiposOS] = useState<{ id: string; codigo: number; descricao: string }[]>([])
+  const [novaTipo, setNovaTipo] = useState('')
+  const [novaNumero, setNovaNumero] = useState('')
+  const [novaDescricao, setNovaDescricao] = useState('')
 
   async function carregar() {
     const { data, error } = await supabase.from('visita').select(SELECT).eq('id', id).single()
@@ -145,6 +195,32 @@ export function ContratoModal({
     }
   }
   useEffect(() => { carregar() }, [id])
+
+  // O catálogo de tipo de O.S. só é preciso quando o usuário vai
+  // acrescentar uma — carregar antes seria peso à toa em cada abertura.
+  useEffect(() => {
+    if (acao !== 'nova_os' || tiposOS.length) return
+    supabase.from('tipo_os').select('id, codigo, descricao').order('codigo')
+      .then(({ data }) => setTiposOS(
+        (data ?? []) as { id: string; codigo: number; descricao: string }[]))
+  }, [acao, tiposOS.length])
+
+  /** Abre a edição já preenchida com o que está gravado. */
+  function abrirEdicao() {
+    if (!v) return
+    setEd({
+      contrato: v.contrato ?? '', wo_numero: v.wo_numero ?? '',
+      cliente_nome: v.cliente_nome ?? '', tipo_pessoa: v.tipo_pessoa ?? '',
+      tipo_residencia: v.tipo_residencia ?? '',
+      telefones: (v.telefones ?? []).join(', '),
+      logradouro: v.logradouro ?? '', complemento: v.complemento ?? '',
+      bairro: v.bairro ?? '', cidade: v.cidade ?? '', uf: v.uf ?? '',
+      cep: v.cep ?? '', node: v.node ?? '',
+      data_agendada: v.data_agendada,
+      janela_inicio: hhmm(v.janela_inicio) ?? '', janela_fim: hhmm(v.janela_fim) ?? '',
+    })
+    setAcao(acao === 'editar' ? null : 'editar')
+  }
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar() }
@@ -226,6 +302,22 @@ export function ContratoModal({
                 ★ {Number(pontos.pontos_claro).toFixed(4)} pts
               </span>
             )}
+            <button onClick={abrirEdicao} disabled={!v}
+              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                         hover:border-af-600 hover:text-af-400 disabled:opacity-40">
+              Editar
+            </button>
+            <button onClick={() => setAcao(acao === 'nova_os' ? null : 'nova_os')}
+              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                         hover:border-af-600 hover:text-af-400">
+              + O.S.
+            </button>
+            <button onClick={() => setAcao(acao === 'voltar' ? null : 'voltar')}
+              title="Voltar a situação do contrato — o sistema da CLARO não faz isso"
+              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                         hover:border-af-600 hover:text-af-400">
+              Voltar
+            </button>
             <button onClick={() => setAcao(acao === 'transferir' ? null : 'transferir')}
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400">
@@ -369,6 +461,173 @@ export function ContratoModal({
             </div>
           )}
 
+          {acao === 'editar' && v && (
+            <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
+              <p className="mb-2 text-xs font-medium">
+                Editar cadastro
+                <span className="ml-2 font-normal text-graf-500">
+                  cliente, endereço e agendamento — a diferença fica no histórico.
+                  {v.origem === 'TOA' && ' A próxima importação do TOA pode sobrescrever'
+                    + ' estes campos enquanto o contrato não estiver bloqueado (D-006).'}
+                </span>
+              </p>
+              <div className="grid gap-2 sm:grid-cols-4">
+                {([
+                  ['contrato', 'Contrato'], ['wo_numero', 'WO'],
+                  ['cliente_nome', 'Nome do cliente'], ['telefones', 'Telefones (vírgula)'],
+                  ['logradouro', 'Endereço'], ['complemento', 'Complemento'],
+                  ['bairro', 'Bairro'], ['cep', 'CEP'],
+                  ['cidade', 'Cidade'], ['uf', 'UF'], ['node', 'Node'],
+                ] as const).map(([k, rot]) => (
+                  <label key={k} className="text-[11px] text-graf-400">
+                    <span className="mb-1 block">{rot}</span>
+                    <input value={ed[k] ?? ''} className={`${campo} w-full`}
+                      onChange={e => setEd({ ...ed, [k]: e.target.value })} />
+                  </label>
+                ))}
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Tipo de pessoa</span>
+                  <select value={ed.tipo_pessoa ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, tipo_pessoa: e.target.value })}>
+                    <option value="">—</option>
+                    <option value="FISICA">Física</option>
+                    <option value="JURIDICA">Jurídica</option>
+                  </select>
+                </label>
+                <label className="text-[11px] text-graf-400">
+                  {/* Edificação manda na pontuação (D-045) — por isso é
+                      editável aqui, e não só lida do complemento. */}
+                  <span className="mb-1 block">Edificação</span>
+                  <select value={ed.tipo_residencia ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, tipo_residencia: e.target.value })}>
+                    <option value="">—</option>
+                    <option value="CASA">Casa</option>
+                    <option value="APTO">Apartamento</option>
+                    <option value="COMERCIAL">Comercial</option>
+                    <option value="OUTRO">Outro</option>
+                  </select>
+                </label>
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Data agendada</span>
+                  <input type="date" value={ed.data_agendada ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, data_agendada: e.target.value })} />
+                </label>
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Janela início</span>
+                  <input type="time" value={ed.janela_inicio ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, janela_inicio: e.target.value })} />
+                </label>
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Janela fim</span>
+                  <input type="time" value={ed.janela_fim ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, janela_fim: e.target.value })} />
+                </label>
+              </div>
+              <button disabled={ocupado}
+                onClick={() => comAviso(() => supabase.rpc('atualizar_visita_manual', {
+                  p_visita: id,
+                  p_dados: {
+                    ...ed,
+                    telefones: ed.telefones
+                      ? ed.telefones.split(',').map(t => t.trim()).filter(Boolean)
+                      : undefined,
+                  },
+                }), 'Cadastro atualizado.')}
+                className="mt-3 rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                           hover:bg-af-500 disabled:opacity-50">
+                Salvar cadastro
+              </button>
+            </div>
+          )}
+
+          {acao === 'nova_os' && v && (
+            <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
+              <p className="mb-2 text-xs font-medium">
+                Acrescentar O.S.
+                <span className="ml-2 font-normal text-graf-500">
+                  deixe o número em branco e o sistema gera um (AF-00000001)
+                </span>
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Tipo de O.S.</span>
+                  <select value={novaTipo} onChange={e => {
+                      setNovaTipo(e.target.value)
+                      const t = tiposOS.find(x => x.id === e.target.value)
+                      if (t) setNovaDescricao(t.descricao)
+                    }} className={`${campo} w-72`}>
+                    <option value="">— escolha —</option>
+                    {tiposOS.map(t => (
+                      <option key={t.id} value={t.id}>{t.codigo} · {t.descricao}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Número da O.S. (opcional)</span>
+                  <input value={novaNumero} onChange={e => setNovaNumero(e.target.value)}
+                    placeholder="gerado pelo sistema" className={`${campo} w-48`} />
+                </label>
+                <label className="min-w-56 flex-1 text-[11px] text-graf-400">
+                  <span className="mb-1 block">Descrição</span>
+                  <input value={novaDescricao} onChange={e => setNovaDescricao(e.target.value)}
+                    placeholder="ADESAO - INSTALAR PONTO VIRTUA"
+                    className={`${campo} w-full`} />
+                </label>
+                <button disabled={ocupado || (!novaTipo && !novaDescricao.trim())}
+                  onClick={() => comAviso(() => supabase.rpc('adicionar_os', {
+                    p_visita: id,
+                    p_dados: {
+                      tipo_os_id: novaTipo || null,
+                      numero_os: novaNumero.trim() || null,
+                      descricao: novaDescricao.trim() || null,
+                    },
+                  }).then(r => { if (!r.error) { setNovaTipo(''); setNovaNumero(''); setNovaDescricao('') } return r }),
+                    'O.S. acrescentada.')}
+                  className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                             hover:bg-af-500 disabled:opacity-50">
+                  Acrescentar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {acao === 'voltar' && v && (
+            <div className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-3">
+              <p className="text-xs font-medium text-amber-200">Voltar o contrato</p>
+              <p className="mt-1 text-[11px] text-amber-200/80">
+                O sistema da CLARO não volta situação. O nosso volta — e por isso
+                registra quem voltou, quando e por quê. Está hoje em{' '}
+                <strong>{SITUACAO_INFO[v.situacao]?.label ?? v.situacao}</strong>.
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Voltar para</span>
+                  <select value={situacaoAlvo} className={`${campo} w-48`}
+                    onChange={e => setSituacaoAlvo(e.target.value as Situacao)}>
+                    <option value="">— escolha —</option>
+                    {SITUACOES.filter(s => s !== v.situacao).map(s => (
+                      <option key={s} value={s}>{SITUACAO_INFO[s]?.label ?? s}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                  <span className="mb-1 block">Motivo (obrigatório)</span>
+                  <input value={motivoV} onChange={e => setMotivoV(e.target.value)}
+                    placeholder="Baixa indevida, técnico marcou errado, reabertura…"
+                    className={`${campo} w-full`} />
+                </label>
+                <button disabled={ocupado || !situacaoAlvo || !motivoV.trim()}
+                  onClick={() => comAviso(() => supabase.rpc('reverter_situacao', {
+                    p_visita: id, p_situacao: situacaoAlvo, p_motivo: motivoV.trim(),
+                  }), 'Contrato voltado.')}
+                  className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-medium text-white
+                             hover:bg-amber-500 disabled:opacity-50">
+                  Voltar contrato
+                </button>
+              </div>
+            </div>
+          )}
+
           {acao === 'excluir' && (
             <div className="rounded-lg border border-af-700/60 bg-af-900/15 p-3">
               <p className="text-xs font-medium text-af-200">Excluir este contrato?</p>
@@ -458,9 +717,22 @@ export function ContratoModal({
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                           <span className="tabular text-graf-600">#{o.sequencia}</span>
                           <span className="tabular font-medium">{o.numero_os ?? '—'}</span>
+                          {/* A descrição é o que a operação lê; o código é
+                              para conferência. O sistema atual mostra as duas. */}
                           <span className="text-graf-300">
-                            {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
+                            {o.descricao ?? o.tipo_os?.descricao ?? '—'}
                           </span>
+                          {o.tipo_os && (
+                            <span className="tabular text-[11px] text-graf-500">
+                              tipo {o.tipo_os.codigo}
+                            </span>
+                          )}
+                          {o.origem === 'MANUAL' && (
+                            <span className="rounded bg-sky-900/40 px-1.5 py-0.5 text-[10px]
+                                             font-semibold uppercase text-sky-300">
+                              manual
+                            </span>
+                          )}
                           {o.status_operadora && (
                             <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[11px] text-graf-400">
                               {o.status_operadora.replace('_', ' ')}
@@ -513,36 +785,51 @@ export function ContratoModal({
             v.visita_evento.length === 0 ? (
               <p className="text-sm text-graf-500">Sem histórico registrado.</p>
             ) : (
-              <table className="w-full text-xs">
-                <thead className="border-b border-graf-800 text-left uppercase
-                                  tracking-wide text-graf-500">
-                  <tr>
-                    <th className="px-2 py-2 font-medium">Quando</th>
-                    <th className="px-2 py-2 font-medium">O quê</th>
-                    <th className="px-2 py-2 font-medium">Baixa</th>
-                    <th className="px-2 py-2 font-medium">Sub-falha</th>
-                    <th className="px-2 py-2 font-medium">Equipe</th>
-                    <th className="px-2 py-2 font-medium">Quem</th>
-                    <th className="px-2 py-2 font-medium">Observação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...v.visita_evento]
-                    .sort((a, b) => b.criado_em.localeCompare(a.criado_em)).map(e => (
-                    <tr key={e.id} className="border-b border-graf-800/60">
-                      <td className="tabular px-2 py-1.5 text-graf-400">{quando(e.criado_em)}</td>
-                      <td className="px-2 py-1.5">{e.tipo}</td>
-                      <td className="px-2 py-1.5 text-graf-300">
-                        {e.codigo_baixa ? `${e.codigo_baixa.codigo} · ${e.codigo_baixa.descricao}` : '—'}
-                      </td>
-                      <td className="px-2 py-1.5 text-graf-300">{e.sub_falha?.nome ?? '—'}</td>
-                      <td className="px-2 py-1.5 text-graf-400">{e.equipe?.codigo ?? '—'}</td>
-                      <td className="px-2 py-1.5 text-graf-400">{e.usuario?.nome ?? 'sistema'}</td>
-                      <td className="px-2 py-1.5 text-graf-400">{e.observacao ?? '—'}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="border-b border-graf-800 text-left uppercase
+                                    tracking-wide text-graf-500">
+                    <tr>
+                      <th className="px-2 py-2 font-medium">Quando</th>
+                      <th className="px-2 py-2 font-medium">Etapa</th>
+                      <th className="px-2 py-2 font-medium">Situação</th>
+                      <th className="px-2 py-2 font-medium">Baixa</th>
+                      <th className="px-2 py-2 font-medium">Sub-falha</th>
+                      <th className="px-2 py-2 font-medium">Equipe</th>
+                      <th className="px-2 py-2 font-medium">Quem</th>
+                      <th className="px-2 py-2 font-medium">Login</th>
+                      <th className="px-2 py-2 font-medium">Observação</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {[...v.visita_evento]
+                      .sort((a, b) => b.criado_em.localeCompare(a.criado_em)).map(e => (
+                      <tr key={e.id} className="border-b border-graf-800/60 align-top">
+                        <td className="tabular whitespace-nowrap px-2 py-1.5 text-graf-400">
+                          {quando(e.criado_em)}
+                        </td>
+                        <td className="px-2 py-1.5 font-medium">
+                          {EVENTO_ROTULO[e.tipo] ?? e.tipo}
+                        </td>
+                        <td className="px-2 py-1.5 text-graf-300">{transicao(e) ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-300">
+                          {e.codigo_baixa
+                            ? `${e.codigo_baixa.codigo} · ${e.codigo_baixa.descricao}` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-graf-300">{e.sub_falha?.nome ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-400">{e.equipe?.codigo ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-400">
+                          {e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
+                        </td>
+                        {/* O login é o do TOA quando o evento veio da planilha,
+                            e o e-mail de quem operou quando veio da tela. */}
+                        <td className="px-2 py-1.5 text-graf-400">{e.login ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-400">{e.observacao ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )
           ) : (
             <section>

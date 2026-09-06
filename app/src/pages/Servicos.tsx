@@ -5,6 +5,7 @@ import type { Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
 import { Alerta, Pill, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
+import { NovoContratoModal } from '../components/NovoContratoModal'
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
@@ -80,6 +81,9 @@ export default function Servicos() {
   const [erro, setErro] = useState<string | null>(null)
   // O contrato abre em JANELA, nao em linha expandida (D-056).
   const [modal, setModal] = useState<string | null>(null)
+  // Cadastro manual: o serviço que não veio do TOA precisa entrar
+  // mesmo assim, senão não é despachado nem cobrado.
+  const [novo, setNovo] = useState(false)
   // Sobe de 1 quando o modal muda algo; os carregamentos ouvem.
   const [versao, setVersao] = useState(0)
 
@@ -286,6 +290,11 @@ export default function Servicos() {
         <span className="text-xs text-graf-500">a</span>
         <input type="date" value={ate} onChange={e => setAte(e.target.value)}
           className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+        <button onClick={() => setNovo(true)}
+          className="ml-1 rounded-md bg-af-600 px-3 py-1 text-xs font-semibold text-white
+                     hover:bg-af-500">
+          + Nova O.S.
+        </button>
       </div>
     }>
       <div className="space-y-3 p-4">
@@ -684,6 +693,19 @@ export default function Servicos() {
             ` · ${linhas.length - base.length} apontamentos de jornada ocultos`}
         </p>
       </div>
+
+      {novo && (
+        <NovoContratoModal
+          onFechar={() => setNovo(false)}
+          onCriado={id => {
+            setNovo(false)
+            setVersao(x => x + 1)
+            // Abre o contrato recém-criado: quem cadastrou quase sempre
+            // quer conferir ou já atribuir equipe.
+            setModal(id)
+          }}
+        />
+      )}
 
       {modal && (
         <ContratoModal
