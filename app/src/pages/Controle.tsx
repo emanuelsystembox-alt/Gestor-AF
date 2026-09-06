@@ -341,11 +341,10 @@ export default function Controle() {
                     className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
                     {porGrupo ? 'ver tipo do TOA' : 'ver grupo de serviço'}
                   </button>
-                  {
                   <button onClick={baixarCSV}
                     className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
                     Exportar CSV
-                  </button>}
+                  </button>
                 </>}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

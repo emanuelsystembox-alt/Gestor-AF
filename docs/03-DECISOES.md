@@ -155,3 +155,42 @@ nomes dentro da função. `unaccent` também saiu do `public` para o schema
 toda senha nova contra o HaveIBeenPwned. Ligar em:
 *Authentication → Policies → Password protection*.
 Com técnico usando senha simples em campo, isso vale muito.
+
+## 2026-09-06 — Multi-tenant
+
+### D-019 · O sistema nasce MULTI-EMPRESA, não só multi-praça
+O Emanuel pretende vender o sistema para outras credenciadas. São coisas
+diferentes:
+
+- **multi-praça**: a AFLINE em 18 cidades (São Luís, Belém, Palmas…)
+- **multi-tenant**: a AFLINE **e** a ENGETEC no mesmo banco, sem nunca
+  enxergarem uma linha da outra
+
+Hierarquia: `empresa` → `base` (praça) → `equipe` → `técnico`.
+
+Feito agora, com 470 visitas, custou uma migration. Adiado, custaria um
+projeto — e uma migração de dado com risco de vazamento entre clientes.
+
+**O furo que isso fechou.** As policies diziam
+`eh_gestor() or equipe_id in (select equipes_visiveis())`, e `eh_gestor()`
+só olha o **papel**. Um ADMIN de outra credenciada passaria por esse `or`
+e leria a operação inteira da AFLINE. Agora **toda policy começa por
+`empresa_id = minha_empresa()`**: o papel decide o que a pessoa faz
+dentro da própria empresa, nunca se ela atravessa a fronteira.
+
+Conferido por consulta, não no olho: zero policies sem filtro de tenant
+nas tabelas operacionais.
+
+**Domínios são compartilhados.** `tipo_os`, `codigo_baixa`,
+`tipo_atividade` etc. têm `empresa_id` nulo = catálogo da CLARO, vale
+para todos. Se uma empresa precisar do seu próprio, basta uma linha com
+o `empresa_id` dela. Não duplicamos 166 códigos por cliente.
+
+**A empresa nunca é digitada.** Trigger `carimba_empresa()` deriva de
+`base_id` no INSERT. Nenhum caminho — importador, tela ou script —
+consegue gravar sem tenant, e ninguém precisa lembrar de preencher.
+
+### D-020 · Comissão vem de Regras de Comissionamento, por fatores
+Confirmado pelo Emanuel: a comissão da equipe **não** está na tabela de
+pontuação. Vem do menu *Regras de Comissionamento*, aplicada por
+**fatores**. Ainda não levantado — ver `docs/06-PONTUACAO.md`.
