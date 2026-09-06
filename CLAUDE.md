@@ -54,6 +54,15 @@ REPLACE` preserva a ACL, mas função criada do zero (após um `RENAME`)
 nasce aberta de novo. **Confira sempre com
 `has_function_privilege('anon', oid, 'EXECUTE')`, não com o lint.**
 
+**RLS não restringe COLUNA.** Policy de `UPDATE` liberada por linha
+libera a linha inteira — inclusive as colunas que dão poder. Para
+proteger coluna, o instrumento é trigger. Ver D-050.
+
+**Teste de policy escrito como `SECURITY DEFINER` não testa nada.**
+Definer roda como o owner, que tem `BYPASSRLS`: todos os cenários passam
+sem o RLS ser consultado. Use INVOKER + `set local role authenticated`.
+Ver D-054.
+
 **`SECURITY DEFINER` ignora o RLS.** Se a função faz algo privilegiado,
 cheque o papel **dentro** dela. Ver `importar_toa`.
 
@@ -106,19 +115,28 @@ cd app && npm install && cp .env.example .env && npm run dev
 Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.
 Sempre `npx tsc --noEmit` antes de commitar.
 
-## Estado atual — 06/09/2026
+## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
 > reais do banco, as 21 migrations, as 26 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: 25 tabelas, 48 policies, **zero tabela sem RLS**. 470 visitas,
-564 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa
-classificados. Sete telas no ar.
+Resumo: **38 tabelas, 74 policies, zero tabela sem RLS**, zero função
+`SECURITY DEFINER` alcançável pelo `anon`. 504 visitas, 610 O.S.,
+89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa, 1.466
+sub-falhas, 1.021 regras de pontuação. **Onze telas no ar.**
 
-**Pendência principal:** pontuação e faturamento — bloqueada por 8
-perguntas em `docs/06-PONTUACAO.md`. Não implemente sem respondê-las.
+**A pontuação deixou de ser bloqueio** (D-045): a regra é combinação de
+O.S. × edificação, derivada do relatório mensal, com 95,4% de cobertura.
+O que falta é `pontos_equipe` — o que a equipe recebe —, que não está em
+nenhum arquivo e depende do Emanuel levantar as Regras de Comissionamento.
+
+**Antes de commitar mudança em RLS, papel ou permissão:**
+
+```sql
+select * from testar_policies();   -- 16 cenários, todos têm que passar
+```
 
 ## Índice da documentação
 

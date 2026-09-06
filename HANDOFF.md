@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **06/09/2026**, por Claude (Opus 5).
+Última atualização: **07/09/2026**, por Claude (Opus 5).
 
 ---
 
@@ -10,7 +10,7 @@ A **AFLINE** presta serviço para a **CLARO** em Manaus e mais 17 praças.
 Hoje opera num sistema de terceiro, o **Alfa Gestor (ngestor)**, que ficou
 caro. Este projeto é o substituto: recebe as ordens de serviço do **TOA
 (Oracle Field Service)** da CLARO, despacha às equipes, recebe a execução
-do campo e mede.
+do campo, mede e pontua.
 
 Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 
@@ -37,10 +37,10 @@ O `.env` já está preenchido e **não** vai para o Git.
 ## Ordem de leitura
 
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
-2. **`docs/08-ESTADO-DO-PROJETO.md`** — onde estamos, com números
+2. **`docs/08-ESTADO-DO-PROJETO.md`** — o inventário, com números do banco
 3. **`docs/03-DECISOES.md`** — as 56 decisões e o porquê de cada uma
 4. **`supabase/README.md`** — banco, conferências e dívida de migrations
-5. **`docs/06-PONTUACAO.md`** — o que está bloqueado e por quê
+5. **`docs/06-PONTUACAO.md`** — como a pontuação foi destravada, e o que sobrou
 
 ---
 
@@ -49,107 +49,125 @@ O `.env` já está preenchido e **não** vai para o Git.
 1. **Não invente regra de negócio. Pergunte.** Ele foi explícito:
    *"não crie nada que achar que é válido, sempre tire dúvida comigo."*
 2. **Derive do dado real.** O de/para de grupo de serviço saiu do
-   cruzamento de dois exports pela WO, não de suposição. Faça igual.
+   cruzamento de dois exports pela WO; a tabela de pontuação saiu do
+   relatório mensal, medida. Faça igual.
 3. **Documente a decisão e o porquê**, em `docs/03-DECISOES.md`.
+
+---
+
+## Antes de commitar qualquer coisa
+
+```bash
+cd app && npx tsc --noEmit && npm run build
+```
+
+```sql
+-- 1. bateria de policy: 16 cenários, todos têm que passar
+select * from testar_policies();
+
+-- 2. nenhuma tabela sem RLS
+select tablename from pg_tables t
+join pg_class c on c.relname = t.tablename
+join pg_namespace n on n.oid = c.relnamespace and n.nspname = t.schemaname
+where t.schemaname = 'public' and not c.relrowsecurity;
+
+-- 3. nenhuma funcao SECURITY DEFINER alcancavel pelo anon
+select p.proname from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.prosecdef
+  and has_function_privilege('anon', p.oid, 'EXECUTE');
+```
+
+As três devem voltar limpas. **Não confie no lint do Supabase** para a
+terceira: ele demora a atualizar.
 
 ---
 
 ## O que está pronto e testado
 
-**Banco:** 26 tabelas, 35 funções, 50 policies, zero tabela sem RLS,
-zero função `SECURITY DEFINER` alcançável pelo `anon`.
+**Banco:** 38 tabelas, 55 funções, 74 policies, zero tabela sem RLS, zero
+`SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde.
 
-**Telas** (todas verificadas com dado real):
+**Onze telas**, todas verificadas com dado real:
 
 | Rota | Estado |
 |---|---|
 | `/entrar` | login |
-| `/controle` | painel do controlador |
-| `/controle/servicos` | lista com 9 filtros + CSV |
-| `/controle/visita/:id` | detalhe com 4 abas + transferência |
+| `/controle` | painel: cartões de situação, volume × pontos, improdutivas por responsabilidade |
+| `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela |
 | `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe |
-| `/controle/importar` | importação do TOA com prévia |
+| `/controle/relatorios` | por contrato e por O.S., com CSV |
+| `/controle/importar` | importação do TOA com prévia e histórico |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
-| `/controle/relatorios` | relatório por contrato e por O.S., com CSV |
 | `/controle/configuracoes` | status, indicadores de qualidade e tabela de pontuação |
 | `/controle/administracao` | usuários, cargos, perfis de acesso e permissões |
+| `/controle/visita/:id` | detalhe completo com histórico e transferência |
 | `/campo` e `/campo/visita/:id` | agenda e execução do técnico |
 
-**Dados:** 470 visitas, 564 O.S., 89 equipes, 104 técnicos, 18 praças,
-168 códigos de baixa classificados. Dois dias: 04 e 05/09/2026.
+**Dados:** 504 visitas, 610 O.S., 89 equipes, 104 técnicos, 18 praças,
+168 códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
+Três dias: 04, 05 e 06/09/2026.
 
 ---
 
-## O que está bloqueado, e por quê
+## O que descobrimos, e que mudou o modelo
 
-### 1. Pontuação e faturamento — o item mais importante
+Isto é o mais importante desta passagem de bastão. Cada item saiu de
+**medir dado real**, não de suposição.
 
-É **dinheiro em duas direções**: o que a CLARO paga e o que a equipe
-recebe, valores diferentes. A regra é
-**tabela de preço × tipo de pessoa × edificação × tipo de O.S.**
+### 1. O mesmo contrato é atendido mais de uma vez (D-041)
 
-**Dois bloqueios:**
+No relatório mensal do ngestor (17.987 linhas): **2.656 contratos
+aparecem com mais de um ID**, e 536 no mesmo dia. Quebrou de manhã, o
+cliente reagendou, foi de novo à tarde — dois atendimentos, dois
+deslocamentos, duas baixas, e o TOA emite **WO nova**.
 
-**a) A fonte não tem duas das quatro dimensões.** ~~Bloqueio~~ **decidido
-em 06/09 (D-030):** o export do ngestor entra também, cruzado pela WO. A
-dependência é aceita e permanente — o objetivo é a camada operacional
-própria, não cortar a fonte.
+Nosso modelo já acertava (`visita.toa_atividade_id` é o atendimento). O
+errado era **um índice único** em `numero_os`, que fazia 8 visitas
+entrarem sem as O.S., em silêncio.
 
-O export do TOA continua sem `Cliente`, `Tipo de pessoa`, `Edificação` e
-`Telefones`. Mas há dois sinais nele que ninguém tinha olhado —
-`Segmentação` (PME, `PURPLE PME PF`) e `Complemento Endereço` (CASA, APT,
-BL, LJ) — que leem 60% dos casos. São **derivações, não o dado**;
-confirmar com o Emanuel antes de valerem para faturamento. Números e as
-três perguntas estão em `docs/06-PONTUACAO.md`.
+### 2. São dois códigos de baixa, e eles divergem (D-042)
 
-**b) Faltam 8 respostas.** Estão listadas no fim daquele documento.
-**Não implemente pontuação sem elas.**
+`Cod. Baixa Operadora` (TOA) e `Código De Baixa` (ngestor) convivem em
+**13.021 linhas**, e discordam com frequência: TOA 425 → 409, TOA 312 →
+106. **A da AFLINE é a que manda no comissionamento.**
 
-### 2. Regras de Comissionamento
+### 3. A pontuação é combinação de O.S. × edificação (D-045)
 
-O Emanuel confirmou que a comissão da equipe sai de lá, aplicada por
-**fatores**. A tela nunca foi aberta. É o próximo levantamento.
+Medido: tirar tipo de pessoa da chave **não muda nada** (94,1% contra
+94,2%); tirar edificação piora nove pontos. Das 105 combinações presentes
+em casa e apartamento, **43 mudam de valor**; das 43 presentes em física
+e jurídica, só 5.
 
-### 3. Sub-falhas — ~~falta a tela~~ ~~falta o arquivo~~ falta ESCOLHER
+> Isso destravou a pontuação. A dimensão que faltava na nossa fonte —
+> tipo de pessoa — era justamente a que menos importa.
 
-O arquivo da CLARO traz **dois** conjuntos, `CASO 1` e `NÍVEL HARD`.
-(A contagem antiga aqui — 114/534 e 155/933 — era de uma cópia mais
-velha; os números medidos no arquivo oficial estão abaixo.)
+### 4. Havia uma escalada de privilégio aberta (D-050)
 
-Os dois já estão no banco (06/09, noite), do arquivo
-`CONSOLIDADO_SUBFALHAS_CLARO_2026_1_0_REVISADO_OFICIAL.xlsx`:
+`perfil_autoedicao` liberava `UPDATE` onde `id = auth.uid()`, para a
+pessoa arrumar o próprio telefone. **RLS não restringe coluna:** com ela,
+qualquer usuário podia trocar o próprio `perfil_acesso_id` e se dar todas
+as permissões. Passou 27 migrations despercebido porque só existia um
+usuário, e ele era ADMIN.
 
-| conjunto | pares | códigos | categorias | sem vínculo |
-|---|--:|--:|--:|--:|
-| CASO 1 | 528 | 115 | 11 | 0 |
-| NÍVEL HARD | 938 | 155 | 17 | 0 |
+### 5. O arquivo de sub-falhas é largo, não longo (D-032)
 
-**Nenhum está marcado como vigente — a escolha é do Emanuel**, no botão
-"Usar este" em `/controle/sub-falhas`. Pode ser trocada depois sem
-reimportar. Enquanto ninguém escolhe, o campo não tem lista de sub-falha
-para oferecer.
-
-O arquivo é **largo** (uma linha por código, `Subfalha 1..7` em colunas)
-— ver D-032. Lido como longo, traria 147 pares em vez de 938.
+Uma linha por código, com `Subfalha 1..7` em colunas. Lido como longo,
+traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ---
 
-## Próximo passo combinado
+## O que está parado, e por quê
 
-Ordem acertada com o Emanuel:
-
-1. ~~Detalhe do contrato~~ **feito**
-1a. ~~Tela de importação das sub-falhas~~ **feita** — `/controle/sub-falhas`
-2. ~~**Equipes expandida**~~ **feita** — painel por dia, com períodos,
-   situações, OCIOSO (D-026/D-033) e cada equipe abrindo os contratos com
-   as O.S. e o código de baixa. Falta ainda `skill` e `pontos`: skill não
-   existe no modelo (lacuna conhecida) e pontos depende da pontuação.
-3. ~~**Marcadores**~~ **feito em parte** — os 7 indicadores de qualidade
-   viraram cadastro, e o analista aponta o marcador no contrato pela tela
-   de Serviços (D-037). Falta combinar quais são **exigidos** por tipo de
-   serviço e se o marcador registra cumprido/não cumprido.
-4. Monitoramento — trajeto, derivável de `visita_evento.lat/lng`
-5. Relatórios — depois que a pontuação existir
+| O quê | Por quê |
+|---|---|
+| **`pontos_equipe`** | O que a equipe recebe **não está em nenhum arquivo que temos** — o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel abrir **Regras de Comissionamento** e dizer se é valor próprio por combinação, percentual sobre o faturado, ou fator. Sem ele não há margem por atendimento nem comissão. |
+| **Abas de equipamento na baixa** | Dependem do almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
+| **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
+| **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
+| **`equipe.skill`** | O sistema atual mostra "SINGLE MASTER"; não modelamos porque não sabemos o domínio. |
+| **34 regras de pontuação marcadas `CONFERIR`** | O relatório traz mais de um valor para a mesma chave — provavelmente tabela de preço diferente. |
+| **448 regras coringa** | Copiam a de CASA quando o endereço não diz a edificação. É o palpite menos ruim, não o dado. |
 
 ---
 
@@ -157,13 +175,9 @@ Ordem acertada com o Emanuel:
 
 | Dívida | Onde |
 |---|---|
-| ~~8 O.S. recusadas~~ **resolvido**: era reatendimento, não duplicata | D-041 |
-| ~~Administração de usuários~~ **feita** (D-049 a D-053) | e a permissão fina entrou nas RPCs, com teste (D-054/D-055) |
-| **`pontos_equipe` vazio** — sem ele não há margem nem comissão | depende das Regras de Comissionamento, que só o Emanuel levanta |
-| Modal de baixa sem Equipamento/Miscelânea | depende do módulo de almoxarifado |
-| 7 migrations aplicadas sem arquivo local | `supabase/README.md` explica como sincronizar |
-| 12 lacunas de modelo (skill, marcadores, geo cerca…) | `docs/07-TELAS-DETALHADAS.md` |
-| Frota, almoxarifado, produtividade, aferição | não iniciados |
+| 7 migrations aplicadas sem arquivo local (`007`, `009`, `016`, `017`, `019`, `021`, `022`) | `supabase/README.md` explica como sincronizar |
+| Permissão fina só nas RPCs, não nas 74 policies | decisão consciente, D-055 — o custo em toda linha não compensa |
+| Estoque, frota, produtividade, aferição | não iniciados |
 | 3 tabelas sem RLS **no outro Supabase**, uma com 183 nomes de técnico | levantado em 04/09, decisão do Emanuel, pendente |
 
 ---
@@ -176,14 +190,19 @@ técnicos de "trabalhar sem cadastro"; três eram login de equipe. Pior: o
 login **muda de dono**, então guardar só o valor corrente corromperia a
 produtividade histórica. Resolvido com `equipe_login_toa` e período.
 
+**Escrevi um teste de policy como `SECURITY DEFINER`.** Definer roda como
+o owner, que tem `BYPASSRLS` — todos os 16 cenários "passavam" sem o RLS
+ser consultado uma vez sequer. Um teste que roda como superusuário é pior
+que nenhum: dá confiança falsa. A versão certa é INVOKER com
+`set local role authenticated`.
+
 **Usei `visita.situacao_em` como hora de encerramento.** Numa visita
 cancelada ele é a hora da IMPORTAÇÃO — a "última atividade" da equipe
-virou 06/09 03:34 para metade da operação. Só vale com `fim`, ou com
-`situacao_em` **quando `bloqueado_em` existe** (o campo tocou). Corrigido
-antes de a tela ir ao ar; ver D-033. É a mesma armadilha do `criado_em`.
+virou 06/09 03:34 para metade da operação. Só vale `fim`, ou
+`situacao_em` quando `bloqueado_em` existe.
 
 **Tentei medir "fila" a partir de `visita.criado_em`.** É a hora da
-importação. Deu 0 min. Da atribuição do TOA deu 878 min — que é a noite
+importação. Deu 0 min. Da atribuição do TOA deu 878 min — a noite
 inteira, já que a atribuição roda 00:23 e o técnico começa 08:00. A
 métrica útil acabou sendo **aderência à janela**.
 
@@ -191,9 +210,11 @@ métrica útil acabou sendo **aderência à janela**.
 nascia travada e o TOA nunca mais a corrigia. A trava tem que significar
 "o campo tocou nisto", e só isso.
 
-**Confiei no lint do Supabase para segurança.** Ele dizia que `anon` ainda
-alcançava `importar_toa` depois de eu revogar. Só a consulta a
-`has_function_privilege` mostrou a verdade — e ela era pior do que o lint
-dizia por outro motivo (concessão nominal vs `PUBLIC`).
+**Esqueci `usuario_papel.escopo` no `definir_papeis`.** É `NOT NULL` sem
+default: o insert morria e o usuário nascia **sem papel nenhum** — um
+login que entra e não vê nada, sem erro visível.
+
+**Confiei no lint do Supabase para segurança.** Só a consulta a
+`has_function_privilege` mostrou a verdade.
 
 > O padrão: **pergunte ao banco, não à ferramenta que resume o banco.**

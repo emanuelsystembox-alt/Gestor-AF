@@ -6,16 +6,27 @@
 | Região | `sa-east-1` (São Paulo — perto de Manaus, importa para o técnico no 4G) |
 | Postgres | 17 |
 
-**26 tabelas · 2 views · 35 funções · 50 policies · zero tabela sem RLS ·
+**38 tabelas · 2 views · 55 funções · 74 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` acessível ao `anon`.**
+
+Desde a migration 029 existe **bateria de teste de policy**. Rode depois
+de qualquer mudança em RLS, papel ou permissão:
+
+```sql
+select * from testar_policies();   -- esperado: passou = true em tudo
+```
 
 ---
 
 ## ⚠ Leia antes de mexer: o banco é a fonte da verdade
 
-**22 migrations estão aplicadas no Supabase.** A pasta `migrations/` tem
-**15 delas**. As restantes (`007`, `009`, `016`, `017`, `019`, `021`,
+**29 migrations estão aplicadas no Supabase.** A pasta `migrations/` tem
+**22 delas**. As restantes (`007`, `009`, `016`, `017`, `019`, `021`,
 `022`) foram aplicadas via MCP e não chegaram a virar arquivo local.
+
+As de 023 a 029 têm arquivo local, mas ele é **consolidado**: o corpo de
+função que foi criado e depois substituído aparece na versão final, com
+NOTA apontando onde mudou. Rodar em ordem reproduz o estado.
 
 Isto é uma dívida conhecida, não um esquecimento silencioso.
 
@@ -46,7 +57,7 @@ conta a história.
 
 ---
 
-## As 22 migrations aplicadas
+## As 29 migrations aplicadas
 
 | # | O que faz | Arquivo local |
 |---|---|---|
@@ -137,10 +148,24 @@ em cada ramo.
 O `equipe_login_toa` duplicou quando espelhei o valor corrente. Índice
 único resolveu.
 
+**RLS não restringe COLUNA.** Uma policy de `UPDATE` liberada por linha
+libera a linha inteira. `perfil_autoedicao` deixava qualquer usuário
+trocar o próprio `perfil_acesso_id` e se dar todas as permissões. Quando
+o alvo é uma coluna, o instrumento é trigger, não policy. Ver D-050.
+
+**Função `SECURITY DEFINER` roda como o owner, que tem `BYPASSRLS`.**
+Um teste de policy escrito como definer não testa policy nenhuma — todos
+os cenários passam porque o RLS nem é consultado. Ver D-054.
+
+**`usuario_papel.escopo` é `NOT NULL` sem default.** Esquecer dele faz o
+usuário nascer sem papel: um login que entra e não enxerga nada, sem erro
+visível. Ver D-052.
+
 ---
 
-## Dados carregados (06/09/2026)
+## Dados carregados (07/09/2026)
 
-1 empresa · 18 praças · 89 equipes · 104 técnicos · 470 visitas ·
-564 O.S. · 168 códigos de baixa · 9 logins TOA mapeados · 2 dias de dado
-(04 e 05/09/2026).
+1 empresa · 18 praças · 89 equipes · 104 técnicos · **504 visitas** ·
+**610 O.S.** · 168 códigos de baixa · **1.466 sub-falhas** ·
+**546 combinações de O.S.** e **1.021 regras de pontuação** ·
+9 logins TOA mapeados · 3 dias de dado (04, 05 e 06/09/2026).

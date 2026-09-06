@@ -1,4 +1,4 @@
-# Estado do projeto — 06/09/2026
+# Estado do projeto — 07/09/2026
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -13,7 +13,7 @@ repositório**, não de memória.
 Camada operacional própria da **AFLINE**, prestadora da **CLARO**, para
 substituir o **Alfa Gestor (ngestor)**. Recebe as ordens de serviço do
 **TOA (Oracle Field Service)** da CLARO, despacha para as equipes, recebe
-a execução do campo e mede.
+a execução do campo, mede e pontua.
 
 Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
@@ -26,6 +26,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 | Banco | Supabase `AFLINE manager` · `kqfflkxjijzdtnfshdlv` · sa-east-1 |
 | Repositório | `github.com/emanuelsystembox-alt/Gestor-AF` |
 | Front-end | Vite + React 18 + TypeScript + Tailwind v4 |
+| Edge Function | `admin-usuarios` — criação de login com `service_role` |
 | Local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
 
 **Fora do escopo:** o Supabase `BANCO PRO - AFLINE 360` é outro projeto
@@ -35,8 +36,14 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**26 tabelas · 2 views · 35 funções · 50 policies · zero tabela sem RLS ·
+**38 tabelas · 2 views · 55 funções · 74 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
+
+E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
+
+```sql
+select * from testar_policies();   -- esperado: passou = true em tudo
+```
 
 ### Estrutura
 
@@ -48,31 +55,40 @@ empresa ─── base (praça) ─── equipe ─── tecnico
                                     ├── evidencia
                                     ├── equipamento_movimento
                                     ├── reincidencia
+                                    ├── visita_marcador
                                     └── visita_evento (auditoria)
 ```
 
-Acesso: `perfil` · `usuario_papel` · `usuario_base` · `carteira`
-Entrada: `importacao` · `importacao_linha`
-Domínios: `tipo_atividade` · `tipo_servico` · `tipo_os` · `codigo_baixa` ·
-`segmentacao` · `categoria_capacidade` · `area_trabalho`
+**Acesso:** `perfil` · `usuario_papel` · `usuario_base` · `carteira` ·
+`cargo` · `perfil_acesso` · `permissao` · `perfil_acesso_permissao`
+
+**Entrada:** `importacao` · `importacao_linha`
+
+**Domínios:** `tipo_atividade` · `tipo_servico` · `tipo_os` ·
+`codigo_baixa` · `sub_falha` · `situacao_visita` · `segmentacao` ·
+`categoria_capacidade` · `area_trabalho` · `indicador_qualidade`
+
+**Dinheiro:** `tabela_preco` · `combinacao_os` · `regra_pontuacao` ·
+`regra_pontuacao_log`
 
 ### Dados carregados
 
 | | |
 |---|---|
-| Empresas | 1 (AFLINE) |
-| Praças | **18** |
+| Empresas | 1 (AFLINE) · Praças **18** |
 | Equipes | **89** · Técnicos **104** · Supervisores 5 |
-| Visitas | **473** (2 dias) — +3 depois do D-041 destravar as recusadas |
-| Ordens de serviço | **570** — 6 delas são a mesma O.S. em dois atendimentos (D-041) |
+| Visitas | **504** em 3 dias (04/09: 344 · 05/09: 129 · 06/09: 31) |
+| Ordens de serviço | **610** |
+| Produtivas × jornada | 349 produtivas · 152 de jornada · 3 sem tipo |
 | Códigos de baixa | **168** classificados |
-| Tipos de O.S. | 37 · Tipos de atividade 20 · Grupos de serviço 8 |
-| Login TOA mapeado | 9 equipes |
-| Sub-falhas | **1.466 importadas**: CASO 1 (528) e NÍVEL HARD (938) — falta escolher qual vale |
-| Eventos de auditoria | 472 |
-
-**339 das 470 visitas têm equipe.** As 131 restantes: 124 são jornada sem
-login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
+| Sub-falhas | **1.466** — CASO 1 (528) e NÍVEL HARD (938) |
+| Conjunto vigente | **NÍVEL HARD** |
+| Indicadores de qualidade | **7** |
+| Combinações de O.S. | **546** · Regras de pontuação **1.021** |
+| Cobertura da pontuação | **95,4%** das produtivas · 386,06 pontos |
+| Cargos / perfis de acesso / permissões | 10 / 6 / 26 |
+| Usuários com login | **1** (o admin) |
+| Eventos de auditoria | 508 |
 
 ---
 
@@ -98,12 +114,12 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | 021 | **Login TOA da equipe, com histórico por período** |
 | 022 | Sub-falha, histórico completo e transferência de equipe |
 | 023 | Escolha do conjunto de sub-falha vigente + resumo por conjunto |
-| 024 | **Painel de equipes por dia** com períodos, situações e OCIOSO (D-033) |
-| 025 | **Cadastro de situação**, indicadores de qualidade e `visita_marcador` (D-036/D-037) |
-| 026 | **Reatendimento** (D-041), **dupla baixa** TOA×AFLINE com sub-falha (D-042), exclusão arquivada (D-043) |
-| 027 | **Pontuação por combinação de O.S. × edificação** (D-045): 546 combinações, 1.021 regras, 95,1% de cobertura |
-| 028 | **Administração**: cargo, perfil de acesso, 26 permissões, e o **fecho da escalada de privilégio** (D-050) |
-| 029 | **`testar_policies()`**: 16 cenários verdes + permissão fina nas RPCs (D-054/D-055) |
+| 024 | **Painel de equipes por dia** com períodos, situações e OCIOSO |
+| 025 | **Cadastro de situação**, indicadores de qualidade e `visita_marcador` |
+| 026 | **Reatendimento**, **dupla baixa** TOA×AFLINE com sub-falha, exclusão arquivada |
+| 027 | **Pontuação por combinação de O.S. × edificação** |
+| 028 | **Administração**: cargo, perfil de acesso, permissões, fecho da escalada |
+| 029 | **`testar_policies()`** (16 cenários) + permissão fina nas RPCs |
 
 ---
 
@@ -112,116 +128,88 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | Rota | O que faz |
 |---|---|
 | `/entrar` | Login com identidade AFLINE |
-| `/controle` | Painel: indicadores, distribuição, **improdutivas por responsabilidade**, encerramentos por hora, motivos, tempo por etapa, equipes, tabela por grupo com CSV |
-| `/controle/servicos` | Lista com **9 filtros combináveis**, duas densidades (a padrão traz O.S. e código de baixa na linha), intervalo de datas, exportação |
-| `/controle/equipes` | **Painel por dia**: contratos, períodos, situações, OCIOSO, e cada equipe abre mostrando os contratos com as O.S. e a baixa |
-| `/controle/importar` | Upload da planilha do TOA com prévia |
-| `/controle/sub-falhas` | Importação dos conjuntos de sub-falha, com mapeamento de coluna, e escolha do conjunto vigente |
-| `/campo` | Agenda do técnico (clara, alto contraste) |
-| `/controle/visita/:id` | **Detalhe do contrato**: cliente, atendimento, O.S. com responsável, histórico com sub-falha, anexos, serviços anteriores, transferência |
-| `/campo/visita/:id` | Execução: rota, baixa por O.S., mudança de situação com GPS |
-| `/controle/relatorios` | **Relatório por contrato e por O.S.**, com filtros múltiplos e CSV; marca a primeira O.S. do endereço (D-038) |
-| `/controle/configuracoes` | **Status** (cor, rótulo, ordem, alerta), **indicadores de qualidade** e **tabela de pontuação** (1.021 regras editáveis) |
-| `/controle/administracao` | **Usuários, cargos e perfis de acesso**, com matriz de permissões e criação de login por Edge Function |
+| `/controle` | Painel: cartões de situação, **volume × pontos** por tipo de serviço, improdutivas por responsabilidade, encerramentos por hora, tempo por etapa, CSV |
+| `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito e **contrato em janela** |
+| `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, e os contratos de cada equipe |
+| `/controle/relatorios` | Relatório **por contrato** e **por O.S.**, com filtros e CSV; marca a primeira O.S. do endereço |
+| `/controle/importar` | Importação do TOA com prévia e **histórico com log** |
+| `/controle/sub-falhas` | Importa os conjuntos da CLARO (arquivo largo) e escolhe o vigente |
+| `/controle/configuracoes` | Status, indicadores de qualidade e **tabela de pontuação** (1.021 regras) |
+| `/controle/administracao` | Usuários, cargos, perfis de acesso e matriz de permissões |
+| `/controle/visita/:id` | Detalhe completo do contrato, com histórico e transferência |
+| `/campo` e `/campo/visita/:id` | Agenda e execução do técnico (tema claro, alvo de toque 48px) |
 
 ---
 
-## As 56 decisões, resumidas
+## As 56 decisões
 
-> D-030 (a dependência do ngestor é aceita e permanente) e D-031 (a tela
-> de sub-falhas não escolhe o conjunto por ninguém) foram tomadas em
-> 06/09 à tarde — estão em `docs/03-DECISOES.md`.
+Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
+**Modelagem** — D-001 visita 1→N O.S. · D-013 cabeçalho repetido lido por
+posição · D-019 multi-empresa · D-024/025 login TOA é da equipe e muda de
+dono · D-027 sub-falha é o segundo nível da causa · D-032 o arquivo da
+CLARO é largo, não longo · **D-041 o mesmo contrato é atendido mais de
+uma vez** · **D-042 são dois códigos de baixa, e eles divergem** · D-036 a
+situação virou cadastro sem virar chave estrangeira
 
-**Modelagem**
-D-001 visita 1→N O.S. · D-005 atribuição à equipe com responsável ·
-D-009 consumo de material por O.S. (novo) · D-013 cabeçalho repetido lido
-por posição · D-019 multi-empresa · D-021 isolamento em dois cercos ·
-D-024/D-025 login TOA é da equipe e muda de dono · D-027 sub-falha é o
-segundo nível da causa · D-028 o histórico carimba a equipe do momento
+**Dinheiro** — D-018 recálculo retroativo · **D-045 a pontuação é
+combinação de O.S. × edificação** · D-038 relatório por contrato e por
+O.S. são leituras diferentes · D-057 volume e pontos também
 
-**Operação**
-D-002 login individual · D-003 Monitor = Controlador · D-004 importação
-várias vezes ao dia · D-006 o campo vence o TOA · D-007 o que o técnico
-não vê · D-008 sem modo offline · D-026 ocioso = 10 min
+**Segurança** — D-015 `SECURITY DEFINER` checa papel por dentro · D-016
+`revoke from public` não remove concessão nominal · **D-050 autoedição
+não pode mudar o que dá poder** · D-051 criar login passa por Edge
+Function · **D-054 teste de policy vem antes de mexer em policy** ·
+**D-055 papel é a barreira, permissão é a granularidade**
 
-**Produto**
-D-029 carga sob demanda por causa do técnico no 4G · D-011 duas linguagens visuais · D-012 MVP = núcleo de O.S. ·
-D-014 a trava só arma em ação de campo
-
-**Segurança**
-D-015 `SECURITY DEFINER` checa papel por dentro · D-016 `revoke from
-public` não remove concessão nominal · D-017 `search_path` fixo
-
-**Dinheiro**
-D-010 abastecimento com foto · D-018 recálculo retroativo (escolha do
-Emanuel) · D-020 comissão vem de Regras de Comissionamento por fatores
+**Produto** — D-011 duas linguagens visuais · D-029 carga sob demanda por
+causa do técnico no 4G · D-043 excluir é arquivar · D-056 o contrato abre
+em janela
 
 ---
 
 ## Defeitos do sistema atual que já corrigimos
 
 1. **Código de baixa duplicado por caixa.** `409 - Servico Concluido` e
-   `409 - SERVICO CONCLUIDO` eram contados separados. Agora `codigo` é
-   inteiro.
-2. **Supervisor como texto livre.** Três grafias da mesma pessoa
-   (`SUPERVISOR - X`, `SUP. X`, `SUPERVISOR X`) unificadas.
-3. **Visita achatada em O.S.** Contava deslocamento em dobro — e impede
-   calcular faturamento, porque não sabe qual O.S. foi a primeira do
-   endereço (deslocamento × agregada).
-4. **Jornada dentro da produtividade.** 144 de 470 são `Na Base` e
-   `Refeição`; dentro da conta derrubam a taxa de conclusão.
-5. **Improdutiva sem responsável.** O ngestor lista o motivo e não diz de
-   quem é a culpa.
+   `409 - SERVICO CONCLUIDO` eram contados separado.
+2. **Supervisor como texto livre.** Três grafias da mesma pessoa.
+3. **Visita achatada em O.S.** Contava deslocamento em dobro.
+4. **Jornada dentro da produtividade.** 152 de 504 são `Na Base` e
+   `Refeição`.
+5. **Improdutiva sem responsável.** O ngestor diz o motivo, não de quem
+   é a culpa.
+6. **Erro de importação invisível.** 8 O.S. eram recusadas em silêncio;
+   o log revelou e o D-041 corrigiu a causa.
 
 ---
 
 ## O que descobrimos sobre o negócio
 
 - **Uma visita carrega até 10 O.S.** O caso mais comum são 2.
+- **O mesmo contrato é atendido mais de uma vez** — 2.656 casos em 17.987
+  linhas do relatório mensal. Quebrou de manhã, o cliente reagendou, foi
+  de novo à tarde: dois atendimentos, dois deslocamentos, duas baixas, e
+  o TOA emite WO nova.
+- **A pontuação é combinação de O.S. × edificação.** Tipo de pessoa quase
+  não influencia: das 43 combinações presentes em física e jurídica, só 5
+  mudam de valor; das 105 presentes em casa e apartamento, 43 mudam.
+- **São dois códigos de baixa**, e eles divergem em 13.021 das 17.987
+  linhas. A da AFLINE é a que manda no comissionamento.
 - **A LPU distingue DESLOCAMENTO de AGREGADA.** A primeira O.S. do
   endereço paga cheio; as demais, reduzido.
-- **A LPU tem itens negativos.** Retorno de Credenciada é **desconto** —
-  e teve a pior conclusão do dia 04/09: 51,6%.
-- **Pontuação = dinheiro em duas direções**: o que a CLARO paga e o que a
-  equipe recebe, valores diferentes.
-- **A regra é** tabela de preço × tipo de pessoa × edificação × tipo de O.S.
-- **`ITEM`/`CONSOLID`/`VALOR`/`PONTOS` são por O.S.**, não por visita.
-
-### Números do dia 04/09/2026
-241 visitas produtivas · 428 O.S. · conclusão 75,9% · **84,8% dentro da
-janela** · 65 improdutivas, das quais **zero por nossa conta** (41
-cliente · 14 operadora · 10 rede).
+- **Retorno de Credenciada é desconto**, e teve a pior taxa de conclusão
+  do dia 04/09: 51,6%.
 
 ---
 
-## Pendências
+## O que falta, e por quê
 
-### Bloqueadas por resposta do Emanuel
-- **Pontuação e faturamento** — 8 perguntas em `06-PONTUACAO.md`
-- **Regras de Comissionamento** — tela não aberta ainda; é de lá que saem
-  os fatores da comissão
-
-### Lacunas de modelo (de `07-TELAS-DETALHADAS.md`)
-skill e despacho por competência · equipe ociosa · marcadores ·
-sub-falha · observação no evento · transferência de equipe ·
-item/consolid/valor/pontos · indicadores de qualidade · anexos com
-autoria · geo cerca e garagem
-
-### Fases não iniciadas
-frota · almoxarifado · produtividade · aferição · relatórios
-
-### Segurança fora deste projeto
-O `BANCO PRO - AFLINE 360` tem 3 tabelas sem RLS, uma com **183 nomes de
-técnico expostos**. Levantado em 04/09, decisão do Emanuel, ainda pendente.
-
----
-
-## Ordem proposta para as próximas telas
-
-1. **Detalhe do contrato** — onde tudo converge: O.S., histórico com
-   sub-falha, anexos, marcadores
-2. **Equipes expandida** — ocioso, login On/Off, skill, pontos, períodos
-3. **Marcadores** — evidências exigidas por tipo de serviço
-4. **Monitoramento** — trajeto, derivável de `visita_evento`
-5. **Relatórios** — depois que a pontuação existir
+| O quê | Por que está parado |
+|---|---|
+| **`pontos_equipe`** | Não é derivável de nenhum arquivo que temos: o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel levantar **Regras de Comissionamento**. Sem ele não há margem por atendimento nem comissão. |
+| **Abas de equipamento no modal de baixa** | Dependem do módulo de almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
+| **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
+| **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
+| **`equipe.skill`** | O sistema atual mostra "SINGLE MASTER"; não modelamos porque não sabemos o domínio. |
+| **7 migrations sem arquivo local** | Dívida conhecida; `supabase/README.md` explica como sincronizar. |
+| Estoque, frota, produtividade, aferição | Fase 2 |
