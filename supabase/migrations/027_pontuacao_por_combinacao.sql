@@ -81,3 +81,8 @@ create table if not exists regra_pontuacao_log (
 
 -- Funções: assinatura_da_visita, edificacao_da_visita, pontos_da_visita,
 -- pontos_por_periodo. Ver o banco para o corpo consolidado (027b/027c).
+
+-- A funcao de trigger nasceu com EXECUTE concedido nominalmente ao anon,
+-- como toda funcao criada em `public` (ver CLAUDE.md). A conferencia com
+-- has_function_privilege pegou; o lint nao teria pegado a tempo.
+revoke all on function regra_pontuacao_registra() from public, anon;
