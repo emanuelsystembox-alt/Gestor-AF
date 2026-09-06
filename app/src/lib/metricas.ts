@@ -30,7 +30,7 @@ export interface Visita {
   fim: string | null
   tempo_deslocamento: string | null
   tipo_atividade: { nome: string; natureza: string } | null
-  tipo_servico: { nome: string } | null
+  tipo_servico: { nome: string; prioridade: number } | null
   area: { codigo: string } | null
   equipe: { codigo: string; nome: string } | null
   tecnico: { nome: string; matricula: string } | null
@@ -211,7 +211,26 @@ export function calcular(visitas: Visita[], agora = new Date()) {
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 8)
 
-  // ---------- por tipo de serviço ----------
+  // ---------- por GRUPO DE SERVIÇO (agrupamento de negócio) ----------
+  // Diferente de tipo_atividade: este é como a operação e a CLARO
+  // enxergam. Derivado do cruzamento TOA × ngestor (ver migration 014).
+  const grupos = new Map<string, { total: number; andamento: number; concluido: number; improd: number; imped: number; prio: number }>()
+  for (const v of produtivas) {
+    const k = v.tipo_servico?.nome ?? '(sem grupo)'
+    const g = grupos.get(k) ?? { total: 0, andamento: 0, concluido: 0, improd: 0, imped: 0, prio: v.tipo_servico?.prioridade ?? 99 }
+    g.total++
+    if (v.situacao === 'CONCLUIDA') {
+      if (v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')) g.improd++
+      else g.concluido++
+    } else if (v.situacao === 'COM_IMPEDIMENTO') g.imped++
+    else if (v.situacao !== 'CANCELADA') g.andamento++
+    grupos.set(k, g)
+  }
+  const porGrupo = [...grupos.entries()]
+    .map(([grupo, g]) => ({ tipo: grupo, ...g, pct: g.total ? (g.concluido / g.total) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total)
+
+  // ---------- por tipo de atividade (nomenclatura do TOA) ----------
   const tipos = new Map<string, { total: number; andamento: number; concluido: number; improd: number; imped: number }>()
   for (const v of produtivas) {
     const k = v.tipo_atividade?.nome ?? '(sem tipo)'
@@ -249,6 +268,7 @@ export function calcular(visitas: Visita[], agora = new Date()) {
     porResponsabilidade,
     motivos,
     horas, hConcluido, hImprodutivo, hImpedimento,
+    porGrupo,
     etapas, gargalo, pctNaJanela, dentroDaJanela, comJanela,
     equipes,
     porTipo,

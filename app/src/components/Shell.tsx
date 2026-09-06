@@ -8,7 +8,7 @@ interface Item { para: string; rotulo: string; contagem?: number; futuro?: boole
 const OPERACAO: Item[] = [
   { para: '/controle', rotulo: 'Dashboard' },
   { para: '/controle/servicos', rotulo: 'Serviços' },
-  { para: '/controle/equipes', rotulo: 'Equipes', futuro: true },
+  { para: '/controle/equipes', rotulo: 'Equipes' },
   { para: '/controle/produtividade', rotulo: 'Produtividade', futuro: true },
 ]
 const ENTRADA: Item[] = [

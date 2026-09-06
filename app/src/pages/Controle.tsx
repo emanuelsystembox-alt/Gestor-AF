@@ -14,7 +14,7 @@ const SELECT = `
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
-  tipo_servico:tipo_servico_id ( nome ),
+  tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo ),
   equipe:equipe_id ( codigo, nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula ),
@@ -63,6 +63,7 @@ export default function Controle() {
   const [equipe, setEquipe] = useState('TODAS')
   const [tipo, setTipo] = useState('TODOS')
   const [semEquipe, setSemEquipe] = useState(false)
+  const [porGrupo, setPorGrupo] = useState(true)
 
   const [linhas, setLinhas] = useState<Visita[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -334,13 +335,18 @@ export default function Controle() {
               </Painel>
 
               {/* ================= por tipo ================= */}
-              <Painel titulo="Visitas por tipo de atividade"
-                extra={
+              <Painel titulo={porGrupo ? 'Visitas por grupo de serviço' : 'Visitas por tipo de atividade (TOA)'}
+                extra={<>
+                  <button onClick={() => setPorGrupo(g => !g)}
+                    className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
+                    {porGrupo ? 'ver tipo do TOA' : 'ver grupo de serviço'}
+                  </button>
+                  {
                   <button onClick={baixarCSV}
                     className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
                     Exportar CSV
-                  </button>
-                }>
+                  </button>}
+                </>}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -355,7 +361,7 @@ export default function Controle() {
                       </tr>
                     </thead>
                     <tbody>
-                      {m.porTipo.map(t => (
+                      {(porGrupo ? m.porGrupo : m.porTipo).map(t => (
                         <tr key={t.tipo} className="border-b border-graf-800/60">
                           <td className="px-2 py-1.5 text-graf-200">{t.tipo}</td>
                           <td className="tabular px-2 py-1.5 text-right">{t.total}</td>
