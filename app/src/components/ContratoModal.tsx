@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
+import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -88,43 +89,6 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null)
 const quando = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'
-
-/**
- * O histórico é o que o sistema atual mostra em "Histórico": uma linha
- * por etapa, com quem fez. `tipo` é código; a operação lê nome.
- */
-const EVENTO_ROTULO: Record<string, string> = {
-  IMPORTADA:       'Entrada — importada do TOA',
-  SITUACAO:        'Mudança de situação',
-  CONFLITO_TOA:    'Conflito com o TOA',
-  BAIXA:           'Baixa de serviço',
-  TRANSFERENCIA:   'Transferência de equipe',
-  REVERSAO:        'Contrato voltado',
-  EXCLUIDA:        'Excluído',
-  RESTAURADA:      'Restaurado',
-  CADASTRO_MANUAL: 'Cadastrado à mão',
-  EDICAO_CADASTRO: 'Edição de cadastro',
-  OS_ADICIONADA:   'O.S. acrescentada',
-  OS_REMOVIDA:     'O.S. removida',
-  DESLOCAMENTO:    'Saiu para o endereço',
-  CHECKIN:         'Chegou e iniciou',
-  IMPEDIMENTO:     'Registrou impedimento',
-  CONCLUSAO:       'Finalizou a visita',
-}
-
-/** "de → para" legível. Situação vira rótulo; o resto sai como está. */
-function transicao(e: { de: Record<string, unknown> | null
-                        para: Record<string, unknown> | null }): string | null {
-  const rot = (o: Record<string, unknown> | null) => {
-    if (!o) return null
-    const s = o.situacao
-    if (typeof s === 'string') return SITUACAO_INFO[s as Situacao]?.label ?? s
-    return Object.entries(o).map(([k, x]) => `${k}: ${String(x)}`).join(', ')
-  }
-  const a = rot(e.de), b = rot(e.para)
-  if (a && b) return `${a} → ${b}`
-  return b ?? a
-}
 
 function corBaixa(n: string | null | undefined) {
   if (n === 'SUCESSO') return 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/40'
@@ -809,9 +773,9 @@ export function ContratoModal({
                           {quando(e.criado_em)}
                         </td>
                         <td className="px-2 py-1.5 font-medium">
-                          {EVENTO_ROTULO[e.tipo] ?? e.tipo}
+                          {rotuloEvento(e.tipo)}
                         </td>
-                        <td className="px-2 py-1.5 text-graf-300">{transicao(e) ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-300">{transicaoEvento(e) ?? '—'}</td>
                         <td className="px-2 py-1.5 text-graf-300">
                           {e.codigo_baixa
                             ? `${e.codigo_baixa.codigo} · ${e.codigo_baixa.descricao}` : '—'}

@@ -105,12 +105,17 @@ export interface VisitaLinha {
   visita_marcador: { indicador_id: string; cumprido: boolean | null }[]
   equipamento_movimento: { operacao: string; serial: string
                            tipo: string | null; modelo: string | null }[]
-  reincidencia: {
-    dias_desde: number | null
-    anterior: { data_agendada: string } | null
-    equipe_anterior: { codigo: string } | null
-    baixa_anterior: { codigo: number; descricao: string } | null
-  }[]
+  // `reincidencia` tem UNIQUE(visita_id), e por isso o PostgREST a trata
+  // como um-para-um: vem OBJETO ou null, não array. Tratar como array
+  // rebentava a tela inteira em `reincidencia[0]`.
+  reincidencia: Reincidencia | Reincidencia[] | null
+}
+
+interface Reincidencia {
+  dias_desde: number | null
+  anterior: { data_agendada: string } | null
+  equipe_anterior: { codigo: string } | null
+  baixa_anterior: { codigo: number; descricao: string } | null
 }
 
 export interface PontoVisita {
@@ -246,7 +251,9 @@ function linhaVisita(v: VisitaLinha): string[] {
   const retr = v.equipamento_movimento.filter(e => e.operacao === 'RETIRADO')
   const eq = (l: typeof inst) =>
     l.map(e => [e.serial, e.tipo, e.modelo].filter(Boolean).join(' - ')).join(' | ')
-  const r = v.reincidencia[0]
+  const r: Reincidencia | null = Array.isArray(v.reincidencia)
+    ? v.reincidencia[0] ?? null
+    : v.reincidencia
 
   return [
     v.base?.nome ?? '',

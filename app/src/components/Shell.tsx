@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
+import { useTema } from '../lib/tema'
 import { Marca } from './ui'
 
 interface Item { para: string; rotulo: string; contagem?: number; futuro?: boolean }
@@ -66,6 +67,7 @@ function Grupo({ titulo, itens }: { titulo: string; itens: Item[] }) {
 
 export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactNode }) {
   const { perfil, papeis, sair } = useAuth()
+  const [tema, setTema] = useTema()
 
   return (
     <div className="sup-controle flex min-h-screen">
@@ -93,6 +95,14 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
             </span>
             <div className="ml-auto flex items-center gap-3">
               {acoes}
+              <button
+                onClick={() => setTema(tema === 'escuro' ? 'claro' : 'escuro')}
+                title={tema === 'escuro' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+                aria-label="Alternar tema"
+                className="rounded-md border border-graf-700 px-2 py-1 text-xs text-graf-400
+                           hover:border-af-600 hover:text-af-400">
+                {tema === 'escuro' ? '☀' : '☾'}
+              </button>
               <div className="hidden text-right sm:block">
                 <div className="text-xs font-medium leading-tight">{perfil?.nome ?? '—'}</div>
                 <div className="text-[10px] leading-tight text-graf-500">

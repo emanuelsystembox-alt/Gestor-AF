@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
+import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Pill } from '../components/ui'
 
 interface OS {
@@ -12,7 +13,7 @@ interface OS {
                   natureza: string; responsabilidade: string | null } | null
 }
 interface Evento {
-  id: number; tipo: string; observacao: string | null
+  id: number; tipo: string; observacao: string | null; login: string | null
   de: Record<string, unknown> | null; para: Record<string, unknown> | null
   lat: number | null; lng: number | null; origem: string | null; criado_em: string
   equipe: { codigo: string } | null
@@ -108,7 +109,7 @@ export default function VisitaDetalhe() {
 
     const [ev, an, eq] = await Promise.all([
       supabase.from('visita_evento')
-        .select(`id, tipo, observacao, de, para, lat, lng, origem, criado_em,
+        .select(`id, tipo, observacao, login, de, para, lat, lng, origem, criado_em,
                  equipe:equipe_id ( codigo ),
                  usuario:usuario_id ( nome ),
                  sub_falha:sub_falha_id ( nome, categoria ),
@@ -424,6 +425,7 @@ export default function VisitaDetalhe() {
                       <th className="px-3 py-2 font-medium">Equipe</th>
                       <th className="px-3 py-2 font-medium">Observação</th>
                       <th className="px-3 py-2 font-medium">Quem</th>
+                      <th className="px-3 py-2 font-medium">Login</th>
                       <th className="px-3 py-2 text-center font-medium">Geo</th>
                     </tr>
                   </thead>
@@ -435,11 +437,11 @@ export default function VisitaDetalhe() {
                         </td>
                         <td className="px-3 py-2">
                           <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[11px] font-medium">
-                            {e.tipo.replace(/_/g, ' ').toLowerCase()}
+                            {rotuloEvento(e.tipo)}
                           </span>
-                          {e.de && e.para && (
+                          {transicaoEvento(e) && (
                             <div className="mt-1 text-[11px] text-graf-500">
-                              {Object.values(e.de).join(', ') || '—'} → {Object.values(e.para).join(', ')}
+                              {transicaoEvento(e)}
                             </div>
                           )}
                         </td>
@@ -467,6 +469,11 @@ export default function VisitaDetalhe() {
                         <td className="px-3 py-2 text-xs text-graf-400">
                           {e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
                           {e.origem && <div className="text-[10px] text-graf-600">{e.origem.toLowerCase()}</div>}
+                        </td>
+                        {/* O login do TOA quando o evento veio da planilha; o
+                            e-mail de quem operou quando veio da tela. */}
+                        <td className="px-3 py-2 text-xs text-graf-400">
+                          {e.login ?? <span className="text-graf-600">—</span>}
                         </td>
                         <td className="px-3 py-2 text-center">
                           {e.lat && e.lng ? (

@@ -84,14 +84,92 @@ body {
   border-radius: 0.5rem;
 }
 
-/* ---------- Superfície CAMPO (clara, alto contraste) ---------- */
+/* ============================================================
+   CONTROLE EM TEMA CLARO
+   ------------------------------------------------------------
+   Nenhum componente foi reescrito para isto. `bg-graf-900` continua
+   `bg-graf-900`; o que muda é QUANTO VALE graf-900. Redefinindo as
+   variáveis de cor dentro de `.sup-controle`, a rampa inteira inverte
+   e as ~1.200 classes utilitárias já escritas seguem junto.
+
+   O seletor é `[data-tema="claro"] .sup-controle`, não `:root`, e a
+   razão é dura: o CAMPO usa a mesma rampa (`bg-graf-50`,
+   `border-graf-200`) esperando os valores CLAROS. Invertê-los no
+   documento inteiro pintaria o fundo do técnico de preto. O campo não
+   tem tema — é claro por condição de trabalho (D-011), não por gosto.
+
+   Só a faixa que serve de TINTA e de TEXTO inverte. As 500/600 são as
+   cores de ação (botão vermelho, botão verde) e ficam onde estão: um
+   botão primário tem de ser saturado nos dois temas.
+   ============================================================ */
+[data-tema="claro"] .sup-controle {
+  /* grafite: inversão completa da rampa */
+  --color-graf-950: #ffffff;
+  --color-graf-900: #f4f6f8;
+  --color-graf-850: #ffffff;
+  --color-graf-800: #e4e7ec;
+  --color-graf-700: #d3d8e0;
+  --color-graf-600: #aeb6c4;
+  --color-graf-500: #7c869a;
+  --color-graf-400: #5b6577;
+  --color-graf-300: #3a4150;
+  --color-graf-200: #262b35;
+  --color-graf-100: #14171c;
+  --color-graf-50:  #0f1115;
+
+  /* marca: 200-400 viram texto escuro; 700-900 viram tinta clara */
+  --color-af-900: #fde3e5;
+  --color-af-800: #fbccd0;
+  --color-af-700: #f7a5ac;
+  --color-af-400: #b01e25;
+  --color-af-300: #921c22;
+  --color-af-200: #7a1d22;
+
+  /* verde de sucesso */
+  --color-emerald-900: #d1fae5;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-400: #047857;
+  --color-emerald-300: #047857;
+  --color-emerald-200: #065f46;
+
+  /* âmbar de atenção */
+  --color-amber-900: #fef3c7;
+  --color-amber-800: #fde68a;
+  --color-amber-700: #fcd34d;
+  --color-amber-400: #b45309;
+  --color-amber-300: #b45309;
+  --color-amber-200: #92400e;
+
+  /* azul de marcador */
+  --color-sky-900: #e0f2fe;
+  --color-sky-700: #7dd3fc;
+  --color-sky-400: #0369a1;
+  --color-sky-300: #0369a1;
+
+  color-scheme: light;
+}
+
+/* No claro a etiqueta escurece o texto em vez de clarear — mesma razão
+   do campo: contraste é contra o FUNDO, e o fundo virou branco. */
+[data-tema="claro"] .sup-controle .pill {
+  color: color-mix(in srgb, var(--pill-cor) 80%, black 20%);
+}
+
+/* Sombra dá o relevo que a borda dava no escuro. */
+[data-tema="claro"] .sup-controle .card-controle {
+  box-shadow: 0 1px 2px rgb(15 17 21 / 0.05), 0 1px 3px rgb(15 17 21 / 0.04);
+}
+
+/* ---------- Superfície CAMPO (clara, alto contraste) ----------
+   Valores literais de propósito: o campo não pode depender de uma
+   variável que o tema do controle move. */
 .sup-campo {
   background: #ffffff;
-  color: var(--color-graf-950);
+  color: #0f1115;
 }
 .card-campo {
   background: #ffffff;
-  border: 1px solid var(--color-graf-200);
+  border: 1px solid #c8cdd6;
   border-radius: 0.875rem;
   box-shadow: 0 1px 2px rgb(15 17 21 / 0.06), 0 2px 8px rgb(15 17 21 / 0.04);
 }
