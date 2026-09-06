@@ -101,6 +101,7 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | 024 | **Painel de equipes por dia** com períodos, situações e OCIOSO (D-033) |
 | 025 | **Cadastro de situação**, indicadores de qualidade e `visita_marcador` (D-036/D-037) |
 | 026 | **Reatendimento** (D-041), **dupla baixa** TOA×AFLINE com sub-falha (D-042), exclusão arquivada (D-043) |
+| 027 | **Pontuação por combinação de O.S. × edificação** (D-045): 546 combinações, 1.021 regras, 95,1% de cobertura |
 
 ---
 
@@ -118,11 +119,11 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | `/controle/visita/:id` | **Detalhe do contrato**: cliente, atendimento, O.S. com responsável, histórico com sub-falha, anexos, serviços anteriores, transferência |
 | `/campo/visita/:id` | Execução: rota, baixa por O.S., mudança de situação com GPS |
 | `/controle/relatorios` | **Relatório por contrato e por O.S.**, com filtros múltiplos e CSV; marca a primeira O.S. do endereço (D-038) |
-| `/controle/configuracoes` | **Status** (cor, rótulo, ordem, alerta) e **indicadores de qualidade** (meta, peso) |
+| `/controle/configuracoes` | **Status** (cor, rótulo, ordem, alerta), **indicadores de qualidade** e **tabela de pontuação** (1.021 regras editáveis) |
 
 ---
 
-## As 43 decisões, resumidas
+## As 47 decisões, resumidas
 
 > D-030 (a dependência do ngestor é aceita e permanente) e D-031 (a tela
 > de sub-falhas não escolhe o conjunto por ninguém) foram tomadas em

@@ -279,3 +279,41 @@ faturamento, é preciso confirmar com o Emanuel:
 > TOA, dá para medir se a derivação acerta — e quanto. É o mesmo método
 > que produziu o de/para de grupo de serviço (D-014). **Basta o arquivo
 > do ngestor.**
+
+
+---
+
+## 07/09 (madrugada) — DESTRAVADO: a regra é combinação de O.S. × edificação
+
+O relatório mensal (`ANALISE GESTOR - MENSAL/_14-07-2026_23-22.xlsx`,
+17.987 linhas, 14.512 com pontuação) respondeu o que faltava:
+
+- **combinação × edificação × pessoa** → 674 chaves, 94,2% com um valor só
+- **combinação × edificação** (sem pessoa) → 579 chaves, **94,1%**
+- **combinação × pessoa** (sem edificação) → 527 chaves, 85,4%
+
+Tirar tipo de pessoa não muda nada. Tirar edificação piora.
+
+Das 105 combinações presentes em CASA e APTO, **43 mudam de valor**.
+Das 43 presentes em FISICA e JURIDICA, **5 mudam**.
+
+> **O bloqueio "a fonte não tem duas das quatro dimensões" caiu pela
+> metade.** A dimensão que faltava — tipo de pessoa — é a que menos
+> importa. Edificação a gente deriva do complemento do endereço.
+
+Construído: `tabela_preco`, `combinacao_os`, `regra_pontuacao` e
+`regra_pontuacao_log` (migration 027), com 546 combinações e 1.021 regras
+semeadas do relatório. Tela em Configurações → Pontuação, editável por
+ADMIN. Cobertura de 95,1% nas visitas produtivas.
+
+### O que continua em aberto
+
+1. **`pontos_equipe` está vazio** — é o que a equipe recebe, e nunca foi
+   levantado. Sem ele não há margem por atendimento nem comissão.
+2. **34 regras marcadas `CONFERIR`** — o relatório traz mais de um valor
+   para a mesma chave. Provavelmente tabelas de preço diferentes.
+3. **448 regras coringa** copiam a de CASA quando o endereço não diz a
+   edificação. É o palpite menos ruim, não o dado.
+4. **DESLOCAMENTO × AGREGADA** ainda não entrou no cálculo. O relatório
+   por O.S. já marca qual foi a primeira do endereço.
+5. As perguntas 1, 4, 5, 6, 7 e 8 da lista acima continuam de pé.

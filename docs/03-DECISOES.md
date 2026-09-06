@@ -624,3 +624,65 @@ TOA**, sem histórico nenhum.
 ### D-044 · Botão direito abre as ações do contrato
 O menu do contrato responde ao clique direito, além do `⋯`. É como o COP
 já trabalha no sistema atual.
+
+### D-045 · A pontuação é COMBINAÇÃO DE O.S. × EDIFICAÇÃO
+Medido no relatório mensal do ngestor (17.987 linhas, 14.512 com
+pontuação):
+
+| chave | chaves distintas | com um valor só |
+|---|--:|--:|
+| combinação × edificação × pessoa | 674 | **94,2%** |
+| combinação × edificação | 579 | **94,1%** |
+| combinação × pessoa | 527 | 85,4% |
+
+Tirar o tipo de pessoa **não muda nada**; tirar a edificação piora nove
+pontos. E olhando combinação a combinação:
+
+- das **105** que aparecem em CASA e APTO, **43 mudam de valor** (41%)
+- das **43** que aparecem em FISICA e JURIDICA, **5 mudam** (12%)
+
+`ADESAO - INSTALACAO DE ASSINATURA + ADESAO - INSTALAR PONTO VIRTUA`
+vale **1,4648 em casa** e **1,2925 em apartamento** — o mesmo valor para
+pessoa física e jurídica.
+
+> **Isto destrava o `06-PONTUACAO`.** A dimensão que faltava na nossa
+> fonte — tipo de pessoa — é justamente a que menos importa. E edificação
+> a gente lê do complemento do endereço.
+
+**Modelo:** `tabela_preco` (a "Vigência" deles) → `combinacao_os`
+(assinatura = os tipos de O.S. normalizados, na ordem, unidos por ` + `)
+→ `regra_pontuacao` (edificação × tipo de pessoa → pontos_claro,
+pontos_equipe). `QUALQUER` é coringa nas duas dimensões, e
+`pontos_da_visita()` sempre prefere a regra mais específica.
+
+**Semente:** 546 combinações e 579 regras direto do relatório de julho,
+mais 448 regras coringa para quando o endereço não diz a edificação —
+essas copiam a regra de CASA, que é 72% da operação, e dizem isso na
+observação. 34 regras nasceram marcadas `CONFERIR`: o relatório traz mais
+de um valor para a mesma chave, provavelmente tabela de preço diferente.
+
+**Cobertura:** 311 de 327 visitas produtivas dos dois dias importados
+(**95,1%**). Jornada não pontua, como deve ser. O dia 05/09 fecha em
+92,8286 pontos CLARO.
+
+`pontos_equipe` está **vazio de propósito**: é o que a equipe recebe, e
+ainda não foi levantado. A diferença entre os dois é a margem por
+atendimento — a informação que o Emanuel disse não enxergar em lugar
+nenhum.
+
+Toda alteração de regra passa por `regra_pontuacao_log`, com de/para,
+autor e hora. Sem isso o recálculo retroativo do D-018 seria irreversível.
+
+### D-046 · O menu do contrato abre onde o mouse está
+Antes ele nascia colado na borda direita da tabela, longe do clique.
+Agora usa `position: fixed` com as coordenadas do evento, limitadas para
+não sair da janela.
+
+### D-047 · Transferir não sai da lista
+Era um link para a tela de detalhe. Virou painel na própria linha, com
+equipe destino e motivo — dois cliques em vez de trocar de tela e voltar.
+A regra continua no banco (`transferir_visita`), que grava de/para, quem
+e o motivo.
+
+### D-048 · Na tela de Equipes o cartão inteiro abre o contrato
+O botão "abrir" era ruído: o cartão já é o alvo natural do clique.

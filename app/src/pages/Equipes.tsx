@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { Shell } from '../components/Shell'
@@ -678,6 +678,7 @@ export default function Equipes() {
 
 /** Um contrato da equipe, com as O.S. agrupadas dentro dele. */
 function ContratoCard({ v }: { v: VisitaLinha }) {
+  const navegar = useNavigate()
   const endereco = [v.logradouro, v.complemento, v.bairro].filter(Boolean).join(', ')
   const baixa = v.ordem_servico.find(o => o.codigo_baixa)?.codigo_baixa ?? null
   const janela = hhmm(v.janela_inicio)
@@ -685,7 +686,11 @@ function ContratoCard({ v }: { v: VisitaLinha }) {
     : 'sem janela'
 
   return (
-    <div className="rounded-lg border border-graf-800 bg-graf-850">
+    // O cartao inteiro abre o contrato — o botao "abrir" era ruido.
+    <div onClick={() => navegar(`/controle/visita/${v.id}`)}
+         title="Abrir o contrato"
+         className="cursor-pointer rounded-lg border border-graf-800 bg-graf-850
+                    transition hover:border-af-700/60 hover:bg-graf-800">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-graf-800 px-3 py-2">
         <Pill situacao={v.situacao} />
         <span className="tabular text-xs font-medium">{v.contrato ?? 'sem contrato'}</span>
@@ -701,11 +706,6 @@ function ContratoCard({ v }: { v: VisitaLinha }) {
           <span title="Tocada pelo campo — o TOA não sobrescreve mais"
                 className="text-[10px] text-af-400">●</span>
         )}
-        <Link to={`/controle/visita/${v.id}`}
-          className="rounded border border-graf-700 px-2 py-0.5 text-[11px] text-graf-400
-                     hover:border-af-600 hover:text-af-400">
-          abrir
-        </Link>
       </div>
 
       <div className="px-3 py-2">

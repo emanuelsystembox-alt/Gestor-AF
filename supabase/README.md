@@ -76,6 +76,7 @@ conta a história.
 | 024 | `painel_equipes(data)`: contratos, períodos, situações e OCIOSO por dia | ✓ |
 | 025 | Cadastro de situação, indicadores de qualidade e marcador no contrato | ✓ |
 | 026 | Reatendimento (O.S. em N visitas), dupla baixa TOA×AFLINE, exclusão com motivo | ✓ |
+| 027 | **Pontuação por combinação de O.S.** × edificação + log de alteração | ✓ |
 
 ---
 

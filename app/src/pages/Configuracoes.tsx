@@ -30,11 +30,27 @@ interface Indicador {
   descricao: string | null; ordem: number; ativo: boolean
 }
 
+/** Regra de pontuação: combinação de O.S. x edificação x tipo de pessoa. */
+interface Regra {
+  id: string
+  edificacao: string
+  tipo_pessoa: string
+  pontos_claro: number | null
+  pontos_equipe: number | null
+  observacao: string | null
+  ativo: boolean
+  combinacao: { assinatura: string; qtd_os: number; atendimentos: number } | null
+}
+
 const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs ' +
               'outline-none focus:border-af-500'
 
 export default function Configuracoes() {
-  const [aba, setAba] = useState<'status' | 'indicadores'>('status')
+  const [aba, setAba] = useState<'status' | 'indicadores' | 'pontuacao'>('status')
+  const [regras, setRegras] = useState<Regra[]>([])
+  const [totalRegras, setTotalRegras] = useState(0)
+  const [buscaRegra, setBuscaRegra] = useState('')
+  const [soConferir, setSoConferir] = useState(false)
   const [situacoes, setSituacoes] = useState<Situacao[]>([])
   const [indicadores, setIndicadores] = useState<Indicador[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -63,6 +79,35 @@ export default function Configuracoes() {
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [])
+
+  // As regras são ~1.000; carrega sob demanda e por busca.
+  useEffect(() => {
+    if (aba !== 'pontuacao') return
+    let q = supabase.from('regra_pontuacao')
+      .select(`id, edificacao, tipo_pessoa, pontos_claro, pontos_equipe,
+               observacao, ativo,
+               combinacao:combinacao_id ( assinatura, qtd_os, atendimentos )`,
+              { count: 'exact' })
+    if (soConferir) q = q.not('observacao', 'is', null)
+    q.order('pontos_claro', { ascending: false, nullsFirst: false }).limit(120)
+      .then(({ data, count, error }) => {
+        if (error) { setErro(error.message); return }
+        setRegras((data ?? []) as unknown as Regra[])
+        setTotalRegras(count ?? 0)
+      })
+  }, [aba, soConferir])
+
+  async function salvarRegra(id: string) {
+    setOcupado(true); setErro(null); setOk(null)
+    const { error } = await supabase.from('regra_pontuacao').update(rascunho).eq('id', id)
+    if (error) setErro(traduzir(error.message))
+    else {
+      setOk('Regra atualizada. Toda alteração fica no log, com de/para e autor.')
+      setEditando(null); setRascunho({})
+      setRegras(rs => rs.map(r => r.id === id ? { ...r, ...(rascunho as Partial<Regra>) } : r))
+    }
+    setOcupado(false)
+  }
 
   async function salvarSituacao(codigo: string) {
     setOcupado(true); setErro(null); setOk(null)
@@ -138,7 +183,8 @@ export default function Configuracoes() {
 
         <div className="flex rounded-lg bg-graf-900 p-0.5">
           {([['status', 'Status', situacoes.length],
-             ['indicadores', 'Indicadores de qualidade', indicadores.length]] as const).map(
+             ['indicadores', 'Indicadores de qualidade', indicadores.length],
+             ['pontuacao', 'Pontuação', totalRegras]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
@@ -274,7 +320,7 @@ export default function Configuracoes() {
               </table>
             </div>
           </section>
-        ) : (
+        ) : aba === 'indicadores' ? (
           <section className="space-y-4">
             <div className="card-controle p-4">
               <h2 className="text-sm font-semibold">Novo indicador</h2>
@@ -398,6 +444,148 @@ export default function Configuracoes() {
               serviço, e se o marcador deve ser cumprido/não cumprido em vez de só
               apontado. Nenhuma das duas foi inventada aqui.
             </p>
+          </section>
+        ) : (
+          <section className="space-y-4">
+            <div className="card-controle p-4">
+              <h2 className="text-sm font-semibold">Tabela de pontuação</h2>
+              <p className="mt-1 max-w-3xl text-xs text-graf-400">
+                A chave é a <strong>combinação de O.S. do atendimento</strong> mais a
+                <strong> edificação</strong>. Foi o que o relatório mensal mostrou: a
+                mesma combinação vale 1,4648 em casa e 1,2925 em apartamento — e o
+                mesmo valor para pessoa física e jurídica. Das 105 combinações que
+                aparecem nas duas edificações, <strong>43 mudam de valor</strong>; das
+                43 que aparecem nos dois tipos de pessoa, só 5 mudam.
+              </p>
+              <p className="mt-2 max-w-3xl text-xs text-graf-500">
+                <strong className="text-graf-300">Pontos CLARO</strong> é o que a
+                operadora paga. <strong className="text-graf-300">Pontos equipe</strong>{' '}
+                é o que a equipe recebe — está vazio porque ainda não foi levantado; a
+                diferença entre os dois é a margem por atendimento. Toda alteração aqui
+                fica no log com de/para e autor (D-018).
+              </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input value={buscaRegra} onChange={e => setBuscaRegra(e.target.value)}
+                  placeholder="Filtrar por combinação de O.S…"
+                  className={`${campo} min-w-72 flex-1`} />
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                  <input type="checkbox" checked={soConferir}
+                    onChange={e => setSoConferir(e.target.checked)} className="accent-af-600" />
+                  Só as que precisam de conferência
+                </label>
+                <span className="tabular text-xs text-graf-500">
+                  {totalRegras} regras no total
+                </span>
+              </div>
+            </div>
+
+            <div className="card-controle overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-graf-800 bg-graf-900 text-left
+                                    text-[11px] uppercase tracking-wide text-graf-400">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Combinação de O.S.</th>
+                      <th className="px-3 py-2 text-center font-medium">O.S.</th>
+                      <th className="px-3 py-2 font-medium">Edificação</th>
+                      <th className="px-3 py-2 font-medium">Pessoa</th>
+                      <th className="px-3 py-2 text-right font-medium">Pontos CLARO</th>
+                      <th className="px-3 py-2 text-right font-medium">Pontos equipe</th>
+                      <th className="px-3 py-2 text-right font-medium">Atend.</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {regras
+                      .filter(r => !buscaRegra.trim() ||
+                        (r.combinacao?.assinatura ?? '')
+                          .toLowerCase().includes(buscaRegra.trim().toLowerCase()))
+                      .map(r => {
+                        const ed = editando === r.id
+                        return (
+                          <tr key={r.id} className="border-b border-graf-800 align-top">
+                            <td className="max-w-96 px-3 py-2">
+                              <div className="text-xs leading-snug">
+                                {r.combinacao?.assinatura ?? '—'}
+                              </div>
+                              {r.observacao && (
+                                <div className="mt-1 text-[10px] leading-snug text-amber-400/80">
+                                  {r.observacao}
+                                </div>
+                              )}
+                            </td>
+                            <td className="tabular px-3 py-2 text-center text-graf-400">
+                              {r.combinacao?.qtd_os ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              {ed ? (
+                                <select defaultValue={r.edificacao} className={campo}
+                                  onChange={e => setRascunho(x => ({ ...x, edificacao: e.target.value }))}>
+                                  {['CASA', 'APTO', 'COMERCIAL', 'QUALQUER'].map(o =>
+                                    <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              ) : (
+                                <span className={r.edificacao === 'QUALQUER'
+                                  ? 'text-graf-500' : 'text-graf-200'}>{r.edificacao}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-graf-500">{r.tipo_pessoa}</td>
+                            <td className="tabular px-3 py-2 text-right">
+                              {ed ? (
+                                <input defaultValue={r.pontos_claro ?? ''}
+                                  className={`${campo} w-24 text-right`}
+                                  onChange={e => setRascunho(x => ({
+                                    ...x, pontos_claro: e.target.value === '' ? null : Number(e.target.value),
+                                  }))} />
+                              ) : r.pontos_claro ?? <span className="text-graf-600">—</span>}
+                            </td>
+                            <td className="tabular px-3 py-2 text-right">
+                              {ed ? (
+                                <input defaultValue={r.pontos_equipe ?? ''}
+                                  className={`${campo} w-24 text-right`}
+                                  onChange={e => setRascunho(x => ({
+                                    ...x, pontos_equipe: e.target.value === '' ? null : Number(e.target.value),
+                                  }))} />
+                              ) : r.pontos_equipe ?? <span className="text-graf-600">—</span>}
+                            </td>
+                            <td className="tabular px-3 py-2 text-right text-graf-500">
+                              {r.combinacao?.atendimentos ?? 0}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {ed ? (
+                                <span className="flex justify-end gap-1.5">
+                                  <button disabled={ocupado} onClick={() => salvarRegra(r.id)}
+                                    className="rounded bg-af-600 px-2.5 py-1 text-[11px] font-medium
+                                               text-white hover:bg-af-500 disabled:opacity-50">
+                                    Salvar
+                                  </button>
+                                  <button onClick={() => { setEditando(null); setRascunho({}) }}
+                                    className="rounded border border-graf-700 px-2.5 py-1
+                                               text-[11px] text-graf-400">
+                                    Cancelar
+                                  </button>
+                                </span>
+                              ) : (
+                                <button onClick={() => { setEditando(r.id); setRascunho({}) }}
+                                  className="rounded border border-graf-700 px-2.5 py-1 text-[11px]
+                                             text-graf-400 hover:border-af-600 hover:text-af-400">
+                                  Editar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+              {regras.length >= 120 && (
+                <p className="border-t border-graf-800 px-3 py-2 text-[11px] text-graf-500">
+                  Mostrando as 120 de maior pontuação. Use o filtro para achar a combinação.
+                </p>
+              )}
+            </div>
           </section>
         )}
       </div>

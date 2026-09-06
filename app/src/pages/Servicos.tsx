@@ -27,6 +27,14 @@ const SELECT = `
 `
 
 interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
+interface PontoVisita {
+  visita_id: string
+  pontos_claro: number | null
+  pontos_equipe: number | null
+  edificacao: string
+  edificacao_de: string
+  achou: boolean
+}
 interface Marcador { id: string; indicador_id: string; cumprido: boolean | null }
 
 /** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
@@ -93,6 +101,9 @@ export default function Servicos() {
   // qual foi cumprido. Catálogo vem de `indicador_qualidade` (025).
   const [indicadores, setIndicadores] = useState<Indicador[]>([])
   const [menu, setMenu] = useState<string | null>(null)
+  // Onde desenhar o menu: o sistema atual abre onde o mouse esta, nao
+  // encostado na borda direita da tabela.
+  const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
   const [painelMarcador, setPainelMarcador] = useState<string | null>(null)
   const [salvandoMarcador, setSalvandoMarcador] = useState(false)
 
@@ -118,6 +129,47 @@ export default function Servicos() {
     else {
       setLinhas(ls => ls.filter(x => x.id !== v.id))
       setPainelExcluir(null); setMotivo(''); setMenu(null)
+    }
+    setSalvandoMarcador(false)
+  }
+
+  // ---- pontuação do contrato (D-045) ----
+  // Uma chamada por período, não uma por linha: `pontos_por_periodo`
+  // resolve as ~90 visitas do dia de uma vez.
+  const [pontos, setPontos] = useState<Map<string, PontoVisita>>(new Map())
+
+  useEffect(() => {
+    if (!de || !ate) return
+    supabase.rpc('pontos_por_periodo', { p_de: de, p_ate: ate }).then(({ data }) => {
+      const m = new Map<string, PontoVisita>()
+      for (const p of (data ?? []) as PontoVisita[]) m.set(p.visita_id, p)
+      setPontos(m)
+    })
+  }, [de, ate])
+
+
+  // ---- transferência rápida, sem sair da lista ----
+  const [painelTransferir, setPainelTransferir] = useState<string | null>(null)
+  const [equipes, setEquipes] = useState<{ id: string; codigo: string; nome: string }[]>([])
+  const [equipeDestino, setEquipeDestino] = useState('')
+  const [motivoTransf, setMotivoTransf] = useState('')
+
+  useEffect(() => {
+    supabase.from('equipe').select('id, codigo, nome').eq('ativo', true).order('codigo')
+      .then(({ data }) => setEquipes((data ?? []) as { id: string; codigo: string; nome: string }[]))
+  }, [])
+
+  async function transferir(v: V) {
+    if (!equipeDestino) return
+    setSalvandoMarcador(true); setErro(null)
+    const { error } = await supabase.rpc('transferir_visita', {
+      p_visita: v.id, p_equipe: equipeDestino, p_motivo: motivoTransf || null,
+    })
+    if (error) setErro(error.message)
+    else {
+      setPainelTransferir(null); setEquipeDestino(''); setMotivoTransf('')
+      const { data } = await supabase.from('visita').select(SELECT).eq('id', v.id).single()
+      if (data) setLinhas(ls => ls.map(x => x.id === v.id ? (data as unknown as V) : x))
     }
     setSalvandoMarcador(false)
   }
@@ -265,6 +317,10 @@ export default function Servicos() {
       ].some(x => x?.toLowerCase().includes(t))
     })
   }, [base, situacao, busca, area, supervisor, equipe, grupo, origem, resultado, culpa])
+
+  const totalPontos = useMemo(
+    () => visiveis.reduce((soma, v) => soma + Number(pontos.get(v.id)?.pontos_claro ?? 0), 0),
+    [visiveis, pontos])
 
   // opções derivadas do que está carregado
   const op = useMemo(() => ({
@@ -484,6 +540,7 @@ export default function Servicos() {
                             // é como o COP está acostumado a trabalhar.
                             e.preventDefault()
                             setMenu(menu === v.id ? null : v.id)
+                            setMenuXY({ x: e.clientX, y: e.clientY })
                             setPainelMarcador(null); setPainelExcluir(null); setPainelBaixa(null)
                           }}
                           style={{
@@ -622,6 +679,20 @@ export default function Servicos() {
                           {detalhada && v.wo_numero && (
                             <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
                           )}
+                          {(() => {
+                            const p = pontos.get(v.id)
+                            if (!p?.achou) return null
+                            return (
+                              <div className="mt-1">
+                                <span
+                                  title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
+                                  className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
+                                             font-semibold text-emerald-300 ring-1 ring-emerald-700/40">
+                                  ★ {Number(p.pontos_claro).toFixed(4)}
+                                </span>
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="relative px-3 py-2 text-right align-top">
                           <div className="flex items-center justify-end gap-1">
@@ -634,6 +705,7 @@ export default function Servicos() {
                               onClick={e => {
                                 e.stopPropagation()
                                 setMenu(menu === v.id ? null : v.id)
+                                setMenuXY({ x: e.clientX, y: e.clientY })
                                 setPainelMarcador(null)
                               }}
                               title="Ações do contrato"
@@ -646,8 +718,12 @@ export default function Servicos() {
 
                           {menu === v.id && (
                             <div onClick={e => e.stopPropagation()}
-                              className="absolute right-3 top-9 z-20 w-52 overflow-hidden rounded-lg
-                                         border border-graf-700 bg-graf-900 text-left shadow-xl">
+                              style={menuXY ? {
+                                left: Math.min(menuXY.x, window.innerWidth - 230),
+                                top: Math.min(menuXY.y, window.innerHeight - 250),
+                              } : undefined}
+                              className="fixed z-50 w-52 overflow-hidden rounded-lg border
+                                         border-graf-700 bg-graf-900 text-left shadow-xl">
                               <Link to={`/controle/visita/${v.id}`}
                                 className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
                                 Abrir contrato
@@ -664,6 +740,7 @@ export default function Servicos() {
                               <button
                                 onClick={() => {
                                   setPainelBaixa(v.id); setAberta(v.id); setMenu(null)
+                                  setPainelTransferir(null); setPainelExcluir(null)
                                   setOsAlvo(v.ordem_servico[0]?.id ?? '')
                                 }}
                                 disabled={v.ordem_servico.length === 0}
@@ -671,10 +748,15 @@ export default function Servicos() {
                                            hover:bg-graf-800 disabled:opacity-40">
                                 Baixar serviço…
                               </button>
-                              <Link to={`/controle/visita/${v.id}?acao=transferir`}
-                                className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
-                                Transferir equipe
-                              </Link>
+                              <button
+                                onClick={() => {
+                                  setPainelTransferir(v.id); setAberta(v.id); setMenu(null)
+                                  setEquipeDestino(''); setMotivoTransf('')
+                                }}
+                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                           hover:bg-graf-800">
+                                Transferir equipe…
+                              </button>
                               <button
                                 onClick={() => {
                                   setPainelExcluir(v.id); setAberta(v.id); setMenu(null); setMotivo('')
@@ -696,6 +778,49 @@ export default function Servicos() {
                       {exp && (
                         <tr className="border-b border-graf-800 bg-graf-900">
                           <td colSpan={10} className="px-3 py-3">
+                            {/* ---- transferência rápida ---- */}
+                            {painelTransferir === v.id && (
+                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
+                                <p className="mb-2 text-xs font-medium text-graf-200">
+                                  Transferir contrato
+                                  <span className="ml-2 font-normal text-graf-500">
+                                    de {v.equipe?.codigo ?? 'sem equipe'} para outra equipe — fica no histórico
+                                  </span>
+                                </p>
+                                <div className="flex flex-wrap items-end gap-2">
+                                  <label className="text-[11px] text-graf-400">
+                                    <span className="mb-1 block">Equipe destino</span>
+                                    <select value={equipeDestino}
+                                      onChange={e => setEquipeDestino(e.target.value)}
+                                      className={`${sel} w-56`}>
+                                      <option value="">— escolha —</option>
+                                      {equipes.filter(e => e.codigo !== v.equipe?.codigo).map(e => (
+                                        <option key={e.id} value={e.id}>{e.codigo} · {e.nome}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="min-w-56 flex-1 text-[11px] text-graf-400">
+                                    <span className="mb-1 block">Motivo</span>
+                                    <input value={motivoTransf}
+                                      onChange={e => setMotivoTransf(e.target.value)}
+                                      placeholder="Por que está transferindo?"
+                                      className={`${sel} w-full`} />
+                                  </label>
+                                  <button onClick={() => transferir(v)}
+                                    disabled={salvandoMarcador || !equipeDestino}
+                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                                               text-white hover:bg-af-500 disabled:opacity-50">
+                                    Transferir
+                                  </button>
+                                  <button onClick={() => setPainelTransferir(null)}
+                                    className="rounded-md border border-graf-700 px-3 py-1.5
+                                               text-xs text-graf-400">
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
                             {/* ---- baixa da AFLINE (D-042) ---- */}
                             {painelBaixa === v.id && (
                               <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
@@ -895,6 +1020,11 @@ export default function Servicos() {
 
         <p className="pb-6 text-center text-xs text-graf-600">
           {visiveis.length} de {base.length} visitas
+          {totalPontos > 0 && (
+            <> · <strong className="tabular text-emerald-400">
+              {totalPontos.toFixed(4)}
+            </strong> pontos CLARO no filtro</>
+          )}
           {soProdutivas && linhas.length !== base.length &&
             ` · ${linhas.length - base.length} apontamentos de jornada ocultos`}
         </p>
