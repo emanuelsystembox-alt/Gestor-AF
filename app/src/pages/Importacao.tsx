@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -11,6 +11,24 @@ interface Resumo {
   criadas: number; atualizadas: number; ignoradas: number
   erros: number; conflitos: number; ordens_servico: number
 }
+
+/** Uma linha do histórico — o "log" que o sistema atual mostra. */
+interface Historico {
+  id: string
+  arquivo_nome: string | null
+  status: string | null
+  total_linhas: number | null
+  qtd_criadas: number | null
+  qtd_atualizadas: number | null
+  qtd_erro: number | null
+  qtd_conflito: number | null
+  criado_em: string
+  aplicado_em: string | null
+  usuario: { nome: string | null; email: string | null } | null
+}
+
+const quando = (ts: string | null) =>
+  ts ? new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }) : '—'
 
 export default function Importacao() {
   const { perfil } = useAuth()
@@ -25,6 +43,18 @@ export default function Importacao() {
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [progresso, setProgresso] = useState('')
   const [arrastando, setArrastando] = useState(false)
+  const [historico, setHistorico] = useState<Historico[]>([])
+
+  /** O log de importações: o que subiu, quem subiu, quando e no que deu. */
+  async function carregarHistorico() {
+    const { data } = await supabase.from('importacao')
+      .select(`id, arquivo_nome, status, total_linhas, qtd_criadas, qtd_atualizadas,
+               qtd_erro, qtd_conflito, criado_em, aplicado_em,
+               usuario:usuario_id ( nome, email )`)
+      .order('criado_em', { ascending: false }).limit(30)
+    setHistorico((data ?? []) as unknown as Historico[])
+  }
+  useEffect(() => { carregarHistorico() }, [])
 
   async function receber(f: File) {
     setErro(null); setResumo(null); setProblemas([])
@@ -86,6 +116,7 @@ export default function Importacao() {
 
       setResumo(res as Resumo)
       setFase('pronto')
+      await carregarHistorico()
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Falha na importação.')
       setFase('lida')
@@ -291,6 +322,87 @@ export default function Importacao() {
             </div>
           </div>
         )}
+
+        {/* ---------- histórico / log ---------- */}
+        <section className="card-controle overflow-hidden">
+          <div className="flex items-baseline justify-between gap-3 border-b border-graf-800 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Histórico de importações</h2>
+              <p className="mt-0.5 text-xs text-graf-400">
+                O que subiu, quem subiu, quando e no que deu.
+              </p>
+            </div>
+            <button onClick={carregarHistorico}
+              className="rounded border border-graf-700 px-2.5 py-1 text-[11px] text-graf-400
+                         hover:border-af-600 hover:text-af-400">
+              atualizar
+            </button>
+          </div>
+
+          {historico.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-graf-500">
+              Nenhuma importação registrada ainda.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-graf-800 bg-graf-900 text-left
+                                  text-[11px] uppercase tracking-wide text-graf-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Arquivo</th>
+                    <th className="px-3 py-2 font-medium">Resultado</th>
+                    <th className="px-3 py-2 font-medium">Criação</th>
+                    <th className="px-3 py-2 font-medium">Conclusão</th>
+                    <th className="px-3 py-2 font-medium">Quem</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historico.map(h => {
+                    const concluida = !!h.aplicado_em
+                    const comErro = (h.qtd_erro ?? 0) > 0
+                    return (
+                      <tr key={h.id} className="border-b border-graf-800">
+                        <td className="max-w-72 truncate px-3 py-2" title={h.arquivo_nome ?? ''}>
+                          {h.arquivo_nome ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-graf-300">
+                          {h.total_linhas
+                            ? <>
+                                <span className="tabular">{h.total_linhas}</span> linhas ·{' '}
+                                <span className="tabular text-emerald-400">{h.qtd_criadas ?? 0}</span> novas ·{' '}
+                                <span className="tabular text-sky-400">{h.qtd_atualizadas ?? 0}</span> atualizadas
+                                {(h.qtd_conflito ?? 0) > 0 && (
+                                  <> · <span className="tabular text-amber-400">
+                                    {h.qtd_conflito}</span> conflitos</>
+                                )}
+                                {comErro && (
+                                  <> · <span className="tabular text-af-400">{h.qtd_erro}</span> erros</>
+                                )}
+                              </>
+                            : <span className="text-graf-600">sem contagem gravada</span>}
+                        </td>
+                        <td className="tabular px-3 py-2 text-xs text-graf-400">{quando(h.criado_em)}</td>
+                        <td className="tabular px-3 py-2 text-xs text-graf-400">{quando(h.aplicado_em)}</td>
+                        <td className="px-3 py-2 text-xs text-graf-400">
+                          {h.usuario?.nome ?? h.usuario?.email ?? '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                            comErro ? 'bg-af-900/40 text-af-300'
+                            : concluida ? 'bg-emerald-900/40 text-emerald-300'
+                            : 'bg-amber-900/40 text-amber-300'}`}>
+                            {comErro ? 'Com erro' : concluida ? 'Sucesso' : 'Processando'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   )

@@ -72,6 +72,10 @@ conta a história.
 | 020 | Recursos fora do cadastro + `vw_equipe_resumo` | ✓ |
 | 021 | Login TOA da equipe, com histórico por período | — |
 | 022 | Sub-falha, histórico completo e transferência | — |
+| 023 | Conjunto de sub-falha vigente (`definir_conjunto_sub_falha`) + `resumo_sub_falhas` | ✓ |
+| 024 | `painel_equipes(data)`: contratos, períodos, situações e OCIOSO por dia | ✓ |
+| 025 | Cadastro de situação, indicadores de qualidade e marcador no contrato | ✓ |
+| 026 | Reatendimento (O.S. em N visitas), dupla baixa TOA×AFLINE, exclusão com motivo | ✓ |
 
 ---
 

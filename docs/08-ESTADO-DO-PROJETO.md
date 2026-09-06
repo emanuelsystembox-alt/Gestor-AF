@@ -63,12 +63,12 @@ Domínios: `tipo_atividade` · `tipo_servico` · `tipo_os` · `codigo_baixa` ·
 | Empresas | 1 (AFLINE) |
 | Praças | **18** |
 | Equipes | **89** · Técnicos **104** · Supervisores 5 |
-| Visitas | **470** (325 produtivas · 144 jornada · 2 dias) |
-| Ordens de serviço | **564** (468 com baixa) |
+| Visitas | **473** (2 dias) — +3 depois do D-041 destravar as recusadas |
+| Ordens de serviço | **570** — 6 delas são a mesma O.S. em dois atendimentos (D-041) |
 | Códigos de baixa | **168** classificados |
 | Tipos de O.S. | 37 · Tipos de atividade 20 · Grupos de serviço 8 |
 | Login TOA mapeado | 9 equipes |
-| Sub-falhas | tabela criada, dados a importar |
+| Sub-falhas | **1.466 importadas**: CASO 1 (528) e NÍVEL HARD (938) — falta escolher qual vale |
 | Eventos de auditoria | 472 |
 
 **339 das 470 visitas têm equipe.** As 131 restantes: 124 são jornada sem
@@ -97,6 +97,10 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 | 020 | Técnicos fora do cadastro + `vw_equipe_resumo` |
 | 021 | **Login TOA da equipe, com histórico por período** |
 | 022 | Sub-falha, histórico completo e transferência de equipe |
+| 023 | Escolha do conjunto de sub-falha vigente + resumo por conjunto |
+| 024 | **Painel de equipes por dia** com períodos, situações e OCIOSO (D-033) |
+| 025 | **Cadastro de situação**, indicadores de qualidade e `visita_marcador` (D-036/D-037) |
+| 026 | **Reatendimento** (D-041), **dupla baixa** TOA×AFLINE com sub-falha (D-042), exclusão arquivada (D-043) |
 
 ---
 
@@ -106,16 +110,24 @@ login no TOA (corretas) e 7 são de um login ainda sem dono (`Z690579`).
 |---|---|
 | `/entrar` | Login com identidade AFLINE |
 | `/controle` | Painel: indicadores, distribuição, **improdutivas por responsabilidade**, encerramentos por hora, motivos, tempo por etapa, equipes, tabela por grupo com CSV |
-| `/controle/servicos` | Lista com **9 filtros combináveis**, intervalo de datas, expansão das O.S., exportação |
-| `/controle/equipes` | Equipes e técnicos, produtividade do dia, agrupamento por supervisor/área, aviso de recurso fora do cadastro |
+| `/controle/servicos` | Lista com **9 filtros combináveis**, duas densidades (a padrão traz O.S. e código de baixa na linha), intervalo de datas, exportação |
+| `/controle/equipes` | **Painel por dia**: contratos, períodos, situações, OCIOSO, e cada equipe abre mostrando os contratos com as O.S. e a baixa |
 | `/controle/importar` | Upload da planilha do TOA com prévia |
+| `/controle/sub-falhas` | Importação dos conjuntos de sub-falha, com mapeamento de coluna, e escolha do conjunto vigente |
 | `/campo` | Agenda do técnico (clara, alto contraste) |
 | `/controle/visita/:id` | **Detalhe do contrato**: cliente, atendimento, O.S. com responsável, histórico com sub-falha, anexos, serviços anteriores, transferência |
 | `/campo/visita/:id` | Execução: rota, baixa por O.S., mudança de situação com GPS |
+| `/controle/relatorios` | **Relatório por contrato e por O.S.**, com filtros múltiplos e CSV; marca a primeira O.S. do endereço (D-038) |
+| `/controle/configuracoes` | **Status** (cor, rótulo, ordem, alerta) e **indicadores de qualidade** (meta, peso) |
 
 ---
 
-## As 29 decisões, resumidas
+## As 43 decisões, resumidas
+
+> D-030 (a dependência do ngestor é aceita e permanente) e D-031 (a tela
+> de sub-falhas não escolhe o conjunto por ninguém) foram tomadas em
+> 06/09 à tarde — estão em `docs/03-DECISOES.md`.
+
 
 **Modelagem**
 D-001 visita 1→N O.S. · D-005 atribuição à equipe com responsável ·

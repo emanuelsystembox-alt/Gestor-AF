@@ -57,3 +57,46 @@ export const SITUACAO_INFO: Record<Situacao, { label: string; cor: string }> = {
 export const EM_ABERTO: Situacao[] = [
   'ENTRADA', 'ATRIBUIDA', 'EM_DESLOCAMENTO', 'EM_EXECUCAO', 'COM_IMPEDIMENTO',
 ]
+
+/**
+ * A partir da migration 025 a situação é CADASTRO (`situacao_visita`):
+ * rótulo, cor, cor de fundo e ordem saem do banco, para a operação
+ * ajustar sem recompilar. O que está acima vira o **padrão de partida**:
+ * se o banco não responder, a tela continua com cor e nome corretos.
+ *
+ * `visita.situacao` continua `text` com CHECK, não virou FK (D-036): o
+ * domínio quem dita é o TOA, e situação nova precisa ENTRAR e aparecer,
+ * não derrubar a importação.
+ */
+export interface SituacaoCadastro {
+  codigo: string; label: string; cor: string; cor_fundo: string | null
+  icone: string | null; ordem: number
+  em_aberto: boolean; terminal: boolean
+  minutos_alerta: number | null; ativo: boolean
+}
+
+/** Fundo da etiqueta, quando o cadastro define um. */
+export const SITUACAO_FUNDO: Record<string, string> = {}
+
+/** Situações que o banco tem e o código não conhece — a tela avisa. */
+export const SITUACAO_DESCONHECIDA: string[] = []
+
+let carregou = false
+
+/** Lê o cadastro e sobrepõe os padrões. Chamada uma vez, na sessão. */
+export async function carregarSituacoes(): Promise<void> {
+  if (carregou) return
+  const { data, error } = await supabase
+    .from('situacao_visita').select('*').order('ordem')
+  if (error || !data) return
+  carregou = true
+  for (const s of data as SituacaoCadastro[]) {
+    if (!s.ativo) continue
+    if ((SITUACOES as readonly string[]).includes(s.codigo)) {
+      SITUACAO_INFO[s.codigo as Situacao] = { label: s.label, cor: s.cor }
+    } else if (!SITUACAO_DESCONHECIDA.includes(s.codigo)) {
+      SITUACAO_DESCONHECIDA.push(s.codigo)
+    }
+    if (s.cor_fundo) SITUACAO_FUNDO[s.codigo] = s.cor_fundo
+  }
+}

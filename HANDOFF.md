@@ -38,7 +38,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — onde estamos, com números
-3. **`docs/03-DECISOES.md`** — as 29 decisões e o porquê de cada uma
+3. **`docs/03-DECISOES.md`** — as 43 decisões e o porquê de cada uma
 4. **`supabase/README.md`** — banco, conferências e dívida de migrations
 5. **`docs/06-PONTUACAO.md`** — o que está bloqueado e por quê
 
@@ -67,8 +67,11 @@ zero função `SECURITY DEFINER` alcançável pelo `anon`.
 | `/controle` | painel do controlador |
 | `/controle/servicos` | lista com 9 filtros + CSV |
 | `/controle/visita/:id` | detalhe com 4 abas + transferência |
-| `/controle/equipes` | equipes, técnicos, aviso de recurso fora do cadastro |
+| `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe |
 | `/controle/importar` | importação do TOA com prévia |
+| `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
+| `/controle/relatorios` | relatório por contrato e por O.S., com CSV |
+| `/controle/configuracoes` | status (cor, rótulo, alerta) e indicadores de qualidade |
 | `/campo` e `/campo/visita/:id` | agenda e execução do técnico |
 
 **Dados:** 470 visitas, 564 O.S., 89 equipes, 104 técnicos, 18 praças,
@@ -86,11 +89,17 @@ recebe, valores diferentes. A regra é
 
 **Dois bloqueios:**
 
-**a) A fonte não tem duas das quatro dimensões.** Conferido nas 470
-visitas: o export do TOA **não traz** `Cliente`, `Tipo de pessoa`,
-`Edificação` nem `Telefones` — zero preenchidos. Quem traz é o export do
-ngestor, justamente o sistema que queremos abandonar. Três caminhos
-possíveis estão em `docs/06-PONTUACAO.md`; a escolha é do Emanuel.
+**a) A fonte não tem duas das quatro dimensões.** ~~Bloqueio~~ **decidido
+em 06/09 (D-030):** o export do ngestor entra também, cruzado pela WO. A
+dependência é aceita e permanente — o objetivo é a camada operacional
+própria, não cortar a fonte.
+
+O export do TOA continua sem `Cliente`, `Tipo de pessoa`, `Edificação` e
+`Telefones`. Mas há dois sinais nele que ninguém tinha olhado —
+`Segmentação` (PME, `PURPLE PME PF`) e `Complemento Endereço` (CASA, APT,
+BL, LJ) — que leem 60% dos casos. São **derivações, não o dado**;
+confirmar com o Emanuel antes de valerem para faturamento. Números e as
+três perguntas estão em `docs/06-PONTUACAO.md`.
 
 **b) Faltam 8 respostas.** Estão listadas no fim daquele documento.
 **Não implemente pontuação sem elas.**
@@ -100,13 +109,27 @@ possíveis estão em `docs/06-PONTUACAO.md`; a escolha é do Emanuel.
 O Emanuel confirmou que a comissão da equipe sai de lá, aplicada por
 **fatores**. A tela nunca foi aberta. É o próximo levantamento.
 
-### 3. Sub-falhas — falta escolher o conjunto
+### 3. Sub-falhas — ~~falta a tela~~ ~~falta o arquivo~~ falta ESCOLHER
 
-`CONSOLIDADO_SUBFALHAS_CLARO_2026.xlsx` traz **dois** conjuntos:
-`CASO 1` (114 códigos, 534 pares) e `NÍVEL HARD` (155 códigos, 933 pares).
-A tabela `sub_falha` e o importador `importar_sub_falhas()` existem; falta
-a tela de importação e a decisão de qual vale
-(`empresa.conjunto_sub_falha`).
+O arquivo da CLARO traz **dois** conjuntos, `CASO 1` e `NÍVEL HARD`.
+(A contagem antiga aqui — 114/534 e 155/933 — era de uma cópia mais
+velha; os números medidos no arquivo oficial estão abaixo.)
+
+Os dois já estão no banco (06/09, noite), do arquivo
+`CONSOLIDADO_SUBFALHAS_CLARO_2026_1_0_REVISADO_OFICIAL.xlsx`:
+
+| conjunto | pares | códigos | categorias | sem vínculo |
+|---|--:|--:|--:|--:|
+| CASO 1 | 528 | 115 | 11 | 0 |
+| NÍVEL HARD | 938 | 155 | 17 | 0 |
+
+**Nenhum está marcado como vigente — a escolha é do Emanuel**, no botão
+"Usar este" em `/controle/sub-falhas`. Pode ser trocada depois sem
+reimportar. Enquanto ninguém escolhe, o campo não tem lista de sub-falha
+para oferecer.
+
+O arquivo é **largo** (uma linha por código, `Subfalha 1..7` em colunas)
+— ver D-032. Lido como longo, traria 147 pares em vez de 938.
 
 ---
 
@@ -115,12 +138,15 @@ a tela de importação e a decisão de qual vale
 Ordem acertada com o Emanuel:
 
 1. ~~Detalhe do contrato~~ **feito**
-2. **Equipes expandida** — com `OCIOSO`, login On/Off, skill, pontos,
-   períodos. A regra de ocioso já está definida (D-026): **10 minutos após
-   concluir o contrato anterior sem novo status**. É derivado, não
-   armazenado; o `10` é `empresa.minutos_ocioso`; e exige o último evento
-   **por equipe**, não por visita.
-3. Marcadores — evidências exigidas por tipo de serviço
+1a. ~~Tela de importação das sub-falhas~~ **feita** — `/controle/sub-falhas`
+2. ~~**Equipes expandida**~~ **feita** — painel por dia, com períodos,
+   situações, OCIOSO (D-026/D-033) e cada equipe abrindo os contratos com
+   as O.S. e o código de baixa. Falta ainda `skill` e `pontos`: skill não
+   existe no modelo (lacuna conhecida) e pontos depende da pontuação.
+3. ~~**Marcadores**~~ **feito em parte** — os 7 indicadores de qualidade
+   viraram cadastro, e o analista aponta o marcador no contrato pela tela
+   de Serviços (D-037). Falta combinar quais são **exigidos** por tipo de
+   serviço e se o marcador registra cumprido/não cumprido.
 4. Monitoramento — trajeto, derivável de `visita_evento.lat/lng`
 5. Relatórios — depois que a pontuação existir
 
@@ -130,6 +156,8 @@ Ordem acertada com o Emanuel:
 
 | Dívida | Onde |
 |---|---|
+| ~~8 O.S. recusadas~~ **resolvido**: era reatendimento, não duplicata | D-041 |
+| Administração de usuários, cargos e permissões | não iniciado — é o maior pedaço que falta |
 | 7 migrations aplicadas sem arquivo local | `supabase/README.md` explica como sincronizar |
 | 12 lacunas de modelo (skill, marcadores, geo cerca…) | `docs/07-TELAS-DETALHADAS.md` |
 | Frota, almoxarifado, produtividade, aferição | não iniciados |
@@ -144,6 +172,12 @@ recurso da **EQUIPE** — a AFLINE trabalha em dupla. Cheguei a acusar 5
 técnicos de "trabalhar sem cadastro"; três eram login de equipe. Pior: o
 login **muda de dono**, então guardar só o valor corrente corromperia a
 produtividade histórica. Resolvido com `equipe_login_toa` e período.
+
+**Usei `visita.situacao_em` como hora de encerramento.** Numa visita
+cancelada ele é a hora da IMPORTAÇÃO — a "última atividade" da equipe
+virou 06/09 03:34 para metade da operação. Só vale com `fim`, ou com
+`situacao_em` **quando `bloqueado_em` existe** (o campo tocou). Corrigido
+antes de a tela ir ao ar; ver D-033. É a mesma armadilha do `criado_em`.
 
 **Tentei medir "fila" a partir de `visita.criado_em`.** É a hora da
 importação. Deu 0 min. Da atribuição do TOA deu 878 min — que é a noite

@@ -7,6 +7,9 @@ const Servicos = lazy(() => import('./pages/Servicos'))
 const Equipes = lazy(() => import('./pages/Equipes'))
 const VisitaDetalhe = lazy(() => import('./pages/VisitaDetalhe'))
 const Importacao = lazy(() => import('./pages/Importacao'))
+const SubFalhas = lazy(() => import('./pages/SubFalhas'))
+const Configuracoes = lazy(() => import('./pages/Configuracoes'))
+const Relatorios = lazy(() => import('./pages/Relatorios'))
 const Campo = lazy(() => import('./pages/Campo'))
 const Visita = lazy(() => import('./pages/Visita'))
 import { Carregando } from './components/ui'
@@ -63,6 +66,12 @@ export default function App() {
           <Protegida exige="GESTAO"><Equipes /></Protegida>} />
         <Route path="/controle/importar" element={
           <Protegida exige="GESTAO"><Importacao /></Protegida>} />
+        <Route path="/controle/sub-falhas" element={
+          <Protegida exige="GESTAO"><SubFalhas /></Protegida>} />
+        <Route path="/controle/relatorios" element={
+          <Protegida exige="GESTAO"><Relatorios /></Protegida>} />
+        <Route path="/controle/configuracoes" element={
+          <Protegida exige="GESTAO"><Configuracoes /></Protegida>} />
 
         <Route path="/campo" element={
           <Protegida exige="CAMPO"><Campo /></Protegida>} />

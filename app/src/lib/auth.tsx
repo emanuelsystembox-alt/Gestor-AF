@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { supabase, carregarSituacoes } from './supabase'
 
 export type Papel =
   | 'ADMIN' | 'COP' | 'CONTROLADOR' | 'SUPERVISOR'
@@ -52,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let vivo = true
     ;(async () => {
       setCarregando(true)
+      // O cadastro de situação (cor, rótulo) vem junto da sessão: uma
+      // consulta, uma vez, e a tela inteira passa a falar a língua do
+      // banco em vez da constante compilada.
+      carregarSituacoes()
       const [p, r] = await Promise.all([
         supabase.from('perfil').select('id, nome, email').eq('id', session.user.id).maybeSingle(),
         supabase.from('usuario_papel').select('papel').eq('usuario_id', session.user.id),

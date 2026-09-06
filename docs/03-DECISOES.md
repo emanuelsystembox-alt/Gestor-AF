@@ -315,3 +315,312 @@ Carga inicial caiu para **115 kB** (−55%). O app do técnico agora são
 > Decisão tomada pensando em quem usa 4G em campo, não em métrica de
 > build. Sem modo offline (D-008), o tamanho do primeiro carregamento é o
 > que separa "abriu" de "não abriu".
+
+## 2026-09-06 (tarde) — Sub-falhas e a fonte do cliente
+
+### D-030 · A dependência do ngestor é aceita, e é permanente
+Três caminhos estavam em aberto para trazer `Tipo de pessoa` e
+`Edificação` — as duas dimensões da regra de pontuação que o export do
+TOA não entrega. O Emanuel decidiu:
+
+- **Caminho 1, escolhido:** importar também o export do ngestor, cruzando
+  pela **WO**. Ele foi explícito sobre o motivo: *"sempre haverá essa
+  dependência; o que tentamos fazer é espelhar o sistema da CLARO, que é
+  muito engessado para o nosso time"*. O objetivo do projeto nunca foi
+  cortar a fonte — é deixar de pagar pela camada operacional e ter uma
+  tela que a operação consiga usar.
+- **Caminho 2, descartado por ora:** buscar a origem real (NETSMS ou
+  outra extração da CLARO). *"Isso não vai acontecer por enquanto."*
+- **Caminho 3, complementar:** o técnico informa a edificação em campo.
+  Continua valendo como complemento, nunca como fonte.
+
+> Consequência de projeto: o importador do ngestor deixa de ser
+> contingência e vira **entrada de primeira classe**, com tela própria,
+> do mesmo jeito que a do TOA. E o modelo precisa registrar de qual fonte
+> veio cada campo do cliente — senão ninguém sabe se um `Tipo de pessoa`
+> vazio é falta de dado ou falta de importação.
+
+### D-031 · A tela de sub-falhas não escolhe o conjunto por ninguém
+O arquivo da CLARO traz `CASO 1` e `NÍVEL HARD` (D-027). A tela importa
+os dois, mostra o que cada um cobre — pares, códigos, categorias, e
+quantos códigos não existem na nossa tabela — e a escolha do vigente é um
+botão, gravado em `empresa.conjunto_sub_falha` pela RPC
+`definir_conjunto_sub_falha()`.
+
+Duas consequências técnicas:
+
+- `empresa` só tem policy de `SELECT`. É de propósito: empresa não é
+  cadastro que o operador edite pelo PostgREST. A escolha então passa por
+  função com checagem de papel, não por `update` direto.
+- O **mapeamento de colunas é manual**, com palpite a partir do
+  cabeçalho. O arquivo é da CLARO e o cabeçalho muda sem aviso; adivinhar
+  em silêncio é exatamente como se perde uma coluna sem ninguém notar
+  (o mesmo risco do D-013, no leitor do TOA).
+
+Sub-falha com código que ainda não existe em `codigo_baixa` entra assim
+mesmo, sem vínculo, e a tela conta quantas são. Não é erro: é a CLARO
+tendo código que ainda não apareceu na nossa operação.
+
+## 2026-09-06 (noite) — Sub-falhas no banco, Equipes por dia, Serviços mais densa
+
+### D-032 · O arquivo de sub-falhas da CLARO é LARGO, não longo
+`CONSOLIDADO_SUBFALHAS_CLARO_2026*.xlsx` tem **uma linha por código**,
+com as sub-falhas espalhadas em colunas `Subfalha 1..7`:
+
+```
+Categoria     | Código | Descrição                | Subfalha 1 | … | Subfalha 7
+IMPRODUTIVOS  | 100    | Agendamento Não Cumprido | Atraso…    | … |
+```
+
+Um leitor "uma linha = um par" traz **147 pares em vez de 938** — e a
+conta fecha sozinha, sem erro na tela. Por isso o importador desempilha
+as colunas (a posição vira `ordem`) e a tela deixa escolher o formato,
+com o largo detectado pelo cabeçalho.
+
+`Descrição` é a descrição do **código**, não da sub-falha. Não é
+importada — já vive em `codigo_baixa`. Aparece na prévia só para quem
+confere não trocar uma pela outra.
+
+**Arquivo usado:** `CONSOLIDADO_SUBFALHAS_CLARO_2026_1_0_REVISADO_OFICIAL.xlsx`,
+de `Documentos/API - CADASTRO SUBFALHAS NGESTOR`. É o mais completo dos
+quatro que existem na máquina: só ele tem `Subfalha 7` no NÍVEL HARD
+(938 pares contra 933 das outras cópias) e está todo em maiúsculo, o que
+evita a duplicação por caixa que a D1 já documentou nos códigos de baixa.
+
+Resultado: **CASO 1** com 528 pares / 115 códigos / 11 categorias e
+**NÍVEL HARD** com 938 pares / 155 códigos / 17 categorias. Nenhum código
+ficou sem vínculo com `codigo_baixa`. **Qual dos dois vale ainda é
+escolha do Emanuel** — os dois estão no banco, nenhum marcado.
+
+### D-033 · OCIOSO derivado do que existe, e só para o dia corrente
+A regra do D-026 pede o **último evento por equipe**. Hoje
+`visita_evento` só tem `IMPORTADA` e `CONFLITO_TOA`, com `equipe_id`
+nulo: o campo ainda não registrou nada por aqui.
+
+`painel_equipes()` então usa o maior entre:
+- `visita.fim` — o encerramento real, vindo do TOA
+- `visita.situacao_em`, **mas só quando `bloqueado_em` existe**, isto é,
+  quando o campo tocou na visita (D-006)
+- `visita_evento.criado_em` da equipe, quando houver
+
+`situacao_em` puro **não serve**: numa visita cancelada ele é a hora da
+importação. Na primeira versão isso deu "última atividade 06/09 03:34"
+para metade da operação — a mesma armadilha do `criado_em` que o
+CLAUDE.md já documenta. A correção mudou os números para 17:40, 18:03,
+18:48 — fim de turno, que é o esperado.
+
+E `ocioso` só é calculado para o **dia corrente**. Ocioso é estado de
+agora; para um dia passado a resposta seria "todo mundo ocioso há dois
+dias", que não informa nada. Em dia passado a coluna mostra a hora da
+última atividade e a situação com que a equipe parou.
+
+### D-034 · Toda tela de operação abre no último dia COM dado
+`vw_equipe_resumo` usava `CURRENT_DATE`. Com importação de 04 e 05/09 e
+o relógio em 06/09, a tela de Equipes devolvia zero para tudo — parecia
+vazia sem estar errada. Serviços tinha o mesmo problema: abria em "hoje".
+
+Agora as duas descobrem o último dia com visita e abrem nele, com a data
+no topo para trocar. O sistema atual faz o mesmo, com "DATA DA SITUAÇÃO".
+
+Efeito colateral que virou regra: **inicializar o estado com "hoje" e
+corrigir depois dispara dois carregamentos concorrentes**, e o mais velho
+pode chegar por último. A data começa vazia, e cada carregamento carimba
+um número — resposta de pedido velho é descartada.
+
+### D-035 · Serviços tem duas densidades; a padrão mostra a baixa
+A lista estava comprimida demais: para saber **por que** uma visita não
+fechou, o COP precisava abrir uma por uma. Na densidade **Detalhada**
+(padrão) a linha traz as O.S. com número, tipo e **código de baixa
+colorido por natureza**, mais complemento do endereço, supervisor da
+equipe, WO e a hora de encerramento. **Compacta** mantém a leitura
+anterior, de uma linha por visita.
+
+Não é cópia da tela do concorrente: lá a informação vem em cartões
+coloridos com etiquetas de evidência. Aqui continua tabela, na linguagem
+escura e densa do Controle (D-011) — o que mudou é quanta informação a
+linha carrega antes de precisar de um clique.
+
+## 2026-09-06 (madrugada) — Cadastros, marcadores, relatórios
+
+### D-036 · Situação vira cadastro, mas continua `text` — não virou FK
+`situacao_visita` guarda rótulo, cor, cor de fundo, ordem, o tempo de
+alerta e se a situação está em aberto ou encerra. A tela inteira lê dali
+(`carregarSituacoes()` roda uma vez, junto da sessão), e o que estava em
+`SITUACAO_INFO` virou **padrão de partida** para o caso de o banco não
+responder.
+
+`visita.situacao` **não** virou chave estrangeira, de propósito: o
+domínio quem dita é o TOA, na importação. Com FK, situação nova derruba
+a importação inteira em vez de entrar e aparecer. `situacao_visita` é
+camada de apresentação, não fonte da verdade — e a tela de Configurações
+avisa quando existe situação em uso sem cadastro, em vez de esconder.
+
+### D-037 · Indicador de qualidade é o catálogo; marcador é a aplicação
+`indicador_qualidade` são os sete da AFLINE — O.S DIGITAL, BOTÃO ESCADA,
+AUTO INSPEÇÃO, URA DE INTERAÇÃO, GEOLOCALIZAÇÃO, CERTIDÃO, BAIXA URA —
+cada um com meta e peso, e podendo valer só em algumas praças
+(`indicador_qualidade_base`; sem linha nenhuma = vale em todas).
+
+`visita_marcador` é a aplicação: o analista aponta, no contrato, qual
+indicador vale ali. Escrita é da gestão (ADMIN/COP/CONTROLADOR/
+SUPERVISOR) — é ela que avalia o trabalho do técnico —, e a autoria é
+carimbada pelo banco (`usuario_id default auth.uid()`), não mandada pelo
+cliente: autoria de avaliação não pode depender de o front-end lembrar.
+
+**Duas coisas ficaram em aberto de propósito**, e estão escritas na
+própria tela: quais indicadores são **exigidos** por tipo de serviço, e
+se o marcador deve registrar cumprido/não cumprido em vez de só ser
+apontado. `visita_marcador.cumprido` existe e fica `null` até essa
+resposta.
+
+> As etiquetas do sistema atual são mais amplas que os sete indicadores
+> (MIGRACAO GPON, CLIENTE ATIVADO, TEC1 - COM PADRAO, LOG CANCELADO 1…).
+> Não modelei essas: não sabemos se são marcador manual, derivado do
+> tipo de serviço ou log do próprio sistema. **Perguntar antes.**
+
+### D-038 · Relatório por contrato e por O.S. são leituras diferentes
+Não é escolha de formato, é o D-001 aparecendo no papel:
+
+- **por contrato** → uma linha por visita: deslocamento, janela, jornada
+- **por O.S.** → uma linha por ordem, contrato repetido: baixa e
+  faturamento
+
+Uma visita com 3 O.S. vira 1 linha no primeiro e 3 no segundo. Somar
+deslocamento no relatório por O.S. conta em triplo — o defeito que a
+gente já corrigiu no modelo e que voltaria pela porta do relatório.
+
+Por isso o relatório por O.S. traz a coluna **"Primeira do endereço"**:
+é ela que separa DESLOCAMENTO de AGREGADA na LPU. Sai marcada agora,
+antes de a pontuação existir, para não se perder depois.
+
+### D-039 · A lista de Serviços separa contrato por cor de situação
+A lista era um bloco só, tudo da mesma cor: não dava para ver onde um
+contrato terminava e outro começava. Agora cada linha tem faixa colorida
+à esquerda pela situação, fundo levemente tingido da mesma cor e um
+separador mais forte entre contratos.
+
+A cor vem do cadastro (D-036), então a operação ajusta sem recompilar.
+
+### D-040 · O log de importação é o que faltava para enxergar erro
+`importacao` já guardava tudo — arquivo, quem, quando, contagens — e
+nada disso aparecia. A tela agora lista as últimas 30 importações com
+resultado e status.
+
+**Na primeira leitura ele já pagou:** toda importação do dia 05/09
+registrou **erros que ninguém tinha visto**. Ver a pendência abaixo.
+
+---
+
+## ⚠ Pendência aberta em 06/09 — a mesma O.S. em duas atividades
+
+O log revelou que **8 O.S. do dia 05/09 foram recusadas** com
+`duplicate key ... ordem_servico_numero_os_idx`. Investigado:
+
+| atividade recusada | O.S. | já pertence à atividade | do dia |
+|---|---|---|---|
+| 198847415 | 2607309803 | 199118753 | 04/09 |
+| 198973687 | 2607498026 | 199170577 | 04/09 |
+| 199117172 | 2607377213 | 198902240 | 04/09 |
+| 199119549 | 2607258996 | 198811097 | 04/09 |
+| 199154860 | 2607128633 | 198712684 | 04/09 |
+| 199155081 | 2607686430 | 199073418 | 04/09 |
+| 199189339 | 2607566112 | 199019018 | 04/09 |
+| 199260507 | 2607790155 | 199143722 | 05/09 |
+
+Ou seja: **a mesma O.S. aparece em duas atividades diferentes**, quase
+sempre uma no dia 04 e outra no 05. Isso tem cara de reagendamento ou
+retrabalho — o TOA abre nova atividade para a mesma ordem.
+
+Nosso índice único assume "uma O.S. vive em uma visita só", e isso é
+falso. Consequência hoje: essas 8 visitas entraram **sem as O.S.**, o
+que subconta produtividade e vai subcontar faturamento.
+
+**Não corrigi porque é regra de negócio, não bug de código.** As saídas
+possíveis, para o Emanuel escolher:
+
+1. **A O.S. muda de visita** — a última importação vence e a O.S. migra
+   para a atividade nova. Preserva "uma O.S., um pagamento", mas apaga
+   que houve duas idas.
+2. **A O.S. pode existir em N visitas** — troca o índice por
+   `(visita_id, numero_os)`. Preserva as duas idas (e o deslocamento de
+   cada uma), mas exige regra de qual delas fatura.
+3. **Vira reincidência** — a segunda ida é registrada como retorno da
+   primeira, usando a tabela `reincidencia` que já existe.
+
+A 3 parece a mais fiel ao negócio, mas envolve dinheiro. **Pergunta
+antes de mexer.**
+
+### D-041 · O mesmo contrato é atendido mais de uma vez — e isso é normal
+Medido no relatório mensal do ngestor (`_14-07-2026_23-22.xlsx`, 17.987
+linhas):
+
+- 17.987 linhas, **17.987 `ID` distintos** — o ID é do ATENDIMENTO
+- **2.656 contratos** aparecem com mais de um ID (18%)
+- **536** pares contrato+dia com mais de um ID
+- **2.036 O.S.** aparecem em mais de um ID
+
+Exemplo real, contrato `226622995` em 01/07:
+
+| ID | WO | Situação | Baixa |
+|---|---|---|---|
+| 1272333 | 230133181 | Reagendamento | 101 Endereco Nao Localizado |
+| 1272703 | 230264018 | Concluido | 409 Instalacao Efetuada |
+
+Quebrou de manhã, o cliente reagendou, foi de novo à tarde. São **dois
+atendimentos, dois deslocamentos, duas baixas** — e o TOA emite **WO
+nova** para o segundo.
+
+Nosso modelo já acertava: `visita.toa_atividade_id` é o ID do
+atendimento. O errado era **um índice**: `ordem_servico.numero_os` era
+único no banco inteiro, como se uma O.S. vivesse numa visita só. Agora é
+índice comum; a unicidade real é `(visita_id, sequencia)`.
+
+> Isso responde a pendência aberta mais cedo hoje. A saída não foi
+> nenhuma das três que eu tinha listado: o Emanuel mostrou que o próprio
+> sistema atual **cria um registro novo por atendimento**, e é isso que
+> o modelo tem que espelhar.
+
+### D-042 · São dois códigos de baixa, e eles divergem
+O relatório traz as duas colunas lado a lado: `Cod. Baixa Operadora`
+(TOA) e `Código De Baixa` (ngestor). **13.021 linhas têm as duas**, e
+elas divergem com frequência:
+
+```
+TOA  -1 → 800 Desatribuido            549x
+TOA 312 → 106 Cliente Ausente          93x
+TOA 425 → 409 Instalacao Efetuada      83x
+TOA 430 → 409 Instalacao Efetuada      61x
+```
+
+Não é erro de um dos lados: a operadora fecha de um jeito e a credenciada
+classifica de outro. Guardar só um perde metade da história — e **é a
+nossa que manda no comissionamento**.
+
+`ordem_servico.codigo_baixa_id` segue sendo o da **operadora** (é o que o
+importador preenche há 25 migrations; renomear mexeria em importador,
+view e quatro telas de uma vez). A nossa entra em
+`codigo_baixa_afline_id`, junto de `sub_falha_id`, `baixa_em`,
+`baixa_por` e `baixa_observacao`.
+
+A `baixar_os()` grava tudo num ato só e registra no histórico — e
+**valida que a sub-falha pertence ao código e ao conjunto vigente**.
+A lista de sub-falha na tela também filtra pelo conjunto: sem isso vinha
+em dobro, CASO 1 e NÍVEL HARD juntos.
+
+**Conjunto escolhido pelo Emanuel: `NÍVEL HARD`** (938 pares, 155
+códigos, 17 categorias).
+
+### D-043 · Excluir contrato é arquivar, não apagar
+`excluir_visita(visita, motivo)` exige motivo, carimba quem e quando, e
+grava evento `EXCLUIDA`. O contrato sai das listas, dos relatórios e do
+painel de equipes, mas continua no banco — e `restaurar_visita()` traz de
+volta.
+
+Apagar de verdade levaria junto as O.S., o histórico, os marcadores, a
+linha de importação que o originou e, quando a pontuação existir, a base
+de um mês já faturado. Pior: a visita **voltaria na próxima importação do
+TOA**, sem histórico nenhum.
+
+### D-044 · Botão direito abre as ações do contrato
+O menu do contrato responde ao clique direito, além do `⋯`. É como o COP
+já trabalha no sistema atual.

@@ -6,7 +6,8 @@ import { Shell } from '../components/Shell'
 import { Alerta, Pill, Vazio } from '../components/ui'
 
 const SELECT = `
-  id, toa_atividade_id, wo_numero, contrato, cliente_nome, logradouro, bairro,
+  id, toa_atividade_id, wo_numero, contrato, cliente_nome,
+  logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
@@ -17,24 +18,54 @@ const SELECT = `
   ordem_servico (
     id, sequencia, numero_os, status_operadora,
     tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade )
-  )
+    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
+    baixa_afline:codigo_baixa_afline_id ( codigo, descricao, natureza, responsabilidade ),
+    sub_falha:sub_falha_id ( nome, categoria ),
+    baixa_em
+  ),
+  visita_marcador ( id, indicador_id, cumprido )
 `
 
-type V = Visita & {
+interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
+interface Marcador { id: string; indicador_id: string; cumprido: boolean | null }
+
+/** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
+type OSDupla = Visita['ordem_servico'][number] & {
+  baixa_afline: { codigo: number; descricao: string
+                  natureza: string | null; responsabilidade: string | null } | null
+  sub_falha: { nome: string; categoria: string | null } | null
+  baixa_em: string | null
+}
+
+type V = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
   node: string | null
+  complemento: string | null
   area: { codigo: string; apelido: string | null } | null
   equipe: { codigo: string; nome: string; supervisor_nome: string | null } | null
+  ordem_servico: OSDupla[]
+  visita_marcador: Marcador[]
 }
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 const hoje = () => iso(new Date())
+const hora = (ts: string | null) =>
+  ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
+
+/** Cor da etiqueta de baixa: verde executou, vermelho improdutiva. */
+function corBaixa(natureza: string | null | undefined): string {
+  if (natureza === 'SUCESSO') return 'bg-emerald-900/40 text-emerald-300'
+  if (natureza === 'IMPRODUTIVA') return 'bg-af-900/40 text-af-300'
+  return 'bg-graf-800 text-graf-400'
+}
 
 export default function Servicos() {
   const [params] = useSearchParams()
-  const [de, setDe] = useState(hoje())
-  const [ate, setAte] = useState(hoje())
+  // Vazias até sabermos o último dia COM visita. Abrir sempre em "hoje"
+  // mostrava tela vazia toda vez que a importação mais recente era de
+  // ontem — e a tela não estava errada, só olhando o dia errado.
+  const [de, setDe] = useState('')
+  const [ate, setAte] = useState('')
   const [linhas, setLinhas] = useState<V[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -52,11 +83,140 @@ export default function Servicos() {
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
   const [soProdutivas, setSoProdutivas] = useState(true)
+  // Quanto a linha mostra. "Detalhada" traz a O.S. e o código de baixa
+  // para a própria linha — sem isso o COP precisava abrir uma por uma
+  // só para saber por que a visita não fechou.
+  const [densidade, setDensidade] = useState<'detalhada' | 'compacta'>('detalhada')
+  const detalhada = densidade === 'detalhada'
+
+  // Marcadores (indicadores de qualidade) — o analista aponta no contrato
+  // qual foi cumprido. Catálogo vem de `indicador_qualidade` (025).
+  const [indicadores, setIndicadores] = useState<Indicador[]>([])
+  const [menu, setMenu] = useState<string | null>(null)
+  const [painelMarcador, setPainelMarcador] = useState<string | null>(null)
+  const [salvandoMarcador, setSalvandoMarcador] = useState(false)
 
   useEffect(() => {
+    supabase.from('indicador_qualidade')
+      .select('id, nome, meta, peso, ordem').eq('ativo', true).order('ordem')
+      .then(({ data }) => setIndicadores((data ?? []) as Indicador[]))
+  }, [])
+
+  const porIndicador = useMemo(
+    () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
+
+  // ---- exclusão de contrato (D-043: arquiva, não apaga) ----
+  const [painelExcluir, setPainelExcluir] = useState<string | null>(null)
+  const [motivo, setMotivo] = useState('')
+
+  async function excluir(v: V) {
+    if (!motivo.trim()) return
+    setSalvandoMarcador(true); setErro(null)
+    const { error } = await supabase.rpc('excluir_visita',
+      { p_visita: v.id, p_motivo: motivo.trim() })
+    if (error) setErro(error.message)
+    else {
+      setLinhas(ls => ls.filter(x => x.id !== v.id))
+      setPainelExcluir(null); setMotivo(''); setMenu(null)
+    }
+    setSalvandoMarcador(false)
+  }
+
+  // ---- baixa da AFLINE, com sub-falha do código escolhido ----
+  const [painelBaixa, setPainelBaixa] = useState<string | null>(null)
+  const [codigos, setCodigos] = useState<{ codigo: number; descricao: string }[]>([])
+  const [osAlvo, setOsAlvo] = useState<string>('')
+  const [codigoSel, setCodigoSel] = useState<string>('')
+  const [subFalhas, setSubFalhas] = useState<{ id: string; nome: string }[]>([])
+  const [subSel, setSubSel] = useState<string>('')
+  const [obsBaixa, setObsBaixa] = useState('')
+
+  // Os dois conjuntos de sub-falha convivem no banco; só um vale. Sem
+  // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
+  const [conjunto, setConjunto] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('codigo_baixa').select('codigo, descricao').order('codigo')
+      .then(({ data }) => setCodigos((data ?? []) as { codigo: number; descricao: string }[]))
+    supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
+      .then(({ data }) =>
+        setConjunto((data as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
+  }, [])
+
+  // A sub-falha depende do código: trocou o código, a lista muda.
+  useEffect(() => {
+    setSubSel('')
+    if (!codigoSel) { setSubFalhas([]); return }
+    let q = supabase.from('sub_falha').select('id, nome').eq('codigo', Number(codigoSel))
+    if (conjunto) q = q.eq('conjunto', conjunto)
+    q.order('ordem').then(({ data }) =>
+      setSubFalhas((data ?? []) as { id: string; nome: string }[]))
+  }, [codigoSel, conjunto])
+
+  async function gravarBaixa(v: V) {
+    if (!osAlvo || !codigoSel) return
+    setSalvandoMarcador(true); setErro(null)
+    const { error } = await supabase.rpc('baixar_os', {
+      p_os: osAlvo,
+      p_codigo: Number(codigoSel),
+      p_sub_falha: subSel || null,
+      p_observacao: obsBaixa || null,
+      p_situacao: null,
+    })
+    if (error) setErro(error.message)
+    else {
+      setPainelBaixa(null); setOsAlvo(''); setCodigoSel(''); setSubSel(''); setObsBaixa('')
+      // recarrega só a visita tocada
+      const { data } = await supabase.from('visita').select(SELECT).eq('id', v.id).single()
+      if (data) setLinhas(ls => ls.map(x => x.id === v.id ? (data as unknown as V) : x))
+    }
+    setSalvandoMarcador(false)
+  }
+
+  /** Liga/desliga um marcador no contrato e atualiza a linha na hora. */
+  async function alternarMarcador(v: V, ind: Indicador) {
+    const atual = v.visita_marcador?.find(m => m.indicador_id === ind.id)
+    setSalvandoMarcador(true)
+    try {
+      if (atual) {
+        const { error } = await supabase.from('visita_marcador')
+          .delete().eq('id', atual.id)
+        if (error) throw new Error(error.message)
+        setLinhas(ls => ls.map(x => x.id === v.id
+          ? { ...x, visita_marcador: x.visita_marcador.filter(m => m.id !== atual.id) }
+          : x))
+      } else {
+        const { data, error } = await supabase.from('visita_marcador')
+          .insert({ visita_id: v.id, indicador_id: ind.id })
+          .select('id, indicador_id, cumprido').single()
+        if (error) throw new Error(error.message)
+        setLinhas(ls => ls.map(x => x.id === v.id
+          ? { ...x, visita_marcador: [...x.visita_marcador, data as Marcador] }
+          : x))
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não consegui gravar o marcador.')
+    } finally {
+      setSalvandoMarcador(false)
+    }
+  }
+
+  useEffect(() => {
+    supabase.from('visita').select('data_agendada')
+      .order('data_agendada', { ascending: false }).limit(1)
+      .then(({ data }) => {
+        const ultima = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? hoje()
+        setDe(ultima); setAte(ultima)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!de || !ate) return
     let vivo = true
     setCarregando(true); setErro(null)
     supabase.from('visita').select(SELECT)
+      // Contrato excluido some da lista, mas continua no banco (D-043).
+      .is('excluido_em', null)
       .gte('data_agendada', de).lte('data_agendada', ate)
       .order('data_agendada', { ascending: false })
       .order('janela_inicio', { ascending: true, nullsFirst: false })
@@ -224,6 +384,18 @@ export default function Servicos() {
                 onChange={e => setSoProdutivas(e.target.checked)} className="accent-af-600" />
               Ocultar jornada
             </label>
+            <div className="flex rounded-md bg-graf-900 p-0.5">
+              {(['detalhada', 'compacta'] as const).map(d => (
+                <button key={d} onClick={() => setDensidade(d)}
+                  title={d === 'detalhada'
+                    ? 'Mostra O.S. e código de baixa na própria linha'
+                    : 'Uma linha por visita, só o essencial'}
+                  className={`rounded px-2 py-1 text-[11px] font-medium transition ${
+                    densidade === d ? 'bg-af-600 text-white' : 'text-graf-400 hover:text-graf-200'}`}>
+                  {d === 'detalhada' ? 'Detalhada' : 'Compacta'}
+                </button>
+              ))}
+            </div>
             {filtrando > 0 && (
               <button onClick={limpar}
                 className="text-xs text-af-400 underline underline-offset-2">
@@ -265,7 +437,9 @@ export default function Servicos() {
                   <th className="px-3 py-2 font-medium">Endereço</th>
                   <th className="px-3 py-2 font-medium">Equipe</th>
                   <th className="px-3 py-2 font-medium">Área</th>
-                  <th className="px-3 py-2 text-center font-medium">O.S.</th>
+                  <th className={`px-3 py-2 font-medium ${detalhada ? '' : 'text-center'}`}>
+                    {detalhada ? 'Ordens de serviço' : 'O.S.'}
+                  </th>
                   <th className="px-3 py-2 font-medium">Contrato</th>
                   <th className="px-3 py-2 font-medium"></th>
                 </tr>
@@ -295,19 +469,42 @@ export default function Servicos() {
                 {visiveis.map(v => {
                   const exp = aberta === v.id
                   const improd = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
+                  const cor = SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
+                  const marcados = (v.visita_marcador ?? [])
+                    .map(m => ({ m, ind: porIndicador.get(m.indicador_id) }))
+                    .filter(x => x.ind)
                   return (
                     <Fragment key={v.id}>
+                      {/* A faixa colorida à esquerda separa um contrato do
+                          outro e diz a situação antes de qualquer leitura.
+                          Antes a lista era um bloco só, tudo da mesma cor. */}
                       <tr onClick={() => setAberta(exp ? null : v.id)}
-                          className={`cursor-pointer border-b border-graf-800 hover:bg-graf-850
+                          onContextMenu={e => {
+                            // Botão direito abre as ações do contrato —
+                            // é como o COP está acostumado a trabalhar.
+                            e.preventDefault()
+                            setMenu(menu === v.id ? null : v.id)
+                            setPainelMarcador(null); setPainelExcluir(null); setPainelBaixa(null)
+                          }}
+                          style={{
+                            borderLeft: `3px solid ${cor}`,
+                            background: exp
+                              ? undefined
+                              : `color-mix(in srgb, ${cor} 5%, transparent)`,
+                          }}
+                          className={`cursor-pointer border-b-2 border-graf-900 hover:bg-graf-850
                                       ${exp ? 'bg-graf-850' : ''}`}>
                         {de !== ate && (
                           <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-400">
                             {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
                           </td>
                         )}
-                        <td className="tabular whitespace-nowrap px-3 py-2 text-graf-300">
+                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
                           {v.janela_inicio?.slice(0, 5) ?? '—'}
                           {v.janela_fim && <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>}
+                          {detalhada && v.fim && (
+                            <div className="text-[10px] text-graf-500">encerrou {hora(v.fim)}</div>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1.5">
@@ -329,38 +526,319 @@ export default function Servicos() {
                             {v.tipo_atividade?.nome}
                           </div>
                         </td>
-                        <td className="max-w-72 truncate px-3 py-2" title={v.logradouro ?? ''}>
-                          {v.logradouro ?? <span className="text-graf-600">—</span>}
-                          {v.bairro && <span className="ml-1.5 text-xs text-graf-500">{v.bairro}</span>}
+                        <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-80' : 'max-w-72 truncate'}`}
+                            title={v.logradouro ?? ''}>
+                          <div className={detalhada ? '' : 'truncate'}>
+                            {v.logradouro ?? <span className="text-graf-600">—</span>}
+                            {detalhada && v.complemento && (
+                              <span className="text-graf-400">, {v.complemento}</span>
+                            )}
+                          </div>
+                          {v.bairro && <div className="text-xs text-graf-500">{v.bairro}</div>}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-graf-300">
+                        <td className="whitespace-nowrap px-3 py-2 align-top text-graf-300">
                           {v.equipe?.codigo ?? <span className="text-af-400/70">sem equipe</span>}
                           {v.tecnico && (
                             <span className="ml-1.5 text-xs text-graf-500">{v.tecnico.matricula}</span>
                           )}
+                          {detalhada && v.equipe?.supervisor_nome && (
+                            <div className="max-w-40 truncate text-[10px] text-graf-500"
+                                 title={v.equipe.supervisor_nome}>
+                              {v.equipe.supervisor_nome}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-3 py-2 text-xs text-graf-400">{v.area?.apelido ?? '—'}</td>
-                        <td className="tabular px-3 py-2 text-center">
-                          {v.ordem_servico.length > 0
-                            ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
-                                {v.ordem_servico.length}</span>
-                            : <span className="text-graf-600">—</span>}
+                        <td className="px-3 py-2 align-top text-xs text-graf-400">
+                          {v.area?.apelido ?? '—'}
                         </td>
-                        <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-500">
+
+                        {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}
+                        <td className={`px-3 py-2 align-top ${detalhada ? '' : 'tabular text-center'}`}>
+                          {!detalhada ? (
+                            v.ordem_servico.length > 0
+                              ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
+                                  {v.ordem_servico.length}</span>
+                              : <span className="text-graf-600">—</span>
+                          ) : v.ordem_servico.length === 0 ? (
+                            <span className="text-[11px] text-graf-600">—</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
+                                <div key={o.id}
+                                     className="flex flex-wrap items-center gap-x-2 text-[11px]">
+                                  <span className="tabular font-medium text-graf-200">
+                                    {o.numero_os ?? '—'}
+                                  </span>
+                                  <span className="text-graf-400">
+                                    {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
+                                  </span>
+                                  {/* Baixa da OPERADORA — vem do TOA */}
+                                  {o.codigo_baixa ? (
+                                    <span title="Baixa da operadora (TOA)"
+                                      className={`rounded px-1.5 py-0.5 font-medium
+                                                  ${corBaixa(o.codigo_baixa.natureza)}`}>
+                                      <span className="mr-1 opacity-60">TOA</span>
+                                      {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
+                                    </span>
+                                  ) : (
+                                    <span className="text-graf-600">sem baixa do TOA</span>
+                                  )}
+                                  {/* Baixa da AFLINE — a nossa, com sub-falha */}
+                                  {o.baixa_afline && (
+                                    <span title="Baixa da AFLINE"
+                                      className={`rounded px-1.5 py-0.5 font-medium ring-1
+                                                  ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
+                                      <span className="mr-1 opacity-60">AF</span>
+                                      {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
+                                      {o.sub_falha && (
+                                        <span className="ml-1 font-normal opacity-80">
+                                          › {o.sub_falha.nome}
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Marcadores — os indicadores de qualidade que o
+                              analista apontou neste contrato. */}
+                          {detalhada && marcados.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {marcados.map(({ m, ind }) => (
+                                <span key={m.id}
+                                  className="rounded bg-sky-900/40 px-1.5 py-0.5 text-[10px]
+                                             font-medium uppercase tracking-wide text-sky-300
+                                             ring-1 ring-sky-700/40">
+                                  {ind!.nome}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-xs text-graf-500">
                           {v.contrato ?? '—'}
+                          {detalhada && v.wo_numero && (
+                            <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
+                          )}
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
-                            className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
-                                       text-graf-400 hover:border-af-600 hover:text-af-400">
-                            abrir
-                          </Link>
+                        <td className="relative px-3 py-2 text-right align-top">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
+                              className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
+                                         text-graf-400 hover:border-af-600 hover:text-af-400">
+                              abrir
+                            </Link>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation()
+                                setMenu(menu === v.id ? null : v.id)
+                                setPainelMarcador(null)
+                              }}
+                              title="Ações do contrato"
+                              className="rounded border border-graf-700 px-1.5 py-0.5 text-[11px]
+                                         leading-none text-graf-400 hover:border-af-600
+                                         hover:text-af-400">
+                              ⋯
+                            </button>
+                          </div>
+
+                          {menu === v.id && (
+                            <div onClick={e => e.stopPropagation()}
+                              className="absolute right-3 top-9 z-20 w-52 overflow-hidden rounded-lg
+                                         border border-graf-700 bg-graf-900 text-left shadow-xl">
+                              <Link to={`/controle/visita/${v.id}`}
+                                className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
+                                Abrir contrato
+                              </Link>
+                              <button
+                                onClick={() => {
+                                  setPainelMarcador(painelMarcador === v.id ? null : v.id)
+                                  setAberta(v.id); setMenu(null)
+                                }}
+                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                           hover:bg-graf-800">
+                                Marcadores…
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPainelBaixa(v.id); setAberta(v.id); setMenu(null)
+                                  setOsAlvo(v.ordem_servico[0]?.id ?? '')
+                                }}
+                                disabled={v.ordem_servico.length === 0}
+                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                           hover:bg-graf-800 disabled:opacity-40">
+                                Baixar serviço…
+                              </button>
+                              <Link to={`/controle/visita/${v.id}?acao=transferir`}
+                                className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
+                                Transferir equipe
+                              </Link>
+                              <button
+                                onClick={() => {
+                                  setPainelExcluir(v.id); setAberta(v.id); setMenu(null); setMotivo('')
+                                }}
+                                className="block w-full border-t border-graf-800 px-3 py-2
+                                           text-left text-xs text-af-300 hover:bg-af-900/20">
+                                Excluir contrato…
+                              </button>
+                              <div className="border-t border-graf-800 px-3 py-2 text-[10px]
+                                              leading-snug text-graf-600">
+                                Editar não existe: o cadastro vem do TOA e é reescrito a cada
+                                importação.
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
 
                       {exp && (
                         <tr className="border-b border-graf-800 bg-graf-900">
                           <td colSpan={10} className="px-3 py-3">
+                            {/* ---- baixa da AFLINE (D-042) ---- */}
+                            {painelBaixa === v.id && (
+                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
+                                <p className="mb-2 text-xs font-medium text-graf-200">
+                                  Baixar serviço
+                                  <span className="ml-2 font-normal text-graf-500">
+                                    esta é a baixa da AFLINE — a da operadora vem do TOA e não se edita
+                                  </span>
+                                </p>
+                                <div className="flex flex-wrap items-end gap-2">
+                                  <label className="text-[11px] text-graf-400">
+                                    <span className="mb-1 block">O.S.</span>
+                                    <select value={osAlvo} onChange={e => setOsAlvo(e.target.value)}
+                                      className={`${sel} w-64`}>
+                                      {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia)
+                                        .map(o => (
+                                          <option key={o.id} value={o.id}>
+                                            #{o.sequencia} · {o.numero_os} ·{' '}
+                                            {o.tipo_os?.descricao ?? '—'}
+                                          </option>
+                                        ))}
+                                    </select>
+                                  </label>
+                                  <label className="text-[11px] text-graf-400">
+                                    <span className="mb-1 block">Código de baixa</span>
+                                    <select value={codigoSel} onChange={e => setCodigoSel(e.target.value)}
+                                      className={`${sel} w-72`}>
+                                      <option value="">— escolha —</option>
+                                      {codigos.map(c => (
+                                        <option key={c.codigo} value={c.codigo}>
+                                          {c.codigo} · {c.descricao}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="text-[11px] text-graf-400">
+                                    <span className="mb-1 block">
+                                      Sub-falha
+                                      {codigoSel && subFalhas.length === 0 && (
+                                        <span className="ml-1 text-graf-600">
+                                          (nenhuma para este código)
+                                        </span>
+                                      )}
+                                    </span>
+                                    <select value={subSel} onChange={e => setSubSel(e.target.value)}
+                                      disabled={!subFalhas.length} className={`${sel} w-72`}>
+                                      <option value="">— sem sub-falha —</option>
+                                      {subFalhas.map(s => (
+                                        <option key={s.id} value={s.id}>{s.nome}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="min-w-56 flex-1 text-[11px] text-graf-400">
+                                    <span className="mb-1 block">Observação</span>
+                                    <input value={obsBaixa} onChange={e => setObsBaixa(e.target.value)}
+                                      className={`${sel} w-full`} />
+                                  </label>
+                                  <button onClick={() => gravarBaixa(v)}
+                                    disabled={salvandoMarcador || !osAlvo || !codigoSel}
+                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                                               text-white hover:bg-af-500 disabled:opacity-50">
+                                    Confirmar baixa
+                                  </button>
+                                  <button onClick={() => setPainelBaixa(null)}
+                                    className="rounded-md border border-graf-700 px-3 py-1.5
+                                               text-xs text-graf-400">
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ---- exclusão (D-043) ---- */}
+                            {painelExcluir === v.id && (
+                              <div className="mb-3 rounded-lg border border-af-700/60 bg-af-900/15 p-3">
+                                <p className="text-xs font-medium text-af-200">
+                                  Excluir o contrato {v.contrato ?? v.toa_atividade_id}?
+                                </p>
+                                <p className="mt-1 text-[11px] text-af-200/80">
+                                  Ele sai das listas e dos relatórios, mas continua no banco com
+                                  quem excluiu, quando e por quê — e pode ser restaurado. Apagar
+                                  de verdade levaria junto as O.S., o histórico e a base de um mês
+                                  já faturado.
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-end gap-2">
+                                  <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                                    <span className="mb-1 block">Motivo (obrigatório)</span>
+                                    <input value={motivo} onChange={e => setMotivo(e.target.value)}
+                                      autoFocus placeholder="Duplicado, aberto por engano, cancelado pela CLARO…"
+                                      className={`${sel} w-full`} />
+                                  </label>
+                                  <button onClick={() => excluir(v)}
+                                    disabled={salvandoMarcador || !motivo.trim()}
+                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                                               text-white hover:bg-af-500 disabled:opacity-50">
+                                    Excluir
+                                  </button>
+                                  <button onClick={() => { setPainelExcluir(null); setMotivo('') }}
+                                    className="rounded-md border border-graf-700 px-3 py-1.5
+                                               text-xs text-graf-400">
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Anexo 8: os indicadores de qualidade são o que
+                                o analista aponta no contrato do técnico. */}
+                            {painelMarcador === v.id && (
+                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
+                                <p className="mb-2 text-xs font-medium text-graf-200">
+                                  Marcadores de qualidade
+                                  <span className="ml-2 font-normal text-graf-500">
+                                    clique para ligar ou desligar neste contrato
+                                  </span>
+                                </p>
+                                {indicadores.length === 0 ? (
+                                  <p className="text-xs text-graf-500">
+                                    Nenhum indicador cadastrado. Cadastre em Configurações.
+                                  </p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {indicadores.map(ind => {
+                                      const ligado = (v.visita_marcador ?? [])
+                                        .some(m => m.indicador_id === ind.id)
+                                      return (
+                                        <button key={ind.id} disabled={salvandoMarcador}
+                                          onClick={() => alternarMarcador(v, ind)}
+                                          title={`Meta ${ind.meta} · peso ${ind.peso}`}
+                                          className={`rounded-md px-2.5 py-1 text-[11px] font-medium
+                                                      ring-1 transition disabled:opacity-50 ${
+                                            ligado
+                                              ? 'bg-sky-900/40 text-sky-300 ring-sky-700/50'
+                                              : 'bg-graf-900 text-graf-400 ring-graf-700 hover:text-graf-200'}`}>
+                                          {ligado && <span className="mr-1">✓</span>}
+                                          {ind.nome}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-graf-400">
                               {v.cliente_nome && <span>Cliente: <span className="text-graf-200">{v.cliente_nome}</span></span>}
                               {v.node && <span>Node: <span className="text-graf-200">{v.node}</span></span>}

@@ -205,3 +205,77 @@ quatro dimensões da regra.
 > Enquanto isso não se resolve, a tela de detalhe mostra esses campos
 > vazios de propósito, em vez de escondê-los. Campo vazio que deveria ter
 > valor é informação; campo escondido é problema invisível.
+
+---
+
+## Resolvido em 06/09 (tarde) — o caminho escolhido
+
+O Emanuel decidiu o **caminho 1**: importar também o export do ngestor,
+cruzando pela WO. A dependência é aceita e considerada permanente — o
+objetivo do projeto é a camada operacional própria, não cortar a fonte.
+O caminho 2 (achar a origem real, NETSMS) está descartado *por enquanto*.
+O caminho 3 (técnico informa) continua como complemento. Ver **D-030**.
+
+> Isso **desbloqueia parcialmente** a pontuação: com o export do ngestor
+> entrando, as quatro dimensões da regra existem. O que ainda falta são
+> as 8 perguntas acima — elas são sobre a *regra*, não sobre a *fonte*.
+
+## O que o export do TOA realmente carrega — conferido no banco
+
+O Emanuel afirmou que o ngestor tira tipo de pessoa e edificação do
+relatório do TOA. Fui olhar as 470 visitas importadas
+(`visita.dados_origem`, a linha crua). O que existe:
+
+**88 colunas com valor.** Não há coluna `Cliente`, `Tipo de Pessoa`,
+`Edificação` nem `Telefones` — confirmado. Mas há **dois sinais** que
+sustentam a afirmação, e que ninguém tinha olhado:
+
+**1. `Segmentação` carrega o segmento comercial** (298 de 470):
+
+| valor | visitas |
+|---|--:|
+| PURPLE | 160 |
+| SEM SEGMENTO | 90 |
+| **PME** | **29** |
+| WHITE | 11 |
+| **PURPLE PME PF** | **4** |
+| BLACK | 2 |
+| PURPLE INTERNET | 1 |
+| BSOD | 1 |
+
+`PME` é segmento empresarial e `PF` aparece **escrito** em
+`PURPLE PME PF`. É sinal de pessoa física/jurídica — não é o campo.
+
+**2. `Complemento Endereço` carrega a edificação** (216 de 325 com
+endereço). Classificando pelo primeiro termo:
+
+| leitura | visitas | destas, com PME |
+|---|--:|--:|
+| indica CASA (`CASA`, `FD`, `ALT`, `QD`, `LT`) | 104 | 5 |
+| indica APTO/COND (`APT`, `BL`, `TOR`, `COND`) | 79 | 6 |
+| indica COMERCIAL (`LJ`, `SALA`, `BOX`, `CJ`) | 11 | **6** |
+| sem complemento | 109 | 16 |
+| não classificado | 22 | 0 |
+
+Dá para ler **194 de 325** (60%). E a correlação bate: 6 de 11
+"comercial" são PME (55%), contra 5 de 104 nas casas (5%).
+
+### O que isso significa, sem inventar regra
+
+São **derivações plausíveis, não o dado**. Antes de valerem como fonte de
+faturamento, é preciso confirmar com o Emanuel:
+
+1. O ngestor deriva de `Segmentação` e `Complemento Endereço`, como aqui,
+   ou existe **outro relatório do TOA** — com colunas explícitas — que
+   nunca chegou até nós? (São coisas diferentes: a segunda resolve; a
+   primeira é heurística que erra em 40% dos casos.)
+2. Se for derivação: `SEM SEGMENTO` e endereço sem complemento caem em
+   qual lado? Errar aqui é errar dinheiro nos dois sentidos.
+3. `PURPLE PME PF` — segmento que é PME **e** pessoa física ao mesmo
+   tempo. Como a tabela de preço trata isso?
+
+> Comparar os dois exports do mesmo dia pela WO resolve isso em uma
+> consulta: com o `TipoDePessoa` do ngestor ao lado da `Segmentação` do
+> TOA, dá para medir se a derivação acerta — e quanto. É o mesmo método
+> que produziu o de/para de grupo de serviço (D-014). **Basta o arquivo
+> do ngestor.**

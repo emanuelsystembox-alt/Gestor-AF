@@ -10,9 +10,14 @@ const OPERACAO: Item[] = [
   { para: '/controle/servicos', rotulo: 'Serviços' },
   { para: '/controle/equipes', rotulo: 'Equipes' },
   { para: '/controle/produtividade', rotulo: 'Produtividade', futuro: true },
+  { para: '/controle/relatorios', rotulo: 'Relatórios' },
 ]
 const ENTRADA: Item[] = [
   { para: '/controle/importar', rotulo: 'Importar TOA' },
+  { para: '/controle/sub-falhas', rotulo: 'Sub-falhas' },
+]
+const AJUSTES: Item[] = [
+  { para: '/controle/configuracoes', rotulo: 'Configurações' },
 ]
 const FUTURO: Item[] = [
   { para: '/estoque', rotulo: 'Estoque', futuro: true },
@@ -71,6 +76,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
           <div className="px-2">
             <Grupo titulo="Operação" itens={OPERACAO} />
             <Grupo titulo="Entrada de dados" itens={ENTRADA} />
+            <Grupo titulo="Ajustes" itens={AJUSTES} />
             <Grupo titulo="Próximas fases" itens={FUTURO} />
           </div>
         </div>
@@ -103,7 +109,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
 
           {/* navegação móvel */}
           <nav className="flex gap-1 overflow-x-auto border-t border-graf-800 px-4 py-1.5 lg:hidden">
-            {[...OPERACAO, ...ENTRADA].filter(i => !i.futuro).map(i => (
+            {[...OPERACAO, ...ENTRADA, ...AJUSTES].filter(i => !i.futuro).map(i => (
               <NavLink key={i.para} to={i.para}
                 className={({ isActive }) =>
                   `whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${
