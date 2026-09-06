@@ -1,0 +1,47 @@
+-- 029 · Bateria de teste de policy + permissão fina nas RPCs
+--
+-- ┌─ D-054 · TESTE DE POLICY VEM ANTES DE MEXER EM POLICY ──────────┐
+-- │ `testar_policies()` cria usuários reais (auth + perfil) de cada  │
+-- │ papel, TROCA O ROLE para `authenticated`, roda a bateria e apaga │
+-- │ tudo no fim — inclusive se estourar no meio.                     │
+-- │                                                                  │
+-- │ A PRIMEIRA VERSÃO NÃO TESTAVA NADA: era `SECURITY DEFINER`, e    │
+-- │ função definer roda como o owner, que tem BYPASSRLS. Todos os    │
+-- │ cenários "passavam" porque o RLS nem era consultado. Um teste de │
+-- │ policy que roda como superusuário é pior que nenhum, porque dá   │
+-- │ confiança falsa.                                                 │
+-- │                                                                  │
+-- │ A versão boa é INVOKER + `set local role authenticated`.         │
+-- │ 16 cenários, todos verdes.                                       │
+-- └──────────────────────────────────────────────────────────────────┘
+--
+-- ┌─ D-055 · A PERMISSÃO FINA ENTRA NAS RPCs, NÃO NAS POLICIES ─────┐
+-- │ Com o teste no lugar, dava para reescrever as 74 policies. Não   │
+-- │ reescrevi, e o motivo é técnico:                                 │
+-- │                                                                  │
+-- │ Policy roda em TODA linha de TODA consulta. Trocar               │
+-- │ `tem_papel('X')` por subconsulta em perfil_acesso_permissao      │
+-- │ multiplica o custo do RLS na tabela mais lida (`visita`) — e o   │
+-- │ ganho é zero, porque permissão sem papel não abre nada.          │
+-- │                                                                  │
+-- │ O lugar certo é a ENTRADA da ação: a RPC, que roda uma vez por   │
+-- │ operação. É lá que a granularidade importa — um CONTROLADOR que  │
+-- │ pode baixar mas não pode excluir, por exemplo.                   │
+-- │                                                                  │
+-- │   Papel     = quem entra na sala   (policy)                      │
+-- │   Permissão = o que faz lá dentro  (RPC)                         │
+-- │                                                                  │
+-- │ `excluir_visita` e `baixar_os` passaram a exigir as duas coisas. │
+-- │ `visita_marcador` teve a policy de escrita afinada com           │
+-- │ `tem_permissao('servicos.marcadores')` — essa é barata, porque a │
+-- │ tabela é pequena e só é escrita por ação humana.                 │
+-- │                                                                  │
+-- │ Efeito colateral que o teste pegou na hora: usuário COM o papel  │
+-- │ mas SEM perfil de acesso perde as ações. É o comportamento certo │
+-- │ e virou cenário fixo da bateria.                                 │
+-- └──────────────────────────────────────────────────────────────────┘
+--
+-- Funções: testar_policies, _prepara_teste_policy, _limpa_teste_policy.
+-- Nenhuma delas é acessível a `authenticated` — são de manutenção.
+--
+--   select * from testar_policies();   -- esperado: passou = true em tudo

@@ -4,6 +4,7 @@ import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '..
 import type { Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
 import { Alerta, Pill, Vazio } from '../components/ui'
+import { ContratoModal } from '../components/ContratoModal'
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
@@ -77,7 +78,10 @@ export default function Servicos() {
   const [linhas, setLinhas] = useState<V[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
-  const [aberta, setAberta] = useState<string | null>(null)
+  // O contrato abre em JANELA, nao em linha expandida (D-056).
+  const [modal, setModal] = useState<string | null>(null)
+  // Sobe de 1 quando o modal muda algo; os carregamentos ouvem.
+  const [versao, setVersao] = useState(0)
 
   // filtros
   const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(
@@ -104,8 +108,6 @@ export default function Servicos() {
   // Onde desenhar o menu: o sistema atual abre onde o mouse esta, nao
   // encostado na borda direita da tabela.
   const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
-  const [painelMarcador, setPainelMarcador] = useState<string | null>(null)
-  const [salvandoMarcador, setSalvandoMarcador] = useState(false)
 
   useEffect(() => {
     supabase.from('indicador_qualidade')
@@ -116,22 +118,6 @@ export default function Servicos() {
   const porIndicador = useMemo(
     () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
 
-  // ---- exclusão de contrato (D-043: arquiva, não apaga) ----
-  const [painelExcluir, setPainelExcluir] = useState<string | null>(null)
-  const [motivo, setMotivo] = useState('')
-
-  async function excluir(v: V) {
-    if (!motivo.trim()) return
-    setSalvandoMarcador(true); setErro(null)
-    const { error } = await supabase.rpc('excluir_visita',
-      { p_visita: v.id, p_motivo: motivo.trim() })
-    if (error) setErro(error.message)
-    else {
-      setLinhas(ls => ls.filter(x => x.id !== v.id))
-      setPainelExcluir(null); setMotivo(''); setMenu(null)
-    }
-    setSalvandoMarcador(false)
-  }
 
   // ---- pontuação do contrato (D-045) ----
   // Uma chamada por período, não uma por linha: `pontos_por_periodo`
@@ -145,43 +131,20 @@ export default function Servicos() {
       for (const p of (data ?? []) as PontoVisita[]) m.set(p.visita_id, p)
       setPontos(m)
     })
-  }, [de, ate])
+  }, [de, ate, versao])
 
 
   // ---- transferência rápida, sem sair da lista ----
-  const [painelTransferir, setPainelTransferir] = useState<string | null>(null)
   const [equipes, setEquipes] = useState<{ id: string; codigo: string; nome: string }[]>([])
-  const [equipeDestino, setEquipeDestino] = useState('')
-  const [motivoTransf, setMotivoTransf] = useState('')
 
   useEffect(() => {
     supabase.from('equipe').select('id, codigo, nome').eq('ativo', true).order('codigo')
       .then(({ data }) => setEquipes((data ?? []) as { id: string; codigo: string; nome: string }[]))
   }, [])
 
-  async function transferir(v: V) {
-    if (!equipeDestino) return
-    setSalvandoMarcador(true); setErro(null)
-    const { error } = await supabase.rpc('transferir_visita', {
-      p_visita: v.id, p_equipe: equipeDestino, p_motivo: motivoTransf || null,
-    })
-    if (error) setErro(error.message)
-    else {
-      setPainelTransferir(null); setEquipeDestino(''); setMotivoTransf('')
-      const { data } = await supabase.from('visita').select(SELECT).eq('id', v.id).single()
-      if (data) setLinhas(ls => ls.map(x => x.id === v.id ? (data as unknown as V) : x))
-    }
-    setSalvandoMarcador(false)
-  }
 
   // ---- baixa da AFLINE, com sub-falha do código escolhido ----
-  const [painelBaixa, setPainelBaixa] = useState<string | null>(null)
   const [codigos, setCodigos] = useState<{ codigo: number; descricao: string }[]>([])
-  const [osAlvo, setOsAlvo] = useState<string>('')
-  const [codigoSel, setCodigoSel] = useState<string>('')
-  const [subFalhas, setSubFalhas] = useState<{ id: string; nome: string }[]>([])
-  const [subSel, setSubSel] = useState<string>('')
-  const [obsBaixa, setObsBaixa] = useState('')
 
   // Os dois conjuntos de sub-falha convivem no banco; só um vale. Sem
   // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
@@ -195,63 +158,8 @@ export default function Servicos() {
         setConjunto((data as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
   }, [])
 
-  // A sub-falha depende do código: trocou o código, a lista muda.
-  useEffect(() => {
-    setSubSel('')
-    if (!codigoSel) { setSubFalhas([]); return }
-    let q = supabase.from('sub_falha').select('id, nome').eq('codigo', Number(codigoSel))
-    if (conjunto) q = q.eq('conjunto', conjunto)
-    q.order('ordem').then(({ data }) =>
-      setSubFalhas((data ?? []) as { id: string; nome: string }[]))
-  }, [codigoSel, conjunto])
 
-  async function gravarBaixa(v: V) {
-    if (!osAlvo || !codigoSel) return
-    setSalvandoMarcador(true); setErro(null)
-    const { error } = await supabase.rpc('baixar_os', {
-      p_os: osAlvo,
-      p_codigo: Number(codigoSel),
-      p_sub_falha: subSel || null,
-      p_observacao: obsBaixa || null,
-      p_situacao: null,
-    })
-    if (error) setErro(error.message)
-    else {
-      setPainelBaixa(null); setOsAlvo(''); setCodigoSel(''); setSubSel(''); setObsBaixa('')
-      // recarrega só a visita tocada
-      const { data } = await supabase.from('visita').select(SELECT).eq('id', v.id).single()
-      if (data) setLinhas(ls => ls.map(x => x.id === v.id ? (data as unknown as V) : x))
-    }
-    setSalvandoMarcador(false)
-  }
 
-  /** Liga/desliga um marcador no contrato e atualiza a linha na hora. */
-  async function alternarMarcador(v: V, ind: Indicador) {
-    const atual = v.visita_marcador?.find(m => m.indicador_id === ind.id)
-    setSalvandoMarcador(true)
-    try {
-      if (atual) {
-        const { error } = await supabase.from('visita_marcador')
-          .delete().eq('id', atual.id)
-        if (error) throw new Error(error.message)
-        setLinhas(ls => ls.map(x => x.id === v.id
-          ? { ...x, visita_marcador: x.visita_marcador.filter(m => m.id !== atual.id) }
-          : x))
-      } else {
-        const { data, error } = await supabase.from('visita_marcador')
-          .insert({ visita_id: v.id, indicador_id: ind.id })
-          .select('id, indicador_id, cumprido').single()
-        if (error) throw new Error(error.message)
-        setLinhas(ls => ls.map(x => x.id === v.id
-          ? { ...x, visita_marcador: [...x.visita_marcador, data as Marcador] }
-          : x))
-      }
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não consegui gravar o marcador.')
-    } finally {
-      setSalvandoMarcador(false)
-    }
-  }
 
   useEffect(() => {
     supabase.from('visita').select('data_agendada')
@@ -279,7 +187,7 @@ export default function Servicos() {
         setCarregando(false)
       })
     return () => { vivo = false }
-  }, [de, ate])
+  }, [de, ate, versao])
 
   const base = useMemo(() => soProdutivas
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
@@ -523,7 +431,6 @@ export default function Servicos() {
                 )}
 
                 {visiveis.map(v => {
-                  const exp = aberta === v.id
                   const improd = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
                   const cor = SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
                   const marcados = (v.visita_marcador ?? [])
@@ -534,23 +441,19 @@ export default function Servicos() {
                       {/* A faixa colorida à esquerda separa um contrato do
                           outro e diz a situação antes de qualquer leitura.
                           Antes a lista era um bloco só, tudo da mesma cor. */}
-                      <tr onClick={() => setAberta(exp ? null : v.id)}
+                      <tr onClick={() => setModal(v.id)}
                           onContextMenu={e => {
                             // Botão direito abre as ações do contrato —
                             // é como o COP está acostumado a trabalhar.
                             e.preventDefault()
                             setMenu(menu === v.id ? null : v.id)
                             setMenuXY({ x: e.clientX, y: e.clientY })
-                            setPainelMarcador(null); setPainelExcluir(null); setPainelBaixa(null)
                           }}
                           style={{
                             borderLeft: `3px solid ${cor}`,
-                            background: exp
-                              ? undefined
-                              : `color-mix(in srgb, ${cor} 5%, transparent)`,
+                            background: `color-mix(in srgb, ${cor} 8%, transparent)`,
                           }}
-                          className={`cursor-pointer border-b-2 border-graf-900 hover:bg-graf-850
-                                      ${exp ? 'bg-graf-850' : ''}`}>
+                          className="cursor-pointer border-b-2 border-graf-900 hover:bg-graf-850">
                         {de !== ate && (
                           <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-400">
                             {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
@@ -634,7 +537,7 @@ export default function Servicos() {
                                     <span title="Baixa da operadora (TOA)"
                                       className={`rounded px-1.5 py-0.5 font-medium
                                                   ${corBaixa(o.codigo_baixa.natureza)}`}>
-                                      <span className="mr-1 opacity-60">TOA</span>
+                                      <span className="mr-1 opacity-70">Baixa TOA</span>
                                       {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
                                     </span>
                                   ) : (
@@ -645,7 +548,7 @@ export default function Servicos() {
                                     <span title="Baixa da AFLINE"
                                       className={`rounded px-1.5 py-0.5 font-medium ring-1
                                                   ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
-                                      <span className="mr-1 opacity-60">AF</span>
+                                      <span className="mr-1 opacity-70">Baixa ngestor</span>
                                       {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
                                       {o.sub_falha && (
                                         <span className="ml-1 font-normal opacity-80">
@@ -706,7 +609,6 @@ export default function Servicos() {
                                 e.stopPropagation()
                                 setMenu(menu === v.id ? null : v.id)
                                 setMenuXY({ x: e.clientX, y: e.clientY })
-                                setPainelMarcador(null)
                               }}
                               title="Ações do contrato"
                               className="rounded border border-graf-700 px-1.5 py-0.5 text-[11px]
@@ -729,38 +631,26 @@ export default function Servicos() {
                                 Abrir contrato
                               </Link>
                               <button
-                                onClick={() => {
-                                  setPainelMarcador(painelMarcador === v.id ? null : v.id)
-                                  setAberta(v.id); setMenu(null)
-                                }}
+                                onClick={() => { setModal(v.id); setMenu(null) }}
                                 className="block w-full px-3 py-2 text-left text-xs text-graf-200
                                            hover:bg-graf-800">
                                 Marcadores…
                               </button>
                               <button
-                                onClick={() => {
-                                  setPainelBaixa(v.id); setAberta(v.id); setMenu(null)
-                                  setPainelTransferir(null); setPainelExcluir(null)
-                                  setOsAlvo(v.ordem_servico[0]?.id ?? '')
-                                }}
+                                onClick={() => { setModal(v.id); setMenu(null) }}
                                 disabled={v.ordem_servico.length === 0}
                                 className="block w-full px-3 py-2 text-left text-xs text-graf-200
                                            hover:bg-graf-800 disabled:opacity-40">
                                 Baixar serviço…
                               </button>
                               <button
-                                onClick={() => {
-                                  setPainelTransferir(v.id); setAberta(v.id); setMenu(null)
-                                  setEquipeDestino(''); setMotivoTransf('')
-                                }}
+                                onClick={() => { setModal(v.id); setMenu(null) }}
                                 className="block w-full px-3 py-2 text-left text-xs text-graf-200
                                            hover:bg-graf-800">
                                 Transferir equipe…
                               </button>
                               <button
-                                onClick={() => {
-                                  setPainelExcluir(v.id); setAberta(v.id); setMenu(null); setMotivo('')
-                                }}
+                                onClick={() => { setModal(v.id); setMenu(null) }}
                                 className="block w-full border-t border-graf-800 px-3 py-2
                                            text-left text-xs text-af-300 hover:bg-af-900/20">
                                 Excluir contrato…
@@ -775,241 +665,6 @@ export default function Servicos() {
                         </td>
                       </tr>
 
-                      {exp && (
-                        <tr className="border-b border-graf-800 bg-graf-900">
-                          <td colSpan={10} className="px-3 py-3">
-                            {/* ---- transferência rápida ---- */}
-                            {painelTransferir === v.id && (
-                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
-                                <p className="mb-2 text-xs font-medium text-graf-200">
-                                  Transferir contrato
-                                  <span className="ml-2 font-normal text-graf-500">
-                                    de {v.equipe?.codigo ?? 'sem equipe'} para outra equipe — fica no histórico
-                                  </span>
-                                </p>
-                                <div className="flex flex-wrap items-end gap-2">
-                                  <label className="text-[11px] text-graf-400">
-                                    <span className="mb-1 block">Equipe destino</span>
-                                    <select value={equipeDestino}
-                                      onChange={e => setEquipeDestino(e.target.value)}
-                                      className={`${sel} w-56`}>
-                                      <option value="">— escolha —</option>
-                                      {equipes.filter(e => e.codigo !== v.equipe?.codigo).map(e => (
-                                        <option key={e.id} value={e.id}>{e.codigo} · {e.nome}</option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="min-w-56 flex-1 text-[11px] text-graf-400">
-                                    <span className="mb-1 block">Motivo</span>
-                                    <input value={motivoTransf}
-                                      onChange={e => setMotivoTransf(e.target.value)}
-                                      placeholder="Por que está transferindo?"
-                                      className={`${sel} w-full`} />
-                                  </label>
-                                  <button onClick={() => transferir(v)}
-                                    disabled={salvandoMarcador || !equipeDestino}
-                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
-                                               text-white hover:bg-af-500 disabled:opacity-50">
-                                    Transferir
-                                  </button>
-                                  <button onClick={() => setPainelTransferir(null)}
-                                    className="rounded-md border border-graf-700 px-3 py-1.5
-                                               text-xs text-graf-400">
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* ---- baixa da AFLINE (D-042) ---- */}
-                            {painelBaixa === v.id && (
-                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
-                                <p className="mb-2 text-xs font-medium text-graf-200">
-                                  Baixar serviço
-                                  <span className="ml-2 font-normal text-graf-500">
-                                    esta é a baixa da AFLINE — a da operadora vem do TOA e não se edita
-                                  </span>
-                                </p>
-                                <div className="flex flex-wrap items-end gap-2">
-                                  <label className="text-[11px] text-graf-400">
-                                    <span className="mb-1 block">O.S.</span>
-                                    <select value={osAlvo} onChange={e => setOsAlvo(e.target.value)}
-                                      className={`${sel} w-64`}>
-                                      {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia)
-                                        .map(o => (
-                                          <option key={o.id} value={o.id}>
-                                            #{o.sequencia} · {o.numero_os} ·{' '}
-                                            {o.tipo_os?.descricao ?? '—'}
-                                          </option>
-                                        ))}
-                                    </select>
-                                  </label>
-                                  <label className="text-[11px] text-graf-400">
-                                    <span className="mb-1 block">Código de baixa</span>
-                                    <select value={codigoSel} onChange={e => setCodigoSel(e.target.value)}
-                                      className={`${sel} w-72`}>
-                                      <option value="">— escolha —</option>
-                                      {codigos.map(c => (
-                                        <option key={c.codigo} value={c.codigo}>
-                                          {c.codigo} · {c.descricao}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="text-[11px] text-graf-400">
-                                    <span className="mb-1 block">
-                                      Sub-falha
-                                      {codigoSel && subFalhas.length === 0 && (
-                                        <span className="ml-1 text-graf-600">
-                                          (nenhuma para este código)
-                                        </span>
-                                      )}
-                                    </span>
-                                    <select value={subSel} onChange={e => setSubSel(e.target.value)}
-                                      disabled={!subFalhas.length} className={`${sel} w-72`}>
-                                      <option value="">— sem sub-falha —</option>
-                                      {subFalhas.map(s => (
-                                        <option key={s.id} value={s.id}>{s.nome}</option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="min-w-56 flex-1 text-[11px] text-graf-400">
-                                    <span className="mb-1 block">Observação</span>
-                                    <input value={obsBaixa} onChange={e => setObsBaixa(e.target.value)}
-                                      className={`${sel} w-full`} />
-                                  </label>
-                                  <button onClick={() => gravarBaixa(v)}
-                                    disabled={salvandoMarcador || !osAlvo || !codigoSel}
-                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
-                                               text-white hover:bg-af-500 disabled:opacity-50">
-                                    Confirmar baixa
-                                  </button>
-                                  <button onClick={() => setPainelBaixa(null)}
-                                    className="rounded-md border border-graf-700 px-3 py-1.5
-                                               text-xs text-graf-400">
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* ---- exclusão (D-043) ---- */}
-                            {painelExcluir === v.id && (
-                              <div className="mb-3 rounded-lg border border-af-700/60 bg-af-900/15 p-3">
-                                <p className="text-xs font-medium text-af-200">
-                                  Excluir o contrato {v.contrato ?? v.toa_atividade_id}?
-                                </p>
-                                <p className="mt-1 text-[11px] text-af-200/80">
-                                  Ele sai das listas e dos relatórios, mas continua no banco com
-                                  quem excluiu, quando e por quê — e pode ser restaurado. Apagar
-                                  de verdade levaria junto as O.S., o histórico e a base de um mês
-                                  já faturado.
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-end gap-2">
-                                  <label className="min-w-64 flex-1 text-[11px] text-graf-400">
-                                    <span className="mb-1 block">Motivo (obrigatório)</span>
-                                    <input value={motivo} onChange={e => setMotivo(e.target.value)}
-                                      autoFocus placeholder="Duplicado, aberto por engano, cancelado pela CLARO…"
-                                      className={`${sel} w-full`} />
-                                  </label>
-                                  <button onClick={() => excluir(v)}
-                                    disabled={salvandoMarcador || !motivo.trim()}
-                                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
-                                               text-white hover:bg-af-500 disabled:opacity-50">
-                                    Excluir
-                                  </button>
-                                  <button onClick={() => { setPainelExcluir(null); setMotivo('') }}
-                                    className="rounded-md border border-graf-700 px-3 py-1.5
-                                               text-xs text-graf-400">
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Anexo 8: os indicadores de qualidade são o que
-                                o analista aponta no contrato do técnico. */}
-                            {painelMarcador === v.id && (
-                              <div className="mb-3 rounded-lg border border-graf-700 bg-graf-850 p-3">
-                                <p className="mb-2 text-xs font-medium text-graf-200">
-                                  Marcadores de qualidade
-                                  <span className="ml-2 font-normal text-graf-500">
-                                    clique para ligar ou desligar neste contrato
-                                  </span>
-                                </p>
-                                {indicadores.length === 0 ? (
-                                  <p className="text-xs text-graf-500">
-                                    Nenhum indicador cadastrado. Cadastre em Configurações.
-                                  </p>
-                                ) : (
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {indicadores.map(ind => {
-                                      const ligado = (v.visita_marcador ?? [])
-                                        .some(m => m.indicador_id === ind.id)
-                                      return (
-                                        <button key={ind.id} disabled={salvandoMarcador}
-                                          onClick={() => alternarMarcador(v, ind)}
-                                          title={`Meta ${ind.meta} · peso ${ind.peso}`}
-                                          className={`rounded-md px-2.5 py-1 text-[11px] font-medium
-                                                      ring-1 transition disabled:opacity-50 ${
-                                            ligado
-                                              ? 'bg-sky-900/40 text-sky-300 ring-sky-700/50'
-                                              : 'bg-graf-900 text-graf-400 ring-graf-700 hover:text-graf-200'}`}>
-                                          {ligado && <span className="mr-1">✓</span>}
-                                          {ind.nome}
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-graf-400">
-                              {v.cliente_nome && <span>Cliente: <span className="text-graf-200">{v.cliente_nome}</span></span>}
-                              {v.node && <span>Node: <span className="text-graf-200">{v.node}</span></span>}
-                              {v.toa_atividade_id && <span>Atividade TOA: <span className="tabular text-graf-200">{v.toa_atividade_id}</span></span>}
-                              {v.wo_numero && <span>WO: <span className="tabular text-graf-200">{v.wo_numero}</span></span>}
-                              {v.equipe?.supervisor_nome && <span>Supervisor: <span className="text-graf-200">{v.equipe.supervisor_nome}</span></span>}
-                            </div>
-                            {v.ordem_servico.length === 0 ? (
-                              <p className="text-xs text-graf-500">
-                                Nenhuma O.S. — apontamento de jornada.
-                              </p>
-                            ) : (
-                              <div className="space-y-1">
-                                {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
-                                  <div key={o.id}
-                                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded
-                                               border border-graf-800 bg-graf-850 px-2.5 py-1.5 text-xs">
-                                    <span className="tabular text-graf-500">#{o.sequencia}</span>
-                                    <span className="tabular font-medium">{o.numero_os}</span>
-                                    <span className="text-graf-300">
-                                      {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
-                                    </span>
-                                    {o.codigo_baixa ? (
-                                      <span className={`ml-auto rounded px-1.5 py-0.5 font-medium ${
-                                        o.codigo_baixa.natureza === 'SUCESSO'
-                                          ? 'bg-emerald-900/40 text-emerald-300'
-                                          : o.codigo_baixa.natureza === 'IMPRODUTIVA'
-                                          ? 'bg-af-900/40 text-af-300'
-                                          : 'bg-graf-800 text-graf-400'}`}>
-                                        {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
-                                        {o.codigo_baixa.responsabilidade && (
-                                          <span className="ml-1.5 opacity-70">
-                                            ({o.codigo_baixa.responsabilidade.toLowerCase()})
-                                          </span>
-                                        )}
-                                      </span>
-                                    ) : (
-                                      <span className="ml-auto text-graf-600">sem baixa</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   )
                 })}
@@ -1029,6 +684,19 @@ export default function Servicos() {
             ` · ${linhas.length - base.length} apontamentos de jornada ocultos`}
         </p>
       </div>
+
+      {modal && (
+        <ContratoModal
+          id={modal}
+          indicadores={indicadores}
+          codigos={codigos}
+          conjunto={conjunto}
+          equipes={equipes}
+          pontos={pontos.get(modal) ?? null}
+          onFechar={() => setModal(null)}
+          onMudou={() => setVersao(x => x + 1)}
+        />
+      )}
     </Shell>
   )
 }

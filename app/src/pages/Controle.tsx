@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { calcular, csvPorTipo, type Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
+import { StatusEPontos } from '../components/StatusEPontos'
 import { Alerta, Vazio } from '../components/ui'
 import {
   BarraEmpilhada, BarrasHorizontais, ColunasPorHora,
@@ -232,6 +233,9 @@ export default function Controle() {
 
         {!carregando && linhas.length > 0 && (
           <>
+            {/* ===== situação em cartões + volume x pontos (anexos 3 e 4) ===== */}
+            <StatusEPontos linhas={linhas} de={de} ate={ate} />
+
             {/* ================= indicadores ================= */}
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Indicador rotulo="Visitas produtivas" valor={m.produtivas}
