@@ -6,6 +6,7 @@ import { Alerta, Logo, Pill, Vazio } from '../components/ui'
 
 interface VisitaCard {
   id: string
+  contrato: string | null
   cliente_nome: string | null
   logradouro: string | null
   bairro: string | null
@@ -15,7 +16,9 @@ interface VisitaCard {
   lat: number | null
   lng: number | null
   tipo_atividade: { nome: string; natureza: string } | null
-  ordem_servico: { id: string; numero_os: string }[]
+  tipo_servico: { nome: string } | null
+  ordem_servico: { id: string; numero_os: string
+                   codigo_baixa_afline_id: string | null }[]
 }
 
 const hojeISO = () => new Date().toISOString().slice(0, 10)
@@ -34,11 +37,13 @@ export default function Campo() {
     supabase
       .from('visita')
       .select(`
-        id, cliente_nome, logradouro, bairro, janela_inicio, janela_fim,
+        id, contrato, cliente_nome, logradouro, bairro, janela_inicio, janela_fim,
         situacao, lat, lng,
         tipo_atividade:tipo_atividade_id ( nome, natureza ),
-        ordem_servico ( id, numero_os )
+        tipo_servico:tipo_servico_id ( nome ),
+        ordem_servico ( id, numero_os, codigo_baixa_afline_id )
       `)
+      .is('excluido_em', null)
       .eq('data_agendada', data)
       .order('janela_inicio', { ascending: true, nullsFirst: false })
       .then(({ data: d, error }) => {
@@ -65,7 +70,11 @@ export default function Campo() {
           <Logo tamanho={30} />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-sm font-semibold">{perfil?.nome ?? 'Técnico'}</div>
-            <div className="text-[11px] text-graf-500">Minha agenda</div>
+            {/* O login aparece aqui porque é ele que vai no histórico de
+                cada etapa que o técnico registrar. */}
+            <div className="truncate text-[11px] text-graf-500">
+              {perfil?.email ?? 'Minha agenda'}
+            </div>
           </div>
           <button onClick={sair}
                   className="ml-auto rounded-lg px-3 py-1.5 text-sm text-graf-500 hover:bg-graf-50">
@@ -127,8 +136,11 @@ export default function Campo() {
                 </div>
 
                 <p className="text-base font-semibold leading-snug">
-                  {v.tipo_atividade?.nome ?? 'Visita'}
+                  {v.tipo_servico?.nome ?? v.tipo_atividade?.nome ?? 'Visita'}
                 </p>
+                {v.cliente_nome && (
+                  <p className="text-sm leading-snug text-graf-600">{v.cliente_nome}</p>
+                )}
 
                 {v.logradouro && (
                   <p className="mt-1 text-sm leading-snug text-graf-600">
@@ -137,12 +149,20 @@ export default function Campo() {
                   </p>
                 )}
 
-                {v.ordem_servico.length > 0 && (
-                  <p className="mt-2 inline-flex rounded-md bg-af-50 px-2 py-0.5 text-xs
-                                font-semibold text-af-700">
-                    {v.ordem_servico.length} O.S. nesta visita
-                  </p>
-                )}
+                {v.ordem_servico.length > 0 && (() => {
+                  // "3 O.S." não diz o que falta fazer. "1 de 3 baixadas" diz.
+                  const feitas = v.ordem_servico
+                    .filter(o => o.codigo_baixa_afline_id).length
+                  const tudo = feitas === v.ordem_servico.length
+                  return (
+                    <p className={`mt-2 inline-flex rounded-md px-2 py-0.5 text-xs
+                                   font-semibold ${tudo
+                                     ? 'bg-emerald-50 text-emerald-700'
+                                     : 'bg-af-50 text-af-700'}`}>
+                      {feitas} de {v.ordem_servico.length} O.S. baixadas
+                    </p>
+                  )
+                })()}
               </div>
 
               <span aria-hidden className="mt-1 text-2xl leading-none text-graf-300">›</span>
