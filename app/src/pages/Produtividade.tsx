@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar } from '../components/ui'
+import { num2, pts, reais } from '../lib/formato'
 
 /**
  * Produtividade e comissão.
@@ -43,6 +44,9 @@ interface Linha {
   dias: number
   meta: number | null
   fator: number | null
+  /** pontuação × fator. Nulo quando não há faixa — nulo diz "não há
+   *  regra ainda"; zero diria "calculei e deu nada". */
+  valor: number | null
 }
 
 interface Faixa { id: string; pontos_de: number; pontos_ate: number; fator: number }
@@ -50,8 +54,6 @@ interface Faixa { id: string; pontos_de: number; pontos_ate: number; fator: numb
 type Dimensao = 'tecnico' | 'equipe' | 'supervisor'
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
-const n2 = (x: number) => x.toFixed(2).replace('.', ',')
-const n4 = (x: number) => x.toFixed(4).replace('.', ',')
 
 /** Primeiro e último dia do mês corrente — comissão é mensal. */
 function mesCorrente() {
@@ -160,9 +162,17 @@ export default function Produtividade() {
 
   const uteis = useMemo(() => diasUteis(de, ate), [de, ate])
 
+  /**
+   * Vale a MAIOR faixa cujo início já foi alcançado — por piso, não por
+   * intervalo fechado. A tabela é escrita em inteiros (190→199, depois
+   * 200→219) e a nossa pontuação não é inteira: com intervalo fechado,
+   * 199,50 pontos não cairia em faixa nenhuma e o técnico receberia
+   * zero. Mesma regra do banco (`fator_da_pontuacao`, migration 038b).
+   */
   function fatorDe(pontos: number): number | null {
-    const f = faixas.find(x => pontos >= Number(x.pontos_de) && pontos <= Number(x.pontos_ate))
-    return f ? Number(f.fator) : null
+    let achado: number | null = null
+    for (const f of faixas) if (pontos >= Number(f.pontos_de)) achado = Number(f.fator)
+    return achado
   }
 
   async function salvarFaixas() {
@@ -243,8 +253,8 @@ export default function Produtividade() {
             ['Concluídos', String(totais.concluidas)],
             ['Visitas', String(totais.visitas)],
             ['Ordens de serviço', String(totais.ordens)],
-            ['Pontos CLARO', n4(totais.pontos)],
-            ['Meta por técnico', meta == null ? '—' : n2(Number(meta))],
+            ['Pontos CLARO', pts(totais.pontos)],
+            ['Meta por técnico', meta == null ? '—' : num2(Number(meta))],
           ].map(([r, v]) => (
             <div key={r} className="card-controle px-3.5 py-3">
               <div className="tabular text-2xl font-semibold leading-none">{v}</div>
@@ -283,17 +293,18 @@ export default function Produtividade() {
                       Meta{dim !== 'tecnico' && <span className="normal-case"> (só por técnico)</span>}
                     </th>
                     <th className="px-3 py-2 text-right font-medium">Fator</th>
+                    <th className="px-3 py-2 text-right font-medium">A receber</th>
                   </tr>
                 </thead>
                 <tbody>
                   {agrupadas.map((l, i) => {
-                    const pts = Number(l.pontos)
-                    const media = l.dias > 0 ? pts / l.dias : 0
+                    const p = Number(l.pontos)
+                    const media = l.dias > 0 ? p / l.dias : 0
                     // Previsão: o ritmo de hoje até o fim do período.
                     const previsao = media * uteis
                     const alvo = Number(l.meta ?? meta ?? 0)
-                    const pct = alvo > 0 ? Math.min(100, (pts / alvo) * 100) : 0
-                    const fator = fatorDe(pts)
+                    const pct = alvo > 0 ? Math.min(100, (p / alvo) * 100) : 0
+                    const fator = fatorDe(p)
                     return (
                       <tr key={`${l.tecnico_id ?? l.tecnico ?? i}`}
                           className="border-b border-graf-800/60">
@@ -319,11 +330,11 @@ export default function Produtividade() {
                         <td className="tabular px-3 py-2 text-right font-medium">{l.concluidas}</td>
                         <td className="tabular px-3 py-2 text-right text-graf-400">{l.ordens}</td>
                         <td className="tabular px-3 py-2 text-right font-semibold text-emerald-400">
-                          {n4(pts)}
+                          {pts(p)}
                         </td>
                         <td className="tabular px-3 py-2 text-right text-graf-400">{l.dias}</td>
-                        <td className="tabular px-3 py-2 text-right text-graf-300">{n2(media)}</td>
-                        <td className="tabular px-3 py-2 text-right text-graf-300">{n2(previsao)}</td>
+                        <td className="tabular px-3 py-2 text-right text-graf-300">{num2(media)}</td>
+                        <td className="tabular px-3 py-2 text-right text-graf-300">{num2(previsao)}</td>
                         <td className="px-3 py-2">
                           {/* Meta e fator são POR TÉCNICO. Somar os pontos de
                               uma equipe e comparar com a meta individual daria
@@ -344,7 +355,16 @@ export default function Produtividade() {
                         <td className="tabular px-3 py-2 text-right">
                           {dim !== 'tecnico' || fator == null
                             ? <span className="text-graf-600">—</span>
-                            : <span className="font-semibold text-emerald-400">{n2(fator)}</span>}
+                            : <span className="font-semibold text-emerald-400">{num2(fator)}</span>}
+                        </td>
+                        {/* A receber = pontuação × fator. Sem faixa não há
+                            fator, e sem fator não há valor. */}
+                        <td className="tabular px-3 py-2 text-right">
+                          {dim !== 'tecnico' || fator == null
+                            ? <span className="text-graf-600">—</span>
+                            : <span className="font-semibold text-emerald-300">
+                                {reais(p * fator)}
+                              </span>}
                         </td>
                       </tr>
                     )
@@ -361,7 +381,7 @@ export default function Produtividade() {
             <div>
               <h2 className="text-sm font-semibold">Tabela de comissão · SINGLE MASTER</h2>
               <p className="mt-0.5 text-xs text-graf-400">
-                Meta de <strong className="tabular">{meta == null ? '—' : n2(Number(meta))}</strong>
+                Meta de <strong className="tabular">{meta == null ? '—' : num2(Number(meta))}</strong>
                 {' '}pontos no mês. Abaixo dela não há fator.
               </p>
             </div>
@@ -399,7 +419,7 @@ export default function Produtividade() {
               <label className="text-[11px] text-graf-400">
                 <span className="mb-1 block">Nova meta (deixe vazio para não mudar)</span>
                 <input value={metaNova} onChange={e => setMetaNova(e.target.value)}
-                  placeholder={meta == null ? '120' : n2(Number(meta))}
+                  placeholder={meta == null ? '120' : num2(Number(meta))}
                   className={`tabular ${sel} w-32`} />
               </label>
               <p className="mt-1.5 text-[11px] text-graf-500">
@@ -429,7 +449,7 @@ export default function Produtividade() {
                             onChange={e => setRascunho(r => r.map((x, j) =>
                               j === i ? { ...x, [k]: e.target.value as unknown as number } : x))} />
                         ) : (
-                          <span className="tabular">{n2(Number(f[k]))}</span>
+                          <span className="tabular">{num2(Number(f[k]))}</span>
                         )}
                       </td>
                     ))}
@@ -439,13 +459,12 @@ export default function Produtividade() {
             </table>
           </div>
 
-          <Alerta tipo="aviso">
-            <strong>Falta a regra do dinheiro.</strong> A tabela dá o <em>fator</em>, mas o que
-            o fator multiplica para virar reais não está em lugar nenhum que a gente tenha —
-            na tela do sistema atual o valor aparece como R$&nbsp;0,00 porque a pontuação está
-            abaixo da primeira faixa, e de um zero não se deduz a fórmula. Enquanto o Emanuel
-            não disser, a coluna “A receber” não existe aqui: preferimos não mostrar número de
-            dinheiro que a gente teria chutado.
+          <Alerta tipo="info">
+            <strong>A receber = pontuação × fator.</strong> O fator sai da maior faixa
+            cujo início a pontuação do mês já alcançou — por piso, e não por intervalo
+            fechado: a tabela é escrita em inteiros (190→199, depois 200→219) e a nossa
+            pontuação não é, então com intervalo fechado alguém com 199,50 pontos cairia
+            fora de todas as faixas e receberia zero.
           </Alerta>
         </section>
       </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
+import { pts } from '../lib/formato'
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -284,7 +285,7 @@ export function ContratoModal({
               <span title={`Edificação ${pontos.edificacao} (${pontos.edificacao_de.toLowerCase()})`}
                 className="rounded bg-emerald-900/30 px-2 py-1 text-xs font-semibold
                            text-emerald-300 ring-1 ring-emerald-700/40">
-                ★ {Number(pontos.pontos_claro).toFixed(4)} pts
+                ★ {pts(pontos.pontos_claro)}
               </span>
             )}
             <button onClick={abrirEdicao} disabled={!v}

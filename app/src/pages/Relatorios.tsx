@@ -7,6 +7,7 @@ import {
 } from '../lib/relatorio'
 import { Shell } from '../components/Shell'
 import { Alerta } from '../components/ui'
+import { pts } from '../lib/formato'
 
 /**
  * Relatórios — por contrato e por O.S.
@@ -244,7 +245,7 @@ export default function Relatorios() {
           {[
             ['Visitas', String(filtradas.length)],
             ['Ordens de serviço', String(totalOS)],
-            ['Pontuação CLARO', somaPontos.toFixed(4).replace('.', ',')],
+            ['Pontuação CLARO', pts(somaPontos)],
             ['Sem regra de pontuação', String(semRegra)],
           ].map(([rot, val], i) => (
             <div key={rot} className={`card-controle px-3.5 py-3 ${

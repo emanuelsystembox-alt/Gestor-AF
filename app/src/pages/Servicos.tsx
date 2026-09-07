@@ -5,6 +5,7 @@ import type { Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
 import { Alerta, Pill, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
+import { pts, dataBR, diaSemana } from '../lib/formato'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 
 const SELECT = `
@@ -436,7 +437,10 @@ export default function Servicos() {
               <thead className="border-b border-graf-700 bg-graf-900 text-left
                                 text-[11px] uppercase tracking-wide text-graf-400">
                 <tr>
-                  {de !== ate && <th className="px-3 py-2 font-medium">Data</th>}
+                  {/* O contrato vem primeiro: e' por ele que se procura, se
+                      fala ao telefone e se confere com a CLARO. A janela e'
+                      importante, mas nao e' a identidade da linha. */}
+                  <th className="px-3 py-2 font-medium">Contrato</th>
                   <th className="px-3 py-2 font-medium">Janela</th>
                   <th className="px-3 py-2 font-medium">Situação</th>
                   <th className="px-3 py-2 font-medium">Grupo</th>
@@ -446,7 +450,7 @@ export default function Servicos() {
                   <th className={`px-3 py-2 font-medium ${detalhada ? '' : 'text-center'}`}>
                     {detalhada ? 'Ordens de serviço' : 'O.S.'}
                   </th>
-                  <th className="px-3 py-2 font-medium">Contrato</th>
+                  <th className="px-3 py-2 font-medium">Data</th>
                   <th className="px-3 py-2 font-medium"></th>
                 </tr>
               </thead>
@@ -496,11 +500,26 @@ export default function Servicos() {
                             background: `color-mix(in srgb, ${cor} 8%, transparent)`,
                           }}
                           className="cursor-pointer border-b-2 border-graf-900 hover:bg-graf-850">
-                        {de !== ate && (
-                          <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-400">
-                            {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
-                          </td>
-                        )}
+                        <td className="tabular whitespace-nowrap px-3 py-2 align-top">
+                          <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
+                          {detalhada && v.wo_numero && (
+                            <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
+                          )}
+                          {(() => {
+                            const p = pontos.get(v.id)
+                            if (!p?.achou) return null
+                            return (
+                              <div className="mt-1">
+                                <span
+                                  title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
+                                  className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
+                                             font-semibold text-emerald-300 ring-1 ring-emerald-700/40">
+                                  ★ {pts(p.pontos_claro)}
+                                </span>
+                              </div>
+                            )
+                          })()}
+                        </td>
                         <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
                           {v.janela_inicio?.slice(0, 5) ?? '—'}
                           {v.janela_fim && <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>}
@@ -619,25 +638,14 @@ export default function Servicos() {
                             </div>
                           )}
                         </td>
-                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-xs text-graf-500">
-                          {v.contrato ?? '—'}
-                          {detalhada && v.wo_numero && (
-                            <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
-                          )}
-                          {(() => {
-                            const p = pontos.get(v.id)
-                            if (!p?.achou) return null
-                            return (
-                              <div className="mt-1">
-                                <span
-                                  title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
-                                  className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
-                                             font-semibold text-emerald-300 ring-1 ring-emerald-700/40">
-                                  ★ {Number(p.pontos_claro).toFixed(4)}
-                                </span>
-                              </div>
-                            )
-                          })()}
+                        {/* A data mora onde o contrato morava. Sem ela a
+                            busca por contrato -- que traz varias datas --
+                            viraria uma pilha de linhas indistinguiveis. */}
+                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-xs text-graf-400">
+                          {dataBR(v.data_agendada)}
+                          <div className="text-[10px] text-graf-600">
+                            {diaSemana(v.data_agendada)}
+                          </div>
                         </td>
                         <td className="relative px-3 py-2 text-right align-top">
                           <div className="flex items-center justify-end gap-1">
@@ -719,8 +727,8 @@ export default function Servicos() {
           {visiveis.length} de {base.length} visitas
           {totalPontos > 0 && (
             <> · <strong className="tabular text-emerald-400">
-              {totalPontos.toFixed(4)}
-            </strong> pontos CLARO no filtro</>
+              {pts(totalPontos)}
+            </strong> CLARO no filtro</>
           )}
           {soProdutivas && linhas.length !== base.length &&
             ` · ${linhas.length - base.length} apontamentos de jornada ocultos`}
