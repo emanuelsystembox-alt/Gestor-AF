@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Alerta, Logo, Pill, Vazio } from '../components/ui'
+import { num2, pts, reais } from '../lib/formato'
 
 interface VisitaCard {
   id: string
@@ -23,6 +24,27 @@ interface VisitaCard {
 
 const hojeISO = () => new Date().toISOString().slice(0, 10)
 
+/** Produção do técnico no mês corrente — a linha dele em
+ *  `produtividade_periodo`, que é DEFINER e já filtra pelo escopo. */
+interface Producao {
+  tecnico_id: string | null
+  pontos: number
+  concluidas: number
+  dias: number
+  meta: number | null
+  fator: number | null
+  valor: number | null
+}
+
+function mesCorrente() {
+  const h = new Date()
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  return {
+    de: iso(new Date(h.getFullYear(), h.getMonth(), 1)),
+    ate: iso(new Date(h.getFullYear(), h.getMonth() + 1, 0)),
+  }
+}
+
 export default function Campo() {
   const { perfil, sair } = useAuth()
   const [data, setData] = useState(hojeISO())
@@ -30,6 +52,21 @@ export default function Campo() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [mostrarFeitas, setMostrarFeitas] = useState(false)
+  const [producao, setProducao] = useState<Producao | null>(null)
+
+  // O técnico vê o mês dele: quanto fez, quanto falta para a meta e
+  // quanto isso vale. É a pergunta que ele faz todo dia, e que hoje só
+  // era respondida no fim do mês, por outra pessoa.
+  useEffect(() => {
+    if (!perfil?.tecnico_id) return
+    const m = mesCorrente()
+    supabase.rpc('produtividade_periodo', { p_de: m.de, p_ate: m.ate })
+      .then(({ data }) => {
+        const minha = ((data ?? []) as Producao[])
+          .find(x => x.tecnico_id === perfil.tecnico_id)
+        setProducao(minha ?? null)
+      })
+  }, [perfil?.tecnico_id])
 
   useEffect(() => {
     let vivo = true
@@ -107,6 +144,52 @@ export default function Campo() {
 
       <main className="space-y-3 px-4 py-4">
         {erro && <Alerta tipo="erro">Não consegui carregar: {erro}</Alerta>}
+
+        {producao && (() => {
+          const p = Number(producao.pontos)
+          const alvo = Number(producao.meta ?? 0)
+          const pct = alvo > 0 ? Math.min(100, (p / alvo) * 100) : 0
+          const falta = Math.max(0, alvo - p)
+          return (
+            <section className="card-campo p-4">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold text-graf-600">Minha produção no mês</h2>
+                <span className="tabular text-xs text-graf-500">
+                  {producao.concluidas} concluída(s) · {producao.dias} dia(s)
+                </span>
+              </div>
+
+              <div className="mt-2 flex items-end gap-2">
+                <span className="tabular text-3xl font-semibold leading-none">
+                  {num2(p)}
+                </span>
+                <span className="pb-0.5 text-sm text-graf-500">
+                  de {num2(alvo)} pts
+                </span>
+              </div>
+
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-graf-100">
+                <div className="h-full rounded-full bg-af-600 transition-all"
+                     style={{ width: `${pct}%` }} />
+              </div>
+
+              <p className="mt-1.5 text-xs text-graf-600">
+                {producao.fator == null
+                  ? <>Faltam <strong className="tabular">{pts(falta)}</strong> para
+                      entrar na primeira faixa.</>
+                  : <>Fator <strong className="tabular">{num2(producao.fator)}</strong> ·
+                      a receber{' '}
+                      <strong className="tabular text-emerald-700">
+                        {reais(producao.valor)}
+                      </strong></>}
+              </p>
+              <p className="mt-1 text-[11px] text-graf-500">
+                Só entra contrato concluído. O valor é uma prévia do mês em
+                andamento — fecha no fim do período.
+              </p>
+            </section>
+          )
+        })()}
         {carregando && <p className="py-10 text-center text-graf-500">Carregando…</p>}
 
         {!carregando && lista.length === 0 && (

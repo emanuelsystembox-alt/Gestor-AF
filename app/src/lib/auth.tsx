@@ -10,6 +10,9 @@ interface Perfil {
   id: string
   nome: string
   email: string
+  /** Preenchido quando o login é de um técnico. É o que liga a pessoa
+   *  à agenda e à própria produção. */
+  tecnico_id: string | null
 }
 
 interface Ctx {
@@ -64,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // banco em vez da constante compilada.
       carregarSituacoes()
       const [p, r, q] = await Promise.all([
-        supabase.from('perfil').select('id, nome, email').eq('id', session.user.id).maybeSingle(),
+        supabase.from('perfil').select('id, nome, email, tecnico_id').eq('id', session.user.id).maybeSingle(),
         supabase.from('usuario_papel').select('papel').eq('usuario_id', session.user.id),
         supabase.rpc('minhas_permissoes'),
       ])
