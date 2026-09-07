@@ -189,11 +189,11 @@ export function NovoContratoModal({
 
   return (
     <div onClick={onFechar}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
-                 bg-black/70 p-4 backdrop-blur-sm">
+      className="janela-fundo fixed inset-0 z-50 flex items-start justify-center
+                 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
       <div onClick={e => e.stopPropagation()}
-        className="sup-controle mt-6 w-full max-w-4xl rounded-xl border border-graf-700
-                   border-t-4 border-t-af-600 bg-graf-950 shadow-2xl">
+        className="janela-caixa sup-controle mt-6 w-full max-w-4xl rounded-xl
+                   border border-graf-700 border-t-4 border-t-af-600 bg-graf-950 shadow-2xl">
 
         <div className="flex items-center gap-3 border-b border-graf-800 px-5 py-3">
           <div>

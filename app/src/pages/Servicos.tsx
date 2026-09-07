@@ -154,6 +154,22 @@ export default function Servicos() {
   // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
   const [conjunto, setConjunto] = useState<string | null>(null)
 
+  // ---- histórico do contrato (D-069) ----
+  // Buscar um número de contrato deixa de ser filtro do período e passa
+  // a ser a pergunta "o que já aconteceu neste contrato". O período
+  // esconderia justamente as outras visitas, que são o que interessa
+  // quando alguém digita um contrato inteiro.
+  const [contratoBuscado, setContratoBuscado] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = busca.trim()
+    const alvo = /^\d{6,}$/.test(t) ? t : null
+    // Espera o usuário parar de digitar: sem isto, "226803663" dispara
+    // nove consultas.
+    const id = setTimeout(() => setContratoBuscado(alvo), 350)
+    return () => clearTimeout(id)
+  }, [busca])
+
   useEffect(() => {
     supabase.from('codigo_baixa').select('codigo, descricao').order('codigo')
       .then(({ data }) => setCodigos((data ?? []) as { codigo: number; descricao: string }[]))
@@ -175,14 +191,17 @@ export default function Servicos() {
   }, [])
 
   useEffect(() => {
-    if (!de || !ate) return
+    if (!contratoBuscado && (!de || !ate)) return
     let vivo = true
     setCarregando(true); setErro(null)
-    supabase.from('visita').select(SELECT)
-      // Contrato excluido some da lista, mas continua no banco (D-043).
-      .is('excluido_em', null)
-      .gte('data_agendada', de).lte('data_agendada', ate)
-      .order('data_agendada', { ascending: false })
+
+    // Contrato excluido some da lista, mas continua no banco (D-043).
+    let q = supabase.from('visita').select(SELECT).is('excluido_em', null)
+    q = contratoBuscado
+      ? q.eq('contrato', contratoBuscado)
+      : q.gte('data_agendada', de).lte('data_agendada', ate)
+
+    q.order('data_agendada', { ascending: false })
       .order('janela_inicio', { ascending: true, nullsFirst: false })
       .then(({ data, error }) => {
         if (!vivo) return
@@ -191,7 +210,7 @@ export default function Servicos() {
         setCarregando(false)
       })
     return () => { vivo = false }
-  }, [de, ate, versao])
+  }, [de, ate, versao, contratoBuscado])
 
   const base = useMemo(() => soProdutivas
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
@@ -395,6 +414,20 @@ export default function Servicos() {
             })}
           </div>
         </section>
+
+        {/* Quando a busca vira histórico de contrato, a tela precisa
+            dizer isso — senão o usuário acha que o filtro de data quebrou. */}
+        {contratoBuscado && (
+          <Alerta tipo="info">
+            Mostrando <strong>todas</strong> as visitas do contrato{' '}
+            <strong className="tabular">{contratoBuscado}</strong>, dia a dia, fora do
+            período{' '}
+            <button onClick={() => setBusca('')}
+              className="underline underline-offset-2 hover:text-af-400">
+              — voltar ao período
+            </button>
+          </Alerta>
+        )}
 
         {/* ====== tabela ====== */}
         <section className="card-controle overflow-hidden">

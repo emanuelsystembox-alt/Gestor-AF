@@ -86,6 +86,23 @@ function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: b
 export default function VisitaDetalhe() {
   const { id } = useParams<{ id: string }>()
   const navegar = useNavigate()
+
+  // Esc volta para onde a pessoa estava. Na janela do contrato o Esc já
+  // fechava; abrir a página cheia e ficar preso nela quebrava o hábito.
+  // Não intercepta quem está digitando — Esc dentro de campo tem dono.
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const alvo = e.target as HTMLElement | null
+      const digitando = alvo && (
+        alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' ||
+        alvo.tagName === 'SELECT' || alvo.isContentEditable)
+      if (digitando) return
+      navegar(-1)
+    }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [navegar])
   const [aba, setAba] = useState<Aba>('detalhe')
   const [v, setV] = useState<Det | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
@@ -181,12 +198,12 @@ export default function VisitaDetalhe() {
 
   return (
     <Shell>
-      <div className="space-y-3 p-4">
+      <div className="pagina-entra space-y-3 p-4">
         {/* ---------- cabeçalho ---------- */}
         <div className="flex flex-wrap items-start gap-3">
           <button onClick={() => navegar(-1)}
             className="-ml-1 rounded-md px-2 py-1 text-xl leading-none text-graf-400 hover:text-graf-100"
-            aria-label="Voltar">‹</button>
+            title="Voltar (Esc)" aria-label="Voltar">‹</button>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold">

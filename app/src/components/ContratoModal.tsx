@@ -256,12 +256,12 @@ export function ContratoModal({
 
   return (
     <div onClick={onFechar}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
-                 bg-black/70 p-4 backdrop-blur-sm">
+      className="janela-fundo fixed inset-0 z-50 flex items-start justify-center
+                 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
       <div onClick={e => e.stopPropagation()}
         style={{ borderTopColor: cor }}
-        className="sup-controle mt-6 w-full max-w-5xl rounded-xl border border-graf-700
-                   border-t-4 bg-graf-950 shadow-2xl">
+        className="janela-caixa sup-controle mt-6 w-full max-w-5xl rounded-xl
+                   border border-graf-700 border-t-4 bg-graf-950 shadow-2xl">
 
         {/* ---------- cabeçalho ---------- */}
         <div className="flex flex-wrap items-center gap-3 border-b border-graf-800 px-5 py-3">
