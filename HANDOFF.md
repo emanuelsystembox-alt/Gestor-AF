@@ -96,7 +96,7 @@ terceira: ele demora a atualizar.
 | `/controle` | painel: cartões de situação, volume × pontos, improdutivas por responsabilidade |
 | `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela, **+ Nova O.S.** |
 | `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe |
-| `/controle/relatorios` | por contrato (**71 colunas**) e por O.S. (**86**), com **pontuação**, Excel e CSV |
+| `/controle/relatorios` | por contrato (**72 colunas**) e por O.S. (**87**), com **pontuação** e **serviço anterior**, Excel e CSV |
 | `/controle/importar` | importação do TOA com prévia e histórico |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
 | `/controle/configuracoes` | status, indicadores de qualidade e tabela de pontuação |

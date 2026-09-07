@@ -143,7 +143,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 24 migrations, as 66 decisões, o que já corrigimos do
+> reais do banco, as 25 migrations, as 67 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -152,7 +152,7 @@ zero função `SECURITY DEFINER` alcançável pelo `anon`. 551 visitas,
 652 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
 1.466 sub-falhas, 1.021 regras de pontuação. **Onze telas no ar.**
 
-O relatório saiu de 25/29 colunas para **71 (por contrato) e 86 (por
+O relatório saiu de 25/29 colunas para **72 (por contrato) e 87 (por
 O.S.)**, com pontuação, e sai em Excel. O contrato tem **cadastro
 manual**, edição e volta de situação. O histórico diz **quem** fez cada
 etapa, com o login. O controle tem **tema claro**.
@@ -174,7 +174,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 66 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 67 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

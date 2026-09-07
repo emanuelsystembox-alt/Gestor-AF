@@ -93,6 +93,7 @@ conta a história.
 | 030 | **Histórico com autor** (`login`, `importacao_id`, evento por mudança de situação) + **cadastro manual** de contrato/O.S. + `reverter_situacao` | ✓ |
 | 031 | SUPERVISOR passa a enxergar as equipes de que é supervisor | ✓ |
 | 032 | `registrar_etapa` do técnico + escopo de equipe em `baixar_os` + leitura do histórico para quem enxerga a visita | ✓ |
+| 033 | **Reincidência derivada do dado** (`detectar_reincidencia`), recalculada a cada importação aplicada | ✓ |
 
 ---
 

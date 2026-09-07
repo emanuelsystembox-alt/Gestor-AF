@@ -113,7 +113,8 @@ export interface VisitaLinha {
 
 interface Reincidencia {
   dias_desde: number | null
-  anterior: { data_agendada: string } | null
+  anterior: { data_agendada: string
+              tipo_servico: { nome: string } | null } | null
   equipe_anterior: { codigo: string } | null
   baixa_anterior: { codigo: number; descricao: string } | null
 }
@@ -164,7 +165,9 @@ export const SELECT_RELATORIO = `
   equipamento_movimento ( operacao, serial, tipo, modelo ),
   reincidencia!reincidencia_visita_id_fkey (
     dias_desde,
-    anterior:visita_anterior_id ( data_agendada ),
+    anterior:visita_anterior_id (
+      data_agendada, tipo_servico:tipo_servico_id ( nome )
+    ),
     equipe_anterior:equipe_anterior_id ( codigo ),
     baixa_anterior:codigo_baixa_anterior_id ( codigo, descricao )
   )
@@ -243,6 +246,7 @@ const CAB_VISITA = [
   'Equipamento instalado', 'Equipamento retirado',
   'Serviço anterior — data', 'Serviço anterior — dias',
   'Serviço anterior — equipe', 'Serviço anterior — baixa',
+  'Serviço anterior — tipo de serviço',
   'Bloqueado em', 'Importado por', 'Importado em', 'Arquivo', 'Cadastrado por',
 ]
 
@@ -285,6 +289,7 @@ function linhaVisita(v: VisitaLinha): string[] {
     r?.dias_desde == null ? '' : String(r.dias_desde),
     r?.equipe_anterior?.codigo ?? '',
     r?.baixa_anterior ? `${r.baixa_anterior.codigo} - ${r.baixa_anterior.descricao}` : '',
+    r?.anterior?.tipo_servico?.nome ?? '',
     dt(v.bloqueado_em),
     v.importacao?.usuario?.nome ?? '', dt(v.importacao?.criado_em ?? null),
     v.importacao?.arquivo_nome ?? '',

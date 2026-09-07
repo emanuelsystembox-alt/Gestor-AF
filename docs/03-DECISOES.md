@@ -991,3 +991,23 @@ A chave fica na variável de ambiente da máquina de quem roda, no momento
 em que roda. As senhas são sorteadas e impressas **uma vez**. O domínio é
 `@teste.local`, que não existe: login de teste que parece login de
 verdade acaba virando login de verdade, e ninguém lembra de tirar.
+
+### D-068 · Reincidência sai do dado, não de palpite
+O relatório dele tem cinco colunas `SERVICO-ANTERIOR-*`. O nosso emitia
+as colunas e **nunca punha nada nelas**: a tabela `reincidencia` existia
+desde a 004 e jamais foi preenchida.
+
+A regra é a mesma dele: **visita anterior no mesmo contrato**, com data,
+dias decorridos, equipe e o código de baixa **da operadora** — que é o
+que a CLARO reconhece (D-042). Quando a visita anterior tinha várias
+O.S., vale a de menor sequência que tenha baixa.
+
+Nos três dias carregados: **12 reincidências em 11 contratos**, de 373
+distintos. Cinco com `dias_desde = 0` — retorno no mesmo dia, que é
+exatamente o caso do D-041. Uma delas conta a história inteira: contrato
+227011035, ADESAO em 06/09 pela equipe 062, **dois dias depois** de a
+equipe 014 fechar em `110 - Problema Na Tubulação`.
+
+O recálculo pendura em `importar_toa`, não em `importar_toa_interno`: a
+prévia estoura de propósito para desfazer a transação, e recalcular
+reincidência num ensaio que vai ser descartado é trabalho jogado fora.

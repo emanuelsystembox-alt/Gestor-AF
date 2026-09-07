@@ -123,6 +123,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 030 | **Histórico com autor** e **cadastro manual** de contrato/O.S.; `reverter_situacao` |
 | 031 | SUPERVISOR passa a enxergar as equipes que supervisiona |
 | 032 | `registrar_etapa` do técnico; escopo de equipe em `baixar_os`; histórico legível por quem enxerga a visita |
+| 033 | **Reincidência derivada do dado**, recalculada a cada importação |
 
 ---
 
@@ -134,7 +135,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | `/controle` | Painel: cartões de situação, **volume × pontos** por tipo de serviço, improdutivas por responsabilidade, encerramentos por hora, tempo por etapa, CSV |
 | `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito, **contrato em janela** e **+ Nova O.S.** (cadastro manual) |
 | `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, e os contratos de cada equipe |
-| `/controle/relatorios` | Relatório **por contrato** (71 colunas) e **por O.S.** (86), com **pontuação**, filtros, Excel e CSV; marca a primeira O.S. do endereço |
+| `/controle/relatorios` | Relatório **por contrato** (72 colunas) e **por O.S.** (87), com **pontuação** e **serviço anterior**, filtros, Excel e CSV; marca a primeira O.S. do endereço |
 | `/controle/importar` | Importação do TOA com prévia e **histórico com log** |
 | `/controle/sub-falhas` | Importa os conjuntos da CLARO (arquivo largo) e escolhe o vigente |
 | `/controle/configuracoes` | Status, indicadores de qualidade e **tabela de pontuação** (1.021 regras) |
@@ -144,7 +145,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 66 decisões
+## As 67 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
