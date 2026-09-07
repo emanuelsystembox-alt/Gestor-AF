@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { Shell } from '../components/Shell'
-import { Alerta, Pill, Vazio } from '../components/ui'
+import { Alerta, Avatar, Pill, Vazio } from '../components/ui'
 
 /**
  * Equipes de campo.
@@ -70,6 +70,8 @@ interface VisitaLinha {
 
 interface Tec {
   id: string; matricula: string; nome: string; situacao: string
+  equipe_id: string | null
+  foto_url: string | null
   equipe: { codigo: string; nome: string; supervisor_nome: string | null
             area: { apelido: string | null } | null } | null
 }
@@ -120,7 +122,10 @@ export default function Equipes() {
   const [busca, setBusca] = useState('')
   const [area, setArea] = useState('TODAS')
   const [supervisor, setSupervisor] = useState('TODOS')
-  const [soAtivas, setSoAtivas] = useState(false)
+  // Ligado por padrao: 89 equipes na tela, 7 com servico no dia. Quem
+  // nao tem contrato nao tem o que ser olhado -- e as 82 linhas vazias
+  // empurravam as 7 que importam para fora da primeira tela.
+  const [soAtivas, setSoAtivas] = useState(true)
   const [agrupar, setAgrupar] = useState<'nenhum' | 'supervisor' | 'area'>('nenhum')
 
   // importação
@@ -147,6 +152,20 @@ export default function Equipes() {
 
   // Cada carregamento carimba um número; resposta de pedido velho é
   // descartada. Trocar de data rápido não embaralha mais o painel.
+  // Quem aparece na bolinha da equipe: o tecnico dela. Uma equipe pode
+  // ter mais de um (a AFLINE trabalha em dupla); mostramos o primeiro e
+  // dizemos no title quantos sao.
+  const porEquipe = useMemo(() => {
+    const m = new Map<string, Tec[]>()
+    for (const t of tecnicos) {
+      if (!t.equipe_id) continue
+      const l = m.get(t.equipe_id) ?? []
+      l.push(t)
+      m.set(t.equipe_id, l)
+    }
+    return m
+  }, [tecnicos])
+
   const pedido = useRef(0)
 
   async function recarregar() {
@@ -157,7 +176,7 @@ export default function Equipes() {
     const [p, t, o] = await Promise.all([
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
-        .select(`id, matricula, nome, situacao,
+        .select(`id, matricula, nome, situacao, equipe_id, foto_url,
                  equipe:equipe_id ( codigo, nome, supervisor_nome,
                                     area:area_id ( apelido ) )`)
         .order('matricula'),
@@ -513,6 +532,21 @@ export default function Equipes() {
                                 <td className="px-2 py-2.5 text-graf-500">{exp ? '▾' : '▸'}</td>
 
                                 <td className="px-3 py-2.5">
+                                  <div className="flex items-start gap-2.5">
+                                  {(() => {
+                                    const ts = porEquipe.get(e.equipe_id) ?? []
+                                    const t = ts[0]
+                                    return (
+                                      <Avatar
+                                        nome={t?.nome ?? e.codigo}
+                                        foto={t?.foto_url}
+                                        tamanho={32}
+                                        titulo={ts.length
+                                          ? `${ts.map(x => x.nome).join(' · ')}`
+                                          : `Equipe ${e.codigo} — sem técnico`} />
+                                    )
+                                  })()}
+                                  <div className="min-w-0">
                                   <div className="flex items-baseline gap-2">
                                     <span className="tabular font-semibold">{e.codigo}</span>
                                     {e.tecnicos === 0 && (
@@ -533,6 +567,8 @@ export default function Equipes() {
                                     <br />
                                     {e.supervisor ?? '—'}
                                     {e.area && <span className="text-graf-500"> · {e.area}</span>}
+                                  </div>
+                                  </div>
                                   </div>
                                 </td>
 

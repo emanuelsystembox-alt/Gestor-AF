@@ -174,6 +174,20 @@ body {
   box-shadow: 0 1px 2px rgb(15 17 21 / 0.06), 0 2px 8px rgb(15 17 21 / 0.04);
 }
 
+/* ---------- Bolinha do técnico ----------
+   O matiz vem do nome (no componente); a luminosidade vem do tema.
+   No escuro é chip escuro com texto claro; no claro, o inverso — senão
+   89 bolinhas saturadas numa lista branca viram confete. */
+.avatar {
+  background: hsl(var(--avatar-h) 45% 22%);
+  color: hsl(var(--avatar-h) 70% 78%);
+}
+[data-tema="claro"] .sup-controle .avatar,
+.sup-campo .avatar {
+  background: hsl(var(--avatar-h) 62% 90%);
+  color: hsl(var(--avatar-h) 55% 30%);
+}
+
 /* Alvo de toque mínimo 44px (WCAG 2.5.5) — o técnico usa com luva */
 .toque { min-height: 3rem; }
 .toque-grande { min-height: 3.5rem; }

@@ -127,12 +127,17 @@ export function ContratoModal({
   const [acao, setAcao] = useState<
     'baixar' | 'transferir' | 'excluir' | 'editar' | 'voltar' | 'nova_os' | null>(null)
 
-  // baixa
-  const [osAlvo, setOsAlvo] = useState('')
-  const [codigoSel, setCodigoSel] = useState('')
-  const [subFalhas, setSubFalhas] = useState<{ id: string; nome: string }[]>([])
-  const [subSel, setSubSel] = useState('')
-  const [obs, setObs] = useState('')
+  // Baixa — uma linha por O.S., todas de uma vez.
+  //
+  // Baixar de uma em uma deixava o contrato meio baixado com uma
+  // situacao que dizia "concluido". Agora o usuario informa o codigo de
+  // cada O.S. e escolhe a situacao final; o banco recusa situacao
+  // terminal com O.S. faltando (`exige_todas_baixadas`).
+  type Preenchida = { codigo: string; sub: string; obs: string }
+  const [baixas, setBaixas] = useState<Record<string, Preenchida>>({})
+  const [subPorCodigo, setSubPorCodigo] =
+    useState<Record<string, { id: string; nome: string }[]>>({})
+  const [situacaoFinal, setSituacaoFinal] = useState('')
   // transferência
   const [destino, setDestino] = useState('')
   const [motivoT, setMotivoT] = useState('')
@@ -155,7 +160,11 @@ export function ContratoModal({
     else {
       const d = data as unknown as Visita
       setV(d)
-      setOsAlvo(d.ordem_servico[0]?.id ?? '')
+      // Comeca com o que ja esta gravado, para trocar so o que muda.
+      setBaixas(Object.fromEntries(d.ordem_servico.map(o => [o.id, {
+        codigo: o.baixa_afline ? String(o.baixa_afline.codigo) : '',
+        sub: '', obs: o.baixa_observacao ?? '',
+      }])))
     }
   }
   useEffect(() => { carregar() }, [id])
@@ -192,14 +201,26 @@ export function ContratoModal({
     return () => window.removeEventListener('keydown', esc)
   }, [onFechar])
 
+  // Busca a sub-falha de cada codigo escolhido, uma vez por codigo.
+  // Os dois conjuntos convivem no banco; sem filtrar pelo vigente a
+  // lista vem em dobro.
   useEffect(() => {
-    setSubSel('')
-    if (!codigoSel) { setSubFalhas([]); return }
-    let q = supabase.from('sub_falha').select('id, nome').eq('codigo', Number(codigoSel))
-    if (conjunto) q = q.eq('conjunto', conjunto)
-    q.order('ordem').then(({ data }) =>
-      setSubFalhas((data ?? []) as { id: string; nome: string }[]))
-  }, [codigoSel, conjunto])
+    const faltam = [...new Set(Object.values(baixas).map(b => b.codigo).filter(Boolean))]
+      .filter(c => !(c in subPorCodigo))
+    if (!faltam.length) return
+    let vivo = true
+    ;(async () => {
+      const novo: Record<string, { id: string; nome: string }[]> = {}
+      for (const c of faltam) {
+        let q = supabase.from('sub_falha').select('id, nome').eq('codigo', Number(c))
+        if (conjunto) q = q.eq('conjunto', conjunto)
+        const { data } = await q.order('ordem')
+        novo[c] = (data ?? []) as { id: string; nome: string }[]
+      }
+      if (vivo) setSubPorCodigo(a => ({ ...a, ...novo }))
+    })()
+    return () => { vivo = false }
+  }, [baixas, conjunto, subPorCodigo])
 
   const marcados = useMemo(() => {
     const nomes = new Map(indicadores.map(i => [i.id, i.nome]))
@@ -329,65 +350,123 @@ export function ContratoModal({
           {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
           {/* ---------- ações ---------- */}
-          {acao === 'baixar' && v && (
+          {acao === 'baixar' && v && (() => {
+            const ordenadas = [...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia)
+            const preenchidas = ordenadas.filter(o => baixas[o.id]?.codigo).length
+            const terminal = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
+            const faltam = ordenadas.length - preenchidas
+            const bloqueiaSituacao = terminal.includes(situacaoFinal) && faltam > 0
+
+            return (
             <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
-              <p className="mb-2 text-xs font-medium">
+              <p className="mb-1 text-xs font-medium">
                 Baixar serviço
                 <span className="ml-2 font-normal text-graf-500">
                   esta é a baixa da AFLINE — a da operadora vem do TOA e não se edita
                 </span>
               </p>
-              <div className="flex flex-wrap items-end gap-2">
+              <p className="mb-2.5 text-[11px] text-graf-500">
+                Concluir, cancelar ou reagendar exige o código de <strong>todas</strong> as
+                {' '}{ordenadas.length} O.S. — {preenchidas} preenchida(s).
+              </p>
+
+              <div className="space-y-2">
+                {ordenadas.map(o => {
+                  const b = baixas[o.id] ?? { codigo: '', sub: '', obs: '' }
+                  const subs = subPorCodigo[b.codigo] ?? []
+                  const mudar = (p: Partial<typeof b>) =>
+                    setBaixas(a => ({ ...a, [o.id]: { ...b, ...p } }))
+                  return (
+                    <div key={o.id}
+                      className={`rounded-md border p-2.5 ${b.codigo
+                        ? 'border-graf-700 bg-graf-850' : 'border-af-800/60 bg-af-900/10'}`}>
+                      <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="tabular text-[11px] text-graf-500">#{o.sequencia}</span>
+                        <span className="tabular text-xs font-medium">{o.numero_os}</span>
+                        <span className="text-[11px] text-graf-400">
+                          {o.descricao ?? o.tipo_os?.descricao ?? '—'}
+                        </span>
+                        {o.baixa_afline && (
+                          <span className="text-[10px] text-graf-600">
+                            já baixada em {quando(o.baixa_em)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className="text-[11px] text-graf-400">
+                          <span className="mb-1 block">Código de baixa</span>
+                          <select value={b.codigo} className={`${campo} w-64`}
+                            onChange={e => mudar({ codigo: e.target.value, sub: '' })}>
+                            <option value="">— escolha —</option>
+                            {codigos.map(c => (
+                              <option key={c.codigo} value={c.codigo}>
+                                {c.codigo} · {c.descricao}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-[11px] text-graf-400">
+                          <span className="mb-1 block">
+                            Sub-falha
+                            {b.codigo && subs.length === 0 &&
+                              <span className="ml-1 text-graf-600">(nenhuma)</span>}
+                          </span>
+                          <select value={b.sub} disabled={!subs.length}
+                            onChange={e => mudar({ sub: e.target.value })}
+                            className={`${campo} w-56`}>
+                            <option value="">— sem sub-falha —</option>
+                            {subs.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                          </select>
+                        </label>
+                        <label className="min-w-48 flex-1 text-[11px] text-graf-400">
+                          <span className="mb-1 block">Observação</span>
+                          <input value={b.obs} onChange={e => mudar({ obs: e.target.value })}
+                            className={`${campo} w-full`} />
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-graf-800 pt-3">
                 <label className="text-[11px] text-graf-400">
-                  <span className="mb-1 block">Ordem de serviço</span>
-                  <select value={osAlvo} onChange={e => setOsAlvo(e.target.value)}
-                    className={`${campo} w-64`}>
-                    {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
-                      <option key={o.id} value={o.id}>
-                        #{o.sequencia} · {o.numero_os} · {o.tipo_os?.descricao ?? '—'}
-                      </option>
+                  <span className="mb-1 block">Situação do contrato depois da baixa</span>
+                  <select value={situacaoFinal} className={`${campo} w-56`}
+                    onChange={e => setSituacaoFinal(e.target.value)}>
+                    <option value="">— não mudar —</option>
+                    {SITUACOES.map(x => (
+                      <option key={x} value={x}>{SITUACAO_INFO[x]?.label ?? x}</option>
                     ))}
                   </select>
                 </label>
-                <label className="text-[11px] text-graf-400">
-                  <span className="mb-1 block">Código de baixa AFLINE</span>
-                  <select value={codigoSel} onChange={e => setCodigoSel(e.target.value)}
-                    className={`${campo} w-72`}>
-                    <option value="">— escolha —</option>
-                    {codigos.map(c => (
-                      <option key={c.codigo} value={c.codigo}>{c.codigo} · {c.descricao}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-[11px] text-graf-400">
-                  <span className="mb-1 block">
-                    Sub-falha
-                    {codigoSel && subFalhas.length === 0 &&
-                      <span className="ml-1 text-graf-600">(nenhuma para este código)</span>}
-                  </span>
-                  <select value={subSel} onChange={e => setSubSel(e.target.value)}
-                    disabled={!subFalhas.length} className={`${campo} w-72`}>
-                    <option value="">— sem sub-falha —</option>
-                    {subFalhas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                  </select>
-                </label>
-                <label className="min-w-56 flex-1 text-[11px] text-graf-400">
-                  <span className="mb-1 block">Observação</span>
-                  <input value={obs} onChange={e => setObs(e.target.value)}
-                    className={`${campo} w-full`} />
-                </label>
-                <button disabled={ocupado || !osAlvo || !codigoSel}
-                  onClick={() => comAviso(() => supabase.rpc('baixar_os', {
-                    p_os: osAlvo, p_codigo: Number(codigoSel),
-                    p_sub_falha: subSel || null, p_observacao: obs || null, p_situacao: null,
-                  }), 'Baixa registrada.')}
-                  className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
-                             hover:bg-af-500 disabled:opacity-50">
-                  Confirmar baixa
+                {bloqueiaSituacao && (
+                  <p className="pb-1.5 text-[11px] text-amber-300">
+                    Faltam {faltam} O.S. sem código — o banco vai recusar
+                    {' '}{SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal}.
+                  </p>
+                )}
+                <button disabled={ocupado || preenchidas === 0 || bloqueiaSituacao}
+                  onClick={() => comAviso(() => supabase.rpc('baixar_visita', {
+                    p_visita: id,
+                    p_itens: ordenadas
+                      .filter(o => baixas[o.id]?.codigo)
+                      .map(o => ({
+                        os_id: o.id,
+                        codigo: Number(baixas[o.id].codigo),
+                        sub_falha_id: baixas[o.id].sub || null,
+                        observacao: baixas[o.id].obs || null,
+                      })),
+                    p_situacao: situacaoFinal || null,
+                  }), `Baixa registrada em ${preenchidas} O.S.`)}
+                  className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                             text-white hover:bg-af-500 disabled:opacity-50">
+                  Confirmar baixa de {preenchidas} O.S.
                 </button>
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {acao === 'transferir' && v && (
             <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">

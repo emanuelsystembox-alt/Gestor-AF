@@ -33,6 +33,53 @@ export function Marca({ compacto = false }: { compacto?: boolean }) {
   )
 }
 
+/**
+ * Bolinha do técnico: foto quando existe, iniciais quando não.
+ *
+ * A cor de fundo sai do próprio texto, não é sorteada — assim a mesma
+ * pessoa tem sempre a mesma cor, em qualquer tela e em qualquer sessão.
+ * Bolinha que muda de cor a cada carregamento não ajuda a reconhecer
+ * ninguém, que é a única razão de ela existir.
+ */
+export function Avatar({ nome, foto, tamanho = 34, titulo }: {
+  nome: string | null | undefined
+  foto?: string | null
+  tamanho?: number
+  titulo?: string
+}) {
+  const texto = (nome ?? '?').trim()
+  const iniciais = texto
+    .split(/\s+/).filter(Boolean).slice(0, 2)
+    .map(p => p[0]?.toUpperCase() ?? '').join('') || '?'
+
+  let soma = 0
+  for (let i = 0; i < texto.length; i++) soma = (soma * 31 + texto.charCodeAt(i)) % 360
+
+  if (foto) {
+    return (
+      <img src={foto} alt={titulo ?? texto} title={titulo ?? texto}
+        width={tamanho} height={tamanho}
+        className="shrink-0 rounded-full object-cover ring-1 ring-graf-700"
+        style={{ width: tamanho, height: tamanho }} />
+    )
+  }
+  return (
+    <div
+      title={titulo ?? texto} aria-hidden={!titulo}
+      className="avatar grid shrink-0 place-items-center rounded-full font-semibold
+                 ring-1 ring-graf-700 select-none"
+      style={{
+        width: tamanho, height: tamanho,
+        fontSize: tamanho * 0.36,
+        // A cor sai daqui; a LUMINOSIDADE sai do CSS, que sabe em que
+        // tema está. Mesma técnica do D-065.
+        ['--avatar-h' as string]: String(soma),
+      }}>
+      {iniciais}
+    </div>
+  )
+}
+
 /** Etiqueta de situação. Mesma cor em toda a aplicação. */
 export function Pill({ situacao }: { situacao: Situacao }) {
   const info = SITUACAO_INFO[situacao]
