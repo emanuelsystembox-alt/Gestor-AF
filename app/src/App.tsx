@@ -10,6 +10,7 @@ const Importacao = lazy(() => import('./pages/Importacao'))
 const SubFalhas = lazy(() => import('./pages/SubFalhas'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
 const Relatorios = lazy(() => import('./pages/Relatorios'))
+const Produtividade = lazy(() => import('./pages/Produtividade'))
 const Administracao = lazy(() => import('./pages/Administracao'))
 const Campo = lazy(() => import('./pages/Campo'))
 const Visita = lazy(() => import('./pages/Visita'))
@@ -69,6 +70,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Importacao /></Protegida>} />
         <Route path="/controle/sub-falhas" element={
           <Protegida exige="GESTAO"><SubFalhas /></Protegida>} />
+        <Route path="/controle/produtividade" element={
+          <Protegida exige="GESTAO"><Produtividade /></Protegida>} />
         <Route path="/controle/relatorios" element={
           <Protegida exige="GESTAO"><Relatorios /></Protegida>} />
         <Route path="/controle/configuracoes" element={

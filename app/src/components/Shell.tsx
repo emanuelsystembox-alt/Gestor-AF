@@ -10,7 +10,7 @@ const OPERACAO: Item[] = [
   { para: '/controle', rotulo: 'Dashboard' },
   { para: '/controle/servicos', rotulo: 'Serviços' },
   { para: '/controle/equipes', rotulo: 'Equipes' },
-  { para: '/controle/produtividade', rotulo: 'Produtividade', futuro: true },
+  { para: '/controle/produtividade', rotulo: 'Produtividade' },
   { para: '/controle/relatorios', rotulo: 'Relatórios' },
 ]
 const ENTRADA: Item[] = [

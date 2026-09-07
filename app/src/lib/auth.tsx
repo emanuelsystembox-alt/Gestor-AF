@@ -16,6 +16,11 @@ interface Ctx {
   session: Session | null
   perfil: Perfil | null
   papeis: Papel[]
+  /** Permissões finas do perfil de acesso (D-055). Papel abre a sala;
+   *  permissão diz o que se faz dentro. A tela usa isto só para não
+   *  mostrar botão que vai falhar — a barreira real é a RPC. */
+  permissoes: string[]
+  pode: (chave: string) => boolean
   carregando: boolean
   temPapel: (...p: Papel[]) => boolean
   ehGestor: boolean
@@ -29,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [papeis, setPapeis] = useState<Papel[]>([])
+  const [permissoes, setPermissoes] = useState<string[]>([])
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
@@ -41,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!s) {
         setPerfil(null)
         setPapeis([])
+        setPermissoes([])
         setCarregando(false)
       }
     })
@@ -56,13 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // consulta, uma vez, e a tela inteira passa a falar a língua do
       // banco em vez da constante compilada.
       carregarSituacoes()
-      const [p, r] = await Promise.all([
+      const [p, r, q] = await Promise.all([
         supabase.from('perfil').select('id, nome, email').eq('id', session.user.id).maybeSingle(),
         supabase.from('usuario_papel').select('papel').eq('usuario_id', session.user.id),
+        supabase.rpc('minhas_permissoes'),
       ])
       if (!vivo) return
       setPerfil(p.data ?? null)
       setPapeis(((r.data ?? []) as { papel: Papel }[]).map(x => x.papel))
+      setPermissoes(((q.data ?? []) as { chave: string }[]).map(x => x.chave))
       setCarregando(false)
     })()
     return () => { vivo = false }
@@ -71,7 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const temPapel = (...p: Papel[]) => p.some(x => papeis.includes(x))
 
   const valor: Ctx = {
-    session, perfil, papeis, carregando, temPapel,
+    session, perfil, papeis, permissoes, carregando, temPapel,
+    pode: (chave: string) => permissoes.includes(chave),
     ehGestor: temPapel('ADMIN', 'COP'),
     ehTecnico: temPapel('TECNICO'),
     sair: async () => { await supabase.auth.signOut() },
