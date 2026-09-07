@@ -85,8 +85,8 @@ terceira: ele demora a atualizar.
 
 ## O que está pronto e testado
 
-**Banco:** 38 tabelas, 55 funções, 74 policies, zero tabela sem RLS, zero
-`SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde.
+**Banco:** 38 tabelas, 62 funções, 74 policies, zero tabela sem RLS, zero
+`SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde (16/16).
 
 **Onze telas**, todas verificadas com dado real:
 
@@ -94,19 +94,25 @@ terceira: ele demora a atualizar.
 |---|---|
 | `/entrar` | login |
 | `/controle` | painel: cartões de situação, volume × pontos, improdutivas por responsabilidade |
-| `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela |
+| `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela, **+ Nova O.S.** |
 | `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe |
-| `/controle/relatorios` | por contrato e por O.S., com CSV |
+| `/controle/relatorios` | por contrato (**71 colunas**) e por O.S. (**86**), com **pontuação**, Excel e CSV |
 | `/controle/importar` | importação do TOA com prévia e histórico |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
 | `/controle/configuracoes` | status, indicadores de qualidade e tabela de pontuação |
 | `/controle/administracao` | usuários, cargos, perfis de acesso e permissões |
-| `/controle/visita/:id` | detalhe completo com histórico e transferência |
-| `/campo` e `/campo/visita/:id` | agenda e execução do técnico |
+| `/controle/visita/:id` | detalhe completo, histórico **com login**, transferência |
+| `/campo` e `/campo/visita/:id` | agenda e execução: a caminho → cheguei → baixa com sub-falha → impedimento com observação → finalizar, e o passo a passo **com o login** |
 
-**Dados:** 504 visitas, 610 O.S., 89 equipes, 104 técnicos, 18 praças,
+**Dados:** 551 visitas, 652 O.S., 89 equipes, 104 técnicos, 18 praças,
 168 códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
 Três dias: 04, 05 e 06/09/2026.
+
+**Também no ar:** tema claro no controle (o campo continua claro sempre,
+por condição de trabalho — D-011/D-065) e
+`app/scripts/criar-usuarios-teste.mjs`, que cria os três logins de teste
+(controlador, supervisor, técnico) e faz os vínculos que a tela de
+Administração não faz. Ver D-067.
 
 ---
 
@@ -162,6 +168,10 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 | O quê | Por quê |
 |---|---|
 | **`pontos_equipe`** | O que a equipe recebe **não está em nenhum arquivo que temos** — o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel abrir **Regras de Comissionamento** e dizer se é valor próprio por combinação, percentual sobre o faturado, ou fator. Sem ele não há margem por atendimento nem comissão. |
+| **Vincular supervisor ao usuário** | `equipe.supervisor_id` está em **0 de 89**. Enquanto ficar assim, o papel SUPERVISOR entra e não enxerga nada — o caminho no RLS já existe desde a 031, falta o dado. `supervisor_nome` (85 de 89) é texto do TOA e não serve de chave. **Depende do Emanuel.** |
+| **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
+| **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
+| **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |
 | **Abas de equipamento na baixa** | Dependem do almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
 | **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
@@ -216,5 +226,24 @@ login que entra e não vê nada, sem erro visível.
 
 **Confiei no lint do Supabase para segurança.** Só a consulta a
 `has_function_privilege` mostrou a verdade.
+
+**Achei que a tela do campo podia dizer quem fez a etapa.** Ela mandava
+`usuario_id` no INSERT do evento. Autor que vem do cliente não é prova de
+nada — e o histórico existe para ser prova. Quem carimba é o servidor,
+em `registrar_etapa` e `baixar_os` (D-061).
+
+**Tratei `reincidencia` como array no relatório.** Ela tem
+`unique (visita_id)`, então o PostgREST a trata como um-para-um e devolve
+**objeto ou null**. `reincidencia[0]` derrubou a tela inteira de
+Relatórios com `Cannot read properties of null`.
+
+**Culpei o meu SELECT por um erro que era cache.** Depois de `ALTER
+TABLE`, o PostgREST responde `failed to parse select parameter` numa
+coluna que **está** no banco. É o cache de schema: `notify pgrst,
+'reload schema'`.
+
+**Testei o SELECT na unha com espaços.** O `supabase-js` remove **todo**
+espaço em branco do `select` antes de enviar. Meu `curl` de teste
+reproduzia um erro que o app nunca teria.
 
 > O padrão: **pergunte ao banco, não à ferramenta que resume o banco.**

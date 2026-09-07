@@ -90,6 +90,9 @@ conta a história.
 | 027 | **Pontuação por combinação de O.S.** × edificação + log de alteração | ✓ |
 | 028 | **Administração**: cargos, perfis de acesso, permissões e a trava de escalada (D-050) | ✓ |
 | 029 | **Bateria de teste de policy** (16 cenários) + permissão fina nas RPCs | ✓ |
+| 030 | **Histórico com autor** (`login`, `importacao_id`, evento por mudança de situação) + **cadastro manual** de contrato/O.S. + `reverter_situacao` | ✓ |
+| 031 | SUPERVISOR passa a enxergar as equipes de que é supervisor | ✓ |
+| 032 | `registrar_etapa` do técnico + escopo de equipe em `baixar_os` + leitura do histórico para quem enxerga a visita | ✓ |
 
 ---
 
@@ -123,6 +126,15 @@ where schemaname = 'public'
 -- 4. norm_txt sobrevive ao unaccent fora do public
 select norm_txt('  Instalação  de  Assinatura ');
 -- esperado: INSTALACAO DE ASSINATURA
+
+-- 5. a bateria de policy, sempre
+select * from testar_policies();
+-- esperado: passou = true nos 16 cenarios
+
+-- 6. depois de DDL, o PostgREST precisa saber que a coluna existe
+notify pgrst, 'reload schema';
+-- sem isto o front recebe "failed to parse select parameter" numa
+-- coluna que ESTA no banco. Ver Armadilhas.
 ```
 
 ---
@@ -156,6 +168,31 @@ o alvo é uma coluna, o instrumento é trigger, não policy. Ver D-050.
 **Função `SECURITY DEFINER` roda como o owner, que tem `BYPASSRLS`.**
 Um teste de policy escrito como definer não testa policy nenhuma — todos
 os cenários passam porque o RLS nem é consultado. Ver D-054.
+
+**O PostgREST tem cache de schema, e ele não sabe da sua coluna nova.**
+Depois de `ALTER TABLE`, o front recebe `PGRST100 — failed to parse
+select parameter` apontando para uma coluna que **está** no banco. Não é
+erro de sintaxe do SELECT; é o cache. Resolve com:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+**Uma FK com UNIQUE vira relação um-para-um no PostgREST — e ele devolve
+OBJETO, não array.** `reincidencia` tem `unique (visita_id)`, então
+`reincidencia ( ... )` no select traz `{...}` ou `null`. O código que
+fazia `reincidencia[0]` quebrava a tela inteira em `Cannot read
+properties of null`. Trate os dois formatos.
+
+**Duas FKs da mesma tabela para a mesma tabela deixam o embed ambíguo.**
+`reincidencia` aponta para `visita` por `visita_id` **e** por
+`visita_anterior_id`; o PostgREST responde `PGRST201` e recusa. Precisa
+do nome da constraint:
+`reincidencia!reincidencia_visita_id_fkey ( ... )`.
+
+**O `supabase-js` remove TODO espaço em branco do `select`.** Se você
+for testar um select pela API na unha (`curl`), replique isso — senão
+você vai caçar um erro de sintaxe que só existe no seu teste.
 
 **`usuario_papel.escopo` é `NOT NULL` sem default.** Esquecer dele faz o
 usuário nascer sem papel: um login que entra e não enxerga nada, sem erro

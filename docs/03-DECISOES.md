@@ -816,3 +816,178 @@ carrega o faturamento. Um painel que só mostra volume engana quem decide.
 
 A tabela de tipos de serviço tem as duas abas, e os cartões de situação
 usam a cor do cadastro (D-036) — a mesma da lista, do modal e do painel.
+
+---
+
+## 2026-09-06 (tarde) — Relatório completo, cadastro manual e visão do técnico
+
+### D-058 · O relatório estava contando menos da metade da história
+O export do sistema atual tem **64 colunas**. O nosso tinha **25** (por
+contrato) e **29** (por O.S.). O que faltava não era enfeite:
+
+| Faltava | Por que importa |
+|---|---|
+| **Pontuação** | é o faturamento; sem ela o relatório não fecha conta |
+| **Descrição da O.S.** | `2607830497` não diz nada; `ADESAO - INSTALAR PONTO VIRTUA` diz |
+| Telefone, tipo de pessoa, edificação | edificação decide a pontuação (D-045) |
+| Equipamento instalado/retirado | é patrimônio em campo |
+| Quem importou, quando, de qual arquivo | é a origem do dado |
+| Os 7 indicadores de qualidade **em coluna** | é exatamente como o relatório dele entrega |
+
+Agora são **71 colunas** por contrato e **86** por O.S., em Excel além de
+CSV. A montagem saiu da tela para `app/src/lib/relatorio.ts`: com 70+
+colunas ela não cabia mais dentro do componente sem afogá-lo.
+
+**O SELECT mora junto do montador, de propósito.** Coluna nova no
+relatório sem campo no SELECT sai vazia **em silêncio** — foi assim que a
+pontuação sumiu do export sem ninguém notar.
+
+### D-059 · A pontuação sai só na primeira O.S. do endereço
+No relatório por O.S., repetir a pontuação da visita em cada linha faria
+uma visita de 3 O.S. valer o triplo numa soma de planilha. É o mesmo erro
+de achatar deslocamento (D-001), agora em cima de dinheiro.
+
+A pontuação sai **apenas** na linha marcada `Primeira do endereço = SIM`;
+nas demais fica **vazia**. A tela diz isso em letra grande, acima da
+prévia, porque quem soma a coluna não vai ler o rodapé.
+
+### D-060 · O histórico só vale se disser QUEM
+O sistema atual mostra no contrato um passo a passo em que cada linha tem
+o autor: *"Entrada - In Box · VERA LUCIA"*, *"Em deslocamento · 007 -
+EQUIPE"*. Nós já tínhamos a tabela (`visita_evento`) e a aba. Faltava o
+autor, e faltava linha:
+
+```
+IMPORTADA      551 eventos ·   0 com usuario_id
+CONFLITO_TOA     2 eventos ·   0 com usuario_id
+```
+
+E não havia **um evento por mudança de situação** — só o de criação. O
+histórico contava o nascimento do contrato e mais nada.
+
+`visita_evento` ganhou `login` e `importacao_id`. A importação passou a
+carimbar autor, arquivo e uma linha a cada vez que a situação muda — e só
+quando muda, senão reimportar a mesma planilha polui a trilha.
+
+**Retroativo:** 207 eventos recuperaram o autor pelo cabeçalho da
+importação e **407 recuperaram o login**, porque a linha crua do TOA já
+estava guardada em `visita.dados_origem` desde a 004. Os 344 restantes
+vieram dos dois primeiros arquivos, cujo cabeçalho nasceu sem
+`usuario_id` — esses ficam anônimos, e está certo que fiquem.
+
+> **`login` tem dois donos.** Vindo da planilha, é o *Login do Técnico*
+> do TOA. Vindo da tela, é o e-mail de quem operou. É a mesma coluna
+> porque responde a mesma pergunta.
+
+### D-061 · Autor que vem do cliente não é prova
+A tela do campo dava `UPDATE` na visita e `INSERT` no evento por conta
+própria, mandando o `usuario_id` junto. Um técnico com o console aberto
+assinava evento em nome de qualquer um — e o histórico existe justamente
+para ser prova.
+
+`registrar_etapa()` e `baixar_os()` passaram a carimbar `usuario_id`,
+`login`, `tecnico_id` e `origem` **no servidor**. A policy de inserção
+agora exige `usuario_id = auth.uid()`.
+
+Ambas são `SECURITY DEFINER`, então o escopo da equipe é conferido **por
+dentro** — e foi conferindo isto que apareceu o furo: `baixar_os` não
+checava equipe nenhuma. **Qualquer técnico baixava a O.S. de qualquer
+outro.**
+
+### D-062 · Você lê o histórico do que você já enxerga
+`evento_leitura` era `eh_gestor() or tem_papel('CONTROLADOR')`. O
+**técnico não lia o histórico do contrato que ele mesmo estava
+executando**, e o supervisor também não.
+
+A regra certa é mais simples e mais barata:
+
+```sql
+using (visita_id in (select id from visita))
+```
+
+O subselect passa pelo RLS da própria `visita`, então ele **não abre nada
+novo** — só para de esconder o que a pessoa já tinha direito de ver.
+
+### D-063 · O contrato que não está no TOA entra na mão
+Nem todo serviço nasce no TOA. Quando não nasce, precisa entrar mesmo
+assim: senão não é despachado, não é medido e não é cobrado.
+
+- **Não criamos tabela `cliente`.** A operação não tem uma — o dado
+  cadastral mora na visita, como vem do TOA. A busca de cliente procura
+  no histórico de visitas e **copia** o cadastro do atendimento anterior.
+  Mesmo efeito prático, sem inventar entidade.
+- **Número de O.S. gerado: `AF-00000001`.** A CLARO usa 10 dígitos
+  (`2607830497`). Um número nosso no mesmo formato colidiria no dia em
+  que o contrato entrasse no TOA, e ninguém saberia qual é qual. O
+  prefixo diz na cara que aquela O.S. nasceu aqui.
+  ⚠ **Formato escolhido por nós, não observado no dado — confirmar com o
+  Emanuel.**
+- **A tela avisa quando falta o Tipo de O.S.** A regra de pontuação é a
+  combinação de *tipos* × edificação (D-045), e `assinatura_da_visita`
+  monta essa combinação pelo `tipo_os_id`. O.S. só com descrição livre
+  não casa com regra nenhuma: o contrato entra valendo zero e ninguém
+  percebe.
+- **O.S. do TOA não se remove**, só a manual e só antes da baixa. Apagar
+  uma do TOA seria mentir para a operadora: a importação a recriaria na
+  hora, sem a nossa baixa.
+- **Não inventamos "Data de Abertura".** A tela dele tem o campo; a
+  planilha do TOA não traz nada equivalente. Guardar a coluna daria 100%
+  de vazio no que é importado. Ela é o `criado_em`, e a tela diz isso.
+
+### D-064 · Voltar contrato é o diferencial, então tem que deixar rastro
+O sistema da CLARO não volta situação. O nosso volta — é uma das razões
+de existir deste projeto. `reverter_situacao()` exige papel de gestor ou
+controlador, **exige motivo** e grava de onde, para onde, quem e por quê.
+
+O técnico **não** volta. Se ele fechou errado, pede ao controlador. Sem
+isso, "voltar" viraria borracha em vez de correção rastreada.
+
+### D-065 · O tema é do controle; o campo não tem chave
+D-011 já dizia que o campo é claro por **condição de trabalho** — celular
+sob sol direto. Isso não é preferência, e por isso o campo **não ganha
+chave**. Quem fica oito horas na tela do controle, sim, tem preferência
+legítima: sala clara com tela escura cansa tanto quanto o contrário.
+
+**A troca não reescreveu componente nenhum.** `bg-graf-900` continua
+`bg-graf-900`; o que muda é *quanto vale* graf-900. `data-tema="claro"`
+redefine as variáveis de cor **dentro de `.sup-controle`**, e as ~1.200
+classes utilitárias já escritas seguem junto.
+
+O seletor é `[data-tema="claro"] .sup-controle`, **não `:root`**, e a
+razão é dura: o campo usa a mesma rampa (`bg-graf-50`, `border-graf-200`)
+esperando os valores **claros**. Invertê-los no documento inteiro
+pintaria o fundo do técnico de preto. Só a faixa que serve de tinta e de
+texto inverte; as 500/600 são cores de ação e ficam onde estão.
+
+### D-066 · O papel SUPERVISOR não enxergava nada
+Apareceu ao montar os logins de teste. `equipes_visiveis()` decidia por
+quatro caminhos — gestor, controlador da equipe, carteira, técnico da
+equipe — e **o supervisor não estava em nenhum**. Ele entrava e via tela
+vazia.
+
+A coluna `equipe.supervisor_id` existia para isto e estava em **0 de 89**
+equipes. Acrescentar o caminho é inócuo hoje (não muda uma linha do que
+se enxerga) e faz o papel funcionar no instante em que os supervisores
+forem vinculados.
+
+`supervisor_nome` (85 de 89) é texto vindo do TOA e **não serve de
+chave**: nome bate por acaso e deixa de bater por acento.
+
+⚠ **PENDENTE PARA O EMANUEL:** ligar cada supervisor real ao usuário dele
+em `equipe.supervisor_id`. Enquanto isso não acontecer, o papel enxerga
+zero — o que está certo, e é melhor que enxergar tudo.
+
+### D-067 · Login de teste é script, login de verdade é tela
+Criar usuário exige a `service_role`, que nunca vai para o navegador
+(D-051) — por isso a Edge Function `admin-usuarios` continua sendo o
+caminho de produção, pela tela de Administração.
+
+O que a tela **não** faz é o vínculo: `tecnico.usuario_id` e
+`equipe.supervisor_id`. Sem eles o login entra e não enxerga nada, porque
+`equipes_visiveis()` depende dos dois. `app/scripts/criar-usuarios-teste.mjs`
+cria os três logins e faz o vínculo, é idempotente e tem `--remover`.
+
+A chave fica na variável de ambiente da máquina de quem roda, no momento
+em que roda. As senhas são sorteadas e impressas **uma vez**. O domínio é
+`@teste.local`, que não existe: login de teste que parece login de
+verdade acaba virando login de verdade, e ninguém lembra de tirar.

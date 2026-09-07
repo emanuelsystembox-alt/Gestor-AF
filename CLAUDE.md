@@ -37,6 +37,9 @@ camada operacional própria: importar, despachar, executar, medir e cobrar.
 | **Tipo de O.S.** | o código numérico da CLARO (`1`, `43`, `191`) | `tipo_os` |
 | **Tipo de O.S. Consolidado** | o item da **LPU** que é faturado | *ainda não modelado* |
 
+> O.S. com número `AF-00000001` nasceu **aqui**, não na CLARO — é
+> cadastro manual (D-063). Os números da operadora têm 10 dígitos.
+>
 > O caso mais comum é **2 O.S. por visita**. Achatar em "1 linha = 1 O.S."
 > conta o deslocamento em dobro **e erra o faturamento** — ver Pontuação.
 
@@ -75,6 +78,25 @@ atribuição do TOA deu 878 min (a atribuição é 00:23 e o técnico começa
 de 344 apontamentos num dia. `tipo_atividade.natureza` separa
 `PRODUTIVA` de `JORNADA`. Sempre filtre.
 
+**O PostgREST tem cache de schema.** Depois de `ALTER TABLE`, o front
+recebe `PGRST100 — failed to parse select parameter` apontando uma coluna
+que **está** no banco. Não é sintaxe: é cache. `notify pgrst, 'reload
+schema';`
+
+**FK com UNIQUE vira um-para-um, e o embed devolve OBJETO, não array.**
+`reincidencia` tem `unique (visita_id)`; `reincidencia[0]` derrubou a
+tela de Relatórios inteira. Duas FKs para a mesma tabela deixam o embed
+ambíguo e exigem o nome da constraint
+(`reincidencia!reincidencia_visita_id_fkey`).
+
+**O `supabase-js` remove TODO espaço em branco do `select`.** Se for
+testar um select na unha com `curl`, replique isso — senão você caça um
+erro de sintaxe que só existe no seu teste.
+
+**Autor de evento não pode vir do cliente.** A tela do campo mandava
+`usuario_id` no INSERT; quem carimba quem fez é o servidor, em
+`registrar_etapa` e `baixar_os`. Ver D-061.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
@@ -86,6 +108,9 @@ app/                     front-end (Vite + React + TS + Tailwind v4)
   src/lib/toa.ts         leitor da planilha do TOA (cabeçalho por posição)
   src/lib/planilha.ts    leitor genérico
   src/lib/metricas.ts    todo o cálculo do painel
+  src/lib/relatorio.ts   colunas do relatório + o SELECT que as alimenta
+  src/lib/eventos.ts     rótulos do histórico, iguais nas duas telas
+  src/lib/tema.ts        tema claro/escuro — só do controle
   src/lib/supabase.ts    cliente + domínios de situação
   src/lib/auth.tsx       sessão, perfil e papéis
   src/components/        Shell (navegação), graficos (SVG puro), ui
@@ -118,14 +143,19 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 21 migrations, as 26 decisões, o que já corrigimos do
+> reais do banco, as 24 migrations, as 66 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **38 tabelas, 74 policies, zero tabela sem RLS**, zero função
-`SECURITY DEFINER` alcançável pelo `anon`. 504 visitas, 610 O.S.,
-89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa, 1.466
-sub-falhas, 1.021 regras de pontuação. **Onze telas no ar.**
+Resumo: **38 tabelas, 62 funções, 74 policies, zero tabela sem RLS**,
+zero função `SECURITY DEFINER` alcançável pelo `anon`. 551 visitas,
+652 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
+1.466 sub-falhas, 1.021 regras de pontuação. **Onze telas no ar.**
+
+O relatório saiu de 25/29 colunas para **71 (por contrato) e 86 (por
+O.S.)**, com pontuação, e sai em Excel. O contrato tem **cadastro
+manual**, edição e volta de situação. O histórico diz **quem** fez cada
+etapa, com o login. O controle tem **tema claro**.
 
 **A pontuação deixou de ser bloqueio** (D-045): a regra é combinação de
 O.S. × edificação, derivada do relatório mensal, com 95,4% de cobertura.
@@ -144,7 +174,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 26 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 66 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

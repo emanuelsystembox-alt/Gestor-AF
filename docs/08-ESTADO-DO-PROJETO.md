@@ -36,7 +36,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**38 tabelas · 2 views · 55 funções · 74 policies · zero tabela sem RLS ·
+**38 tabelas · 2 views · 62 funções · 74 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
@@ -120,6 +120,9 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 027 | **Pontuação por combinação de O.S. × edificação** |
 | 028 | **Administração**: cargo, perfil de acesso, permissões, fecho da escalada |
 | 029 | **`testar_policies()`** (16 cenários) + permissão fina nas RPCs |
+| 030 | **Histórico com autor** e **cadastro manual** de contrato/O.S.; `reverter_situacao` |
+| 031 | SUPERVISOR passa a enxergar as equipes que supervisiona |
+| 032 | `registrar_etapa` do técnico; escopo de equipe em `baixar_os`; histórico legível por quem enxerga a visita |
 
 ---
 
@@ -129,19 +132,19 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 |---|---|
 | `/entrar` | Login com identidade AFLINE |
 | `/controle` | Painel: cartões de situação, **volume × pontos** por tipo de serviço, improdutivas por responsabilidade, encerramentos por hora, tempo por etapa, CSV |
-| `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito e **contrato em janela** |
+| `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito, **contrato em janela** e **+ Nova O.S.** (cadastro manual) |
 | `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, e os contratos de cada equipe |
-| `/controle/relatorios` | Relatório **por contrato** e **por O.S.**, com filtros e CSV; marca a primeira O.S. do endereço |
+| `/controle/relatorios` | Relatório **por contrato** (71 colunas) e **por O.S.** (86), com **pontuação**, filtros, Excel e CSV; marca a primeira O.S. do endereço |
 | `/controle/importar` | Importação do TOA com prévia e **histórico com log** |
 | `/controle/sub-falhas` | Importa os conjuntos da CLARO (arquivo largo) e escolhe o vigente |
 | `/controle/configuracoes` | Status, indicadores de qualidade e **tabela de pontuação** (1.021 regras) |
 | `/controle/administracao` | Usuários, cargos, perfis de acesso e matriz de permissões |
 | `/controle/visita/:id` | Detalhe completo do contrato, com histórico e transferência |
-| `/campo` e `/campo/visita/:id` | Agenda e execução do técnico (tema claro, alvo de toque 48px) |
+| `/campo` e `/campo/visita/:id` | Agenda e execução do técnico (tema claro, alvo de toque 48px): a caminho → cheguei → baixa com sub-falha → impedimento com observação → finalizar, e o **passo a passo com o login** de quem fez cada etapa |
 
 ---
 
-## As 56 decisões
+## As 66 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -207,6 +210,10 @@ em janela
 | O quê | Por que está parado |
 |---|---|
 | **`pontos_equipe`** | Não é derivável de nenhum arquivo que temos: o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel levantar **Regras de Comissionamento**. Sem ele não há margem por atendimento nem comissão. |
+| **Vincular supervisor ao usuário** | `equipe.supervisor_id` está em **0 de 89**. Enquanto ficar assim, o papel SUPERVISOR entra e não enxerga nada — o caminho no RLS já existe desde a 031, falta o dado. `supervisor_nome` (85 de 89) é texto do TOA e não serve de chave. **Depende do Emanuel.** |
+| **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
+| **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
+| **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |
 | **Abas de equipamento no modal de baixa** | Dependem do módulo de almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
 | **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
