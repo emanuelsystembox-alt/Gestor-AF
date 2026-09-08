@@ -1557,3 +1557,40 @@ claro (D-011), e uma borda escura fixa viraria risco preto sobre branco.
 A grade usa `graf-500` **com alpha** — 25% entre contratos, 15% entre
 colunas —, que é cinza médio nos dois temas e se apoia sobre o fundo
 tingido da situação em vez de brigar com ele.
+
+### D-093 · Jornada sem login fica sem equipe, e está certo assim
+> *"Vai ficar sem equipe. Sabemos quem executou, o login que executou,
+> porém vai ficar sem equipe, pois o usuário não cadastrou ninguém com
+> todos os dados: CPF, data e etc."* — Emanuel, 07/09
+
+Eu tinha apontado que **50 dos 159 apontamentos de jornada** trazem o
+`Recurso` preenchido (D-091) e sugerido que era "o caminho para ligar
+jornada ao técnico sem inventar nada". **Não é**, e a resposta do
+Emanuel fecha a questão: saber *quem* executou não é o mesmo que ter
+*cadastro* — e sem cadastro não há equipe.
+
+É a mesma regra do D-088 e do D-089, aplicada a outro campo. Trocaria a
+dedução pela matrícula por uma dedução pelo nome do recurso, que é
+igualmente uma conclusão minha sobre a qual ninguém foi consultado.
+**Reconhecer a pessoa não a cadastra.**
+
+O estado do banco confirma o argumento — dos **104 técnicos**:
+
+| Campo | Preenchidos |
+|---|---|
+| matrícula, nome, equipe, skill | 104 |
+| CPF, telefone, admissão, foto, acesso | **0** |
+
+Os 104 saíram todos da planilha de equipes. Nenhuma pessoa foi
+cadastrada; o que existe é o eco de um import. Atribuir jornada a uma
+equipe com base nisso daria número de produtividade a um cadastro que
+ninguém conferiu.
+
+> **Fica como está:** jornada sem login não entra em equipe nenhuma. O
+> `Recurso` continua servindo para *identificar* o login na hora de
+> cadastrar (D-091) — não para atribuir.
+
+**Em aberto:** a ficha de cadastro do técnico (CPF, admissão, telefone,
+foto, contato) não existe em tela. Enquanto não existir, "técnico
+cadastrado" e "técnico que apareceu na planilha" são indistinguíveis —
+e o D-090 (desligar em vez de apagar) opera sobre linhas de planilha.
