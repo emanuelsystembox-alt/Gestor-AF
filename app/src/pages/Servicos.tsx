@@ -435,7 +435,11 @@ export default function Servicos() {
             <table className="w-full text-sm">
               <thead className="border-b border-graf-700 bg-graf-900 text-left
                                 text-[11px] uppercase tracking-wide text-graf-400">
-                <tr>
+                {/* As divisórias são translúcidas (graf-500 com alpha), não
+                    uma cor fixa: a rampa inverte no tema claro e uma borda
+                    escura fixa viraria risco preto sobre branco. */}
+                <tr className="[&>th]:border-r [&>th]:border-graf-500/20
+                               [&>th:last-child]:border-r-0">
                   {/* O contrato vem primeiro: e' por ele que se procura, se
                       fala ao telefone e se confere com a CLARO. A janela e'
                       importante, mas nao e' a identidade da linha. */}
@@ -498,7 +502,9 @@ export default function Servicos() {
                             borderLeft: `3px solid ${cor}`,
                             background: `color-mix(in srgb, ${cor} 8%, transparent)`,
                           }}
-                          className="cursor-pointer border-b-2 border-graf-900 hover:bg-graf-850">
+                          className="cursor-pointer border-b border-graf-500/25
+                                     [&>td]:border-r [&>td]:border-graf-500/15
+                                     [&>td:last-child]:border-r-0 hover:bg-graf-850">
                         <td className="tabular whitespace-nowrap px-3 py-2 align-top">
                           <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
                           {detalhada && v.wo_numero && (

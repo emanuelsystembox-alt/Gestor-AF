@@ -1500,3 +1500,60 @@ Desligar não é UPDATE direto: RLS não restringe COLUNA (D-050), e um
 update liberado por linha deixaria mexer em matrícula e equipe de
 carona. A tela chama `mudar_situacao_tecnico`, que muda só a situação e
 grava `situacao_em` e `situacao_por` — quem desligou, e quando.
+
+### D-091 · Os dois exports do TOA entram; o que muda é o nome
+> *"Vi que meu sistema está importando informações a mais e a menos. Os
+> dois são aceitos? Um tem o nome do login, o outro não tem."*
+> — Emanuel, 07/09
+
+Conferidos os dois arquivos de 07/09 — 66 linhas cada, mesmas colunas na
+mesma ordem, uma diferença:
+
+| | Colunas | Login do Técnico | Recurso |
+|---|---|---|---|
+| `Atividades…(5).xlsx` | 120 | sim | **não** |
+| `Atividades…(4).xlsx` | 121 | sim | **sim** |
+
+**Os dois têm o login.** A coluna a mais no (4) é `Recurso`, e ela não é
+o login: é o **nome** de quem estava logado — `Z634559` → `FABIO SOUZA
+DA SILVA`.
+
+Os dois são aceitos, e a coluna extra no começo não desloca a leitura:
+`toa.ts` desduplica os cabeçalhos **por posição** (D-013) e depois monta
+o objeto **pela chave**. Coluna a mais na frente não empurra nada.
+
+O defeito estava em outro lugar: **o `Recurso` já vinha sendo gravado em
+`dados_origem` e ninguém lia**. 207 das 617 visitas o têm — 27 dos 55
+logins —, e a tela de Equipes perguntava "de quem é o Z634559?" com a
+resposta dentro do próprio registro.
+
+Isto **não revoga o D-089**. Lá o nome era dedução nossa, de casar o
+login com a matrícula da planilha de equipes. Aqui é o campo que o TOA
+emite junto do apontamento.
+
+> **Sugestão continua fora; dado da fonte entra.** O nome diz *de quem é
+> o login* — que é a pergunta que trava o cadastro. Quem diz a *equipe*
+> continua sendo quem opera.
+
+A prévia da importação passa a dizer o que o arquivo traz, porque a
+escolha do export tem consequência operacional: sem `Recurso`, o login
+aparece na tela sem nome e alguém tem de saber de cor de quem ele é.
+
+Sobra uma pista para depois: **50 apontamentos de jornada sem login têm
+`Recurso` preenchido** — é o caminho para ligar jornada ao técnico sem
+inventar nada.
+
+### D-092 · A grade da lista de contratos é translúcida
+> *"No print de contratos deve haver uma divisão melhor, uma linha
+> transparente separando contrato por contrato, e coluna por coluna."*
+> — Emanuel, 07/09
+
+A lista tinha faixa colorida à esquerda e fundo tingido por situação,
+mas nenhuma divisória: com endereço em duas linhas e até 10 O.S. na
+mesma célula, os blocos encostavam um no outro.
+
+Divisória de cor fixa não serve: a rampa grafite **inverte** no tema
+claro (D-011), e uma borda escura fixa viraria risco preto sobre branco.
+A grade usa `graf-500` **com alpha** — 25% entre contratos, 15% entre
+colunas —, que é cinza médio nos dois temas e se apoia sobre o fundo
+tingido da situação em vez de brigar com ele.

@@ -123,6 +123,13 @@ para ADMIN (policy), e trigger recusa quem tem histórico — inclusive
 para o ADMIN. A tela só oferece Desligar/Reativar, via
 `mudar_situacao_tecnico`. Ver D-090.
 
+**O TOA exporta em dois formatos, e os dois entram.** Diferem em uma
+coluna: `Recurso`, o **nome** de quem estava logado — não o login, que
+os dois trazem. Coluna a mais no começo não desloca nada, porque
+`toa.ts` desduplica por posição e depois indexa por chave. `Recurso`
+mora em `dados_origem` e é a resposta para "de quem é este login".
+Ver D-091.
+
 **`toISOString()` devolve a data em UTC.** Em Manaus (UTC−4) o dia vira
 às 20h e a tela abre no dia seguinte, vazia. Use `isoLocal()` de
 `lib/formato.ts`. Ver D-084.
@@ -177,7 +184,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 36 migrations, as 89 decisões, o que já corrigimos do
+> reais do banco, as 37 migrations, as 91 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -212,7 +219,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 89 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 91 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

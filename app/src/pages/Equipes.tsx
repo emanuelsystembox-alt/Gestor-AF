@@ -88,10 +88,13 @@ interface LoginEquipe {
 /** Login que aparece no TOA e ninguém disse de quem é. Enquanto não
  *  disser, o contrato dele fica na equipe "Sem login definido".
  *
- *  Sem sugestão de nome nem de equipe (D-089): deduzir pela matrícula
- *  acerta quase sempre, e é por isso que ninguém confere. */
+ *  Sem sugestão de EQUIPE (D-089): deduzir pela matrícula acerta quase
+ *  sempre, e é por isso que ninguém confere. O `nome_toa` é outra
+ *  coisa — é a coluna "Recurso" que o próprio TOA emite ao lado do
+ *  login (D-091). Dado da fonte, não palpite nosso. */
 interface LoginSemDono {
   login: string; visitas: number; primeira: string; ultima: string
+  nome_toa: string | null
 }
 interface Orfao {
   matricula: string; visitas: number
@@ -424,7 +427,9 @@ export default function Equipes() {
             <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
               Os contratos desses logins estão em{' '}
               <strong>Sem login definido</strong> e ficam fora da produtividade até
-              alguém dizer de quem é cada um.
+              alguém dizer de quem é cada um. O nome ao lado do login é o{' '}
+              <strong>Recurso do TOA</strong> — quem estava logado, segundo a
+              própria planilha. A equipe, quem diz é você.
             </p>
 
             <div className="mt-3 space-y-1.5">
@@ -435,6 +440,21 @@ export default function Equipes() {
                     className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                       <span className="tabular font-semibold">{l.login}</span>
+                      {/* Quem o TOA diz que estava logado. Não decide a
+                          equipe — diz de quem é o login, que é a pergunta
+                          que trava o cadastro. */}
+                      {l.nome_toa ? (
+                        <span className="text-xs text-graf-300">
+                          {l.nome_toa}
+                          <span className="ml-1 rounded bg-graf-800 px-1 text-[9px]
+                                           font-semibold uppercase text-graf-400">
+                            no TOA
+                          </span>
+                        </span>
+                      ) : (
+                        <span title="A planilha importada não trazia a coluna Recurso"
+                          className="text-xs text-graf-600">nome não veio na planilha</span>
+                      )}
                       <span className="text-graf-400">{l.visitas} visitas</span>
                       <span className="text-xs text-graf-600">
                         {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}

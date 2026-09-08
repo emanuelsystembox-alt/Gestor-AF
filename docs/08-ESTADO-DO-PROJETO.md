@@ -134,6 +134,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 041 | Login TOA no cadastro de acesso |
 | 042 | **Só o cadastro roteia**; equipe "Sem login definido" |
 | 043 | **Cadastro sem autor não roteia**; técnico se desliga, não se apaga |
+| 044 | O nome do técnico vem do TOA (coluna `Recurso`), não do palpite |
 
 ---
 
@@ -156,7 +157,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 89 decisões
+## As 91 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

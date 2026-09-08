@@ -225,6 +225,38 @@ export default function Importacao() {
                 ))}
               </div>
 
+              {/* O TOA exporta com e sem a coluna "Recurso". As duas
+                  entram — mas só uma diz o NOME de quem estava logado,
+                  e é esse nome que resolve o cadastro do login (D-091). */}
+              {(() => {
+                const temLogin   = leitura.cabecalhos.includes('Login do Técnico')
+                const temRecurso = leitura.cabecalhos.includes('Recurso')
+                if (temLogin && temRecurso) return (
+                  <p className="mt-3 text-xs text-emerald-400">
+                    Traz <strong>Login do Técnico</strong> e <strong>Recurso</strong> —
+                    login e nome de quem executou. É o export completo.
+                  </p>
+                )
+                return (
+                  <div className="mt-3 rounded-lg border border-graf-700 bg-graf-900
+                                  px-3 py-2.5 text-xs">
+                    <p className="text-graf-300">
+                      {temLogin
+                        ? <>Traz o <strong>Login do Técnico</strong>, mas não a coluna{' '}
+                            <strong>Recurso</strong> (o nome de quem estava logado).</>
+                        : <>Não traz o <strong>Login do Técnico</strong>.</>}
+                    </p>
+                    <p className="mt-1 text-graf-500">
+                      A importação funciona assim mesmo. O que muda é o cadastro:{' '}
+                      {temLogin
+                        ? 'na tela de Equipes o login aparece sem nome, e alguém tem de saber de cor de quem ele é.'
+                        : 'sem login não há como rotear o contrato para equipe nenhuma.'}
+                      {' '}No TOA, marque as duas colunas na exportação.
+                    </p>
+                  </div>
+                )
+              })()}
+
               {/* D-013 visível para quem opera */}
               {leitura.duplicados.length > 0 && (
                 <div className="mt-3 rounded-lg border border-graf-700 bg-graf-900 px-3 py-2.5 text-xs">
