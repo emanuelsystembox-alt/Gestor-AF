@@ -29,7 +29,7 @@ export const SELECT_CONTRATO = `
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
-  finalizado_toa,
+  finalizado_toa, produtos_pendentes,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo, apelido ),
@@ -60,6 +60,10 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
   /** Aderencia a janela (D-099). Nulo = a regra nao se aplica. */
   tec1?: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
+  /** O que ainda vai ser feito no cliente: os produtos com situacao
+   *  "pendente" no analitico do TOA (D-106). Vem com repeticao -- o
+   *  mesmo produto em varios itens da assinatura --, e a tela agrupa. */
+  produtos_pendentes?: string[] | null
   /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
    *  quem nao encerrou (D-103). */
@@ -83,6 +87,18 @@ export interface PontoVisita {
 
 export const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
+
+/**
+ * Agrupa os pendentes repetidos: um contrato com 3 pontos traz
+ * "NETFLIX INCLUSO" tres vezes, e 72 etiquetas iguais nao se leem.
+ * Vira "NETFLIX INCLUSO x3", na ordem em que o TOA mandou.
+ */
+export function agrupaProdutos(lista: string[] | null | undefined) {
+  if (!lista?.length) return []
+  const m = new Map<string, number>()
+  for (const n of lista) m.set(n, (m.get(n) ?? 0) + 1)
+  return [...m.entries()].map(([nome, qtd]) => ({ nome, qtd }))
+}
 
 /** Cor da etiqueta de baixa: verde executou, vermelho improdutiva. */
 export function corBaixa(natureza: string | null | undefined): string {
@@ -351,6 +367,30 @@ export function TabelaContratos({
                     ))}
                   </div>
                 )}
+
+                {/* O que ainda falta fazer no cliente. Fica junto das
+                    O.S. porque e a mesma pergunta: o que este contrato
+                    ainda deve? (D-106) */}
+                {detalhada && (() => {
+                  const ps = agrupaProdutos(v.produtos_pendentes)
+                  if (!ps.length) return null
+                  return (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <span className="text-[9px] font-semibold uppercase tracking-wide
+                                       text-amber-400/80">pendente</span>
+                      {ps.map(p => (
+                        <span key={p.nome}
+                          className="rounded bg-amber-900/30 px-1.5 py-0.5 text-[10px]
+                                     text-amber-200 ring-1 ring-amber-700/40">
+                          {p.nome}
+                          {p.qtd > 1 && (
+                            <span className="ml-1 font-semibold opacity-80">×{p.qtd}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })()}
 
                 {/* Marcadores — os indicadores de qualidade apontados. */}
                 {detalhada && marcados.length > 0 && (

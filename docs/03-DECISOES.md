@@ -2003,3 +2003,42 @@ o palpite acerta na maioria, não sempre.
 
 Só vira busca de contrato quando o texto é **só número e separador**:
 `R JOAO 123456` continua sendo busca de endereço, não de contrato.
+
+
+### D-106 · O produto pendente — o que vai ser feito no cliente
+> *"Quero visualizar o produto pendente da O.S. Ela fica no analítico do
+> TOA, no meio de um monte de texto. Ela mostra o que vai ser feito no
+> cliente."* — Emanuel, 08/09
+
+O "monte de texto" é a coluna **Produto**, com até **1.309 caracteres
+numa célula só**. Os itens vêm colados, sem separador entre eles:
+
+```
+34655828|ACESSO VIRTUA PON|pendente34655829|FIBRA 600MEGA…|pendente
+^id      ^nome              ^situação^^ já é o id do próximo item
+```
+
+Dá para ler porque a situação é sempre uma palavra em minúsculas e o id
+seguinte começa com dígito — `(\d+)\|([^|]+?)\|([a-z]+)` resolve. Na
+planilha de 08/09: 240 linhas, **1.858 itens**, duas situações:
+`pendente` (695) e `instalado` (1.163). No banco: 5.488 itens, **1.933
+pendentes em 441 contratos**.
+
+> ⚠ **O id do item não é o número da O.S.** Tem 8 dígitos, a O.S. tem 10,
+> e em 240 linhas conferidas **nenhum bateu** — é o identificador do
+> item na assinatura. Por isso o produto amarra no **contrato**, não na
+> O.S. Chamar de "produto da O.S." seria inventar um vínculo que o dado
+> não tem, e a tela ficaria dizendo uma precisão que não existe.
+
+O dado cru fica em `visita_produto` (item a item, com id e situação); o
+resumo do que falta fica em `visita.produtos_pendentes`, para a tela não
+ter de embutir 5.488 linhas por consulta.
+
+**A repetição é real e precisa ser lida como tal.** Um contrato com 3
+pontos traz "NETFLIX INCLUSO" três vezes — um deles chegou a 33
+pendentes. A tela agrupa e mostra `NETFLIX ANUNCIO - INCLUSO ×3`: 33
+etiquetas iguais não se leem, e esconder a repetição mentiria sobre o
+tamanho do serviço.
+
+Aparece nas duas telas (é o mesmo componente, D-095) e vira coluna
+**Produtos pendentes** no relatório exportado.

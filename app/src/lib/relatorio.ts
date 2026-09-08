@@ -85,6 +85,8 @@ export interface VisitaLinha {
   situacao_em: string | null
   /** Aderencia a janela pela regra TEC1 (D-099). */
   tec1: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
+  /** O que ainda vai ser feito no cliente (D-106). */
+  produtos_pendentes: string[] | null
   inicio: string | null
   fim: string | null
   tempo_deslocamento: string | null
@@ -143,6 +145,7 @@ export const SELECT_RELATORIO = `
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim,
   situacao, situacao_em, inicio, fim, tempo_deslocamento, tec1,
+  produtos_pendentes,
   observacao, bloqueado_em, criado_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
@@ -232,6 +235,16 @@ export function rotuloTec1(t: string | null | undefined): string {
   return ''
 }
 
+/** Os pendentes numa celula so, agrupados: "NETFLIX x3 | COMODATO". */
+export function produtosPendentes(lista: string[] | null | undefined): string {
+  if (!lista?.length) return ''
+  const m = new Map<string, number>()
+  for (const n of lista) m.set(n, (m.get(n) ?? 0) + 1)
+  return [...m.entries()]
+    .map(([nome, qtd]) => (qtd > 1 ? `${nome} x${qtd}` : nome))
+    .join(' | ')
+}
+
 const endereco = (v: VisitaLinha) =>
   [v.logradouro, v.complemento].filter(Boolean).join(', ')
 
@@ -257,7 +270,7 @@ const CAB_VISITA = [
   'Cliente', 'Tipo de pessoa', 'Tipo de residência', 'Telefones',
   'Endereço', 'Bairro', 'CEP', 'Cidade', 'UF', 'Lat', 'Lng',
   'Início', 'Fim', 'Tempo de conclusão', 'Tempo de deslocamento',
-  'Aderência à janela', 'TEC1',
+  'Aderência à janela', 'TEC1', 'Produtos pendentes',
   'Observação',
   'Equipamento instalado', 'Equipamento retirado',
   'Serviço anterior — data', 'Serviço anterior — dias',
@@ -298,7 +311,7 @@ function linhaVisita(v: VisitaLinha): string[] {
     v.lat == null ? '' : String(v.lat), v.lng == null ? '' : String(v.lng),
     dt(v.inicio), dt(v.fim), duracao(v.inicio, v.fim),
     v.tempo_deslocamento ?? '',
-    aderencia(v), rotuloTec1(v.tec1),
+    aderencia(v), rotuloTec1(v.tec1), produtosPendentes(v.produtos_pendentes),
     v.observacao ?? '',
     eq(inst), eq(retr),
     r?.anterior ? dia(r.anterior.data_agendada) : '',

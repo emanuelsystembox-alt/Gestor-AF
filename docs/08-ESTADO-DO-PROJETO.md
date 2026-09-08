@@ -144,6 +144,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 049 | **Exclusão definitiva** — DELETE com registro de auditoria |
 | 050 | **O status do TOA não conclui**; `finalizado_toa`; baixa automática ligada |
 | 051 | Atividade **suspensa** não entra na importação |
+| 052 | **Produto pendente** lido da coluna `Produto` do TOA |
 
 ---
 
@@ -166,7 +167,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 105 decisões
+## As 106 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
