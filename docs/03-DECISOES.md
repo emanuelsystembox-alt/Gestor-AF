@@ -1671,3 +1671,18 @@ Efeito colateral bom: a expansão da equipe ganhou o que só existia em
 Serviços — **pontuação, baixa da AFLINE com sub-falha e marcadores de
 qualidade**. Não foi feature nova; era informação que já estava no banco
 e a outra tela não mostrava.
+
+### D-096 · A fila de cadastro vai para o rodapé
+> *"Essa sugestão para atualizar equipes tem que ficar no final da
+> página; essa de baixo, com os cadastrados, tem que ficar em cima."*
+> — Emanuel, 08/09
+
+Os blocos de pendência — os logins sem cadastro e os técnicos fora da
+planilha — abriam a tela de Equipes. Com 58 logins, o painel do dia
+ficava a **duas telas de rolagem** de quem só queria ver como as equipes
+estão indo.
+
+Quem abre Equipes vem ver o dia das equipes que **existem**. A fila de
+cadastro é trabalho de fundo: precisa aparecer — e continua aparecendo
+inteira, com o contador na linha do abrigo —, mas não empurra o painel
+para fora da primeira tela.

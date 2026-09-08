@@ -404,146 +404,6 @@ export default function Equipes() {
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
-        {/* ====== técnicos vistos em campo e fora do cadastro ====== */}
-        {/* ====== logins sem dono ======
-            O contrato só vai para uma equipe quando alguém diz de quem é
-            o login. Até lá fica em "Sem login definido", visível, em vez
-            de a gente adivinhar pela matrícula e acertar calado. */}
-        {semDono.length > 0 && (
-          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
-            <h2 className="font-medium text-amber-200">
-              {semDono.length} login(s) sem equipe definida
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
-              Os contratos desses logins estão em{' '}
-              <strong>Sem login definido</strong> e ficam fora da produtividade até
-              alguém dizer de quem é cada um. O nome ao lado do login é o{' '}
-              <strong>Recurso do TOA</strong> — quem estava logado, segundo a
-              própria planilha. A equipe, quem diz é você.
-            </p>
-
-            <div className="mt-3 space-y-1.5">
-              {semDono.map(l => {
-                const escolhida = equipeDoLogin[l.login] ?? ''
-                return (
-                  <div key={l.login}
-                    className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                      <span className="tabular font-semibold">{l.login}</span>
-                      {/* Quem o TOA diz que estava logado. Não decide a
-                          equipe — diz de quem é o login, que é a pergunta
-                          que trava o cadastro. */}
-                      {l.nome_toa ? (
-                        <span className="text-xs text-graf-300">
-                          {l.nome_toa}
-                          <span className="ml-1 rounded bg-graf-800 px-1 text-[9px]
-                                           font-semibold uppercase text-graf-400">
-                            no TOA
-                          </span>
-                        </span>
-                      ) : (
-                        <span title="A planilha importada não trazia a coluna Recurso"
-                          className="text-xs text-graf-600">nome não veio na planilha</span>
-                      )}
-                      <span className="text-graf-400">{l.visitas} visitas</span>
-                      <span className="text-xs text-graf-600">
-                        {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}
-                        {l.primeira !== l.ultima &&
-                          ` a ${new Date(l.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
-                      </span>
-
-                      <select value={escolhida} className={`${sel} ml-auto w-56`}
-                        onChange={e => setEquipeDoLogin(v =>
-                          ({ ...v, [l.login]: e.target.value }))}>
-                        <option value="">— escolha a equipe —</option>
-                        {painel
-                          .filter(e => e.codigo !== 'SEM-LOGIN')
-                          .map(e => (
-                            <option key={e.equipe_id} value={e.equipe_id}>
-                              {e.codigo} · {e.nome}
-                            </option>
-                          ))}
-                      </select>
-
-                      <button disabled={ocupado || !escolhida}
-                        onClick={() => cadastrarLogin(l.login, escolhida)}
-                        className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium
-                                   text-white hover:bg-af-500 disabled:opacity-40">
-                        é desta equipe
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
-        {orfaos.length > 0 && (
-          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
-            <h2 className="font-medium text-amber-200">
-              {orfaos.length} técnico(s) trabalhando em campo e fora do cadastro
-            </h2>
-            <p className="mt-1 text-sm text-amber-200/80">
-              Apareceram no TOA executando <strong>{totalOrfaos} visitas</strong>, mas não
-              estão na planilha de equipes. Enquanto isso, essas visitas ficam sem equipe
-              e fora da produtividade.
-            </p>
-            <div className="mt-3 space-y-1.5">
-              {orfaos.map(o => (
-                <div key={o.matricula}
-                  className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <span className="tabular font-semibold">{o.matricula}</span>
-                    <span className="text-graf-400">{o.visitas} visitas</span>
-                    <span className="text-xs text-graf-500">
-                      {new Date(o.primeira + 'T12:00').toLocaleDateString('pt-BR')}
-                      {o.primeira !== o.ultima &&
-                        ` a ${new Date(o.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
-                    </span>
-                    {o.equipes_sugeridas && (
-                      <span className="text-xs text-graf-500">área {o.equipes_sugeridas}</span>
-                    )}
-                    <button
-                      onClick={() => { setCadastrando(cadastrando === o.matricula ? null : o.matricula); setNomeNovo('') }}
-                      className="ml-auto rounded-md bg-af-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-af-500">
-                      {cadastrando === o.matricula ? 'Cancelar' : 'Cadastrar'}
-                    </button>
-                  </div>
-
-                  {cadastrando === o.matricula && (
-                    <div className="mt-2.5 flex flex-wrap items-end gap-2 border-t border-graf-800 pt-2.5">
-                      <div className="min-w-48 flex-1">
-                        <label className="mb-1 block text-[11px] text-graf-400">Nome</label>
-                        <input value={nomeNovo} onChange={e => setNomeNovo(e.target.value)}
-                          placeholder={o.matricula} autoFocus
-                          className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
-                      </div>
-                      <div className="min-w-40">
-                        <label className="mb-1 block text-[11px] text-graf-400">Equipe</label>
-                        <select value={equipeNova} onChange={e => setEquipeNova(e.target.value)}
-                          className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
-                          <option value="">Sem equipe por enquanto</option>
-                          {painel.map(e => (
-                            <option key={e.equipe_id} value={e.equipe_id}>
-                              {e.codigo} · {e.area ?? '—'}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button disabled={ocupado} onClick={() => cadastrarAvulso(o.matricula)}
-                        className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white
-                                   hover:bg-emerald-500 disabled:opacity-50">
-                        {ocupado ? 'Salvando…' : 'Salvar e religar visitas'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* ====== prévia da importação ====== */}
         {previa && (
           <section className="card-controle space-y-3 p-4">
@@ -936,6 +796,151 @@ export default function Equipes() {
             </p>
           </section>
         )}
+
+        {/* ====== o que espera cadastro ======
+            No fim da página, e não no topo: quem abre Equipes vem ver
+            o dia das equipes que EXISTEM. A fila de cadastro é trabalho
+            de fundo — importa, aparece, mas não empurra o painel para
+            fora da primeira tela. */}
+        {/* ====== logins sem dono ======
+            O contrato só vai para uma equipe quando alguém diz de quem é
+            o login. Até lá fica em "Sem login definido", visível, em vez
+            de a gente adivinhar pela matrícula e acertar calado. */}
+        {semDono.length > 0 && (
+          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
+            <h2 className="font-medium text-amber-200">
+              {semDono.length} login(s) sem equipe definida
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
+              Os contratos desses logins estão em{' '}
+              <strong>Sem login definido</strong> e ficam fora da produtividade até
+              alguém dizer de quem é cada um. O nome ao lado do login é o{' '}
+              <strong>Recurso do TOA</strong> — quem estava logado, segundo a
+              própria planilha. A equipe, quem diz é você.
+            </p>
+
+            <div className="mt-3 space-y-1.5">
+              {semDono.map(l => {
+                const escolhida = equipeDoLogin[l.login] ?? ''
+                return (
+                  <div key={l.login}
+                    className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <span className="tabular font-semibold">{l.login}</span>
+                      {/* Quem o TOA diz que estava logado. Não decide a
+                          equipe — diz de quem é o login, que é a pergunta
+                          que trava o cadastro. */}
+                      {l.nome_toa ? (
+                        <span className="text-xs text-graf-300">
+                          {l.nome_toa}
+                          <span className="ml-1 rounded bg-graf-800 px-1 text-[9px]
+                                           font-semibold uppercase text-graf-400">
+                            no TOA
+                          </span>
+                        </span>
+                      ) : (
+                        <span title="A planilha importada não trazia a coluna Recurso"
+                          className="text-xs text-graf-600">nome não veio na planilha</span>
+                      )}
+                      <span className="text-graf-400">{l.visitas} visitas</span>
+                      <span className="text-xs text-graf-600">
+                        {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}
+                        {l.primeira !== l.ultima &&
+                          ` a ${new Date(l.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
+                      </span>
+
+                      <select value={escolhida} className={`${sel} ml-auto w-56`}
+                        onChange={e => setEquipeDoLogin(v =>
+                          ({ ...v, [l.login]: e.target.value }))}>
+                        <option value="">— escolha a equipe —</option>
+                        {painel
+                          .filter(e => e.codigo !== 'SEM-LOGIN')
+                          .map(e => (
+                            <option key={e.equipe_id} value={e.equipe_id}>
+                              {e.codigo} · {e.nome}
+                            </option>
+                          ))}
+                      </select>
+
+                      <button disabled={ocupado || !escolhida}
+                        onClick={() => cadastrarLogin(l.login, escolhida)}
+                        className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium
+                                   text-white hover:bg-af-500 disabled:opacity-40">
+                        é desta equipe
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {orfaos.length > 0 && (
+          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
+            <h2 className="font-medium text-amber-200">
+              {orfaos.length} técnico(s) trabalhando em campo e fora do cadastro
+            </h2>
+            <p className="mt-1 text-sm text-amber-200/80">
+              Apareceram no TOA executando <strong>{totalOrfaos} visitas</strong>, mas não
+              estão na planilha de equipes. Enquanto isso, essas visitas ficam sem equipe
+              e fora da produtividade.
+            </p>
+            <div className="mt-3 space-y-1.5">
+              {orfaos.map(o => (
+                <div key={o.matricula}
+                  className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <span className="tabular font-semibold">{o.matricula}</span>
+                    <span className="text-graf-400">{o.visitas} visitas</span>
+                    <span className="text-xs text-graf-500">
+                      {new Date(o.primeira + 'T12:00').toLocaleDateString('pt-BR')}
+                      {o.primeira !== o.ultima &&
+                        ` a ${new Date(o.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
+                    </span>
+                    {o.equipes_sugeridas && (
+                      <span className="text-xs text-graf-500">área {o.equipes_sugeridas}</span>
+                    )}
+                    <button
+                      onClick={() => { setCadastrando(cadastrando === o.matricula ? null : o.matricula); setNomeNovo('') }}
+                      className="ml-auto rounded-md bg-af-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-af-500">
+                      {cadastrando === o.matricula ? 'Cancelar' : 'Cadastrar'}
+                    </button>
+                  </div>
+
+                  {cadastrando === o.matricula && (
+                    <div className="mt-2.5 flex flex-wrap items-end gap-2 border-t border-graf-800 pt-2.5">
+                      <div className="min-w-48 flex-1">
+                        <label className="mb-1 block text-[11px] text-graf-400">Nome</label>
+                        <input value={nomeNovo} onChange={e => setNomeNovo(e.target.value)}
+                          placeholder={o.matricula} autoFocus
+                          className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
+                      </div>
+                      <div className="min-w-40">
+                        <label className="mb-1 block text-[11px] text-graf-400">Equipe</label>
+                        <select value={equipeNova} onChange={e => setEquipeNova(e.target.value)}
+                          className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
+                          <option value="">Sem equipe por enquanto</option>
+                          {painel.map(e => (
+                            <option key={e.equipe_id} value={e.equipe_id}>
+                              {e.codigo} · {e.area ?? '—'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button disabled={ocupado} onClick={() => cadastrarAvulso(o.matricula)}
+                        className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white
+                                   hover:bg-emerald-500 disabled:opacity-50">
+                        {ocupado ? 'Salvando…' : 'Salvar e religar visitas'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
 
         <p className="pb-6 text-center text-xs text-graf-600">
           {aba === 'equipes'
