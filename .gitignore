@@ -28,3 +28,6 @@ desktop.ini
 # temporários
 *.log
 .cache/
+
+# arquivo temporario que o Vite cria ao recarregar a config
+vite.config.ts.timestamp-*
