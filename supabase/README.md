@@ -57,7 +57,7 @@ conta a história.
 
 ---
 
-## As 29 migrations aplicadas
+## As 56 migrations aplicadas
 
 | # | O que faz | Arquivo local |
 |---|---|---|
@@ -106,6 +106,23 @@ conta a história.
 | 045 | **Skill do técnico** — domínio em tabela, `definir_skill_tecnico`; comissão deixa de ser fixa em SINGLE MASTER | ✓ |
 | 044 | **O nome vem do TOA** — `logins_sem_cadastro` devolve o `Recurso` (nome de quem estava logado) | ✓ |
 | 043 | **Sem autor não é cadastro** — `equipe_do_login` exige `criado_por`; desfaz os 9 seeds; DELETE de técnico/equipe só ADMIN e barrado por histórico; `mudar_situacao_tecnico` | ✓ |
+| 046 | **O código decide a situação** — `codigo_baixa.situacao_destino` e o parâmetro `baixa_automatica` (D-097) | ✓ |
+| 047 | **TEC1 — aderência à janela**, a regra lida do painel do Emanuel | ✓ |
+| 048 | Excluir contratos em lote, sem atalho na regra | ✓ |
+| 049 | **Exclusão definitiva** — DELETE com registro de auditoria | ✓ |
+| 050 | **O status do TOA não conclui**; `finalizado_toa`; baixa automática ligada (D-103) | ✓ |
+| 051 | Atividade **suspensa** não entra na importação | ✓ |
+| 052 | **Produto pendente** lido da coluna `Produto` do TOA (D-107) | ✓ |
+| 053 | O produto é **da O.S., pelo Ponto** — corrige o 052 | ✓ |
+| 054 | **Rota do Dia** — `rota_do_dia`, `rota_bairros`, `rota_alertas` (D-111) | ✓ |
+| 055 | **O campo no celular** — bucket `evidencia` + policies do Storage, `registrar_evidencia`, `registrar_equipamento`, `pode_anexar_na_visita`, `agenda_do_campo`, `hoje_local`, e as travas da baixa (D-112 a D-116) | ✓ |
+| 056 | **`testar_campo()`** — 14 cenários das travas da 055, INVOKER (D-054) | ✓ |
+
+> **A 055 derruba e recria `baixar_os` e `baixar_visita`.** Assinatura com
+> default não convive com a versão antiga: as duas casariam com uma
+> chamada de argumentos nomeados, e o PostgREST recusa por ambiguidade.
+> Se você reaplicar migrations antigas por cima, a 055 tem de rodar
+> **depois** delas.
 
 ---
 
@@ -143,6 +160,21 @@ select norm_txt('  Instalação  de  Assinatura ');
 -- 5. a bateria de policy, sempre
 select * from testar_policies();
 -- esperado: passou = true nos 16 cenarios
+
+-- 5b. e a bateria das travas do campo (055)
+select * from testar_campo();
+-- esperado: passou = true nos 14 cenarios
+-- Ela cobre o que a 5 nao alcanca: as regras do campo nao sao policy,
+-- sao guarda dentro de funcao SECURITY DEFINER, que ignora RLS por
+-- definicao. As duas sao INVOKER de proposito (D-054).
+
+-- 5c. as duas policies do Storage continuam de pe
+select policyname from pg_policies
+where schemaname = 'storage' and tablename = 'objects'
+  and policyname like 'evidencia%';
+-- esperado: evidencia_arquivo_ver, evidencia_arquivo_enviar
+-- Nao ha policy de UPDATE nem de DELETE, e isso e proposital:
+-- evidencia e prova (D-115).
 
 -- 6. depois de DDL, o PostgREST precisa saber que a coluna existe
 notify pgrst, 'reload schema';
@@ -232,9 +264,14 @@ visível. Ver D-052.
 
 ---
 
-## Dados carregados (07/09/2026)
+## Dados carregados (08/09/2026)
 
-1 empresa · 18 praças · 89 equipes · 104 técnicos · **504 visitas** ·
-**610 O.S.** · 168 códigos de baixa · **1.466 sub-falhas** ·
-**546 combinações de O.S.** e **1.021 regras de pontuação** ·
-9 logins TOA mapeados · 3 dias de dado (04, 05 e 06/09/2026).
+1 empresa · 18 praças · 107 equipes · 104 técnicos · **955 visitas** ·
+**1.181 O.S.** · 168 códigos de baixa (todos com situação de destino) ·
+**1.466 sub-falhas** · **546 combinações de O.S.** e **1.021 regras de
+pontuação** · 5.505 itens de produto · 5 dias de dado (04 a 08/09/2026).
+
+> **`tecnico.usuario_id` está em 0 de 104.** É o que falta para alguém
+> conseguir usar o aplicativo do campo: sem o vínculo,
+> `equipes_visiveis()` não devolve equipe nenhuma e a agenda vem vazia.
+> Ver `docs/10-APP-DO-TECNICO.md`.

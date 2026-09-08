@@ -196,7 +196,7 @@ aparelho e sobe sozinha depois.
 
 ---
 
-## As 111 decisões
+## As 116 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -225,7 +225,7 @@ em janela
 
 ---
 
-## O dia 08/09 — 22 commits, 12 migrations
+## O dia 08/09 — 23 commits, 14 migrations
 
 Uma sessão inteira de trabalho, na ordem em que aconteceu. Quase tudo
 nasceu de o Emanuel olhar a tela e apontar o que estava errado — e em
@@ -286,6 +286,32 @@ metade dos casos o defeito era maior do que ele tinha visto.
 **Infraestrutura**
 - O sistema **entrou no ar**: `gestor-af.pages.dev` (`docs/09-PUBLICAR.md`)
 
+**E, no fim do dia, o aplicativo do técnico** — `campo/`, Expo SDK 57,
+Android e iPhone, rodando no Expo Go. Documentado inteiro em
+`docs/10-APP-DO-TECNICO.md`; aqui o resumo:
+
+| O que ele pediu | O que virou |
+|---|---|
+| *"técnico tem que tirar foto, vídeos e usar a geolocalização"* | câmera e vídeo nativos, GPS com precisão registrada, e **fila offline** para quando o sinal cai (D-112) |
+| *"o técnico só pode baixar se estiver ligado"* | **ligado é o GPS** — perguntei antes de escrever. `baixar_os` e o encerramento recusam a chamada do campo sem coordenada (D-113) |
+| *"o técnico não tem o poder de tirar do cancelado, reagendado, executado"* | baixa dada não se desfaz e situação terminal não volta. Achei um buraco: a trava de 032 **deixava `REAGENDAMENTO` passar** — justamente o que a baixa automática aplica 1.075 vezes (D-114) |
+| *"ele vai poder editar foto depois de baixado, ou anexar equipamento ou foto não lançada"* | anexo sobrevive à baixa, **no dia do contrato** — janela escolhida por ele entre três (D-115) |
+| *"vamos ter que melhorar e fazer melhor"* (sobre as telas do concorrente) | o mapa das 12 telas deles está em `docs/10`, com o que copiamos, o que recusamos e por quê |
+
+Três coisas que o concorrente faz e nós recusamos, de propósito:
+
+1. **Ele pergunta "Você está na casa do cliente? SIM/NÃO"** com a
+   permissão de localização concedida. Autodeclaração não é prova — nós
+   medimos.
+2. **Abre com um menu de doze ícones**, e o trabalho do dia é um deles.
+   A nossa tela inicial é a agenda.
+3. **Mostra `#N/A` e `00:00:00` na cara do técnico.** Campo vazio some;
+   não vira texto.
+
+A parte que importa: **as quatro regras moram no banco** (055), não na
+tela — e têm bateria própria, `testar_campo()`, 14 cenários, INVOKER,
+com fixture própria e limpeza garantida (056).
+
 ### Erros meus, registrados
 
 Ficam aqui porque custaram tempo e podem voltar:
@@ -297,6 +323,10 @@ Ficam aqui porque custaram tempo e podem voltar:
    ficaram idênticas na tela (D-108 → D-109).
 3. **Tirei a coluna Data da visão de equipe** por economia; ela fazia
    falta (D-102).
+3b. **Quase deixei duas `baixar_os` no banco.** Acrescentar parâmetro com
+   default parecia inofensivo — mas as duas assinaturas casam com a mesma
+   chamada de argumentos nomeados, e o PostgREST recusa por ambiguidade.
+   Derrubar a antiga e atualizar os chamadores era o único caminho.
 4. **`unaccent_simples` não existe** neste banco, e variável record
    chamada `v` colide com o alias `v` da tabela (D-099).
 5. **Filtrei `codigo_baixa` por empresa**, e ele é catálogo global — a
@@ -350,7 +380,12 @@ Ficam aqui porque custaram tempo e podem voltar:
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
 | **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |
-| **Abas de equipamento no modal de baixa** | Dependem do módulo de almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
+| **Vincular técnico a usuário** | `tecnico.usuario_id` em **0 de 104**. É o que destrava o teste do aplicativo do campo: sem o vínculo a agenda vem vazia, e não é bug. Administração → Usuários, campo **Login TOA** (D-087). |
+| **Ligar `campo/` ao projeto EAS** | O projeto `afline-manager` já existe na Expo; falta o id completo para rodar `eas init` e habilitar build para as lojas. |
+| **Apagar ou ocultar foto errada** | Dedo na lente, contrato trocado. Hoje só pelo `service_role`: não há policy de UPDATE/DELETE no bucket nem RPC de exclusão, porque prova que se apaga não é prova. A saída certa é **ocultar com motivo** — decisão do Emanuel (D-115). |
+| **Evidência obrigatória** | O Emanuel decidiu **livre**: nenhuma foto trava a baixa. Se virar exigência por tipo de serviço ou por código de baixa, é tabela nova + cenário em `testar_campo()`. |
+| **Abas de equipamento no modal de baixa** | O aplicativo já lança serial, tipo e modelo, com autor (055-F). O que falta é o **almoxarifado**: sem cadastro de serial não há conferência — é o técnico digitando, não estoque batendo. Daí também depende o leitor de código de barras que o concorrente tem. |
+| **Ranking · Premiação · Portaria · Abastecer · Terminais · Aceites de Materiais · Mensagens** | Telas do aplicativo do concorrente que não replicamos: dependem de almoxarifado ou de frota (módulos que não existem), ou de regra de gestão que ninguém definiu. Meta e Premiação já são respondidas por "Minha produção no mês". Ver `docs/10-APP-DO-TECNICO.md`. |
 | **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
 | **`equipe.skill`** | O sistema atual mostra "SINGLE MASTER"; não modelamos porque não sabemos o domínio. |

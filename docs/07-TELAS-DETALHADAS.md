@@ -164,6 +164,6 @@ Abas: **Status Técnicos** · **Caminho percorrido** · **Código De Baixa** ·
 | Transferência de equipe registrada | falta |
 | `ITEM` / `CONSOLID` / `VALOR` / `PONTOS` por O.S. | falta — depende de `06-PONTUACAO.md` |
 | Indicadores de qualidade / aferição | falta |
-| Anexos com autoria e miniatura | parcial (`evidencia` existe, falta tela) |
-| Geo cerca e garagem | falta |
+| Anexos com autoria e miniatura | **feito no aplicativo** (055 + `campo/`): foto e vídeo com autor, tipo, coordenada, precisão e miniatura. Na **web** ainda falta a galeria — hoje `/controle/visita/:id` não mostra o que o campo anexou |
+| Geo cerca e garagem | falta — e é **decisão em aberto**: a baixa hoje exige coordenada (D-113), mas não confere se ela bate com o endereço. Cerca exige raio aceitável, que ninguém definiu |
 | Trajeto percorrido | derivável de `visita_evento` |

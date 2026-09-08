@@ -1,6 +1,12 @@
 # Mapa de telas do sistema atual (Alfa Gestor / ngestor)
 
 Levantado em 05/09/2026, navegando como usuário.
+
+> **O aplicativo de celular deles está em `docs/10-APP-DO-TECNICO.md`.**
+> Levantado em 08/09/2026 pelas capturas do Emanuel — as doze telas do
+> menu, o cartão de atividade, o detalhe da O.S. com a timeline, o menu
+> de situação e o fluxo de "Concluir Serviço" com as quatro abas. Lá
+> também está o que copiamos, o que recusamos e por quê.
 **O que documentamos aqui é arquitetura de informação** — quais telas
 existem, o que cada uma mostra, quais filtros e ações. Não copiamos
 código nem identidade visual.

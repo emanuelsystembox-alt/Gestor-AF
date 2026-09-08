@@ -38,6 +38,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 
 ## Ordem de leitura
 
+0. **`docs/10-APP-DO-TECNICO.md`** — se você veio pelo aplicativo, é aqui
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — o inventário, com números do banco
 3. **`docs/03-DECISOES.md`** — as 56 decisões e o porquê de cada uma

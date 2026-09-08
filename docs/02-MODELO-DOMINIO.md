@@ -101,8 +101,15 @@ sem viabilidade técnica, recusa…) Essa lista é um cadastro, não um campo li
 ### `os_execucao` — o que o técnico registra em campo
 - check-in com GPS e horário
 - checklist do serviço (varia por tipo_servico ❓)
-- **fotos** (quantas? obrigatórias? quais ângulos?)
-- **equipamentos instalados/retirados** → serial
+- ~~**fotos** (quantas? obrigatórias? quais ângulos?)~~ →
+  **RESPONDIDO em 08/09: nenhuma é obrigatória.** O Emanuel escolheu
+  *livre* entre quatro opções; foto não trava a baixa. A tabela é
+  `evidencia`, com `midia` (FOTO/VIDEO), `tipo`, coordenada, `precisao_m`
+  e autor carimbado pelo servidor. Ver D-115 e `docs/10-APP-DO-TECNICO.md`
+- ~~**equipamentos instalados/retirados** → serial~~ →
+  **feito**: `equipamento_movimento` com `registrar_equipamento` (055-F),
+  serial normalizado e autor. Falta o **almoxarifado** para conferir o
+  serial contra um cadastro
 - **metragem de cabo** aplicada → baixa no saldo do técnico
 - **miscelânea** consumida
 - assinatura do cliente ❓

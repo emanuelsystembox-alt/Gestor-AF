@@ -293,7 +293,8 @@ por definição. As duas são INVOKER de propósito (D-054).
 | Arquivo | Para quê |
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
-| `campo/README.md` | o aplicativo do técnico: rodar no Expo Go e publicar |
+| `docs/10-APP-DO-TECNICO.md` | **o aplicativo do técnico**: o concorrente tela a tela, o que copiamos e recusamos, arquitetura, regras e o que falta |
+| `campo/README.md` | rodar no Expo Go, vincular o técnico, publicar nas lojas |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 111 decisões, com o porquê de cada uma |
