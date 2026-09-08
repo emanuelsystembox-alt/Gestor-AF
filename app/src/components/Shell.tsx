@@ -3,8 +3,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTema } from '../lib/tema'
 import { Marca } from './ui'
+import { Icone, type NomeIcone } from './icones'
 
-interface Item { para: string; rotulo: string; contagem?: number; futuro?: boolean }
+interface Item {
+  para: string; rotulo: string; icone: NomeIcone
+  contagem?: number; futuro?: boolean
+}
 
 /**
  * Menu recolhido: a preferencia fica no navegador, como a do tema.
@@ -23,29 +27,24 @@ function lerRecolhido(): boolean {
   try { return localStorage.getItem(CHAVE_MENU) === '1' } catch { return false }
 }
 
-/** A inicial que representa o item quando so cabe um caractere. */
-function sigla(rotulo: string): string {
-  return rotulo.trim().charAt(0).toUpperCase()
-}
-
 const OPERACAO: Item[] = [
-  { para: '/controle', rotulo: 'Dashboard' },
-  { para: '/controle/servicos', rotulo: 'Serviços' },
-  { para: '/controle/equipes', rotulo: 'Equipes' },
-  { para: '/controle/produtividade', rotulo: 'Produtividade' },
-  { para: '/controle/relatorios', rotulo: 'Relatórios' },
+  { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard' },
+  { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos' },
+  { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes' },
+  { para: '/controle/produtividade', rotulo: 'Produtividade', icone: 'produtividade' },
+  { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
 ]
 const ENTRADA: Item[] = [
-  { para: '/controle/importar', rotulo: 'Importar TOA' },
-  { para: '/controle/sub-falhas', rotulo: 'Sub-falhas' },
+  { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar' },
+  { para: '/controle/sub-falhas', rotulo: 'Sub-falhas', icone: 'subfalhas' },
 ]
 const AJUSTES: Item[] = [
-  { para: '/controle/configuracoes', rotulo: 'Configurações' },
-  { para: '/controle/administracao', rotulo: 'Administração' },
+  { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes' },
+  { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao' },
 ]
 const FUTURO: Item[] = [
-  { para: '/estoque', rotulo: 'Estoque', futuro: true },
-  { para: '/frota', rotulo: 'Frota', futuro: true },
+  { para: '/estoque', rotulo: 'Estoque', icone: 'estoque', futuro: true },
+  { para: '/frota', rotulo: 'Frota', icone: 'frota', futuro: true },
 ]
 
 function Grupo({ titulo, itens, recolhido }: {
@@ -68,30 +67,32 @@ function Grupo({ titulo, itens, recolhido }: {
           const ativo = local.pathname === i.para
           if (i.futuro) return (
             <span key={i.para}
-              className={`flex cursor-not-allowed items-center gap-2 rounded-md py-1.5
+              className={`flex cursor-not-allowed items-center gap-2.5 rounded-md py-1.5
                           text-sm text-graf-600 ${recolhido ? 'justify-center px-0' : 'px-3'}`}
               title={recolhido ? `${i.rotulo} — ainda não construído` : 'Ainda não construído — Fase 2'}>
-              {recolhido ? sigla(i.rotulo) : i.rotulo}
-              {!recolhido && (
+              <Icone nome={i.icone} />
+              {!recolhido && <>
+                {i.rotulo}
                 <span className="ml-auto rounded bg-graf-800 px-1.5 py-0.5 text-[9px]
                                  font-semibold uppercase text-graf-500">em breve</span>
-              )}
+              </>}
             </span>
           )
           return (
-            // Recolhido, o `title` e a unica pista do que e o item --
-            // sem ele a faixa de iniciais vira adivinhacao.
             <NavLink key={i.para} to={i.para} title={recolhido ? i.rotulo : undefined}
-              className={`flex items-center gap-2 rounded-md py-1.5 text-sm transition ${
+              className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition ${
                 recolhido ? 'justify-center px-0' : 'px-3'} ${
                 ativo ? 'bg-af-600/15 font-medium text-af-300 ring-1 ring-af-600/30'
                       : 'text-graf-300 hover:bg-graf-800'}`}>
-              {recolhido ? sigla(i.rotulo) : i.rotulo}
-              {!recolhido && i.contagem !== undefined && (
-                <span className="tabular ml-auto rounded bg-graf-800 px-1.5 text-[11px]">
-                  {i.contagem}
-                </span>
-              )}
+              <Icone nome={i.icone} />
+              {!recolhido && <>
+                {i.rotulo}
+                {i.contagem !== undefined && (
+                  <span className="tabular ml-auto rounded bg-graf-800 px-1.5 text-[11px]">
+                    {i.contagem}
+                  </span>
+                )}
+              </>}
             </NavLink>
           )
         })}
@@ -104,6 +105,10 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   const { perfil, papeis, sair } = useAuth()
   const [tema, setTema] = useTema()
   const [recolhido, setRecolhido] = useState(lerRecolhido)
+  /** Recolhido, mas com o mouse em cima: abre só enquanto o cursor
+   *  estiver lá. Não mexe na preferência guardada. */
+  const [espiando, setEspiando] = useState(false)
+  const aberto = !recolhido || espiando
 
   useEffect(() => {
     try { localStorage.setItem(CHAVE_MENU, recolhido ? '1' : '0') } catch { /* sem storage */ }
@@ -112,18 +117,32 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   return (
     <div className="sup-controle flex min-h-screen">
       {/* ---------- lateral ---------- */}
-      <aside className={`hidden shrink-0 border-r border-graf-800 bg-graf-900
-                         transition-[width] duration-150 lg:block
+      {/*
+        * Recolhido, a lateral vira uma faixa de ícones de 56px — e
+        * ABRE SOZINHA quando o mouse encosta (D-110). A faixa segura o
+        * espaço no layout; o painel que cresce é `absolute`, por cima
+        * do conteúdo, para a tabela não se mexer a cada passada de
+        * mouse. Menu que empurra a tela ao passar o cursor é pior que
+        * menu estreito.
+        */}
+      <aside className={`relative hidden shrink-0 lg:block
                          ${recolhido ? 'w-14' : 'w-56'}`}>
-        <div className="sticky top-0">
-          <div className={`flex items-center py-4 ${recolhido ? 'justify-center px-0' : 'px-4'}`}>
-            <Marca compacto={recolhido} />
-          </div>
-          <div className="px-2">
-            <Grupo titulo="Operação" itens={OPERACAO} recolhido={recolhido} />
-            <Grupo titulo="Entrada de dados" itens={ENTRADA} recolhido={recolhido} />
-            <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={recolhido} />
-            <Grupo titulo="Próximas fases" itens={FUTURO} recolhido={recolhido} />
+        <div onMouseEnter={() => recolhido && setEspiando(true)}
+             onMouseLeave={() => setEspiando(false)}
+             className={`absolute left-0 top-0 h-full border-r border-graf-800
+                         bg-graf-900 transition-[width] duration-150
+                         ${aberto ? 'w-56' : 'w-14'}
+                         ${espiando ? 'z-40 shadow-2xl shadow-black/40' : ''}`}>
+          <div className="sticky top-0">
+            <div className={`flex items-center py-4 ${aberto ? 'px-4' : 'justify-center px-0'}`}>
+              <Marca compacto={!aberto} />
+            </div>
+            <div className="px-2">
+              <Grupo titulo="Operação" itens={OPERACAO} recolhido={!aberto} />
+              <Grupo titulo="Entrada de dados" itens={ENTRADA} recolhido={!aberto} />
+              <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={!aberto} />
+              <Grupo titulo="Próximas fases" itens={FUTURO} recolhido={!aberto} />
+            </div>
           </div>
         </div>
       </aside>
@@ -134,7 +153,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
           <div className="flex items-center gap-3 px-4 py-2.5">
             {/* So no desktop: no celular a navegacao e a barra de baixo,
                 e nao ha lateral para recolher. */}
-            <button onClick={() => setRecolhido(r => !r)}
+            <button onClick={() => { setRecolhido(r => !r); setEspiando(false) }}
               title={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
               aria-label={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
               className="hidden rounded-md border border-graf-700 px-2 py-1 text-xs
