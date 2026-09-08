@@ -155,19 +155,36 @@ export default function Servicos() {
   // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
   const [conjunto, setConjunto] = useState<string | null>(null)
 
-  // ---- histórico do contrato (D-069) ----
-  // Buscar um número de contrato deixa de ser filtro do período e passa
-  // a ser a pergunta "o que já aconteceu neste contrato". O período
-  // esconderia justamente as outras visitas, que são o que interessa
-  // quando alguém digita um contrato inteiro.
-  const [contratoBuscado, setContratoBuscado] = useState<string | null>(null)
+  // ---- histórico do contrato (D-069) e busca em GRUPO (D-105) ----
+  // Um número de contrato inteiro deixa de ser filtro do período e vira
+  // a pergunta "o que já aconteceu neste contrato" — o período
+  // esconderia justamente as outras visitas.
+  //
+  // Vários números, separados por espaço, vírgula ou linha, são um
+  // GRUPO: o COP cola a lista que recebeu e vê os contratos dela. Aí o
+  // período volta a valer por padrão, porque quem cola 40 contratos
+  // quase sempre quer o dia (ou o mês) que está na tela — e pode
+  // desligar isso num clique.
+  const [contratosBuscados, setContratosBuscados] = useState<string[]>([])
+  /** Na busca por contrato, respeitar o período escolhido em cima. */
+  const [contratoNoPeriodo, setContratoNoPeriodo] = useState(false)
 
   useEffect(() => {
+    const achados = (busca.match(/\d{6,}/g) ?? [])
     const t = busca.trim()
-    const alvo = /^\d{6,}$/.test(t) ? t : null
+    // Só vale como lista de contrato se a busca for SÓ números e
+    // separadores — senão "R JOAO 123456" viraria busca de contrato.
+    const soNumeros = t.length > 0 && /^[\d\s,;\n\r.-]+$/.test(t)
+    const alvo = soNumeros ? [...new Set(achados)] : []
     // Espera o usuário parar de digitar: sem isto, "226803663" dispara
     // nove consultas.
-    const id = setTimeout(() => setContratoBuscado(alvo), 350)
+    const id = setTimeout(() => {
+      setContratosBuscados(alvo)
+      // Um contrato só: histórico completo, como sempre foi.
+      // Vários: o padrão é o período da tela.
+      if (alvo.length <= 1) setContratoNoPeriodo(false)
+      else setContratoNoPeriodo(true)
+    }, 350)
     return () => clearTimeout(id)
   }, [busca])
 
@@ -192,15 +209,24 @@ export default function Servicos() {
   }, [])
 
   useEffect(() => {
-    if (!contratoBuscado && (!de || !ate)) return
+    if (!contratosBuscados.length && (!de || !ate)) return
     let vivo = true
     setCarregando(true); setErro(null)
 
     // Contrato excluido some da lista, mas continua no banco (D-043).
     let q = supabase.from('visita').select(SELECT).is('excluido_em', null)
-    q = contratoBuscado
-      ? q.eq('contrato', contratoBuscado)
-      : q.gte('data_agendada', de).lte('data_agendada', ate)
+    if (contratosBuscados.length) {
+      q = contratosBuscados.length === 1
+        ? q.eq('contrato', contratosBuscados[0])
+        : q.in('contrato', contratosBuscados)
+      // O grupo pode ser lido dentro do período ou dia a dia, como o
+      // histórico de um contrato só.
+      if (contratoNoPeriodo && de && ate) {
+        q = q.gte('data_agendada', de).lte('data_agendada', ate)
+      }
+    } else {
+      q = q.gte('data_agendada', de).lte('data_agendada', ate)
+    }
 
     q.order('data_agendada', { ascending: false })
       .order('janela_inicio', { ascending: true, nullsFirst: false })
@@ -211,7 +237,7 @@ export default function Servicos() {
         setCarregando(false)
       })
     return () => { vivo = false }
-  }, [de, ate, versao, contratoBuscado])
+  }, [de, ate, versao, contratosBuscados, contratoNoPeriodo])
 
   const base = useMemo(() => soProdutivas
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
@@ -324,7 +350,7 @@ export default function Servicos() {
         <section className="card-controle space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <input value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Cliente, endereço, WO, contrato, O.S., node, matrícula, código de baixa…"
+              placeholder="Cliente, endereço, WO, contrato (ou vários, colados), O.S., node, matrícula…"
               className="min-w-72 flex-1 rounded-md border border-graf-700 bg-graf-900 px-3 py-1.5
                          text-sm outline-none placeholder-graf-500 focus:border-af-500" />
             <button onClick={exportar} disabled={visiveis.length === 0}
@@ -418,14 +444,27 @@ export default function Servicos() {
 
         {/* Quando a busca vira histórico de contrato, a tela precisa
             dizer isso — senão o usuário acha que o filtro de data quebrou. */}
-        {contratoBuscado && (
+        {contratosBuscados.length > 0 && (
           <Alerta tipo="info">
-            Mostrando <strong>todas</strong> as visitas do contrato{' '}
-            <strong className="tabular">{contratoBuscado}</strong>, dia a dia, fora do
-            período{' '}
+            {contratosBuscados.length === 1 ? (
+              <>Contrato <strong className="tabular">{contratosBuscados[0]}</strong></>
+            ) : (
+              <><strong className="tabular">{contratosBuscados.length}</strong> contratos
+                na busca</>
+            )}
+            {contratoNoPeriodo
+              ? <> — mostrando só o que está <strong>no período</strong> escolhido.</>
+              : <> — mostrando <strong>todas</strong> as visitas, dia a dia,
+                  fora do período.</>}
+            {' '}
+            <button onClick={() => setContratoNoPeriodo(p => !p)}
+              className="underline underline-offset-2 hover:text-af-400">
+              {contratoNoPeriodo ? 'ver todas as datas' : 'limitar ao período'}
+            </button>
+            {' · '}
             <button onClick={() => setBusca('')}
               className="underline underline-offset-2 hover:text-af-400">
-              — voltar ao período
+              limpar
             </button>
           </Alerta>
         )}

@@ -143,6 +143,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 048 | Excluir contratos em lote, sem atalho na regra |
 | 049 | **Exclusão definitiva** — DELETE com registro de auditoria |
 | 050 | **O status do TOA não conclui**; `finalizado_toa`; baixa automática ligada |
+| 051 | Atividade **suspensa** não entra na importação |
 
 ---
 
@@ -165,7 +166,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 103 decisões
+## As 105 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

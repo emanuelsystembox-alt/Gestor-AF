@@ -1944,3 +1944,62 @@ Duas decisões dele, perguntado com os números na mão:
 - **Os 110 contratos antigos ficam como estão.** A correção vale daqui
   para a frente; quem quiser acertar um dia antigo reimporta o arquivo
   daquele dia.
+
+
+### D-104 · Atividade suspensa não entra
+> *"225853870 foi baixado e tem código de baixa, porém o sistema colocou
+> como impedimento. Acho que ele pode ter lido a atividade suspensa —
+> não vamos ler ela, pois é uma ação que foi suspensa, ou seja não
+> aconteceu."* — Emanuel, 08/09
+
+Ele acertou o diagnóstico antes de eu abrir o arquivo. A WO
+`00121|231317484` tem **duas atividades** no TOA, do mesmo técnico, no
+mesmo dia:
+
+| Atividade | Status | Horário | Baixa |
+|---|---|---|---|
+| 199375883 | **suspenso** | 08:29–09:40 | nenhuma, nem status de O.S. |
+| 199020500 | concluído | 10:28–10:56 | 409 nas duas O.S. |
+
+A suspensa entrava como visita e virava COM IMPEDIMENTO — um contrato
+"parado" que na verdade tinha sido executado às 10:56.
+
+Suspensa é **tentativa abortada**: sem baixa, sem O.S. executada, sem
+trabalho feito e sem pontuação. Deixa de ser lida, como a linha sem "ID
+da Atividade" já era (D-004).
+
+> ⚠ Medido antes de aplicar: das 3 suspensas no banco, **2 estão
+> sozinhas na WO**. Para essas, ignorar significa o contrato não
+> aparecer em lugar nenhum. Por isso a importação passou a **contar** as
+> suspensas e mostrar o número no resumo: some da tela, não do relatório
+> da importação.
+
+As 3 que já estão no banco continuam lá — a decisão de não mexer no
+histórico (D-103) vale aqui também. Quem quiser tirá-las agora tem o
+botão de apagar; quem reimportar o dia já não as recebe.
+
+### D-105 · Buscar um grupo de contratos, dentro do período
+> *"Na aba serviço deve ter um filtro no qual eu posso pesquisar um
+> grupo de contrato e ele trazer somente do dia, ou do mês conforme a
+> data que eu escolher."* — Emanuel, 08/09
+
+A busca já entendia **um** contrato e, ao encontrá-lo, ignorava o
+período de propósito (D-069): quem digita um contrato inteiro quer o
+histórico dele, e o período esconderia justamente as outras visitas.
+
+Agora ela entende **vários**, colados como vierem — espaço, vírgula,
+ponto-e-vírgula ou uma por linha. E a regra do período muda com a
+quantidade, porque a intenção muda junto:
+
+| O que se digita | Período |
+|---|---|
+| um contrato | **ignorado** — histórico completo, dia a dia |
+| dois ou mais | **respeitado** — é o dia (ou mês) da tela |
+
+Quem cola quarenta contratos quase sempre quer conferir a lista *do
+dia*; quem digita um quer a vida inteira dele. Os dois casos têm um
+botão para trocar — "ver todas as datas" / "limitar ao período" — porque
+o palpite acerta na maioria, não sempre.
+
+Só vira busca de contrato quando o texto é **só número e separador**:
+`R JOAO 123456` continua sendo busca de endereço, não de contrato.

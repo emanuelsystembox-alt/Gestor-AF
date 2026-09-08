@@ -9,6 +9,9 @@ type Fase = 'ocioso' | 'lendo' | 'lida' | 'enviando' | 'pronto'
 
 interface Resumo {
   criadas: number; atualizadas: number; ignoradas: number
+  /** Atividades suspensas recusadas na leitura (D-104): tentativa
+   *  abortada nao e trabalho, e some da tela -- mas nao daqui. */
+  suspensas?: number
   erros: number; conflitos: number; ordens_servico: number
 }
 
@@ -316,6 +319,7 @@ export default function Importacao() {
                 ['Atualizadas', resumo.atualizadas, 'var(--st-execucao)'],
                 ['O.S. processadas', resumo.ordens_servico, undefined],
                 ['Ignoradas', resumo.ignoradas, undefined],
+                ['Suspensas (não lidas)', resumo.suspensas ?? 0, undefined],
                 ['Erros', resumo.erros, resumo.erros ? 'var(--st-conflito)' : undefined],
                 ['Conflitos com o TOA', resumo.conflitos,
                   resumo.conflitos ? 'var(--st-reagendamento)' : undefined],
