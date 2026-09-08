@@ -1252,6 +1252,11 @@ etapa gravada com `login Z656921 · origem MOBILE`, e conclusão sem baixa
 barrada nomeando a O.S.
 
 ### D-082 · O critério 3 vale — mas a tela diz que é ele
+> ⚠ **REVOGADA em 07/09 pelo D-088.** O Emanuel tinha delegado a decisão;
+> eu escolhi manter o critério 3 e escolhi errado. Fica registrada porque
+> o raciocínio abaixo é o que precisou ser desfeito — e porque a etiqueta
+> de origem do login, que nasceu aqui, continua valendo.
+
 O Emanuel delegou a decisão. **Fica valendo.**
 
 `tecnico.matricula → tecnico.equipe_id` saiu da planilha de equipes: é
@@ -1296,3 +1301,126 @@ que estava feito.
 > nenhum. Criar conta é ação dele — a tela de Administração faz isso pela
 > Edge Function `admin-usuarios` (D-051). Depois de criado o login com o
 > papel SUPERVISOR, o vínculo é um clique.
+
+---
+
+## 2026-09-07 (noite) — Fuso, sessão, e quem tem o direito de declarar
+
+### D-084 · O painel abria no dia seguinte, porque a data era UTC
+`new Date().toISOString().slice(0,10)` devolve a data em **UTC**. Manaus
+é UTC−4: às 22h do dia 7, em UTC já é dia 8. O painel abria em 08/09 e
+dizia *"Nenhuma visita neste período"* para uma operação que ainda
+estava trabalhando.
+
+Eram **nove cópias da mesma linha errada** — toda tela que abre "em
+hoje" passava por ela, e `metricas.ts` também usava no cálculo do que é
+"hoje". Viraram uma só: `isoLocal()` em `lib/formato.ts`, que monta a
+data pelos getters locais em vez de converter para UTC.
+
+Conferido às 22:06 em Manaus: relógio local 07/09, UTC 08/09,
+`isoLocal()` 07/09, tela 07/09.
+
+> ⚠ Ela usa o fuso do computador de quem olha. Para as 18 praças (AM e
+> RO em UTC−4, as demais em UTC−3) cada um vê o próprio dia — certo
+> enquanto a tela for de uma praça só. No dia em que o COP em Manaus
+> precisar olhar o dia de Belém, isto vira `base.fuso` e uma conversão
+> explícita.
+
+### D-085 · Sessão renovada não pode remontar a tela
+O `supabase-js` renova o token sozinho e dispara `onAuthStateChange`
+**toda vez que a aba recupera o foco**. O objeto de sessão vem novo a
+cada disparo: mesma pessoa, mesma permissão, referência diferente.
+
+Guardar esse objeto direto no estado fazia o React remontar a árvore
+inteira — piscava o "Carregando…", refazia perfil, papéis e permissões,
+e **cada página refazia as consultas dela**. Sair para olhar outra coisa
+e voltar recarregava tudo.
+
+O que a aplicação usa da sessão é o **ID de quem está logado**. Se o ID
+não mudou, nada mudou para a tela; o token renovado o próprio cliente já
+usa por dentro. O efeito passou a depender do ID, não do objeto.
+
+Conferido com `refreshSession()` de verdade: 51 linhas antes, 51 depois,
+zero reconsulta, sem piscar.
+
+> **A regra:** estado derivado de biblioteca externa deve guardar o
+> **valor** que interessa, não o objeto que a biblioteca devolve. Objeto
+> novo com conteúdo igual é re-render garantido.
+
+### D-086 · Arquivo certo na tela errada não é erro de arquivo
+Os dois botões se chamam "Importar planilha": um na tela de Equipes
+(planilha de equipes), outro em Importar TOA (atividades). A planilha de
+atividades largada na primeira devolvia *"Colunas ausentes: LOGIN, NOME
+DO TÉCNICO, EQUIPE, SUPERVISOR, ÁREA"* — o que manda a pessoa procurar
+defeito num arquivo que não tem defeito.
+
+A tela passou a reconhecer a assinatura do TOA (`ID da Atividade` +
+`Status da Atividade`, que a planilha de equipes não tem) e a dizer:
+*"Esta é a planilha de ATIVIDADES do TOA. O arquivo está certo; só está
+na tela errada"*, com link para a tela certa.
+
+> Mensagem de erro que descreve o sintoma custa uma hora de quem lê.
+> Mensagem que nomeia a causa custa um clique.
+
+### D-087 · O Login TOA entra na hora de criar o acesso
+Criar o acesso não bastava: `tecnico.usuario_id` continuava nulo, e é ele
+que o RLS consulta (`meu_tecnico_id`, `equipes_visiveis`) para saber qual
+agenda a pessoa enxerga. **O técnico entrava no app e via tela vazia** —
+e ninguém sabia por quê.
+
+O elo é o **Login do TOA**, que é a matrícula do técnico: o mesmo valor
+que a importação usa para rotear o contrato. Pedi-lo na hora de criar o
+acesso é pedir a coisa certa no momento certo.
+
+Duas travas, porque cada uma corrompe uma conta diferente:
+
+- **um técnico só pode ter um login** — dois acessos para a mesma pessoa
+  fariam a produtividade dela contar em dois lugares
+- **um acesso só responde por um técnico** — o anterior é solto
+
+Se o vínculo falhar, o recado diz as **duas** coisas — acesso criado,
+vínculo não —, para ninguém criar o usuário de novo achando que nada
+aconteceu. E se o login não existir, o erro manda importar a planilha de
+equipes, em vez de criar o acesso e deixar o problema para o técnico
+descobrir em campo.
+
+### D-088 · Só o cadastro roteia — REVOGA o critério 3 do D-082
+> *"Está jogando para equipes que eu nem disse que o login x é da equipe
+> x. Os contratos deveriam ir para a equipe 'Sem login definido'. O
+> usuário, ao cadastrar, vai dizer: login tal é do Fernando, vai para
+> equipe X."* — Emanuel, 07/09
+
+`equipe_do_login` tinha três critérios. O terceiro casava o login com a
+**matrícula** do técnico e usava a equipe dele — mandando contrato para
+equipe que ninguém declarou.
+
+No D-082 eu tinha decidido manter esse critério, com o argumento de que
+vinha da planilha de equipes. **Estava errado, e a decisão nunca foi
+minha.** A matrícula diz de *quem* é o login; não diz de qual *equipe*
+ele é. São perguntas diferentes.
+
+Deduzir pela matrícula parecia inofensivo porque acerta na maioria das
+vezes — e é exatamente isso que faz ninguém perceber quando erra.
+
+| Situação | Destino |
+|---|---|
+| Login cadastrado | vai para a equipe |
+| Login sem cadastro | vai para **"Sem login definido"** |
+| Sem login (jornada) | não vai para lugar nenhum |
+
+Depois de realinhar: 337 visitas de 46 logins no abrigo, 121 de 9 logins
+em equipe cadastrada, 159 de jornada sem equipe.
+
+**Cadastrar leva os contratos junto**, e vale desde a **primeira visita
+daquele login**, não desde hoje. Sem isso o usuário cadastraria, veria a
+etiqueta mudar e continuaria com 337 contratos no abrigo — concluindo,
+com razão, que o cadastro não serviu para nada.
+
+A tela de Equipes lista os logins sem dono com o nome do técnico e a
+equipe dele como **sugestão** da planilha; quem confirma é o usuário, no
+botão "é desta equipe".
+
+> **A regra que sobra das três voltas neste assunto (D-079, D-082,
+> D-088):** o sistema pode sugerir, e deve mostrar que sugeriu. O que
+> ele não pode é declarar no lugar de quem opera — nem gravando cadastro
+> que ninguém digitou (D-079), nem roteando por dedução calada (D-088).

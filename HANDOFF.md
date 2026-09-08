@@ -85,7 +85,7 @@ terceira: ele demora a atualizar.
 
 ## O que está pronto e testado
 
-**Banco:** 40 tabelas, 71 funções, 76 policies, zero tabela sem RLS, zero
+**Banco:** 40 tabelas, 81 funções, 76 policies, zero tabela sem RLS, zero
 `SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde (16/16).
 
 **Doze telas**, todas verificadas com dado real:
@@ -168,8 +168,9 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 | O quê | Por quê |
 |---|---|
-| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: vale.** A tela passou a etiquetar cada login como CADASTRADO ou PELA MATRÍCULA, e `cadastrar_login_da_equipe()` promove um para o outro — D-082. |
-| **Criar os logins dos 5 supervisores** | A aba *Supervisores* em Administração vincula 21 equipes em um clique, mas os supervisores não têm conta. Criar conta é ação sua (Administração → Usuários, papel SUPERVISOR) — D-083. |
+| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: NÃO vale** — D-088 revoga o D-082. Só o login cadastrado leva contrato para equipe; o resto fica em "Sem login definido". |
+| **Declarar os 46 logins sem dono** | 337 visitas em "Sem login definido" até você dizer de quem é cada login. A tela de Equipes faz num clique, com a equipe sugerida preenchida — D-088. |
+| **Criar os logins (supervisores e técnicos)** | Criar conta é ação sua, em Administração → Usuários. O campo **Login TOA** já liga o acesso ao técnico na hora — D-087. |
 | **Faixa de comissão: piso ou intervalo fechado?** | Mudei para piso porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Isso difere da tabela literal do sistema atual. Se a AFLINE quiser estrito, é uma linha em dois lugares. Ver D-077. |
 | **Logins de teste** | Só o Emanuel cria: exige a `service_role`, que não pode passar pelo assistente nem pelo navegador. `app/scripts/criar-usuarios-teste.mjs` faz tudo e tem `--remover`. |
 | ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator` (D-077). |
@@ -242,6 +243,22 @@ cadeira do dado declarado. Ver D-079.
 normaliza para a mesma string vazia, então as duas casam. Resultado:
 `equipe_do_login(base, NULL, data)` devolvia a primeira equipe sem login,
 e 158 apontamentos de jornada foram parar numa equipe qualquer. Ver D-070.
+
+**Decidi no lugar dele, duas vezes, no mesmo assunto.** Semeei cadastro
+de login que ninguém digitou (D-079) e depois, quando ele delegou a
+decisão sobre o critério 3, escolhi mantê-lo (D-082) — e escolhi errado
+(D-088). Delegar não é carta branca para inventar regra de negócio: era
+para eu escolher entre caminhos que ele já tinha desenhado, não abrir um
+novo. **O sistema pode sugerir e deve mostrar que sugeriu; declarar é de
+quem opera.**
+
+**Usei `toISOString()` para "hoje".** Devolve UTC. Em Manaus (UTC−4) o
+painel abria no dia seguinte, vazio, às 20h. Nove telas tinham a mesma
+linha. Ver D-084.
+
+**Guardei o objeto de sessão do supabase no estado.** Ele é reemitido a
+cada foco na aba, com conteúdo igual e referência nova — e a aplicação
+inteira remontava. Guarde o ID. Ver D-085.
 
 **Medi desempenho como owner.** 402 ms como dono, timeout como
 `authenticated` — o RLS reavaliava as funções de escopo por linha. É o

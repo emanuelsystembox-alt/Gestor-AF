@@ -108,11 +108,19 @@ e roteava jornada para uma equipe qualquer, em silêncio. Ver D-070.
 E CTE com função de conjunto referenciada uma vez é *inline*: use
 `as materialized`. Ver D-081.
 
-**Dedução do sistema não pode ocupar a cadeira do cadastro.** Semeei
-`equipe.login_toa` a partir da matrícula do técnico; a tela passou a
-mostrar como se o usuário tivesse cadastrado. Ver D-079. O conserto não
-foi parar de deduzir — foi a tela dizer que deduziu (D-082).
-**Dedução calada é o problema; dedução etiquetada é informação.**
+**Só o cadastro roteia contrato para equipe.** O sistema pode SUGERIR,
+e deve mostrar que sugeriu; o que ele não pode é declarar no lugar de
+quem opera — nem gravando cadastro que ninguém digitou (D-079), nem
+roteando por dedução calada (D-088). Login sem cadastro vai para a
+equipe **"Sem login definido"**, visível, até alguém dizer de quem é.
+
+**`toISOString()` devolve a data em UTC.** Em Manaus (UTC−4) o dia vira
+às 20h e a tela abre no dia seguinte, vazia. Use `isoLocal()` de
+`lib/formato.ts`. Ver D-084.
+
+**Objeto novo com conteúdo igual é re-render garantido.** O `supabase-js`
+reemite a sessão a cada foco na aba; guardar o objeto no estado
+remontava a aplicação inteira. Guarde o ID. Ver D-085.
 
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
@@ -160,13 +168,13 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 32 migrations, as 82 decisões, o que já corrigimos do
+> reais do banco, as 34 migrations, as 87 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **40 tabelas, 71 funções, 76 policies, zero tabela sem RLS**,
-zero função `SECURITY DEFINER` alcançável pelo `anon`. 607 visitas,
-721 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
+Resumo: **40 tabelas, 81 funções, 76 policies, zero tabela sem RLS**,
+zero função `SECURITY DEFINER` alcançável pelo `anon`. 617 visitas,
+736 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
 1.466 sub-falhas, 1.021 regras de pontuação. **Doze telas no ar.**
 
 **A regra do dinheiro fechou** (D-077): `a receber = pontuação × fator`,
@@ -195,7 +203,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 82 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 87 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

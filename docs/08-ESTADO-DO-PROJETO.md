@@ -36,7 +36,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**40 tabelas · 2 views · 71 funções · 76 policies · zero tabela sem RLS ·
+**40 tabelas · 2 views · 81 funções · 76 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
@@ -131,6 +131,8 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 038 | **A receber = pontuação × fator**; faixa por piso |
 | 039 | Desfaz o cadastro deduzido e o abrigo |
 | 040 | Vínculo supervisor ↔ equipes; origem do login na tela |
+| 041 | Login TOA no cadastro de acesso |
+| 042 | **Só o cadastro roteia**; equipe "Sem login definido" |
 
 ---
 
@@ -153,7 +155,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 82 decisões
+## As 87 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -219,9 +221,10 @@ em janela
 | O quê | Por que está parado |
 |---|---|
 | ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator`, com o fator saindo da faixa do mês (D-077). Meta e faixas viraram cadastro editável. |
-| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: vale**, e a tela passou a dizer de onde cada login veio (CADASTRADO / PELA MATRÍCULA) — D-082. |
+| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: NÃO vale** (D-088, revoga D-082). Só o login cadastrado roteia; o resto vai para a equipe "Sem login definido" e a tela de Equipes lista os 46 logins esperando declaração. |
 | **Faixa de comissão: piso ou intervalo fechado?** | Está por piso, porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Difere da tabela literal do sistema atual — D-077. |
-| **Criar os logins dos 5 supervisores** | A aba *Supervisores* em Administração já vincula em um clique, mas os 5 supervisores do TOA não têm conta nenhuma. Criar conta é ação do Emanuel (Administração → Usuários, papel SUPERVISOR) — D-083. |
+| **Declarar os 46 logins sem dono** | 337 visitas estão em "Sem login definido" até alguém dizer de quem é cada login. A tela de Equipes faz isso num clique por login, com a equipe sugerida já preenchida — D-088. |
+| **Criar os logins dos supervisores e dos técnicos** | Criar conta é ação do Emanuel (Administração → Usuários). O campo **Login TOA** no formulário já liga o acesso ao técnico — D-087. A aba *Supervisores* foi retirada a pedido; as RPCs seguem no banco. |
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
 | **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |

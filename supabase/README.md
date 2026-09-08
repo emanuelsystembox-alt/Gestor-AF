@@ -100,7 +100,9 @@ conta a história.
 | 037 | **Meta e comissão do técnico** + `produtividade_periodo` | ✓ |
 | 038 | **A receber = pontuação × fator**, e a faixa por piso (sem buraco) | ✓ |
 | 039 | Desfaz o cadastro de login deduzido (D-079) e o abrigo (D-080) | ✓ |
-| 040 | **Vínculo supervisor ↔ equipes** e a etiqueta de origem do login (CADASTRADO / PELA MATRÍCULA) | ✓ |
+| 040 | Vínculo supervisor ↔ equipes e a etiqueta de origem do login | ✓ |
+| 041 | **Login TOA no cadastro de acesso** — liga o login ao técnico (`tecnico.usuario_id`) | ✓ |
+| 042 | **Só o cadastro roteia** — revoga o critério 3; equipe "Sem login definido"; tela para declarar | ✓ |
 
 ---
 
@@ -212,6 +214,10 @@ properties of null`. Trate os dois formatos.
 `visita_anterior_id`; o PostgREST responde `PGRST201` e recusa. Precisa
 do nome da constraint:
 `reincidencia!reincidencia_visita_id_fkey ( ... )`.
+
+**`new Date().toISOString()` devolve a data em UTC, não a local.**
+Manaus é UTC−4: às 22h do dia 7 o painel já abria no dia 8, vazio. Use
+`isoLocal()` de `lib/formato.ts`. Ver D-084.
 
 **O `supabase-js` remove TODO espaço em branco do `select`.** Se você
 for testar um select pela API na unha (`curl`), replique isso — senão
