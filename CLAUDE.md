@@ -97,6 +97,21 @@ erro de sintaxe que só existe no seu teste.
 `usuario_id` no INSERT; quem carimba quem fez é o servidor, em
 `registrar_etapa` e `baixar_os`. Ver D-061.
 
+**`norm_txt(NULL)` devolve STRING VAZIA, não NULL** — e coluna nula
+normaliza para a mesma string vazia, então as duas casam.
+`equipe_do_login(base, NULL, data)` devolvia a primeira equipe sem login
+e roteava jornada para uma equipe qualquer, em silêncio. Ver D-070.
+
+**Medir desempenho como owner mente igual a testar policy como owner.**
+`produtividade_periodo` fazia 402 ms como dono e estourava o timeout como
+`authenticated`, porque o RLS reavaliava as funções de escopo por linha.
+E CTE com função de conjunto referenciada uma vez é *inline*: use
+`as materialized`. Ver D-081.
+
+**Dedução do sistema não pode ocupar a cadeira do cadastro.** Semeei
+`equipe.login_toa` a partir da matrícula do técnico; a tela passou a
+mostrar como se o usuário tivesse cadastrado. Ver D-079.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
@@ -143,14 +158,18 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 25 migrations, as 67 decisões, o que já corrigimos do
+> reais do banco, as 31 migrations, as 80 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **38 tabelas, 62 funções, 74 policies, zero tabela sem RLS**,
-zero função `SECURITY DEFINER` alcançável pelo `anon`. 551 visitas,
-652 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
-1.466 sub-falhas, 1.021 regras de pontuação. **Onze telas no ar.**
+Resumo: **40 tabelas, 71 funções, 76 policies, zero tabela sem RLS**,
+zero função `SECURITY DEFINER` alcançável pelo `anon`. 607 visitas,
+721 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
+1.466 sub-falhas, 1.021 regras de pontuação. **Doze telas no ar.**
+
+**A regra do dinheiro fechou** (D-077): `a receber = pontuação × fator`,
+com o fator saindo da faixa do mês. Produtividade e comissão numa tela
+só, com três dimensões, no lugar dos 16 relatórios do sistema atual.
 
 O relatório saiu de 25/29 colunas para **72 (por contrato) e 87 (por
 O.S.)**, com pontuação, e sai em Excel. O contrato tem **cadastro
@@ -174,7 +193,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 67 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 80 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

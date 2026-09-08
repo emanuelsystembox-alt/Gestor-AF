@@ -1011,3 +1011,242 @@ equipe 014 fechar em `110 - Problema Na Tubulação`.
 O recálculo pendura em `importar_toa`, não em `importar_toa_interno`: a
 prévia estoura de propósito para desfazer a transação, e recalcular
 reincidência num ensaio que vai ser descartado é trabalho jogado fora.
+
+---
+
+## 2026-09-07 (tarde/noite) — Roteamento por login, comissão e produtividade
+
+### D-069 · O login do TOA manda na equipe — e a importação o ignorava
+Cada contrato do TOA traz um **Login do Técnico**. Esse login pertence a
+uma equipe, e é ele que decide para onde o contrato vai. Existia função
+pronta para isso desde a 021 — `equipe_do_login()`, com três critérios em
+ordem de prioridade.
+
+**A importação não usava a função.** Usava só o *terceiro* critério, a
+matrícula do técnico. O que o usuário cadastrava em `equipe.login_toa`
+era simplesmente ignorado, e 7 contratos estavam na equipe 203 quando o
+cadastro dizia 020 e 026.
+
+Passou a usar a cascata. `equipe.login_toa` ganhou índice único por base
+— se um login apontar para duas equipes, a importação tem duas respostas
+para a mesma pergunta e escolhe uma por acaso. No histórico
+(`equipe_login_toa`), o mesmo login não pode ter duas atribuições
+**abertas**: trocar de dono é fechar a anterior com `fim`, porque o login
+muda de equipe com o tempo e a produtividade histórica depende de saber
+de quem ele era em cada dia.
+
+### D-070 · `norm_txt(NULL)` devolve string vazia — e isso roteava contrato
+Bug latente desde a 021, achado ao rodar o realinhamento em lote.
+
+`norm_txt(NULL)` não devolve NULL: devolve `''`. E equipe sem `login_toa`
+também normaliza para `''`. Portanto:
+
+```
+equipe_do_login(base, NULL, data)  →  a primeira equipe SEM login
+```
+
+Contrato sem login no TOA — **todo apontamento de jornada é assim** — era
+atribuído a uma equipe qualquer, em silêncio. Só apareceu porque um
+comando em lote jogou 158 apontamentos na equipe 002 de uma vez; um a um,
+teria passado despercebido por meses.
+
+A função passou a dizer "não sei" quando não sabe, e cada ramo passa a
+exigir que o próprio cadastro tenha login.
+
+> **A lição:** função que normaliza texto tem de decidir o que faz com
+> nulo, e dizer isso no nome ou no comentário. `''` e `NULL` são coisas
+> diferentes e o Postgres não vai lembrar disso por você.
+
+### D-071 · Situação terminal exige TODAS as O.S. baixadas
+Um contrato de 3 O.S. que fecha com 1 baixada mente duas vezes: diz que
+o serviço acabou, e deixa duas ordens sem resultado — que é justamente o
+que a CLARO fatura.
+
+`exige_todas_baixadas()` mora num lugar só e as três portas chamam ela:
+`baixar_visita`, `registrar_etapa` e a tela. A mensagem diz **quais**
+faltam, com número de O.S. — "faltam 2" manda o usuário procurar.
+
+A janela do contrato passou a baixar todas as O.S. de uma vez, uma linha
+por ordem, com código, sub-falha e observação em cada.
+
+### D-072 · O status espelha o TOA mesmo com a trava do D-006
+O D-006 dizia: em conflito com o TOA, o dado do campo vence. O Emanuel
+reviu — o sistema é **espelho** do TOA, e status que não espelha não
+serve para despachar.
+
+A trava continua protegendo o **trabalho** do campo (baixa da AFLINE,
+foto, observação). O **status**, não: a importação sobrepõe, e o evento
+`CONFLITO_TOA` continua sendo gravado, então nada se perde da trilha.
+
+> ⚠ **Consequência declarada:** com o app do técnico em uso, uma planilha
+> do TOA mais velha que a última etapa dele vai desfazer essa etapa. Foi
+> decisão do Emanuel, tomada com esse risco na mesa. Hoje afeta 1 visita.
+
+### D-073 · A lista de equipes abre só com quem tem contrato
+89 equipes na tela, 7 com serviço no dia. As 82 linhas vazias empurravam
+as 7 que importam para fora da primeira tela. "Só com serviço no dia"
+passou a vir ligado.
+
+E cada equipe ganhou a **bolinha do técnico** — foto (`tecnico.foto_url`)
+ou iniciais. O matiz sai do nome, então a mesma pessoa tem sempre a mesma
+cor, em qualquer tela e em qualquer sessão; bolinha que muda de cor a
+cada carregamento não ajuda a reconhecer ninguém, que é a única razão de
+ela existir. A **luminosidade** sai do CSS, que sabe o tema (D-065): no
+escuro é chip escuro com texto claro, no claro é o inverso — senão 89
+bolinhas saturadas numa lista branca viram confete.
+
+### D-074 · Buscar um contrato é perguntar pela história dele
+Digitar um número de contrato na busca deixou de ser filtro dentro do
+período e passou a ser "o que já aconteceu neste contrato": traz **todas**
+as visitas, dia a dia, com as baixas.
+
+O período esconderia justamente as outras visitas, que são o que
+interessa quando alguém digita um contrato inteiro. A tela avisa que saiu
+do período, com um atalho para voltar — filtro que muda de sentido sem
+avisar é pior que filtro que não muda.
+
+### D-075 · A janela abre e o Esc devolve
+Fade no fundo e subida curta com escala na caixa: 160 ms e 200 ms, curva
+`cubic-bezier(.32,.72,0,1)` — a que assenta em vez de parar seco. Curto
+de propósito: 400 ms atrasa quem fica na tela o dia inteiro. Quem pediu
+menos movimento continua sem movimento.
+
+E **Esc na página cheia do contrato volta para onde a pessoa estava**. Na
+janela o Esc já fechava; abrir a página e ficar preso nela quebrava o
+hábito. Não intercepta quem está digitando — Esc dentro de campo tem dono.
+
+### D-076 · Uma tela de produtividade, não dezesseis relatórios
+O menu de Relatórios do sistema atual tem 16 itens: Insights, Por
+Serviços, Por LPU, Por Equipamentos, Batidas de Ponto x Serviço, Dias
+Trabalhados, Indicadores de Qualidade, Pontuação Geral, Pontuação
+Técnico, Tabela Pontuação, Pontuação Monitor, Período, Ranking Geral,
+Log's Retorno, COP 360, Produtividade Geral.
+
+Boa parte é a **mesma pergunta agrupada de outro jeito**: "Pontuação
+Técnico", "Pontuação Monitor" e "Ranking Geral" são a mesma soma por
+técnico, por supervisor e ordenada.
+
+Virou **uma tela e um seletor de dimensão**. Quem procura o ranking acha
+na tela em que já estava, em vez de voltar ao menu.
+
+Só conta **contrato concluído**: contrato em execução não virou dinheiro,
+e contá-lo faz a comissão oscilar para baixo quando o contrato cai.
+Jornada não entra.
+
+Meta e fator só aparecem na dimensão **técnico**: somar os pontos de uma
+equipe e comparar com a meta individual dava 86% para um supervisor de
+três técnicos — número bonito e sem sentido.
+
+### D-077 · A receber = pontuação × fator
+Fecha a pendência que estava aberta desde a 027 (`pontos_equipe`).
+
+O fator sai da faixa em que a pontuação do mês caiu. Fica no **banco**, e
+não na tela, porque dinheiro tem de ter uma fórmula só: relatório, tela e
+futura folha precisam concordar sem ninguém reimplementar a
+multiplicação.
+
+Conferido: 120 × 2 = R$ 240,00 · 150 × 4 = R$ 600,00 · 300 × 12 =
+R$ 3.600,00.
+
+**O buraco entre as faixas.** A tabela é escrita em inteiros — 190→199,
+depois 200→219. A nossa pontuação não é inteira (1,4648 · 20,3331):
+
+```
+199,00 pts → fator 5,8 → R$ 1.154,20
+199,50 pts → SEM FATOR → R$ 0,00      ← o técnico perde tudo
+200,00 pts → fator 7,0 → R$ 1.400,00
+```
+
+Um centésimo de ponto zerando a comissão não é regra de negócio, é
+defeito de arredondamento da tabela. A busca passou a ser por **piso**:
+vale a maior faixa cujo início já foi alcançado. Sem buraco, e quem passa
+do teto (400) fica no fator do teto em vez de perder tudo.
+
+> ⚠ Isto muda o comportamento em relação à tabela literal do sistema
+> atual. Se a AFLINE quiser faixa estrita mesmo, é `>= pontos_de` de
+> volta para `between` em dois lugares.
+
+A meta **não se sobrescreve**: a antiga fecha e a nova começa hoje. Sem
+isso, mudar a meta em outubro reescreveria a comissão de setembro.
+
+### D-078 · Pontuação com duas casas na tela, quatro no arquivo
+`2,16 pts` em toda tela. Quatro casas só atrapalhavam: ninguém compara
+`20,3331` com `17,3176` de relance, e a coluna fica larga à toa.
+
+**O export continua com quatro.** Arredondar cada linha antes de somar
+centenas delas move dinheiro de verdade. A tela é para ler; a planilha é
+para contar. `lib/formato.ts` guarda os dois formatos e a razão.
+
+Na lista de Serviços, o **contrato virou a primeira coluna** — é por ele
+que se procura, se fala ao telefone e se confere com a CLARO; a janela é
+importante, mas não é a identidade da linha. A **data** ocupou o lugar
+que era do contrato, no fim: sem ela, a busca por contrato (que agora
+traz várias datas) seria uma pilha de linhas indistinguíveis.
+
+### D-079 · Cadastro é declaração; dedução minha não vira cadastro
+**Erro meu, pego pelo Emanuel.**
+
+A migration 034 semeou 45 registros em `equipe.login_toa`, deduzidos da
+matrícula do técnico. Ninguém cadastrou aquilo. A tela de Equipes passou
+a mostrar "Login TOA Z125771" como se fosse declaração do usuário, e não
+havia como distinguir o que ele registrou do que eu inferi.
+
+Apagadas as 45; voltaram as 9 que já estavam lá. Isso **não** mudou para
+onde os contratos vão — as 45 linhas eram cópia do terceiro critério da
+cascata no lugar do segundo.
+
+> **A regra:** dado que o sistema deduz pode alimentar uma decisão, mas
+> não pode se sentar na cadeira do dado que a pessoa declarou. Se ficar
+> nos dois lugares, ninguém mais sabe qual é qual.
+
+### D-080 · Sem cadastro, sem equipe
+A 036 mandava o contrato de login desconhecido para uma equipe abrigo
+("SEM-LOGIN"). O Emanuel pediu isso num dia e reviu no outro — e a
+revisão está certa.
+
+Contrato dentro de uma equipe — qualquer equipe — já entra em contagem,
+em produtividade e em comissão. O abrigo tinha **nome de alarme mas
+cheiro de atribuição**. Fora de equipe, o contrato aparece no cartão
+"Fora do cadastro" da tela de Equipes, que é onde ele deve incomodar até
+alguém cadastrar o login.
+
+Onde cada contrato vai parar hoje:
+
+| Como a equipe é encontrada | Visitas | Logins |
+|---|---|---|
+| Sem login no TOA (jornada) → sem equipe | 158 | — |
+| 1 · cadastro de login da equipe | 118 | 9 |
+| 3 · matrícula do técnico → equipe (planilha de equipes) | **323** | **45** |
+| 4 · não cadastrado em lugar nenhum → sem equipe | 8 | 1 |
+
+> ⚠ **PENDENTE DO EMANUEL:** o critério 3 conta como cadastro? Não é
+> palpite — sai da planilha de equipes, dado declarado —, mas é frase
+> diferente de "esta equipe usa o login X do TOA". Se **não** valer, 323
+> visitas (73% das produtivas) ficam sem equipe até alguém cadastrar
+> login por login, e a produtividade fica quase vazia.
+
+### D-081 · A produção do mês na mão do técnico
+O técnico abre a agenda e vê, no topo: pontos concluídos, meta, barra do
+quanto falta e — quando já entrou em faixa — o fator e o valor em reais.
+É a pergunta que ele faz todo dia e que hoje só era respondida no fim do
+mês, por outra pessoa.
+
+`produtividade_periodo` é `SECURITY DEFINER` com o escopo conferido por
+dentro, então a mesma função serve o COP e o técnico sem vazar nada.
+
+**Por que DEFINER, e por que `as materialized`.** A primeira versão era
+INVOKER e morria de duas mortes:
+
+1. `pontos_por_periodo` numa CTE referenciada uma vez é *inline* pelo
+   planejador — e passa a ser reexecutada por linha do join.
+2. Como INVOKER, o RLS da `visita` reavaliava `minha_empresa()`,
+   `bases_visiveis()` e `equipes_visiveis()` a cada linha.
+
+Media **402 ms como owner** e **estourava o statement timeout como
+`authenticated`**. É o mesmo engano do D-054 — testar como dono —, agora
+em desempenho. Virou DEFINER com escopo calculado uma vez: 844 ms.
+
+Conferido com usuário temporário ligado a um técnico real, e desfeito:
+19 visitas visíveis (só a equipe dele), 0 de outras, 1 linha de produção,
+etapa gravada com `login Z656921 · origem MOBILE`, e conclusão sem baixa
+barrada nomeando a O.S.

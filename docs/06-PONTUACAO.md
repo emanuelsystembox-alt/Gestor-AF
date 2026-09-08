@@ -3,8 +3,27 @@
 Levantado em 06/09/2026 no sistema atual, tela
 *Configurações → Serviços → Pontuação por Grupo*.
 
-> **Status: LEVANTAMENTO. Nada foi construído ainda.** Há perguntas em
-> aberto no fim deste documento. Não implemente sem respondê-las.
+> **Status em 07/09/2026: CONSTRUÍDO, e a regra do dinheiro fechou.**
+>
+> O que a CLARO paga saiu na 027 (combinação de O.S. × edificação,
+> D-045). O que o técnico recebe fechou na 038:
+>
+> ```
+> a receber = pontuação do mês × fator da faixa
+> ```
+>
+> Confirmado pelo Emanuel em 07/09. Meta e faixas são cadastro
+> (`meta_tecnico`, `faixa_comissao`), editáveis na tela de Produtividade
+> por quem tem a permissão `comissao.editar`. Só entra contrato
+> **concluído**. Ver D-077 e D-081.
+>
+> **A faixa é por PISO, não por intervalo fechado.** A tabela do sistema
+> atual é escrita em inteiros (190→199, depois 200→219) e a nossa
+> pontuação não é: com intervalo fechado, 199,50 pontos cairiam fora de
+> todas as faixas e o técnico receberia zero. Ver D-077.
+>
+> O levantamento abaixo fica como está — é o registro de onde a regra
+> veio, e as perguntas que sobraram continuam marcadas.
 
 ## Por que isso é diferente do resto
 

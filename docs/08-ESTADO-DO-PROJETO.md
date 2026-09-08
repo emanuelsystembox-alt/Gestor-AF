@@ -36,7 +36,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**38 tabelas · 2 views · 62 funções · 74 policies · zero tabela sem RLS ·
+**40 tabelas · 2 views · 71 funções · 76 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
@@ -124,6 +124,12 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 031 | SUPERVISOR passa a enxergar as equipes que supervisiona |
 | 032 | `registrar_etapa` do técnico; escopo de equipe em `baixar_os`; histórico legível por quem enxerga a visita |
 | 033 | **Reincidência derivada do dado**, recalculada a cada importação |
+| 034 | O login do TOA manda na equipe; login único por base |
+| 035 | Situação terminal exige todas as O.S. baixadas |
+| 036 | Equipe abrigo — **revertida pela 039** |
+| 037 | Meta, comissão e `produtividade_periodo` |
+| 038 | **A receber = pontuação × fator**; faixa por piso |
+| 039 | Desfaz o cadastro deduzido e o abrigo |
 
 ---
 
@@ -134,7 +140,8 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | `/entrar` | Login com identidade AFLINE |
 | `/controle` | Painel: cartões de situação, **volume × pontos** por tipo de serviço, improdutivas por responsabilidade, encerramentos por hora, tempo por etapa, CSV |
 | `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito, **contrato em janela** e **+ Nova O.S.** (cadastro manual) |
-| `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, e os contratos de cada equipe |
+| `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, contratos de cada equipe, **bolinha do técnico**; abre só com quem tem contrato |
+| `/controle/produtividade` | **Produtividade e comissão** em três dimensões (técnico · equipe · supervisor): pontos, dias, média/dia, previsão, meta, fator e **a receber**; edita a tabela de comissão com a permissão `comissao.editar` |
 | `/controle/relatorios` | Relatório **por contrato** (72 colunas) e **por O.S.** (87), com **pontuação** e **serviço anterior**, filtros, Excel e CSV; marca a primeira O.S. do endereço |
 | `/controle/importar` | Importação do TOA com prévia e **histórico com log** |
 | `/controle/sub-falhas` | Importa os conjuntos da CLARO (arquivo largo) e escolhe o vigente |
@@ -145,7 +152,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 67 decisões
+## As 80 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -210,7 +217,9 @@ em janela
 
 | O quê | Por que está parado |
 |---|---|
-| **`pontos_equipe`** | Não é derivável de nenhum arquivo que temos: o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel levantar **Regras de Comissionamento**. Sem ele não há margem por atendimento nem comissão. |
+| ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator`, com o fator saindo da faixa do mês (D-077). Meta e faixas viraram cadastro editável. |
+| **O critério 3 conta como cadastro?** | `equipe_do_login` resolve por cadastro de login da equipe, login corrente e **matrícula do técnico → equipe**. O terceiro roteia hoje **323 visitas (73% das produtivas), de 45 logins**. Se não valer como cadastro, elas ficam sem equipe até alguém cadastrar login por login. **Decisão do Emanuel** — D-080. |
+| **Faixa de comissão: piso ou intervalo fechado?** | Está por piso, porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Difere da tabela literal do sistema atual — D-077. |
 | **Vincular supervisor ao usuário** | `equipe.supervisor_id` está em **0 de 89**. Enquanto ficar assim, o papel SUPERVISOR entra e não enxerga nada — o caminho no RLS já existe desde a 031, falta o dado. `supervisor_nome` (85 de 89) é texto do TOA e não serve de chave. **Depende do Emanuel.** |
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |

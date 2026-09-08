@@ -94,6 +94,12 @@ conta a história.
 | 031 | SUPERVISOR passa a enxergar as equipes de que é supervisor | ✓ |
 | 032 | `registrar_etapa` do técnico + escopo de equipe em `baixar_os` + leitura do histórico para quem enxerga a visita | ✓ |
 | 033 | **Reincidência derivada do dado** (`detectar_reincidencia`), recalculada a cada importação aplicada | ✓ |
+| 034 | **O login do TOA manda na equipe**: importador usa `equipe_do_login`, login único por base, `tecnico.foto_url` | ✓ |
+| 035 | **Situação terminal exige todas as O.S. baixadas** (`exige_todas_baixadas`, `baixar_visita`) | ✓ |
+| 036 | Equipe abrigo para login não cadastrado — **revertida pela 039** | ✗ |
+| 037 | **Meta e comissão do técnico** + `produtividade_periodo` | ✓ |
+| 038 | **A receber = pontuação × fator**, e a faixa por piso (sem buraco) | ✓ |
+| 039 | Desfaz o cadastro de login deduzido (D-079) e o abrigo (D-080) | ✓ |
 
 ---
 
@@ -169,6 +175,21 @@ o alvo é uma coluna, o instrumento é trigger, não policy. Ver D-050.
 **Função `SECURITY DEFINER` roda como o owner, que tem `BYPASSRLS`.**
 Um teste de policy escrito como definer não testa policy nenhuma — todos
 os cenários passam porque o RLS nem é consultado. Ver D-054.
+
+**E medir desempenho como owner mente pelo mesmo motivo.**
+`produtividade_periodo` fazia 402 ms como dono e **estourava o statement
+timeout** como `authenticated`: o RLS reavaliava `minha_empresa()`,
+`bases_visiveis()` e `equipes_visiveis()` a cada linha. Ver D-081.
+
+**CTE com função que retorna conjunto é *inline* se referenciada uma vez**
+— e a função passa a ser reexecutada por linha do join. `with x as
+materialized (...)` obriga a rodar uma vez e guardar.
+
+**`norm_txt(NULL)` devolve STRING VAZIA, não NULL.** E coluna de texto
+nula normaliza para a mesma string vazia, então as duas "casam". Foi
+assim que `equipe_do_login(base, NULL, data)` passou a devolver a
+primeira equipe sem login cadastrado, roteando jornada para uma equipe
+qualquer em silêncio. Ver D-070.
 
 **O PostgREST tem cache de schema, e ele não sabe da sua coluna nova.**
 Depois de `ALTER TABLE`, o front recebe `PGRST100 — failed to parse

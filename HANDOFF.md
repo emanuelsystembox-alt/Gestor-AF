@@ -85,17 +85,18 @@ terceira: ele demora a atualizar.
 
 ## O que está pronto e testado
 
-**Banco:** 38 tabelas, 62 funções, 74 policies, zero tabela sem RLS, zero
+**Banco:** 40 tabelas, 71 funções, 76 policies, zero tabela sem RLS, zero
 `SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde (16/16).
 
-**Onze telas**, todas verificadas com dado real:
+**Doze telas**, todas verificadas com dado real:
 
 | Rota | Estado |
 |---|---|
 | `/entrar` | login |
 | `/controle` | painel: cartões de situação, volume × pontos, improdutivas por responsabilidade |
-| `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela, **+ Nova O.S.** |
-| `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe |
+| `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela, **+ Nova O.S.**; contrato na 1ª coluna e busca por contrato = histórico dia a dia |
+| `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe, **bolinha do técnico**; abre só com quem tem contrato |
+| `/controle/produtividade` | **produtividade e comissão**: técnico · equipe · supervisor, meta, fator e a receber |
 | `/controle/relatorios` | por contrato (**72 colunas**) e por O.S. (**87**), com **pontuação** e **serviço anterior**, Excel e CSV |
 | `/controle/importar` | importação do TOA com prévia e histórico |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
@@ -167,7 +168,10 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 | O quê | Por quê |
 |---|---|
-| **`pontos_equipe`** | O que a equipe recebe **não está em nenhum arquivo que temos** — o relatório do ngestor só traz o que a CLARO paga. Depende do Emanuel abrir **Regras de Comissionamento** e dizer se é valor próprio por combinação, percentual sobre o faturado, ou fator. Sem ele não há margem por atendimento nem comissão. |
+| **O critério 3 conta como cadastro?** | `equipe_do_login` resolve por (1) cadastro de login da equipe, (2) login corrente, (3) **matrícula do técnico → equipe**, que vem da planilha de equipes. Hoje o critério 3 roteia **323 visitas (73% das produtivas), de 45 logins**. Se ele NÃO valer como cadastro, essas 323 ficam sem equipe até alguém cadastrar login por login. **Decisão do Emanuel.** Ver D-080. |
+| **Faixa de comissão: piso ou intervalo fechado?** | Mudei para piso porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Isso difere da tabela literal do sistema atual. Se a AFLINE quiser estrito, é uma linha em dois lugares. Ver D-077. |
+| **Logins de teste** | Só o Emanuel cria: exige a `service_role`, que não pode passar pelo assistente nem pelo navegador. `app/scripts/criar-usuarios-teste.mjs` faz tudo e tem `--remover`. |
+| ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator` (D-077). |
 | **Vincular supervisor ao usuário** | `equipe.supervisor_id` está em **0 de 89**. Enquanto ficar assim, o papel SUPERVISOR entra e não enxerga nada — o caminho no RLS já existe desde a 031, falta o dado. `supervisor_nome` (85 de 89) é texto do TOA e não serve de chave. **Depende do Emanuel.** |
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
@@ -226,6 +230,23 @@ login que entra e não vê nada, sem erro visível.
 
 **Confiei no lint do Supabase para segurança.** Só a consulta a
 `has_function_privilege` mostrou a verdade.
+
+**Semeei cadastro que ninguém cadastrou.** Preenchi `equipe.login_toa`
+em 45 equipes deduzindo da matrícula do técnico. A tela passou a mostrar
+como se o usuário tivesse declarado aquilo, e não havia como distinguir.
+Dedução do sistema pode alimentar uma decisão, mas não pode sentar na
+cadeira do dado declarado. Ver D-079.
+
+**Achei que `norm_txt(NULL)` fosse NULL.** É string vazia — e coluna nula
+normaliza para a mesma string vazia, então as duas casam. Resultado:
+`equipe_do_login(base, NULL, data)` devolvia a primeira equipe sem login,
+e 158 apontamentos de jornada foram parar numa equipe qualquer. Ver D-070.
+
+**Medi desempenho como owner.** 402 ms como dono, timeout como
+`authenticated` — o RLS reavaliava as funções de escopo por linha. É o
+mesmo engano do teste de policy definer (D-054), agora em desempenho.
+E CTE com função de conjunto referenciada uma vez é *inline*: precisa de
+`as materialized`. Ver D-081.
 
 **Achei que a tela do campo podia dizer quem fez a etapa.** Ela mandava
 `usuario_id` no INSERT do evento. Autor que vem do cliente não é prova de
