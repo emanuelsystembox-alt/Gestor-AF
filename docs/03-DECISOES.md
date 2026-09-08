@@ -1895,6 +1895,8 @@ menu de botão direito, o `⋯`, e o contrato abria numa página em vez do
 modal — ou seja, dentro da equipe não dava para baixar, transferir,
 marcar nem apagar sem sair da tela.
 
-Agora as duas telas têm o mesmo modal e o mesmo menu. O que continua
-diferente é só o contexto: dentro de uma equipe, num dia, as colunas
-Equipe e Data seguem fora, porque repetiriam o cabeçalho em cada linha.
+Agora as duas telas têm o mesmo modal e o mesmo menu. Tirar a coluna
+**Data** foi economia mal-feita: o painel é por dia, mas quem olha um
+contrato quer a data escrita nele — o Emanuel pediu de volta e ela
+voltou. Fora fica só a coluna **Equipe**, que dentro da equipe
+repetiria o cabeçalho em cada linha.

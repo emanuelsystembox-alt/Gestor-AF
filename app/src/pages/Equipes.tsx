@@ -705,15 +705,16 @@ export default function Equipes() {
 
                               {exp && (
                                 <tr className="border-b border-graf-800 bg-graf-900">
-                                  {/* Mesma linha da tela de Serviços. Equipe e
-                                      data saem: dentro de uma equipe, num dia,
-                                      as duas colunas repetiriam o cabeçalho em
-                                      cada linha (D-095). */}
+                                  {/* Mesma linha da tela de Serviços. Só a
+                                      coluna Equipe sai — aqui ela repetiria o
+                                      cabeçalho em cada linha. A Data fica: o
+                                      painel é por dia, mas quem olha o contrato
+                                      quer ver a data escrita nele (D-095). */}
                                   <td colSpan={7} className="p-0">
                                     <div className="overflow-x-auto border-y border-graf-800">
                                       <TabelaContratos
                                         linhas={detalhe[e.equipe_id] ?? []}
-                                        colunas={{ equipe: false, data: false }}
+                                        colunas={{ equipe: false }}
                                         pontos={pontos}
                                         porIndicador={porIndicador}
                                         carregando={carregandoDetalhe === e.equipe_id}
