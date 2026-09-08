@@ -1,75 +1,78 @@
-# Publicar o sistema — para o gerente abrir de outra máquina
+# Publicar o sistema — o endereço para abrir de qualquer máquina
 
-O banco **já está na nuvem** (Supabase). O que roda na sua máquina é só
-a tela, em `localhost:5173`. Publicar significa hospedar essa tela num
-endereço fixo; ela continua conversando com o mesmo banco de sempre.
+**No ar em https://gestor-af.pages.dev** (Cloudflare Pages, projeto
+`gestor-af`, conta `emanuel.systembox@gmail.com`).
+
+O banco **sempre esteve na nuvem** (Supabase). O que estava preso na
+máquina do Emanuel era só a tela, em `localhost:5173`. Publicar foi
+hospedar essa tela num endereço fixo; ela conversa com o mesmo banco de
+sempre.
 
 > **Ninguém vê nada sem login.** A tela pede e-mail e senha, e o RLS do
-> Postgres barra por papel. Publicar não expõe contrato, cliente nem
-> endereço para quem não tem acesso — mas **exige** que você crie o
-> usuário do gerente (Administração → Novo usuário).
+> Postgres barra por papel. Publicar não expôs contrato, cliente nem
+> endereço — mas **exige** criar o usuário de quem for entrar
+> (Administração → Novo usuário).
 
-## O que já está pronto no repositório
+## Como está montado
 
-| Arquivo | Para quê |
+O build é feito **na máquina**, e sobe a pasta `dist` pronta. O Vite
+embute as variáveis `VITE_*` no bundle em tempo de compilação, então
+não há variável de ambiente configurada no painel da Cloudflare — o
+`app/.env` local é a fonte.
+
+| Peça | Onde |
 |---|---|
-| `app/public/_redirects` | Cloudflare Pages e Netlify: manda toda rota para o `index.html`. Sem isso, recarregar em `/controle/servicos` dá **404** — o roteamento é do React, não do servidor. |
-| `app/vercel.json` | O mesmo, na sintaxe da Vercel. |
+| Projeto | Cloudflare Pages, `gestor-af`, branch de produção `main` |
+| Conteúdo | `app/dist`, enviado pelo Wrangler |
+| Rotas | `app/public/_redirects` → `/* /index.html 200` |
+| Credencial | OAuth do Wrangler, em `%APPDATA%\xdg.config\.wrangler` |
 
-O build já foi conferido: `npm run build` fecha em ~2 s.
+O `_redirects` não é detalhe: sem ele, abrir direto em
+`/controle/servicos` daria **404**, porque o roteamento é do React e o
+servidor não conhece essa rota. Conferido no ar: a rota profunda carrega
+e cai no login, como tem que ser.
 
-## Passo a passo — Cloudflare Pages
+## Republicar depois de mudar o código
 
-1. **Suba o código**: `git push origin main` (sem isso o serviço publica
-   uma versão velha).
-2. Entre em **dash.cloudflare.com** → *Workers & Pages* → *Create* →
-   *Pages* → *Connect to Git* → autorize o GitHub e escolha
-   **`emanuelsystembox-alt/Gestor-AF`**.
-3. Configure a build:
+```bash
+cd app && npm run build && npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
+```
 
-   | Campo | Valor |
-   |---|---|
-   | Framework preset | `Vite` |
-   | Root directory | `app` |
-   | Build command | `npm run build` |
-   | Build output directory | `dist` |
+Cada envio gera também um endereço só daquela versão (tipo
+`https://874da8e7.gestor-af.pages.dev`), útil para comparar antes e
+depois. O endereço que se dá para as pessoas é sempre o principal.
 
-4. **Variáveis de ambiente** (Settings → Environment variables). O
-   `.env` não vai para o Git — é aqui que elas entram:
+### Se um dia quiser que republique sozinho
 
-   ```
-   VITE_SUPABASE_URL=https://kqfflkxjijzdtnfshdlv.supabase.co
-   VITE_SUPABASE_ANON_KEY=<a chave publishable do app/.env>
-   ```
+Dá para ligar o projeto ao GitHub (Pages → Settings → Builds &
+deployments → Connect to Git), com **Root directory `app`**, build
+`npm run build`, output `dist`. Aí as duas variáveis do `.env` **passam
+a ser necessárias no painel**, porque o build deixa de acontecer aqui.
+Enquanto o deploy for manual, não são.
 
-   A chave *publishable* é feita para viver no navegador: quem protege o
-   dado é o RLS, não o segredo dela. **Nunca** publique a `service_role`.
+## O que foi conferido no ar
 
-5. *Save and Deploy*. Sai um endereço tipo
-   `gestor-af.pages.dev` — é esse link que o gerente abre.
-
-Cada `git push` na `main` republica sozinho.
-
-### Vercel, se preferir
-
-Mesmos campos: *Import Project* → o repositório → **Root Directory
-`app`** → as duas variáveis de ambiente → *Deploy*. O `vercel.json` já
-cuida do roteamento.
-
-## Depois de publicar
-
-1. **Crie o acesso do gerente**: Administração → Novo usuário. Nome,
-   e-mail e um **perfil de acesso**. A senha é gerada pelo servidor e
-   aparece **uma vez só** — copie e repasse pessoalmente.
-2. Escolha o perfil com cuidado: COP e Controlador **podem baixar,
-   transferir e excluir contrato**. Se o gerente só deve olhar, peça um
-   perfil de leitura antes de criar o acesso.
-3. O gerente troca a senha no primeiro acesso.
+- A rota profunda `/controle/servicos` carrega e redireciona ao login.
+- Nenhum erro no console.
+- O bundle publicado tem a URL do Supabase e a chave **publishable** —
+  e **nenhuma** chave secreta. (O texto `sb_secret_` aparece no bundle,
+  mas é código da biblioteca `supabase-js` conferindo prefixo de chave,
+  não um segredo nosso. Vale saber: uma busca ingênua por essa palavra
+  assusta à toa.)
 
 ## O que NÃO fazer
 
-- Não coloque a chave `service_role` em variável do front. Ela ignora o
-  RLS inteiro.
-- Não mande print de tela com nome, telefone ou endereço de assinante
-  por WhatsApp ou e-mail: é dado pessoal (LGPD). O link com login é
-  justamente o caminho certo para não precisar disso.
+- Não colocar a chave `service_role` em variável do front. Ela ignora o
+  RLS inteiro. A que está publicada é a *publishable*, feita para viver
+  no navegador.
+- Não mandar print com nome, telefone ou endereço de assinante por
+  WhatsApp ou e-mail: é dado pessoal (LGPD). O link com login existe
+  justamente para não precisar disso.
+
+## Antes de passar o link para alguém
+
+1. **Crie o acesso**: Administração → Novo usuário. A senha é gerada
+   pelo servidor e aparece **uma vez só**.
+2. **Escolha o perfil com cuidado**: COP e Controlador podem **baixar,
+   transferir e excluir contrato**. Para quem só deve olhar, ainda não
+   existe um perfil de leitura — é preciso criá-lo antes.

@@ -226,6 +226,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 | Arquivo | Para quê |
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
+| `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 95 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
