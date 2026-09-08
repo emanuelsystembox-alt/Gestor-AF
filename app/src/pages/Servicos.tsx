@@ -1,73 +1,22 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
-import type { Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
-import { Alerta, Pill, Vazio } from '../components/ui'
+import { Alerta, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
-import { dataBR, diaSemana, isoLocal, pts } from '../lib/formato'
+import { isoLocal, pts } from '../lib/formato'
 import { NovoContratoModal } from '../components/NovoContratoModal'
+// A linha do contrato e o SELECT que a alimenta moram no componente —
+// Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
+import {
+  TabelaContratos, SELECT_CONTRATO,
+  type ContratoLinha, type PontoVisita,
+} from '../components/TabelaContratos'
 
-const SELECT = `
-  id, toa_atividade_id, wo_numero, contrato, cliente_nome,
-  logradouro, complemento, bairro,
-  data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
-  origem, criado_em, inicio, fim, tempo_deslocamento, node,
-  tipo_atividade:tipo_atividade_id ( nome, natureza ),
-  tipo_servico:tipo_servico_id ( nome, prioridade ),
-  area:area_id ( codigo, apelido ),
-  equipe:equipe_id ( codigo, nome, supervisor_nome ),
-  tecnico:tecnico_responsavel_id ( nome, matricula ),
-  ordem_servico (
-    id, sequencia, numero_os, status_operadora,
-    tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
-    baixa_afline:codigo_baixa_afline_id ( codigo, descricao, natureza, responsabilidade ),
-    sub_falha:sub_falha_id ( nome, categoria ),
-    baixa_em
-  ),
-  visita_marcador ( id, indicador_id, cumprido )
-`
+const SELECT = SELECT_CONTRATO
 
 interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
-interface PontoVisita {
-  visita_id: string
-  pontos_claro: number | null
-  pontos_equipe: number | null
-  edificacao: string
-  edificacao_de: string
-  achou: boolean
-}
-interface Marcador { id: string; indicador_id: string; cumprido: boolean | null }
-
-/** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
-type OSDupla = Visita['ordem_servico'][number] & {
-  baixa_afline: { codigo: number; descricao: string
-                  natureza: string | null; responsabilidade: string | null } | null
-  sub_falha: { nome: string; categoria: string | null } | null
-  baixa_em: string | null
-}
-
-type V = Omit<Visita, 'ordem_servico'> & {
-  contrato: string | null
-  node: string | null
-  complemento: string | null
-  area: { codigo: string; apelido: string | null } | null
-  equipe: { codigo: string; nome: string; supervisor_nome: string | null } | null
-  ordem_servico: OSDupla[]
-  visita_marcador: Marcador[]
-}
-
-
-const hora = (ts: string | null) =>
-  ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
-
-/** Cor da etiqueta de baixa: verde executou, vermelho improdutiva. */
-function corBaixa(natureza: string | null | undefined): string {
-  if (natureza === 'SUCESSO') return 'bg-emerald-900/40 text-emerald-300'
-  if (natureza === 'IMPRODUTIVA') return 'bg-af-900/40 text-af-300'
-  return 'bg-graf-800 text-graf-400'
-}
+type V = ContratoLinha
 
 export default function Servicos() {
   const [params] = useSearchParams()
@@ -432,299 +381,99 @@ export default function Servicos() {
         {/* ====== tabela ====== */}
         <section className="card-controle overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-graf-700 bg-graf-900 text-left
-                                text-[11px] uppercase tracking-wide text-graf-400">
-                {/* As divisórias são translúcidas (graf-500 com alpha), não
-                    uma cor fixa: a rampa inverte no tema claro e uma borda
-                    escura fixa viraria risco preto sobre branco. */}
-                <tr className="[&>th]:border-r [&>th]:border-graf-500/20
-                               [&>th:last-child]:border-r-0">
-                  {/* O contrato vem primeiro: e' por ele que se procura, se
-                      fala ao telefone e se confere com a CLARO. A janela e'
-                      importante, mas nao e' a identidade da linha. */}
-                  <th className="px-3 py-2 font-medium">Contrato</th>
-                  <th className="px-3 py-2 font-medium">Janela</th>
-                  <th className="px-3 py-2 font-medium">Situação</th>
-                  <th className="px-3 py-2 font-medium">Grupo</th>
-                  <th className="px-3 py-2 font-medium">Endereço</th>
-                  <th className="px-3 py-2 font-medium">Equipe</th>
-                  <th className="px-3 py-2 font-medium">Área</th>
-                  <th className={`px-3 py-2 font-medium ${detalhada ? '' : 'text-center'}`}>
-                    {detalhada ? 'Ordens de serviço' : 'O.S.'}
-                  </th>
-                  <th className="px-3 py-2 font-medium">Data</th>
-                  <th className="px-3 py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {carregando && (
-                  <tr><td colSpan={10} className="px-3 py-10 text-center text-graf-400">
-                    Carregando…</td></tr>
+            <TabelaContratos
+              linhas={visiveis}
+              detalhada={detalhada}
+              pontos={pontos}
+              porIndicador={porIndicador}
+              carregando={carregando}
+              aoAbrir={v => setModal(v.id)}
+              aoMenuContexto={(v, e) => {
+                // Botão direito abre as ações do contrato — é como o COP
+                // está acostumado a trabalhar.
+                setMenu(menu === v.id ? null : v.id)
+                setMenuXY({ x: e.clientX, y: e.clientY })
+              }}
+              vazio={
+                <Vazio titulo="Nenhuma visita para este filtro"
+                  descricao={linhas.length === 0
+                    ? 'Não há visitas neste período.'
+                    : `${base.length} carregadas, nenhuma passa nos ${filtrando} filtro(s).`}
+                  acao={linhas.length === 0
+                    ? <Link to="/controle/importar"
+                        className="rounded-lg bg-af-600 px-4 py-2 text-sm font-medium text-white
+                                   hover:bg-af-500">Importar planilha</Link>
+                    : <button onClick={limpar}
+                        className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                                   text-graf-300 hover:border-af-600">Limpar filtros</button>} />
+              }
+              renderAcoes={v => (<>
+                <div className="flex items-center justify-end gap-1">
+                  <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
+                    className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
+                               text-graf-400 hover:border-af-600 hover:text-af-400">
+                    abrir
+                  </Link>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      setMenu(menu === v.id ? null : v.id)
+                      setMenuXY({ x: e.clientX, y: e.clientY })
+                    }}
+                    title="Ações do contrato"
+                    className="rounded border border-graf-700 px-1.5 py-0.5 text-[11px]
+                               leading-none text-graf-400 hover:border-af-600
+                               hover:text-af-400">
+                    ⋯
+                  </button>
+                </div>
+
+                {menu === v.id && (
+                  <div onClick={e => e.stopPropagation()}
+                    style={menuXY ? {
+                      left: Math.min(menuXY.x, window.innerWidth - 230),
+                      top: Math.min(menuXY.y, window.innerHeight - 250),
+                    } : undefined}
+                    className="fixed z-50 w-52 overflow-hidden rounded-lg border
+                               border-graf-700 bg-graf-900 text-left shadow-xl">
+                    <Link to={`/controle/visita/${v.id}`}
+                      className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
+                      Abrir contrato
+                    </Link>
+                    <button
+                      onClick={() => { setModal(v.id); setMenu(null) }}
+                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                 hover:bg-graf-800">
+                      Marcadores…
+                    </button>
+                    <button
+                      onClick={() => { setModal(v.id); setMenu(null) }}
+                      disabled={v.ordem_servico.length === 0}
+                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                 hover:bg-graf-800 disabled:opacity-40">
+                      Baixar serviço…
+                    </button>
+                    <button
+                      onClick={() => { setModal(v.id); setMenu(null) }}
+                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
+                                 hover:bg-graf-800">
+                      Transferir equipe…
+                    </button>
+                    <button
+                      onClick={() => { setModal(v.id); setMenu(null) }}
+                      className="block w-full border-t border-graf-800 px-3 py-2
+                                 text-left text-xs text-af-300 hover:bg-af-900/20">
+                      Excluir contrato…
+                    </button>
+                    <div className="border-t border-graf-800 px-3 py-2 text-[10px]
+                                    leading-snug text-graf-600">
+                      Editar não existe: o cadastro vem do TOA e é reescrito a cada
+                      importação.
+                    </div>
+                  </div>
                 )}
-
-                {!carregando && visiveis.length === 0 && (
-                  <tr><td colSpan={10}>
-                    <Vazio titulo="Nenhuma visita para este filtro"
-                      descricao={linhas.length === 0
-                        ? 'Não há visitas neste período.'
-                        : `${base.length} carregadas, nenhuma passa nos ${filtrando} filtro(s).`}
-                      acao={linhas.length === 0
-                        ? <Link to="/controle/importar"
-                            className="rounded-lg bg-af-600 px-4 py-2 text-sm font-medium text-white
-                                       hover:bg-af-500">Importar planilha</Link>
-                        : <button onClick={limpar}
-                            className="rounded-lg border border-graf-700 px-4 py-2 text-sm
-                                       text-graf-300 hover:border-af-600">Limpar filtros</button>} />
-                  </td></tr>
-                )}
-
-                {visiveis.map(v => {
-                  const improd = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
-                  const cor = SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
-                  const marcados = (v.visita_marcador ?? [])
-                    .map(m => ({ m, ind: porIndicador.get(m.indicador_id) }))
-                    .filter(x => x.ind)
-                  return (
-                    <Fragment key={v.id}>
-                      {/* A faixa colorida à esquerda separa um contrato do
-                          outro e diz a situação antes de qualquer leitura.
-                          Antes a lista era um bloco só, tudo da mesma cor. */}
-                      <tr onClick={() => setModal(v.id)}
-                          onContextMenu={e => {
-                            // Botão direito abre as ações do contrato —
-                            // é como o COP está acostumado a trabalhar.
-                            e.preventDefault()
-                            setMenu(menu === v.id ? null : v.id)
-                            setMenuXY({ x: e.clientX, y: e.clientY })
-                          }}
-                          style={{
-                            borderLeft: `3px solid ${cor}`,
-                            background: `color-mix(in srgb, ${cor} 8%, transparent)`,
-                          }}
-                          className="cursor-pointer border-b border-graf-500/25
-                                     [&>td]:border-r [&>td]:border-graf-500/15
-                                     [&>td:last-child]:border-r-0 hover:bg-graf-850">
-                        <td className="tabular whitespace-nowrap px-3 py-2 align-top">
-                          <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
-                          {detalhada && v.wo_numero && (
-                            <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
-                          )}
-                          {(() => {
-                            const p = pontos.get(v.id)
-                            if (!p?.achou) return null
-                            return (
-                              <div className="mt-1">
-                                <span
-                                  title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
-                                  className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
-                                             font-semibold text-emerald-300 ring-1 ring-emerald-700/40">
-                                  ★ {pts(p.pontos_claro)}
-                                </span>
-                              </div>
-                            )
-                          })()}
-                        </td>
-                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
-                          {v.janela_inicio?.slice(0, 5) ?? '—'}
-                          {v.janela_fim && <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>}
-                          {detalhada && v.fim && (
-                            <div className="text-[10px] text-graf-500">encerrou {hora(v.fim)}</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <Pill situacao={v.situacao} />
-                            {v.bloqueado_em && (
-                              <span title="Tocada pelo campo — o TOA não sobrescreve mais"
-                                    className="text-[10px] text-af-400">●</span>
-                            )}
-                            {improd && (
-                              <span title="Tem O.S. improdutiva"
-                                    className="text-[10px] text-amber-400">▲</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-xs">
-                          {v.tipo_servico?.nome ?? <span className="text-graf-600">—</span>}
-                          <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
-                            ? 'italic text-graf-600' : 'text-graf-500'}`}>
-                            {v.tipo_atividade?.nome}
-                          </div>
-                        </td>
-                        <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-80' : 'max-w-72 truncate'}`}
-                            title={v.logradouro ?? ''}>
-                          <div className={detalhada ? '' : 'truncate'}>
-                            {v.logradouro ?? <span className="text-graf-600">—</span>}
-                            {detalhada && v.complemento && (
-                              <span className="text-graf-400">, {v.complemento}</span>
-                            )}
-                          </div>
-                          {v.bairro && <div className="text-xs text-graf-500">{v.bairro}</div>}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 align-top text-graf-300">
-                          {v.equipe?.codigo ?? <span className="text-af-400/70">sem equipe</span>}
-                          {v.tecnico && (
-                            <span className="ml-1.5 text-xs text-graf-500">{v.tecnico.matricula}</span>
-                          )}
-                          {detalhada && v.equipe?.supervisor_nome && (
-                            <div className="max-w-40 truncate text-[10px] text-graf-500"
-                                 title={v.equipe.supervisor_nome}>
-                              {v.equipe.supervisor_nome}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 align-top text-xs text-graf-400">
-                          {v.area?.apelido ?? '—'}
-                        </td>
-
-                        {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}
-                        <td className={`px-3 py-2 align-top ${detalhada ? '' : 'tabular text-center'}`}>
-                          {!detalhada ? (
-                            v.ordem_servico.length > 0
-                              ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
-                                  {v.ordem_servico.length}</span>
-                              : <span className="text-graf-600">—</span>
-                          ) : v.ordem_servico.length === 0 ? (
-                            <span className="text-[11px] text-graf-600">—</span>
-                          ) : (
-                            <div className="space-y-0.5">
-                              {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
-                                <div key={o.id}
-                                     className="flex flex-wrap items-center gap-x-2 text-[11px]">
-                                  <span className="tabular font-medium text-graf-200">
-                                    {o.numero_os ?? '—'}
-                                  </span>
-                                  <span className="text-graf-400">
-                                    {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
-                                  </span>
-                                  {/* Baixa da OPERADORA — vem do TOA */}
-                                  {o.codigo_baixa ? (
-                                    <span title="Baixa da operadora (TOA)"
-                                      className={`rounded px-1.5 py-0.5 font-medium
-                                                  ${corBaixa(o.codigo_baixa.natureza)}`}>
-                                      <span className="mr-1 opacity-70">Baixa TOA</span>
-                                      {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
-                                    </span>
-                                  ) : (
-                                    <span className="text-graf-600">sem baixa do TOA</span>
-                                  )}
-                                  {/* Baixa da AFLINE — a nossa, com sub-falha */}
-                                  {o.baixa_afline && (
-                                    <span title="Baixa da AFLINE"
-                                      className={`rounded px-1.5 py-0.5 font-medium ring-1
-                                                  ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
-                                      <span className="mr-1 opacity-70">Baixa ngestor</span>
-                                      {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
-                                      {o.sub_falha && (
-                                        <span className="ml-1 font-normal opacity-80">
-                                          › {o.sub_falha.nome}
-                                        </span>
-                                      )}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Marcadores — os indicadores de qualidade que o
-                              analista apontou neste contrato. */}
-                          {detalhada && marcados.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {marcados.map(({ m, ind }) => (
-                                <span key={m.id}
-                                  className="rounded bg-sky-900/40 px-1.5 py-0.5 text-[10px]
-                                             font-medium uppercase tracking-wide text-sky-300
-                                             ring-1 ring-sky-700/40">
-                                  {ind!.nome}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        {/* A data mora onde o contrato morava. Sem ela a
-                            busca por contrato -- que traz varias datas --
-                            viraria uma pilha de linhas indistinguiveis. */}
-                        <td className="tabular whitespace-nowrap px-3 py-2 align-top text-xs text-graf-400">
-                          {dataBR(v.data_agendada)}
-                          <div className="text-[10px] text-graf-600">
-                            {diaSemana(v.data_agendada)}
-                          </div>
-                        </td>
-                        <td className="relative px-3 py-2 text-right align-top">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
-                              className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
-                                         text-graf-400 hover:border-af-600 hover:text-af-400">
-                              abrir
-                            </Link>
-                            <button
-                              onClick={e => {
-                                e.stopPropagation()
-                                setMenu(menu === v.id ? null : v.id)
-                                setMenuXY({ x: e.clientX, y: e.clientY })
-                              }}
-                              title="Ações do contrato"
-                              className="rounded border border-graf-700 px-1.5 py-0.5 text-[11px]
-                                         leading-none text-graf-400 hover:border-af-600
-                                         hover:text-af-400">
-                              ⋯
-                            </button>
-                          </div>
-
-                          {menu === v.id && (
-                            <div onClick={e => e.stopPropagation()}
-                              style={menuXY ? {
-                                left: Math.min(menuXY.x, window.innerWidth - 230),
-                                top: Math.min(menuXY.y, window.innerHeight - 250),
-                              } : undefined}
-                              className="fixed z-50 w-52 overflow-hidden rounded-lg border
-                                         border-graf-700 bg-graf-900 text-left shadow-xl">
-                              <Link to={`/controle/visita/${v.id}`}
-                                className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
-                                Abrir contrato
-                              </Link>
-                              <button
-                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                           hover:bg-graf-800">
-                                Marcadores…
-                              </button>
-                              <button
-                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                disabled={v.ordem_servico.length === 0}
-                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                           hover:bg-graf-800 disabled:opacity-40">
-                                Baixar serviço…
-                              </button>
-                              <button
-                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                           hover:bg-graf-800">
-                                Transferir equipe…
-                              </button>
-                              <button
-                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                className="block w-full border-t border-graf-800 px-3 py-2
-                                           text-left text-xs text-af-300 hover:bg-af-900/20">
-                                Excluir contrato…
-                              </button>
-                              <div className="border-t border-graf-800 px-3 py-2 text-[10px]
-                                              leading-snug text-graf-600">
-                                Editar não existe: o cadastro vem do TOA e é reescrito a cada
-                                importação.
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
+              </>)}
+            />
           </div>
         </section>
 

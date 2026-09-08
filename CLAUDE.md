@@ -160,6 +160,9 @@ app/                     front-end (Vite + React + TS + Tailwind v4)
   src/lib/supabase.ts    cliente + domínios de situação
   src/lib/auth.tsx       sessão, perfil e papéis
   src/components/        Shell (navegação), graficos (SVG puro), ui
+  src/components/TabelaContratos.tsx
+                         a linha do contrato + o SELECT que a alimenta —
+                         uma só, em Serviços e em Equipes (D-095)
   src/pages/             Login · Controle · Servicos · Equipes ·
                          Importacao · Campo · Visita
 docs/                    mapeamento, domínio, decisões, mapa do concorrente
@@ -189,7 +192,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 38 migrations, as 94 decisões, o que já corrigimos do
+> reais do banco, as 38 migrations, as 95 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -224,7 +227,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 94 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 95 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

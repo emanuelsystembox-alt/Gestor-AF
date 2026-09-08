@@ -1640,3 +1640,34 @@ Daí as três peças:
    outras duas* — a decisão do Emanuel ("cada uma tem faixas próprias")
    seria impossível de executar na tela que ele tem. Agora há um seletor,
    e a skill sem tabela diz isso em amarelo em vez de devolver R$ 0.
+
+### D-095 · Uma linha de contrato só, para as duas telas
+> *"Faixa de visão de Serviço: precisa passar esse modelo do contrato
+> para a faixa de visão por equipe. Quando abre a equipe é diferente,
+> precisa ser igual, é melhor."* — Emanuel, 07/09
+
+Serviços mostrava o contrato numa **tabela**: faixa de situação à
+esquerda, colunas fixas, O.S. e as duas baixas na própria linha.
+Equipes, ao abrir uma equipe, mostrava **os mesmos contratos** como
+cartão empilhado — outra ordem de leitura, outros rótulos, menos
+informação (sem pontuação, sem baixa da AFLINE, sem sub-falha, sem
+marcadores).
+
+Duas linguagens para o mesmo objeto obrigam quem opera a reaprender a
+ler quando muda de tela. Pior: elas **divergem sozinhas** — a coluna
+nova entra numa e não na outra, e ninguém percebe.
+
+Por isso não foi "copiar o visual": a linha virou **um componente só**,
+`components/TabelaContratos.tsx`, com o `SELECT` que a alimenta
+exportado ao lado. Quem consulta usa o mesmo `SELECT_CONTRATO` e não
+descobre na tela que faltou um campo.
+
+O que muda entre as telas são **as colunas de contexto**, opcionais:
+dentro de uma equipe, num dia, repetir "Equipe" e "Data" em cada linha é
+ruído. O resto é idêntico — de propósito. As ações também são da tela:
+Serviços passa o menu de botão direito; Equipes passa só "abrir".
+
+Efeito colateral bom: a expansão da equipe ganhou o que só existia em
+Serviços — **pontuação, baixa da AFLINE com sub-falha e marcadores de
+qualidade**. Não foi feature nova; era informação que já estava no banco
+e a outra tela não mostrava.

@@ -1,11 +1,17 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { isoLocal } from '../lib/formato'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
-import { Alerta, Avatar, Pill, Vazio } from '../components/ui'
+import { Alerta, Avatar, Vazio } from '../components/ui'
+// O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
+// linha só, um componente só (D-095).
+import {
+  TabelaContratos, SELECT_CONTRATO,
+  type ContratoLinha, type PontoVisita,
+} from '../components/TabelaContratos'
 
 /**
  * Equipes de campo.
@@ -43,33 +49,6 @@ interface EquipePainel {
   ocioso: boolean | null
 }
 
-interface OS {
-  id: string
-  sequencia: number
-  numero_os: string | null
-  status_operadora: string | null
-  ponto: string | null
-  tipo_os: { codigo: number; descricao: string } | null
-  codigo_baixa: { codigo: number; descricao: string; natureza: string | null } | null
-}
-interface VisitaLinha {
-  id: string
-  contrato: string | null
-  wo_numero: string | null
-  logradouro: string | null
-  complemento: string | null
-  bairro: string | null
-  situacao: Situacao
-  janela_inicio: string | null
-  janela_fim: string | null
-  inicio: string | null
-  fim: string | null
-  bloqueado_em: string | null
-  tipo_servico: { nome: string } | null
-  tipo_atividade: { nome: string; natureza: string | null } | null
-  ordem_servico: OS[]
-}
-
 interface Tec {
   id: string; matricula: string; nome: string; situacao: string
   equipe_id: string | null
@@ -103,24 +82,13 @@ interface Orfao {
 
 const COLUNAS = ['LOGIN', 'NOME DO TÉCNICO', 'EQUIPE', 'SUPERVISOR', 'ÁREA']
 
-const SELECT_VISITA = `
-  id, contrato, wo_numero, logradouro, complemento, bairro,
-  situacao, janela_inicio, janela_fim, inicio, fim, bloqueado_em,
-  tipo_servico:tipo_servico_id ( nome ),
-  tipo_atividade:tipo_atividade_id ( nome, natureza ),
-  ordem_servico (
-    id, sequencia, numero_os, status_operadora, ponto,
-    tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza )
-  )
-`
 
 
-const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null)
 const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
 export default function Equipes() {
+  const navegar = useNavigate()
   const { pode, temPapel } = useAuth()
   // Quem edita equipe desliga o técnico. Apagar não está aqui para
   // ninguém: o que ele executou fica gravado (D-090).
@@ -142,9 +110,17 @@ export default function Equipes() {
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
+  // Pontuação e marcadores do dia: a linha do contrato mostra os dois
+  // (D-095), e sem eles a mesma linha diria menos aqui do que em
+  // Serviços. Uma chamada por dia, não uma por equipe aberta.
+  const [pontos, setPontos] = useState<Map<string, PontoVisita>>(new Map())
+  const [indicadores, setIndicadores] = useState<{ id: string; nome: string }[]>([])
+  const porIndicador = useMemo(
+    () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
+
   // expansão sob demanda
   const [aberta, setAberta] = useState<string | null>(null)
-  const [detalhe, setDetalhe] = useState<Record<string, VisitaLinha[]>>({})
+  const [detalhe, setDetalhe] = useState<Record<string, ContratoLinha[]>>({})
   const [carregandoDetalhe, setCarregandoDetalhe] = useState<string | null>(null)
 
   // filtros
@@ -172,6 +148,20 @@ export default function Equipes() {
   const [cadastrando, setCadastrando] = useState<string | null>(null)
   const [nomeNovo, setNomeNovo] = useState('')
   const [equipeNova, setEquipeNova] = useState('')
+
+  useEffect(() => {
+    supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
+      .then(({ data: d }) => setIndicadores((d ?? []) as { id: string; nome: string }[]))
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    supabase.rpc('pontos_por_periodo', { p_de: data, p_ate: data }).then(({ data: d }) => {
+      const m = new Map<string, PontoVisita>()
+      for (const x of (d ?? []) as PontoVisita[]) m.set(x.visita_id, x)
+      setPontos(m)
+    })
+  }, [data])
 
   // A data padrão é o último dia COM visita — não adianta abrir no dia
   // corrente se a importação mais recente é de anteontem.
@@ -243,12 +233,12 @@ export default function Equipes() {
     setAberta(e.equipe_id)
     if (detalhe[e.equipe_id]) return
     setCarregandoDetalhe(e.equipe_id)
-    const { data: d, error } = await supabase.from('visita').select(SELECT_VISITA)
+    const { data: d, error } = await supabase.from('visita').select(SELECT_CONTRATO)
       .eq('equipe_id', e.equipe_id).eq('data_agendada', data)
       .is('excluido_em', null)
       .order('janela_inicio', { ascending: true, nullsFirst: false })
     if (error) setErro(error.message)
-    else setDetalhe(m => ({ ...m, [e.equipe_id]: (d ?? []) as unknown as VisitaLinha[] }))
+    else setDetalhe(m => ({ ...m, [e.equipe_id]: (d ?? []) as unknown as ContratoLinha[] }))
     setCarregandoDetalhe(null)
   }
 
@@ -836,21 +826,36 @@ export default function Equipes() {
 
                               {exp && (
                                 <tr className="border-b border-graf-800 bg-graf-900">
-                                  <td colSpan={7} className="px-3 py-3">
-                                    {carregandoDetalhe === e.equipe_id ? (
-                                      <p className="text-xs text-graf-400">Carregando contratos…</p>
-                                    ) : (detalhe[e.equipe_id]?.length ?? 0) === 0 ? (
-                                      <p className="text-xs text-graf-500">
-                                        Nenhum contrato para esta equipe em{' '}
-                                        {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.
-                                      </p>
-                                    ) : (
-                                      <div className="space-y-1.5">
-                                        {detalhe[e.equipe_id].map(v => (
-                                          <ContratoCard key={v.id} v={v} />
-                                        ))}
-                                      </div>
-                                    )}
+                                  {/* Mesma linha da tela de Serviços. Equipe e
+                                      data saem: dentro de uma equipe, num dia,
+                                      as duas colunas repetiriam o cabeçalho em
+                                      cada linha (D-095). */}
+                                  <td colSpan={7} className="p-0">
+                                    <div className="overflow-x-auto border-y border-graf-800">
+                                      <TabelaContratos
+                                        linhas={detalhe[e.equipe_id] ?? []}
+                                        colunas={{ equipe: false, data: false }}
+                                        pontos={pontos}
+                                        porIndicador={porIndicador}
+                                        carregando={carregandoDetalhe === e.equipe_id}
+                                        aoAbrir={v => navegar(`/controle/visita/${v.id}`)}
+                                        vazio={
+                                          <p className="px-3 py-6 text-center text-xs text-graf-500">
+                                            Nenhum contrato para esta equipe em{' '}
+                                            {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.
+                                          </p>
+                                        }
+                                        renderAcoes={v => (
+                                          <Link to={`/controle/visita/${v.id}`}
+                                            onClick={ev => ev.stopPropagation()}
+                                            className="rounded border border-graf-700 px-2 py-0.5
+                                                       text-[11px] text-graf-400
+                                                       hover:border-af-600 hover:text-af-400">
+                                            abrir
+                                          </Link>
+                                        )}
+                                      />
+                                    </div>
                                   </td>
                                 </tr>
                               )}
@@ -942,85 +947,5 @@ export default function Equipes() {
         </p>
       </div>
     </Shell>
-  )
-}
-
-/** Um contrato da equipe, com as O.S. agrupadas dentro dele. */
-function ContratoCard({ v }: { v: VisitaLinha }) {
-  const navegar = useNavigate()
-  const endereco = [v.logradouro, v.complemento, v.bairro].filter(Boolean).join(', ')
-  const baixa = v.ordem_servico.find(o => o.codigo_baixa)?.codigo_baixa ?? null
-  const janela = hhmm(v.janela_inicio)
-    ? `${hhmm(v.janela_inicio)}–${hhmm(v.janela_fim) ?? '?'}`
-    : 'sem janela'
-
-  return (
-    // O cartao inteiro abre o contrato — o botao "abrir" era ruido.
-    <div onClick={() => navegar(`/controle/visita/${v.id}`)}
-         title="Abrir o contrato"
-         className="cursor-pointer rounded-lg border border-graf-800 bg-graf-850
-                    transition hover:border-af-700/60 hover:bg-graf-800">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-graf-800 px-3 py-2">
-        <Pill situacao={v.situacao} />
-        <span className="tabular text-xs font-medium">{v.contrato ?? 'sem contrato'}</span>
-        <span className="text-xs text-graf-400">
-          {v.tipo_servico?.nome ?? '—'}
-          {v.tipo_atividade?.nome && (
-            <span className="text-graf-500"> · {v.tipo_atividade.nome}</span>
-          )}
-        </span>
-        <span className="tabular ml-auto text-xs text-graf-400">{janela}</span>
-        {v.fim && <span className="tabular text-xs text-graf-500">encerrou {hora(v.fim)}</span>}
-        {v.bloqueado_em && (
-          <span title="Tocada pelo campo — o TOA não sobrescreve mais"
-                className="text-[10px] text-af-400">●</span>
-        )}
-      </div>
-
-      <div className="px-3 py-2">
-        <p className="text-xs text-graf-300">
-          {endereco || <span className="text-graf-600">sem endereço</span>}
-          {v.wo_numero && <span className="tabular ml-2 text-graf-500">WO {v.wo_numero}</span>}
-        </p>
-
-        {v.ordem_servico.length === 0 ? (
-          <p className="mt-1.5 text-[11px] text-graf-600">
-            Sem O.S. — apontamento de jornada.
-          </p>
-        ) : (
-          <div className="mt-1.5 space-y-1">
-            {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
-              <div key={o.id}
-                className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
-                <span className="tabular text-graf-600">#{o.sequencia}</span>
-                <span className="tabular font-medium text-graf-200">{o.numero_os ?? '—'}</span>
-                <span className="text-graf-400">
-                  {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
-                </span>
-                {o.status_operadora && (
-                  <span className="rounded bg-graf-800 px-1.5 py-0.5 text-graf-400">
-                    {o.status_operadora}
-                  </span>
-                )}
-                {o.codigo_baixa && (
-                  <span className={`ml-auto rounded px-1.5 py-0.5 font-medium ${
-                    o.codigo_baixa.natureza === 'SUCESSO'
-                      ? 'bg-emerald-900/40 text-emerald-300'
-                      : o.codigo_baixa.natureza === 'IMPRODUTIVA'
-                      ? 'bg-af-900/40 text-af-300'
-                      : 'bg-graf-800 text-graf-400'}`}>
-                    {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!baixa && EM_ABERTO.includes(v.situacao) && (
-          <p className="mt-1.5 text-[11px] text-graf-600">Ainda sem código de baixa.</p>
-        )}
-      </div>
-    </div>
   )
 }
