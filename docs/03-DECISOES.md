@@ -2135,3 +2135,81 @@ mandando na cor. **O que distingue é a forma:**
 Mais o prefixo curto dentro de cada uma, que resolve no texto o que a
 forma resolve no relance. Cheio = veio de fora e não se discute;
 vazado = é nosso, foi alguém aqui que digitou.
+
+
+### D-110 · Ícones no menu, e a lateral que abre no hover
+> *"Atribua ícones para cada categoria do menu."* · *"Quando eu encolher
+> o retrátil, quando eu colocar o mouse em cima ele pode abrir
+> novamente."* — Emanuel, 08/09
+
+Onze ícones SVG escritos à mão, na mesma grade de 24 e com
+`currentColor` — a mesma decisão dos gráficos (D-010): uma biblioteca de
+ícones traria milhares para usar onze, e teria de ser mantida.
+
+O ganho não é decorativo. Recolhido, o menu mostrava **iniciais**, e `S`
+servia para *Serviços* e para *Sub-falhas*. Símbolo distingue onde letra
+não distinguia.
+
+E a lateral recolhida **abre sozinha no hover**. A faixa de 56px segura
+o espaço no layout; o painel que cresce é `absolute`, por cima do
+conteúdo. Menu que empurra a tabela a cada passada de cursor é pior que
+menu estreito. O hover não toca na preferência guardada: tirou o mouse,
+volta a faixa.
+
+### D-111 · Rota do Dia — a terceira visão
+> *"Se eu quisesse olhar a rota como um todo, pra saber se está ajustada
+> de fato, queria criar uma visão Router."* — Emanuel, 08/09
+>
+> *"Autorizado, pode fazer."* — depois de ver a proposta com os números
+
+**Medi antes de desenhar, e a medição é que justificou a tela.** No dia
+08/09, com as 248 visitas produtivas que têm login e coordenada:
+
+| | |
+|---|---|
+| 676 km | rodados no dia, somados os deslocamentos de 45 técnicos |
+| 38 de 50 | bairros com mais de um técnico |
+| 11 | técnicos diferentes em Alvorada, para 19 visitas |
+| 50 | visitas em que o técnico voltou a um bairro onde já tinha estado |
+
+O caso que resume tudo: **Z683677 esteve em Tancredo Neves às 11:37 e
+voltou às 21:32**, depois de passar por Lago Azul, Jorge Teixeira, Nova
+Cidade e N. Aleixo.
+
+O TOA aloca por habilidade, janela e capacidade — não por geografia.
+Não é defeito dele; é o que ele faz. O Console de Alocação mostra *se o
+técnico está ocupado*, não *se faz sentido onde ele está*. Serviços
+responde pelo contrato, Equipes pela equipe. Ninguém respondia **"a rota
+está ajustada?"**.
+
+Três painéis, na ordem em que o COP pensa:
+
+1. **O que precisa de olho** — retorno a bairro já visitado, salto acima
+   de 10 km, bairro dividido entre 5+ técnicos. Clicar no alerta foca o
+   técnico na linha do tempo.
+2. **O dia no tempo** — uma faixa por técnico, um bloco por visita, com
+   o **bairro escrito no bloco**. O Console do TOA escreve o tipo de
+   serviço ali; trocar pelo bairro é o que faz o zigue-zague aparecer
+   sem abrir nada.
+3. **O dia no espaço** — bairros pela coordenada média, tamanho por
+   visitas e cor por número de técnicos.
+
+Duas decisões que valem registro:
+
+- **A escala do tempo não é fixa em 8h–18h.** Ela vai do primeiro
+  início ao último fim do dia. Fixar cortaria justamente o técnico que
+  encerrou às 23:30 — que é o que interessa olhar.
+- **Os limites (10 km, 5 técnicos) saíram do próprio dia**, do que ficou
+  fora da curva. Não são meta da CLARO nem regra da operação, e a tela
+  diz isso na cara: número inventado que parece meta vira cobrança
+  errada.
+
+> ⚠ **O que a tela não sabe, e admite:** o trajeto percorrido (o TOA
+> manda pontos, não caminho), onde o técnico está agora (sem GPS ao
+> vivo, isto é o dia agendado, não rastreamento) e a distância de rua —
+> o km aqui é linha reta. Serve para comparar e ordenar, não para
+> calcular combustível.
+
+Jornada fica de fora: "Na Base" e "Refeição" não são deslocamento para
+cliente. A proposta que o Emanuel aprovou está em
+`docs/proposta-rota-do-dia.html`.

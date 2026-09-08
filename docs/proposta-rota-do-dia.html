@@ -1,0 +1,609 @@
+<title>Rota do Dia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #f4f6f8;
+    --surface:     #ffffff;
+    --surface-2:   #eceff3;
+    --line:        #d5dae1;
+    --line-soft:   #e4e8ed;
+    --ink:         #171a20;
+    --ink-2:       #4a5361;
+    --ink-3:       #78828f;
+    --af:          #c31f28;
+    --af-soft:     #f6dcde;
+    --ok:          #17864f;
+    --ok-soft:     #d8f0e3;
+    --warn:        #9a6a00;
+    --warn-soft:   #fbeccb;
+    --bad:         #b3372c;
+    --bad-soft:    #f7dcd9;
+    --cool:        #2c5f9e;
+    --cool-soft:   #dae7f6;
+    --shadow:      0 1px 2px rgba(20,25,35,.06), 0 8px 24px -12px rgba(20,25,35,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0f1218;
+      --surface:   #161a22;
+      --surface-2: #1d222c;
+      --line:      #2b323e;
+      --line-soft: #232935;
+      --ink:       #e7eaf0;
+      --ink-2:     #a4adbb;
+      --ink-3:     #78828f;
+      --af:        #ef4b53;
+      --af-soft:   #3a171b;
+      --ok:        #4ec98a;
+      --ok-soft:   #12331f;
+      --warn:      #e0b040;
+      --warn-soft: #34280c;
+      --bad:       #f0736a;
+      --bad-soft:  #3a1a17;
+      --cool:      #6ba3e8;
+      --cool-soft: #142338;
+      --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:    #0f1218;
+    --surface:   #161a22;
+    --surface-2: #1d222c;
+    --line:      #2b323e;
+    --line-soft: #232935;
+    --ink:       #e7eaf0;
+    --ink-2:     #a4adbb;
+    --ink-3:     #78828f;
+    --af:        #ef4b53;
+    --af-soft:   #3a171b;
+    --ok:        #4ec98a;
+    --ok-soft:   #12331f;
+    --warn:      #e0b040;
+    --warn-soft: #34280c;
+    --bad:       #f0736a;
+    --bad-soft:  #3a1a17;
+    --cool:      #6ba3e8;
+    --cool-soft: #142338;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 96px; }
+  .col  { max-width: 68ch; }
+
+  h1, h2, h3, .num, .eyebrow {
+    font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  }
+  h1 {
+    font-size: clamp(30px, 4.4vw, 46px); line-height: 1.08; font-weight: 700;
+    letter-spacing: -.02em; margin: 0 0 14px; text-wrap: balance;
+  }
+  h2 {
+    font-size: 23px; font-weight: 600; letter-spacing: -.01em;
+    margin: 0 0 10px; text-wrap: balance;
+  }
+  h3 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+  p  { margin: 0 0 14px; }
+  strong { font-weight: 600; }
+  .mono, .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  .eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 10px;
+  }
+
+  header.topo {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    padding: 40px 0 34px; margin-bottom: 40px;
+  }
+  .selo {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--af);
+    border: 1px solid currentColor; border-radius: 3px; padding: 3px 8px; margin-bottom: 18px;
+  }
+  .lead { font-size: 18px; color: var(--ink-2); max-width: 62ch; }
+
+  section { margin: 0 0 52px; }
+
+  /* ---- provas: números que motivam a tela ---- */
+  .provas {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; margin: 26px 0;
+  }
+  .prova { background: var(--surface); padding: 18px 20px; }
+  .prova .num { font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+  .prova .rot { font-size: 13px; color: var(--ink-2); margin-top: 7px; }
+  .prova.alerta .num { color: var(--af); }
+
+  /* ---- o mockup ---- */
+  .painel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; margin: 20px 0 8px;
+  }
+  .painel > header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+    padding: 13px 18px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2);
+  }
+  .painel > header h3 { margin: 0; }
+  .painel > header .dica { font-size: 12.5px; color: var(--ink-3); margin-left: auto; }
+  .painel .corpo { padding: 16px 18px 20px; overflow-x: auto; }
+
+  .legenda {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    font-size: 12px; color: var(--ink-2); padding: 0 18px 16px;
+  }
+  .chave { display: inline-flex; align-items: center; gap: 6px; }
+  .quad { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+  /* ---- alertas ---- */
+  .alertas { display: grid; gap: 10px; margin-top: 18px; }
+  .alerta-item {
+    display: grid; grid-template-columns: 4px 1fr auto; gap: 14px; align-items: start;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; padding: 13px 15px 13px 0; overflow: hidden;
+  }
+  .faixa { align-self: stretch; border-radius: 2px 0 0 2px; }
+  .alerta-item h3 { font-size: 14.5px; }
+  .alerta-item p { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-2); }
+  .grau {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 3px 7px; border-radius: 3px; white-space: nowrap;
+  }
+
+  /* ---- listas de limite ---- */
+  ul.limites { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 11px; }
+  ul.limites li {
+    display: grid; grid-template-columns: auto 1fr; gap: 11px; align-items: start;
+    font-size: 15px; color: var(--ink-2);
+  }
+  ul.limites .marca {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px; margin-top: 2px; white-space: nowrap;
+  }
+  .tem  { background: var(--ok-soft);   color: var(--ok); }
+  .nao  { background: var(--bad-soft);  color: var(--bad); }
+  .quase{ background: var(--warn-soft); color: var(--warn); }
+
+  table.comp { border-collapse: collapse; width: 100%; font-size: 14.5px; margin-top: 14px; }
+  table.comp th, table.comp td {
+    text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  table.comp th {
+    font-family: "Archivo", sans-serif; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--ink-3); border-bottom-color: var(--line);
+  }
+  table.comp td:first-child { font-weight: 600; white-space: nowrap; }
+
+  .fecho {
+    border: 1px solid var(--af); border-radius: 8px; padding: 22px 24px;
+    background: var(--surface); margin-top: 8px;
+  }
+  .fecho h2 { color: var(--af); }
+  .fecho .opcoes { display: grid; gap: 8px; margin-top: 14px; }
+  .fecho .opcao {
+    display: grid; grid-template-columns: auto 1fr; gap: 11px; align-items: baseline;
+    font-size: 15px;
+  }
+  .fecho .letra {
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--af);
+  }
+
+  footer.rodape {
+    border-top: 1px solid var(--line); margin-top: 44px; padding-top: 18px;
+    font-size: 13px; color: var(--ink-3);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .alerta-item, .painel { transition: border-color .15s ease; }
+  }
+</style>
+
+<header class="topo">
+  <div class="wrap">
+    <div class="selo">Proposta · não construída</div>
+    <h1>Rota do Dia</h1>
+    <p class="lead">
+      Uma terceira visão para o controlador, ao lado de Serviços e Equipes: o dia
+      inteiro no eixo do tempo e no mapa, para responder uma pergunta que hoje
+      nenhuma tela responde — <strong>a rota está ajustada?</strong>
+    </p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="col">
+    <p class="eyebrow">Por que agora</p>
+    <h2>O que o dia 08/09 mostrou</h2>
+    <p>
+      Antes de desenhar tela, medi. Estes números saíram do banco, das
+      <span class="mono">339</span> visitas de 8 de setembro — <span class="mono">248</span>
+      delas com coordenada e bairro.
+    </p>
+  </section>
+
+  <div class="provas">
+    <div class="prova">
+      <div class="num">647<span style="font-size:18px"> km</span></div>
+      <div class="rot">rodados no dia, somando os deslocamentos entre visitas de 45 técnicos</div>
+    </div>
+    <div class="prova alerta">
+      <div class="num">38<span style="font-size:18px">/50</span></div>
+      <div class="rot">bairros receberam <strong>mais de um técnico</strong> no mesmo dia</div>
+    </div>
+    <div class="prova alerta">
+      <div class="num">11</div>
+      <div class="rot">técnicos diferentes no bairro Alvorada, para 19 visitas</div>
+    </div>
+    <div class="prova">
+      <div class="num">77<span style="font-size:18px">%</span></div>
+      <div class="rot">dos deslocamentos trocaram de bairro (152 de 197)</div>
+    </div>
+  </div>
+
+  <section class="col">
+    <p>
+      O TOA aloca por habilidade, janela e capacidade — não por geografia. Isso não é
+      defeito dele: é o que ele foi feito para fazer. O efeito colateral aparece só
+      quando se olha o dia inteiro de uma vez, e é aí que não existe tela nenhuma.
+    </p>
+  </section>
+
+  <!-- ============ PAINEL 1 ============ -->
+  <section>
+    <p class="eyebrow">Painel 1 de 3</p>
+    <h2>A linha do tempo, bairro a bairro</h2>
+    <p class="col">
+      Cada faixa é um técnico; cada bloco, uma visita, na hora em que aconteceu e
+      com o bairro escrito. O Console de Alocação do TOA mostra a mesma coisa — mas
+      com o <em>tipo de serviço</em> no bloco. Trocar o rótulo pelo <strong>bairro</strong>
+      muda o que se enxerga: o zigue-zague fica visível sem abrir nada.
+    </p>
+
+    <div class="painel">
+      <header>
+        <h3>Terça, 8 de setembro · MAN-AFLINE</h3>
+        <span class="dica">quatro técnicos reais, do dia importado</span>
+      </header>
+      <div class="corpo"><div id="gantt"></div></div>
+      <div class="legenda">
+        <span class="chave"><i class="quad" style="background:var(--ok)"></i> concluída</span>
+        <span class="chave"><i class="quad" style="background:var(--cool)"></i> em execução</span>
+        <span class="chave"><i class="quad" style="background:var(--warn)"></i> reagendamento</span>
+        <span class="chave"><i class="quad" style="background:var(--bad)"></i> cancelada</span>
+        <span class="chave"><i class="quad" style="background:var(--ink-3)"></i> ainda na entrada</span>
+        <span class="chave" style="margin-left:auto">↩ volta a um bairro onde já esteve hoje</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAINEL 2 ============ -->
+  <section>
+    <p class="eyebrow">Painel 2 de 3</p>
+    <h2>Onde o dia aconteceu</h2>
+    <p class="col">
+      Cada bolha é um bairro, na posição real dele em Manaus. O tamanho é o número de
+      visitas; a cor, quantos técnicos diferentes passaram lá. Bolha grande e vermelha
+      é bairro com serviço concentrado e equipe espalhada — o caso mais caro que existe.
+    </p>
+
+    <div class="painel">
+      <header>
+        <h3>31 bairros com 3 ou mais visitas</h3>
+        <span class="dica">posição por coordenada média do bairro</span>
+      </header>
+      <div class="corpo"><div id="mapa"></div></div>
+      <div class="legenda">
+        <span class="chave"><i class="quad" style="background:var(--cool)"></i> 1 a 3 técnicos</span>
+        <span class="chave"><i class="quad" style="background:var(--warn)"></i> 4 a 6 técnicos</span>
+        <span class="chave"><i class="quad" style="background:var(--af)"></i> 7 ou mais técnicos no mesmo bairro</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAINEL 3 ============ -->
+  <section>
+    <p class="eyebrow">Painel 3 de 3</p>
+    <h2>O que o controlador precisa ver sem procurar</h2>
+    <p class="col">
+      Os dois painéis acima mostram o dia. Este diz onde olhar. Todos os casos abaixo
+      são reais, do dia 08/09 — não são exemplos inventados.
+    </p>
+
+    <div class="alertas">
+      <div class="alerta-item">
+        <i class="faixa" style="background:var(--af)"></i>
+        <div>
+          <h3>Voltou a um bairro onde já tinha estado</h3>
+          <p>
+            <span class="mono">Z683677</span> esteve em <strong>Tancredo Neves</strong> às
+            <span class="mono">11:37</span> e voltou às <span class="mono">21:32</span>,
+            depois de passar por Lago Azul, Jorge Teixeira, Nova Cidade e N. Aleixo.
+          </p>
+        </div>
+        <span class="grau" style="background:var(--af-soft);color:var(--af)">rota</span>
+      </div>
+
+      <div class="alerta-item">
+        <i class="faixa" style="background:var(--af)"></i>
+        <div>
+          <h3>Bairro com equipe demais</h3>
+          <p>
+            <strong>Alvorada</strong> teve 19 visitas divididas entre
+            <span class="mono">11</span> técnicos. <strong>Planalto</strong> teve
+            10 visitas para <span class="mono">10</span> técnicos — uma para cada.
+          </p>
+        </div>
+        <span class="grau" style="background:var(--af-soft);color:var(--af)">alocação</span>
+      </div>
+
+      <div class="alerta-item">
+        <i class="faixa" style="background:var(--warn)"></i>
+        <div>
+          <h3>Salto longo entre duas visitas</h3>
+          <p>
+            10 deslocamentos passaram de <span class="mono">10 km</span> no dia; o maior
+            foi <span class="mono">17,4 km</span> entre uma visita e a seguinte do mesmo técnico.
+          </p>
+        </div>
+        <span class="grau" style="background:var(--warn-soft);color:var(--warn)">tempo</span>
+      </div>
+
+      <div class="alerta-item">
+        <i class="faixa" style="background:var(--warn)"></i>
+        <div>
+          <h3>Janela em risco pelo deslocamento</h3>
+          <p>
+            Visita com janela até 12:00, aberta às 11:40 e a anterior encerrada às 11:26
+            a 8 km dali. O TEC1 só conta isso depois; aqui daria para ver antes.
+          </p>
+        </div>
+        <span class="grau" style="background:var(--warn-soft);color:var(--warn)">janela</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ limites ============ -->
+  <section class="col">
+    <p class="eyebrow">Antes de você decidir</p>
+    <h2>O que dá e o que não dá com o dado de hoje</h2>
+    <p>
+      A tela é honesta ou não serve. Isto é o que o TOA nos entrega e o que ele
+      não entrega:
+    </p>
+    <ul class="limites">
+      <li><span class="marca tem">tem</span>
+        <span>Coordenada do cliente em <strong>73%</strong> das visitas do dia
+        (248 de 339). O resto entra pelo bairro.</span></li>
+      <li><span class="marca tem">tem</span>
+        <span>Hora de início e fim de cada visita — é com isso que a linha do
+        tempo é desenhada.</span></li>
+      <li><span class="marca tem">tem</span>
+        <span>Janela contratada, situação, equipe e login do técnico.</span></li>
+      <li><span class="marca quase">parcial</span>
+        <span>A <strong>distância</strong> é em linha reta entre dois pontos, não o
+        trajeto de rua. Serve para comparar e ordenar; não é quilometragem de
+        combustível.</span></li>
+      <li><span class="marca nao">não tem</span>
+        <span>O <strong>trajeto percorrido</strong>. O TOA manda os pontos, não o
+        caminho. Ligar dois pontos numa linha é desenho, não é a rota real.</span></li>
+      <li><span class="marca nao">não tem</span>
+        <span>Onde o técnico <strong>está agora</strong>. Sem GPS ao vivo, esta tela
+        é do dia que passou e do dia que está agendado — não é rastreamento.</span></li>
+    </ul>
+  </section>
+
+  <section class="col">
+    <h2>O que ela acrescenta ao que já existe</h2>
+    <table class="comp">
+      <thead>
+        <tr><th>Tela</th><th>Pergunta que responde</th><th>O que ela não vê</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Serviços</td>
+          <td>O que aconteceu neste contrato?</td>
+          <td>O dia do técnico</td>
+        </tr>
+        <tr>
+          <td>Equipes</td>
+          <td>O que a equipe 014 tem hoje?</td>
+          <td>A relação entre as equipes</td>
+        </tr>
+        <tr>
+          <td>Console TOA</td>
+          <td>O técnico está ocupado?</td>
+          <td>Onde ele está, e se faz sentido</td>
+        </tr>
+        <tr>
+          <td><strong style="color:var(--af)">Rota do Dia</strong></td>
+          <td><strong>A rota está ajustada?</strong></td>
+          <td>Trajeto real e posição ao vivo</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="fecho">
+    <h2>Autoriza?</h2>
+    <p style="margin-bottom:0;color:var(--ink-2)">
+      Nada disso foi construído — os painéis acima são desenho com dado de verdade,
+      para você ver antes de decidir. Três caminhos possíveis:
+    </p>
+    <div class="opcoes">
+      <div class="opcao"><span class="letra">A</span>
+        <span><strong>Os três painéis</strong>, como menu Rota, ao lado de Serviços e Equipes.</span></div>
+      <div class="opcao"><span class="letra">B</span>
+        <span><strong>Só a linha do tempo</strong>, primeiro. É a que substitui o Console de
+        Alocação no dia a dia, e a mais rápida de entregar.</span></div>
+      <div class="opcao"><span class="letra">C</span>
+        <span><strong>Só os alertas</strong>, dentro da tela de Equipes, sem menu novo —
+        o mínimo que já muda a decisão do controlador.</span></div>
+    </div>
+  </section>
+
+  <footer class="rodape">
+    Dados: banco do Gestor AF, importação do TOA de 08/09/2026 — 339 visitas, 45 técnicos,
+    50 bairros. Sem nome, telefone ou endereço de assinante: os bairros aparecem pela
+    coordenada média, nunca pela casa do cliente.
+  </footer>
+</div>
+
+<script>
+  const BAIRROS = [
+    {b:"ADRIANOPOLIS",x:-60.013,y:-3.105,v:6,t:2},{b:"ALVORADA",x:-60.048,y:-3.075,v:19,t:11},
+    {b:"C NOVA",x:-59.974,y:-3.030,v:25,t:10},{b:"CACHOEIRINHA",x:-60.008,y:-3.122,v:4,t:3},
+    {b:"CENTRO",x:-60.024,y:-3.131,v:12,t:6},{b:"COL OLIVEIRA MACHADO",x:-59.992,y:-3.135,v:6,t:3},
+    {b:"COLONIA TERRA NOVA",x:-60.025,y:-3.016,v:4,t:4},{b:"COMPENSA",x:-60.060,y:-3.102,v:16,t:10},
+    {b:"EDUCANDOS",x:-60.010,y:-3.143,v:4,t:2},{b:"FLORES",x:-59.998,y:-3.049,v:7,t:4},
+    {b:"LAGO AZUL",x:-60.004,y:-2.970,v:4,t:3},{b:"LGA AZUL",x:-59.996,y:-2.965,v:3,t:2},
+    {b:"LIRIO DO VLE",x:-60.068,y:-3.078,v:3,t:2},{b:"MONTE DAS OLIVEIRAS",x:-59.991,y:-2.999,v:4,t:3},
+    {b:"N ALEIXO",x:-59.966,y:-3.056,v:8,t:6},{b:"NOVA CIDADE",x:-59.977,y:-3.011,v:9,t:7},
+    {b:"NOVA ESPERANCA",x:-60.059,y:-3.080,v:6,t:5},{b:"PC 14 JANEIRO",x:-60.014,y:-3.124,v:3,t:2},
+    {b:"PLANALTO",x:-60.057,y:-3.067,v:10,t:10},{b:"PONTA NEGRA",x:-60.092,y:-3.070,v:11,t:7},
+    {b:"REDENCAO",x:-60.047,y:-3.057,v:11,t:8},{b:"S FRANCISCO",x:-60.003,y:-3.114,v:5,t:4},
+    {b:"S GERALDO",x:-60.027,y:-3.103,v:3,t:2},{b:"S RAIMUNDO",x:-60.041,y:-3.111,v:3,t:3},
+    {b:"SANTA LUZIA",x:-60.004,y:-3.141,v:3,t:2},{b:"SANTO ANTONIO",x:-60.043,y:-3.116,v:6,t:4},
+    {b:"SAO JORGE",x:-60.036,y:-3.108,v:8,t:6},{b:"TANCREDO NEVES",x:-59.949,y:-3.054,v:3,t:2},
+    {b:"TARUMA",x:-60.038,y:-3.011,v:3,t:2},{b:"TARUMA-ACU",x:-60.024,y:-2.977,v:6,t:4},
+    {b:"VL DA PRATA",x:-60.048,y:-3.101,v:4,t:4}
+  ];
+
+  const VISITAS = [
+    {lg:"T7233436",b:"SAO JORGE",i:"08:25",f:"09:12",s:"CONCLUIDA"},
+    {lg:"T7233436",b:"CACHOEIRINHA",i:"09:31",f:"10:06",s:"CONCLUIDA"},
+    {lg:"T7233436",b:"EDUCANDOS",i:"10:23",f:"10:48",s:"CONCLUIDA"},
+    {lg:"T7233436",b:"COL OLIVEIRA MACHADO",i:"11:08",f:"11:26",s:"CONCLUIDA"},
+    {lg:"T7233436",b:"SANTA LUZIA",i:"11:40",f:"12:11",s:"CONCLUIDA"},
+    {lg:"T7233436",b:"BETANIA",i:"12:29",f:"13:11",s:"EM_EXECUCAO"},
+    {lg:"T7233436",b:"BETANIA",i:"14:29",f:"14:55",s:"ENTRADA"},
+    {lg:"T7233436",b:"MR LIBERDADE",i:"15:00",f:"15:26",s:"ENTRADA"},
+    {lg:"T7233436",b:"SANTA LUZIA",i:"15:29",f:"16:11",s:"ENTRADA"},
+    {lg:"T7233436",b:"EDUCANDOS",i:"16:15",f:"16:57",s:"ENTRADA"},
+    {lg:"T7233436",b:"EDUCANDOS",i:"16:59",f:"17:44",s:"ENTRADA"},
+    {lg:"Z509191",b:"SAO GERALDO",i:"08:28",f:"09:24",s:"CONCLUIDA"},
+    {lg:"Z509191",b:"ADRIANOPOLIS",i:"09:29",f:"11:18",s:"CONCLUIDA"},
+    {lg:"Z509191",b:"ADRIANOPOLIS",i:"11:24",f:"11:55",s:"REAGENDAMENTO"},
+    {lg:"Z509191",b:"SANTO ANTONIO",i:"14:25",f:"15:13",s:"ENTRADA"},
+    {lg:"Z509191",b:"ADRIANOPOLIS",i:"15:25",f:"16:22",s:"ENTRADA"},
+    {lg:"Z509191",b:"ADRIANOPOLIS",i:"16:30",f:"18:01",s:"ENTRADA"},
+    {lg:"Z543203",b:"PRESIDENTE VARGAS",i:"08:27",f:"09:09",s:"EM_EXECUCAO"},
+    {lg:"Z543203",b:"PC 14 JANEIRO",i:"09:28",f:"09:49",s:"EM_EXECUCAO"},
+    {lg:"Z543203",b:"CACHOEIRINHA",i:"10:03",f:"10:20",s:"CONCLUIDA"},
+    {lg:"Z543203",b:"COL OLIVEIRA MACHADO",i:"10:46",f:"11:07",s:"CONCLUIDA"},
+    {lg:"Z543203",b:"PETROPOLIS",i:"11:33",f:"12:18",s:"CONCLUIDA"},
+    {lg:"Z543203",b:"S GERALDO",i:"12:13",f:"12:38",s:"CANCELADA"},
+    {lg:"Z543203",b:"PETROPOLIS",i:"12:46",f:"12:52",s:"CONCLUIDA"},
+    {lg:"Z543203",b:"S GERALDO",i:"15:08",f:"15:44",s:"ENTRADA"},
+    {lg:"Z543203",b:"EDUCANDOS",i:"15:56",f:"16:21",s:"ENTRADA"},
+    {lg:"Z543203",b:"CACHOEIRINHA",i:"16:27",f:"16:52",s:"ENTRADA"},
+    {lg:"Z683677",b:"C NOVA",i:"08:25",f:"11:02",s:"CONCLUIDA"},
+    {lg:"Z683677",b:"TANCREDO NEVES",i:"11:37",f:"11:59",s:"REAGENDAMENTO"},
+    {lg:"Z683677",b:"LAGO AZUL",i:"13:19",f:"14:56",s:"CONCLUIDA"},
+    {lg:"Z683677",b:"JORGE TEIXEIRA",i:"15:21",f:"16:30",s:"ENTRADA"},
+    {lg:"Z683677",b:"NOVA CIDADE",i:"16:46",f:"17:55",s:"ENTRADA"},
+    {lg:"Z683677",b:"N ALEIXO",i:"18:10",f:"19:19",s:"ENTRADA"},
+    {lg:"Z683677",b:"TANCREDO NEVES",i:"21:32",f:"23:30",s:"ENTRADA"}
+  ];
+
+  const COR = {
+    CONCLUIDA: "var(--ok)", EM_EXECUCAO: "var(--cool)", REAGENDAMENTO: "var(--warn)",
+    CANCELADA: "var(--bad)", ENTRADA: "var(--ink-3)"
+  };
+  const min = h => (+h.slice(0,2)) * 60 + (+h.slice(3,5));
+
+  /* ---------- painel 1: linha do tempo ---------- */
+  (function gantt() {
+    const tecnicos = [...new Set(VISITAS.map(v => v.lg))];
+    const H0 = 8 * 60, H1 = 24 * 60;
+    const L = 88, R = 16, T = 26, alt = 34, gap = 9;
+    const W = 1040, H = T + tecnicos.length * (alt + gap) + 12;
+    const px = m => L + (m - H0) / (H1 - H0) * (W - L - R);
+
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:900px" font-family="IBM Plex Sans, sans-serif">`;
+    for (let h = 8; h <= 23; h += 2) {
+      s += `<line x1="${px(h*60)}" y1="${T-8}" x2="${px(h*60)}" y2="${H-10}"
+             stroke="var(--line-soft)" stroke-width="1"/>`;
+      s += `<text x="${px(h*60)}" y="${T-14}" fill="var(--ink-3)" font-size="10.5"
+             text-anchor="middle" font-family="IBM Plex Mono, monospace">${String(h).padStart(2,'0')}h</text>`;
+    }
+    tecnicos.forEach((tec, li) => {
+      const y = T + li * (alt + gap);
+      const linha = VISITAS.filter(v => v.lg === tec);
+      s += `<text x="0" y="${y + alt/2 + 4}" fill="var(--ink-2)" font-size="11.5"
+             font-family="IBM Plex Mono, monospace">${tec}</text>`;
+      s += `<rect x="${L}" y="${y}" width="${W-L-R}" height="${alt}" rx="3"
+             fill="var(--surface-2)"/>`;
+      const vistos = new Set();
+      linha.forEach(v => {
+        const x = px(min(v.i)), w = Math.max(px(min(v.f)) - x, 15);
+        const repetido = vistos.has(v.b); vistos.add(v.b);
+        s += `<g><title>${v.b} · ${v.i}–${v.f} · ${v.s.toLowerCase().replace('_',' ')}</title>`;
+        s += `<rect x="${x}" y="${y+4}" width="${w}" height="${alt-8}" rx="2.5"
+               fill="${COR[v.s]}" opacity="${v.s==='ENTRADA' ? .38 : .92}"/>`;
+        if (w > 54) {
+          s += `<text x="${x+6}" y="${y+alt/2+3.5}" font-size="9.5" fill="var(--surface)"
+                 style="font-weight:600">${(repetido ? '↩ ' : '') + v.b.slice(0,Math.floor(w/6.2))}</text>`;
+        } else if (repetido) {
+          s += `<text x="${x+3}" y="${y+alt/2+3.5}" font-size="10" fill="var(--surface)">↩</text>`;
+        }
+        s += `</g>`;
+      });
+      s += `<line x1="${L}" y1="${y+alt+gap/2}" x2="${W-R}" y2="${y+alt+gap/2}"
+             stroke="var(--line-soft)"/>`;
+    });
+    s += `</svg>`;
+    document.getElementById('gantt').innerHTML = s;
+  })();
+
+  /* ---------- painel 2: mapa de bairros ---------- */
+  (function mapa() {
+    const W = 1040, H = 430, M = 46;
+    const xs = BAIRROS.map(d => d.x), ys = BAIRROS.map(d => d.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const px = v => M + (v - x0) / (x1 - x0) * (W - 2*M);
+    const py = v => H - M - (v - y0) / (y1 - y0) * (H - 2*M);
+    const r  = v => 7 + Math.sqrt(v) * 3.4;
+    const cor = t => t >= 7 ? 'var(--af)' : t >= 4 ? 'var(--warn)' : 'var(--cool)';
+
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:860px"
+              font-family="IBM Plex Sans, sans-serif">`;
+    s += `<rect x="1" y="1" width="${W-2}" height="${H-2}" rx="5" fill="var(--surface-2)"
+           stroke="var(--line-soft)"/>`;
+    s += `<text x="${M}" y="${H-14}" font-size="10.5" fill="var(--ink-3)"
+           font-family="IBM Plex Mono, monospace">oeste ← Manaus → leste</text>`;
+    [...BAIRROS].sort((a,b) => b.v - a.v).forEach(d => {
+      const cx = px(d.x), cy = py(d.y), rr = r(d.v);
+      s += `<g><title>${d.b} · ${d.v} visitas · ${d.t} técnicos</title>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="${cor(d.t)}" opacity=".26"/>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="${cor(d.t)}"
+             stroke-width="1.6"/>`;
+      s += `<text x="${cx}" y="${cy+3.5}" text-anchor="middle" font-size="10.5"
+             font-family="IBM Plex Mono, monospace" font-weight="600"
+             fill="${cor(d.t)}">${d.t}</text>`;
+      if (d.v >= 8) {
+        s += `<text x="${cx}" y="${cy - rr - 5}" text-anchor="middle" font-size="10"
+               fill="var(--ink-2)">${d.b}</text>`;
+      }
+      s += `</g>`;
+    });
+    s += `</svg>`;
+    document.getElementById('mapa').innerHTML = s;
+  })();
+</script>

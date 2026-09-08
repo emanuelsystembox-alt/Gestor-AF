@@ -146,6 +146,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 051 | Atividade **suspensa** não entra na importação |
 | 052 | **Produto pendente** lido da coluna `Produto` do TOA |
 | 053 | O produto é **da O.S., pelo Ponto** — corrige o 052 |
+| 054 | **Rota do Dia** — `rota_do_dia`, `rota_bairros`, `rota_alertas` |
 
 ---
 
@@ -168,7 +169,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 109 decisões
+## As 111 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

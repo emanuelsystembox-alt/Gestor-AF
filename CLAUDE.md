@@ -185,7 +185,9 @@ app/                     front-end (Vite + React + TS + Tailwind v4)
   src/components/TabelaContratos.tsx
                          a linha do contrato + o SELECT que a alimenta —
                          uma só, em Serviços e em Equipes (D-095)
-  src/pages/             Login · Controle · Servicos · Equipes ·
+  src/components/icones.tsx
+                         os 11 icones do menu, SVG a mao (D-110)
+  src/pages/             Login · Controle · Servicos · Equipes · Rota ·
                          Importacao · Campo · Visita
 docs/                    mapeamento, domínio, decisões, mapa do concorrente
 supabase/migrations/     schema, em ordem
@@ -214,14 +216,14 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 49 migrations, as 109 decisões, o que já corrigimos do
+> reais do banco, as 50 migrations, as 111 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
 Resumo: **41 tabelas, 85 funções, 82 policies, zero tabela sem RLS**,
 zero função `SECURITY DEFINER` alcançável pelo `anon`. 617 visitas,
 736 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
-1.466 sub-falhas, 1.021 regras de pontuação. **Doze telas no ar.**
+1.466 sub-falhas, 1.021 regras de pontuação. **Treze telas no ar.**
 
 **A regra do dinheiro fechou** (D-077): `a receber = pontuação × fator`,
 com o fator saindo da faixa do mês. Produtividade e comissão numa tela
@@ -250,7 +252,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 109 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 111 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

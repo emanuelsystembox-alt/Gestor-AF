@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import Login from './pages/Login'
 const Controle = lazy(() => import('./pages/Controle'))
 const Servicos = lazy(() => import('./pages/Servicos'))
+const Rota = lazy(() => import('./pages/Rota'))
 const Equipes = lazy(() => import('./pages/Equipes'))
 const VisitaDetalhe = lazy(() => import('./pages/VisitaDetalhe'))
 const Importacao = lazy(() => import('./pages/Importacao'))
@@ -62,6 +63,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Controle /></Protegida>} />
         <Route path="/controle/servicos" element={
           <Protegida exige="GESTAO"><Servicos /></Protegida>} />
+        <Route path="/controle/rota" element={
+          <Protegida exige="GESTAO"><Rota /></Protegida>} />
         <Route path="/controle/visita/:id" element={
           <Protegida exige="GESTAO"><VisitaDetalhe /></Protegida>} />
         <Route path="/controle/equipes" element={
