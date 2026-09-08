@@ -32,6 +32,23 @@ interface Permissao {
   chave: string; modulo: string; rotulo: string
   descricao: string | null; ordem: number; disponivel: boolean
 }
+/** Quem apagou o contrato, quando e por quê. Existe porque exclusão
+ *  definitiva não se desfaz: no dia de uma investigação, esta é a única
+ *  coisa que sobra do contrato (D-101). */
+interface Exclusao {
+  id: number
+  contrato: string | null
+  wo_numero: string | null
+  toa_atividade_id: string | null
+  data_agendada: string | null
+  situacao: string | null
+  equipe_codigo: string | null
+  ordens: number | null
+  motivo: string
+  excluido_em: string
+  perfil: { nome: string; email: string } | null
+}
+
 /** Skill do técnico — ADESÃO, MANUTENÇÃO, DESCONEXÃO. Não é rótulo: é a
  *  chave que liga o técnico à meta e à faixa de comissão (D-094). */
 interface Skill { id: string; nome: string; ativo: boolean; ordem: number }
@@ -52,7 +69,9 @@ export default function Administracao() {
   const { perfil, temPapel } = useAuth()
   const souAdmin = temPapel('ADMIN')
 
-  const [aba, setAba] = useState<'usuarios' | 'perfis' | 'cargos'>('usuarios')
+  const [aba, setAba] = useState<'usuarios' | 'perfis' | 'cargos' | 'exclusoes'>('usuarios')
+  const [exclusoes, setExclusoes] = useState<Exclusao[]>([])
+  const [buscaExc, setBuscaExc] = useState('')
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [papeisPorUsuario, setPapeisPorUsuario] = useState<Map<string, string[]>>(new Map())
   const [cargos, setCargos] = useState<Cargo[]>([])
@@ -130,6 +149,20 @@ export default function Administracao() {
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [])
+
+  // Só quando a aba abre: é histórico, não faz parte da tela inicial.
+  useEffect(() => {
+    if (aba !== 'exclusoes') return
+    supabase.from('exclusao_definitiva')
+      .select(`id, contrato, wo_numero, toa_atividade_id, data_agendada, situacao,
+               equipe_codigo, ordens, motivo, excluido_em,
+               perfil:excluido_por ( nome, email )`)
+      .order('excluido_em', { ascending: false }).limit(500)
+      .then(({ data, error }) => {
+        if (error) setErro(error.message)
+        else setExclusoes((data ?? []) as unknown as Exclusao[])
+      })
+  }, [aba])
 
   const porModulo = useMemo(() => {
     const m = new Map<string, Permissao[]>()
@@ -341,7 +374,8 @@ export default function Administracao() {
         <div className="flex rounded-lg bg-graf-900 p-0.5">
           {([['usuarios', 'Usuários', usuarios.length],
              ['perfis', 'Perfis de acesso', perfis.length],
-             ['cargos', 'Cargos', cargos.length]] as const).map(([a, rot, n]) => (
+             ['cargos', 'Cargos', cargos.length],
+             ['exclusoes', 'Contratos apagados', exclusoes.length]] as const).map(([a, rot, n]) => (
             <button key={a} onClick={() => { setAba(a); setEditando(null) }}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
@@ -595,6 +629,97 @@ export default function Administracao() {
               banco não deixa tirar o último ADMIN ativo — nem você desativar a si mesmo.
             </p>
           </section>
+        ) : aba === 'exclusoes' ? (
+          <section className="card-controle overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-3">
+              <h2 className="font-medium">Contratos apagados do banco</h2>
+              <p className="mt-1 max-w-3xl text-sm text-graf-400">
+                Exclusão definitiva não se desfaz — este registro é o que sobra do
+                contrato, e existe para o dia em que alguém precisar apurar. Guarda
+                quem apagou, quando e por quê. <strong>Não guarda</strong> nome,
+                telefone nem endereço do assinante: dado pessoal também sai do banco.
+              </p>
+              <input value={buscaExc} onChange={e => setBuscaExc(e.target.value)}
+                placeholder="Buscar contrato, WO, motivo, quem apagou…"
+                className={`${campo} mt-3 w-full`} />
+            </div>
+
+            {exclusoes.length === 0 ? (
+              <Vazio titulo="Nenhum contrato apagado"
+                descricao="Quando alguém apagar um contrato do banco, ele aparece aqui." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-graf-800 bg-graf-900 text-left
+                                    text-[11px] uppercase tracking-wide text-graf-400">
+                    <tr className="[&>th]:border-r [&>th]:border-graf-500/20
+                                   [&>th:last-child]:border-r-0">
+                      <th className="px-3 py-2 font-medium">Quando</th>
+                      <th className="px-3 py-2 font-medium">Quem apagou</th>
+                      <th className="px-3 py-2 font-medium">Contrato</th>
+                      <th className="px-3 py-2 font-medium">WO</th>
+                      <th className="px-3 py-2 font-medium">Data / Equipe</th>
+                      <th className="px-3 py-2 font-medium">Situação</th>
+                      <th className="px-3 py-2 font-medium">O.S.</th>
+                      <th className="px-3 py-2 font-medium">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exclusoes.filter(x => {
+                      const t = buscaExc.trim().toLowerCase()
+                      if (!t) return true
+                      return [x.contrato, x.wo_numero, x.motivo, x.perfil?.nome,
+                              x.perfil?.email, x.toa_atividade_id]
+                        .some(c => c?.toLowerCase().includes(t))
+                    }).map(x => (
+                      <tr key={x.id} className="border-b border-graf-500/25
+                                                [&>td]:border-r [&>td]:border-graf-500/15
+                                                [&>td:last-child]:border-r-0">
+                        <td className="tabular whitespace-nowrap px-3 py-2 text-xs">
+                          {new Date(x.excluido_em).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {x.perfil?.nome ?? <span className="text-graf-600">—</span>}
+                          {x.perfil?.email && (
+                            <div className="text-[10px] text-graf-500">{x.perfil.email}</div>
+                          )}
+                        </td>
+                        <td className="tabular px-3 py-2 font-medium">
+                          {x.contrato ?? '—'}
+                          {x.toa_atividade_id && (
+                            <div className="text-[10px] text-graf-600">
+                              TOA {x.toa_atividade_id}
+                            </div>
+                          )}
+                        </td>
+                        <td className="tabular px-3 py-2 text-xs text-graf-400">
+                          {x.wo_numero ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-graf-400">
+                          {x.data_agendada
+                            ? new Date(x.data_agendada + 'T12:00').toLocaleDateString('pt-BR')
+                            : '—'}
+                          <div className="text-[10px] text-graf-500">
+                            {x.equipe_codigo ?? 'sem equipe'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-graf-400">{x.situacao ?? '—'}</td>
+                        <td className="tabular px-3 py-2 text-center text-xs text-graf-400">
+                          {x.ordens ?? 0}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-graf-300">{x.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="border-t border-graf-800 px-4 py-2.5 text-xs text-graf-500">
+              Últimas 500 exclusões. Só gestor lê esta lista, e ninguém escreve nela pela
+              tela — quem grava é a própria função de exclusão.
+            </p>
+          </section>
+
         ) : aba === 'perfis' ? (
           <section className="space-y-3">
             {perfis.map(pa => {

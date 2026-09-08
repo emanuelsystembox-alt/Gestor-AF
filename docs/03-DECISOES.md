@@ -1867,3 +1867,34 @@ Três travas, porque isto não se desfaz:
 > `toa_atividade_id`: a lista para o importador respeitar a exclusão já
 > existe, e vira uma linha de código no dia em que o Emanuel disser que
 > é para respeitar.
+
+
+### D-102 · O log da exclusão, e a visão de equipe fica igual mesmo
+> *"Definitivo. Depois só tem que ter um log, caso tenha alguma
+> investigação de fraude ou algo do tipo, sabermos quem excluiu o
+> contrato tal."*
+>
+> *"Na visão equipe ainda falta alguns campos que na visão serviço tem
+> com relação aos contratos."* — Emanuel, 08/09
+
+**O individual também apaga de vez.** O botão direito e o modal
+passaram a chamar `excluir_visitas_definitivo`, com as mesmas duas
+travas do lote: motivo e a palavra `APAGAR` digitada — aqui num campo,
+não num `prompt`. Ficou um caminho só: em qualquer lugar da tela,
+apagar é apagar.
+
+**O log ganhou tela**, em Administração → *Contratos apagados*: quando,
+quem, contrato, WO, ID do TOA, data, equipe, situação, quantas O.S. e o
+motivo. Só gestor lê; ninguém escreve por ali — quem grava é a própria
+função de exclusão, que é `SECURITY DEFINER`. Registro de auditoria que
+a tela pode editar não é auditoria.
+
+**A visão de equipe estava mesmo incompleta**, e o D-095 tinha resolvido
+só metade: as colunas ficaram iguais, mas as *ações* não. Faltavam o
+menu de botão direito, o `⋯`, e o contrato abria numa página em vez do
+modal — ou seja, dentro da equipe não dava para baixar, transferir,
+marcar nem apagar sem sair da tela.
+
+Agora as duas telas têm o mesmo modal e o mesmo menu. O que continua
+diferente é só o contexto: dentro de uma equipe, num dia, as colunas
+Equipe e Data seguem fora, porque repetiriam o cabeçalho em cada linha.

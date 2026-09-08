@@ -144,6 +144,7 @@ export function ContratoModal({
   const [motivoT, setMotivoT] = useState('')
   // exclusão
   const [motivoE, setMotivoE] = useState('')
+  const [confirmaE, setConfirmaE] = useState('')
   // edição do cadastro — o que o sistema atual não deixa fazer
   const [ed, setEd] = useState<Record<string, string>>({})
   // voltar contrato
@@ -672,31 +673,45 @@ export function ContratoModal({
             </div>
           )}
 
+          {/* Exclusao DEFINITIVA (D-101): aqui e no lote, a mesma coisa.
+              Duas travas -- motivo e a palavra APAGAR -- porque nao ha
+              como desfazer, e o registro de quem apagou fica em
+              `exclusao_definitiva`. */}
           {acao === 'excluir' && (
             <div className="rounded-lg border border-af-700/60 bg-af-900/15 p-3">
-              <p className="text-xs font-medium text-af-200">Excluir este contrato?</p>
+              <p className="text-xs font-medium text-af-200">
+                Apagar este contrato do banco?
+              </p>
               <p className="mt-1 text-[11px] text-af-200/80">
-                Sai das listas e dos relatórios, mas continua no banco com quem excluiu,
-                quando e por quê — e pode ser restaurado.
+                <strong>Não se desfaz.</strong> Somem o contrato, as O.S., o histórico e
+                as fotos. Fica registrado quem apagou, quando e por quê — para o dia em
+                que alguém precisar investigar.
               </p>
               <div className="mt-2 flex flex-wrap items-end gap-2">
-                <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                <label className="min-w-56 flex-1 text-[11px] text-graf-400">
                   <span className="mb-1 block">Motivo (obrigatório)</span>
                   <input value={motivoE} onChange={e => setMotivoE(e.target.value)} autoFocus
                     placeholder="Duplicado, aberto por engano, cancelado pela CLARO…"
                     className={`${campo} w-full`} />
                 </label>
-                <button disabled={ocupado || !motivoE.trim()}
+                <label className="w-40 text-[11px] text-graf-400">
+                  <span className="mb-1 block">Digite APAGAR</span>
+                  <input value={confirmaE} onChange={e => setConfirmaE(e.target.value)}
+                    placeholder="APAGAR" className={`${campo} w-full`} />
+                </label>
+                <button
+                  disabled={ocupado || !motivoE.trim()
+                            || confirmaE.trim().toUpperCase() !== 'APAGAR'}
                   onClick={async () => {
                     setOcupado(true); setErro(null)
-                    const { error } = await supabase.rpc('excluir_visita',
-                      { p_visita: id, p_motivo: motivoE.trim() })
+                    const { error } = await supabase.rpc('excluir_visitas_definitivo',
+                      { p_visitas: [id], p_motivo: motivoE.trim() })
                     if (error) { setErro(error.message); setOcupado(false); return }
                     onMudou(); onFechar()
                   }}
                   className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
                              hover:bg-af-500 disabled:opacity-50">
-                  Excluir
+                  Apagar do banco
                 </button>
               </div>
             </div>

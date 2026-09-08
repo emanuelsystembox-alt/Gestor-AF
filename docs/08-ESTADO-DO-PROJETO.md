@@ -164,7 +164,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 101 decisões
+## As 102 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

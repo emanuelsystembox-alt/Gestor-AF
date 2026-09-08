@@ -540,7 +540,7 @@ export default function Servicos() {
                       onClick={() => { setModal(v.id); setMenu(null) }}
                       className="block w-full border-t border-graf-800 px-3 py-2
                                  text-left text-xs text-af-300 hover:bg-af-900/20">
-                      Excluir contrato…
+                      Apagar do banco…
                     </button>
                     <div className="border-t border-graf-800 px-3 py-2 text-[10px]
                                     leading-snug text-graf-600">

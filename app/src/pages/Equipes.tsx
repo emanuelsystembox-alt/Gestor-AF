@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { isoLocal } from '../lib/formato'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
+import { ContratoModal } from '../components/ContratoModal'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
 // linha só, um componente só (D-095).
 import {
@@ -88,7 +89,6 @@ const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
 export default function Equipes() {
-  const navegar = useNavigate()
   const { pode, temPapel } = useAuth()
   // Quem edita equipe desliga o técnico. Apagar não está aqui para
   // ninguém: o que ele executou fica gravado (D-090).
@@ -117,6 +117,17 @@ export default function Equipes() {
   const [indicadores, setIndicadores] = useState<{ id: string; nome: string }[]>([])
   const porIndicador = useMemo(
     () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
+
+  // O contrato abre em JANELA, como em Serviços (D-056) — e não numa
+  // página separada. Era a última diferença entre as duas telas.
+  const [modal, setModal] = useState<string | null>(null)
+  const [menu, setMenu] = useState<string | null>(null)
+  const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
+  // O que o modal precisa para baixar, transferir e marcar.
+  const [codigos, setCodigos] = useState<{ codigo: number; descricao: string }[]>([])
+  const [conjunto, setConjunto] = useState<string | null>(null)
+  const [equipesLista, setEquipesLista] =
+    useState<{ id: string; codigo: string; nome: string }[]>([])
 
   // expansão sob demanda
   const [aberta, setAberta] = useState<string | null>(null)
@@ -152,6 +163,14 @@ export default function Equipes() {
   useEffect(() => {
     supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data: d }) => setIndicadores((d ?? []) as { id: string; nome: string }[]))
+    supabase.from('codigo_baixa').select('codigo, descricao').order('codigo')
+      .then(({ data: d }) => setCodigos((d ?? []) as { codigo: number; descricao: string }[]))
+    supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
+      .then(({ data: d }) => setConjunto(
+        (d as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
+    supabase.from('equipe').select('id, codigo, nome').eq('ativo', true).order('codigo')
+      .then(({ data: d }) => setEquipesLista(
+        (d ?? []) as { id: string; codigo: string; nome: string }[]))
   }, [])
 
   useEffect(() => {
@@ -698,22 +717,84 @@ export default function Equipes() {
                                         pontos={pontos}
                                         porIndicador={porIndicador}
                                         carregando={carregandoDetalhe === e.equipe_id}
-                                        aoAbrir={v => navegar(`/controle/visita/${v.id}`)}
+                                        aoAbrir={v => setModal(v.id)}
+                                        aoMenuContexto={(v, ev) => {
+                                          setMenu(menu === v.id ? null : v.id)
+                                          setMenuXY({ x: ev.clientX, y: ev.clientY })
+                                        }}
                                         vazio={
                                           <p className="px-3 py-6 text-center text-xs text-graf-500">
                                             Nenhum contrato para esta equipe em{' '}
                                             {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.
                                           </p>
                                         }
-                                        renderAcoes={v => (
-                                          <Link to={`/controle/visita/${v.id}`}
-                                            onClick={ev => ev.stopPropagation()}
-                                            className="rounded border border-graf-700 px-2 py-0.5
-                                                       text-[11px] text-graf-400
-                                                       hover:border-af-600 hover:text-af-400">
-                                            abrir
-                                          </Link>
-                                        )}
+                                        renderAcoes={v => (<>
+                                          <div className="flex items-center justify-end gap-1">
+                                            <Link to={`/controle/visita/${v.id}`}
+                                              onClick={ev => ev.stopPropagation()}
+                                              className="rounded border border-graf-700 px-2 py-0.5
+                                                         text-[11px] text-graf-400
+                                                         hover:border-af-600 hover:text-af-400">
+                                              abrir
+                                            </Link>
+                                            <button
+                                              onClick={ev => {
+                                                ev.stopPropagation()
+                                                setMenu(menu === v.id ? null : v.id)
+                                                setMenuXY({ x: ev.clientX, y: ev.clientY })
+                                              }}
+                                              title="Ações do contrato"
+                                              className="rounded border border-graf-700 px-1.5 py-0.5
+                                                         text-[11px] leading-none text-graf-400
+                                                         hover:border-af-600 hover:text-af-400">
+                                              ⋯
+                                            </button>
+                                          </div>
+
+                                          {menu === v.id && (
+                                            <div onClick={ev => ev.stopPropagation()}
+                                              style={menuXY ? {
+                                                left: Math.min(menuXY.x, window.innerWidth - 230),
+                                                top: Math.min(menuXY.y, window.innerHeight - 250),
+                                              } : undefined}
+                                              className="fixed z-50 w-52 overflow-hidden rounded-lg
+                                                         border border-graf-700 bg-graf-900
+                                                         text-left shadow-xl">
+                                              <Link to={`/controle/visita/${v.id}`}
+                                                className="block px-3 py-2 text-xs text-graf-200
+                                                           hover:bg-graf-800">
+                                                Abrir contrato
+                                              </Link>
+                                              <button
+                                                onClick={() => { setModal(v.id); setMenu(null) }}
+                                                className="block w-full px-3 py-2 text-left text-xs
+                                                           text-graf-200 hover:bg-graf-800">
+                                                Marcadores…
+                                              </button>
+                                              <button
+                                                onClick={() => { setModal(v.id); setMenu(null) }}
+                                                disabled={v.ordem_servico.length === 0}
+                                                className="block w-full px-3 py-2 text-left text-xs
+                                                           text-graf-200 hover:bg-graf-800
+                                                           disabled:opacity-40">
+                                                Baixar serviço…
+                                              </button>
+                                              <button
+                                                onClick={() => { setModal(v.id); setMenu(null) }}
+                                                className="block w-full px-3 py-2 text-left text-xs
+                                                           text-graf-200 hover:bg-graf-800">
+                                                Transferir equipe…
+                                              </button>
+                                              <button
+                                                onClick={() => { setModal(v.id); setMenu(null) }}
+                                                className="block w-full border-t border-graf-800
+                                                           px-3 py-2 text-left text-xs text-af-300
+                                                           hover:bg-af-900/20">
+                                                Apagar do banco…
+                                              </button>
+                                            </div>
+                                          )}
+                                        </>)}
                                       />
                                     </div>
                                   </td>
@@ -951,6 +1032,19 @@ export default function Equipes() {
             ' · OCIOSO só é calculado para o dia corrente'}
         </p>
       </div>
+
+      {modal && (
+        <ContratoModal
+          id={modal}
+          indicadores={indicadores}
+          codigos={codigos}
+          conjunto={conjunto}
+          equipes={equipesLista}
+          pontos={pontos.get(modal) ?? null}
+          onFechar={() => setModal(null)}
+          onMudou={() => { setDetalhe({}); recarregar() }}
+        />
+      )}
     </Shell>
   )
 }
