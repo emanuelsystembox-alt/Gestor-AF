@@ -139,6 +139,8 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 046 | **O código de baixa decide a situação** (67.485 linhas analisadas) + `parametro` |
 | 046b | Baixa automática no importador |
 | 046c | `codigo_baixa` é catálogo global — correção do filtro por empresa |
+| 047 | **TEC1 — aderência à janela**, regra lida do painel do Emanuel |
+| 048 | Excluir contratos em lote, sem atalho na regra |
 
 ---
 
@@ -161,7 +163,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 98 decisões
+## As 100 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

@@ -62,11 +62,52 @@ export default function Servicos() {
   // encostado na borda direita da tabela.
   const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
 
+  // Selecao em lote. Guarda IDs, nao objetos: a lista e recarregada e
+  // objeto novo com conteudo igual nao e o mesmo objeto (D-085).
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [excluindo, setExcluindo] = useState(false)
+
   useEffect(() => {
     supabase.from('indicador_qualidade')
       .select('id, nome, meta, peso, ordem').eq('ativo', true).order('ordem')
       .then(({ data }) => setIndicadores((data ?? []) as Indicador[]))
   }, [])
+
+  function alternarSelecao(id: string, marcado: boolean) {
+    setSelecionados(s => {
+      const n = new Set(s)
+      if (marcado) n.add(id); else n.delete(id)
+      return n
+    })
+  }
+
+  /** Exclusao em lote. O motivo e obrigatorio no banco -- e aqui
+   *  tambem, porque contrato que some sem explicacao vira discussao
+   *  com a CLARO depois. */
+  async function excluirSelecionados() {
+    const ids = [...selecionados]
+    if (!ids.length) return
+    const motivo = prompt(
+      `Excluir ${ids.length} contrato(s).\n\n`
+      + 'Eles saem da tela e continuam no banco, com quem excluiu e por quê.\n'
+      + 'Informe o motivo:')
+    if (!motivo || !motivo.trim()) return
+    setExcluindo(true)
+    const { data, error } = await supabase.rpc('excluir_visitas',
+      { p_visitas: ids, p_motivo: motivo.trim() })
+    if (error) {
+      setErro(error.message)
+    } else {
+      const r = data as { excluidos: number; ja_estavam: number; erros: number }
+      setErro(null)
+      setSelecionados(new Set())
+      setVersao(v => v + 1)
+      alert(`${r.excluidos} contrato(s) excluído(s).`
+        + (r.ja_estavam ? ` ${r.ja_estavam} já estava(m).` : '')
+        + (r.erros ? ` ${r.erros} recusado(s).` : ''))
+    }
+    setExcluindo(false)
+  }
 
   const porIndicador = useMemo(
     () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
@@ -381,8 +422,30 @@ export default function Servicos() {
         {/* ====== tabela ====== */}
         <section className="card-controle overflow-hidden">
           <div className="overflow-x-auto">
+            {selecionados.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 border-b border-graf-800
+                              bg-af-900/15 px-4 py-2.5">
+                <span className="text-sm font-medium text-af-300">
+                  {selecionados.size} contrato(s) selecionado(s)
+                </span>
+                <button onClick={() => setSelecionados(new Set())}
+                  className="text-xs text-graf-400 underline underline-offset-2
+                             hover:text-graf-200">
+                  limpar seleção
+                </button>
+                <button onClick={excluirSelecionados} disabled={excluindo}
+                  className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold
+                             text-white hover:bg-af-500 disabled:opacity-50">
+                  {excluindo ? 'Excluindo…' : `Excluir ${selecionados.size}`}
+                </button>
+              </div>
+            )}
             <TabelaContratos
               linhas={visiveis}
+              selecionados={selecionados}
+              aoSelecionar={alternarSelecao}
+              aoSelecionarTodos={marcado => setSelecionados(
+                marcado ? new Set(visiveis.map(v => v.id)) : new Set())}
               detalhada={detalhada}
               pontos={pontos}
               porIndicador={porIndicador}

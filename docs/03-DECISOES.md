@@ -1769,3 +1769,74 @@ ganhar espaço, não se perder. A preferência fica no navegador, como a do
 tema (D-084): preferência que volta ao normal a cada F5 não é
 preferência. No celular nada muda — lá a navegação é a barra inferior, e
 não há lateral para recolher.
+
+### D-099 · TEC1 — a regra veio do painel dele, não de mim
+> *"Analise o HTML e busque a regra do TEC1: quando o contrato for
+> finalizado no TOA, deve subir um sinalizador — TEC1 PADRÃO, TEC1 SEM
+> PADRÃO. Precisa subir na situação e aparecer como coluna no
+> relatório."* — Emanuel, 08/09
+
+A regra foi **lida** de `painel_produtividade.html` (função
+`classifyTEC1Row`), o painel que ele já usa. Não inventei nada — e é
+justamente o tipo de coisa que a regra de ouro nº 1 manda não inventar.
+
+| | Manutenção | Instalação |
+|---|---|---|
+| O que é | `VISITA TECNICA` ou `RETORNO`, exceto `RETORNO DE CREDENCIADA` | todo o resto |
+| Carência | 59 min | 119 min |
+
+**Só entram atividades Concluído ou Não Concluído no TOA** — que é
+exatamente o "quando for finalizado no TOA" que ele descreveu. Cancelado,
+Suspenso, Iniciado e Pendente nem são avaliados.
+
+```
+1) encerrou até o fim da janela ....... PADRÃO (qualquer status)
+2) passou da janela e EXECUTADO ....... PADRÃO se dentro da carência
+3) passou da janela, não executado:
+     manutenção .......................  não se aplica
+     instalação ....................... SEM PADRÃO
+```
+
+Expurgos, que contam à parte e não como falha: `Não Concluído` +
+"Cancelado no Sistema NETSMS", e janela `Imediata`.
+
+Nos 935 contratos de hoje: **363 PADRÃO · 14 SEM PADRÃO · 24 expurgadas
+· 534 sem regra aplicável** — 96,3%, contra a meta de 95% do painel.
+
+> ⚠ **Não substitui a coluna "Aderência à janela"** que o relatório já
+> tinha. Aquela mede se o técnico **chegou** dentro da janela; o TEC1
+> olha o **fim**, com carência. São perguntas diferentes e as duas
+> continuam no relatório, em colunas separadas.
+
+Duas armadilhas que esta função pagou, e que ficam registradas:
+`unaccent_simples` não existe (quem normaliza é `norm_txt`), e a
+variável record não pode se chamar `v` quando a tabela tem alias `v` —
+o plpgsql resolve `v.id` como a variável ainda não atribuída e estoura
+*"record v is not assigned yet"*.
+
+O TEC1 é recalculado **a cada importação, sempre** — mesmo com a baixa
+automática desligada. Ele é medição, não decisão: não muda o contrato,
+só diz se a janela foi respeitada.
+
+### D-100 · Excluir em lote, sem atalho na regra
+> *"Deve ter uma função de clicar no lado direito e apagar individual,
+> ou caixa seletora para apagar todas as atividades ou somente
+> algumas."* — Emanuel, 08/09
+
+`excluir_visitas` chama `excluir_visita` **uma por uma**. Parece
+desperdício e não é: a barreira (papel + permissão `servicos.excluir` +
+motivo obrigatório) e o evento por contrato continuam idênticos. Lote
+que toma um atalho pela regra é a forma clássica de apagar em massa o
+que a exclusão individual teria recusado.
+
+Três decisões de segurança:
+
+- **Limite de 500 por vez.** Seleção de milhares é quase sempre engano
+  de "selecionar tudo" num filtro largo.
+- **"Selecionar todos" marca o que está NA TELA**, não o que existe no
+  banco. Marcar 900 linhas invisíveis seria uma armadilha.
+- **Se nenhum contrato saiu mas houve erro, a função levanta exceção.**
+  "0 excluídos" numa mensagem verde esconderia a recusa.
+
+A exclusão continua **lógica**: o contrato sai da tela e permanece no
+banco, com autor e motivo.

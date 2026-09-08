@@ -149,6 +149,11 @@ do ngestor, `EXECUTADA` virou Reagendamento 1.075 vezes e Cancelado 657.
 linhas); o parâmetro `baixa_automatica` decide se agimos sozinhos. Ver
 D-097.
 
+**Variável record chamada `v` colide com alias `v` da tabela.** O
+plpgsql resolve `v.id` como a variável ainda não atribuída e estoura
+"record v is not assigned yet". E `unaccent_simples` não existe aqui:
+quem normaliza é `norm_txt`. Ver D-099.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
@@ -198,7 +203,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 41 migrations, as 98 decisões, o que já corrigimos do
+> reais do banco, as 44 migrations, as 100 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -234,7 +239,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 98 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 100 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

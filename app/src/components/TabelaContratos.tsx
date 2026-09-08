@@ -28,7 +28,7 @@ export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
-  origem, criado_em, inicio, fim, tempo_deslocamento, node,
+  origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo, apelido ),
@@ -57,6 +57,8 @@ export interface Marcador { id: string; indicador_id: string; cumprido: boolean 
 
 export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
+  /** Aderencia a janela (D-099). Nulo = a regra nao se aplica. */
+  tec1?: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
   node: string | null
   complemento: string | null
   area: { codigo: string; apelido: string | null } | null
@@ -96,6 +98,10 @@ interface Props {
   aoMenuContexto?: (v: ContratoLinha, e: React.MouseEvent) => void
   /** Última célula — cada tela tem as suas ações. */
   renderAcoes?: (v: ContratoLinha) => ReactNode
+  /** Seleção em lote. Só aparece quando a tela passa os três. */
+  selecionados?: Set<string>
+  aoSelecionar?: (id: string, marcado: boolean) => void
+  aoSelecionarTodos?: (marcado: boolean) => void
   carregando?: boolean
   vazio?: ReactNode
 }
@@ -103,10 +109,15 @@ interface Props {
 export function TabelaContratos({
   linhas, detalhada = true, pontos, porIndicador,
   colunas, aoAbrir, aoMenuContexto, renderAcoes, carregando, vazio,
+  selecionados, aoSelecionar, aoSelecionarTodos,
 }: Props) {
   const mostra = { equipe: true, area: true, data: true, ...(colunas ?? {}) }
+  const temSelecao = !!(selecionados && aoSelecionar)
+  const todosMarcados = temSelecao && linhas.length > 0
+    && linhas.every(l => selecionados!.has(l.id))
   const nCols = 5 + (mostra.equipe ? 1 : 0) + (mostra.area ? 1 : 0)
                   + (mostra.data ? 1 : 0) + (renderAcoes ? 1 : 0)
+                  + (temSelecao ? 1 : 0)
 
   return (
     <table className="w-full text-sm">
@@ -117,6 +128,17 @@ export function TabelaContratos({
             fixa viraria risco preto sobre branco (D-092). */}
         <tr className="[&>th]:border-r [&>th]:border-graf-500/20
                        [&>th:last-child]:border-r-0">
+          {temSelecao && (
+            // "Todos" marca o que está NA TELA, não o que existe no
+            // banco: o filtro é o que a pessoa está vendo, e marcar
+            // 900 linhas invisíveis seria uma armadilha.
+            <th className="w-8 px-2 py-2">
+              <input type="checkbox" checked={todosMarcados}
+                title={todosMarcados ? 'Desmarcar os desta tela' : 'Marcar os desta tela'}
+                onChange={e => aoSelecionarTodos?.(e.target.checked)}
+                className="accent-af-600" />
+            </th>
+          )}
           {/* O contrato vem primeiro: é por ele que se procura, se fala
               ao telefone e se confere com a CLARO. */}
           <th className="px-3 py-2 font-medium">Contrato</th>
@@ -165,6 +187,14 @@ export function TabelaContratos({
                             [&>td]:border-r [&>td]:border-graf-500/15
                             [&>td:last-child]:border-r-0 hover:bg-graf-850
                             ${aoAbrir ? 'cursor-pointer' : ''}`}>
+              {temSelecao && (
+                <td className="px-2 py-2 align-top"
+                    onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={selecionados!.has(v.id)}
+                    onChange={e => aoSelecionar!(v.id, e.target.checked)}
+                    className="accent-af-600" />
+                </td>
+              )}
               <td className="tabular whitespace-nowrap px-3 py-2 align-top">
                 <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
                 {detalhada && v.wo_numero && (
@@ -195,7 +225,7 @@ export function TabelaContratos({
               </td>
 
               <td className="px-3 py-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Pill situacao={v.situacao} />
                   {v.bloqueado_em && (
                     <span title="Tocada pelo campo — o TOA não sobrescreve mais"
@@ -206,6 +236,26 @@ export function TabelaContratos({
                           className="text-[10px] text-amber-400">▲</span>
                   )}
                 </div>
+                {/* TEC1: sobe junto com a baixa do TOA. Sem etiqueta = a
+                    regra não se aplica àquela atividade (D-099). */}
+                {v.tec1 === 'PADRAO' && (
+                  <span title="Encerrou dentro da janela, ou na carência depois de executar"
+                    className="mt-1 inline-block rounded bg-emerald-900/40 px-1.5 py-0.5
+                               text-[9px] font-semibold uppercase tracking-wide
+                               text-emerald-300">TEC1 · padrão</span>
+                )}
+                {v.tec1 === 'SEM_PADRAO' && (
+                  <span title="Passou da janela e da carência"
+                    className="mt-1 inline-block rounded bg-af-900/40 px-1.5 py-0.5
+                               text-[9px] font-semibold uppercase tracking-wide
+                               text-af-300">TEC1 · sem padrão</span>
+                )}
+                {v.tec1 === 'EXPURGADA' && (
+                  <span title="Fora do cálculo: janela Imediata ou cancelamento no NETSMS"
+                    className="mt-1 inline-block rounded bg-graf-800 px-1.5 py-0.5
+                               text-[9px] font-semibold uppercase tracking-wide
+                               text-graf-400">TEC1 · expurgada</span>
+                )}
               </td>
 
               <td className="whitespace-nowrap px-3 py-2 text-xs">

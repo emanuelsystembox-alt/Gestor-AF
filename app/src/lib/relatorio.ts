@@ -83,6 +83,8 @@ export interface VisitaLinha {
   janela_fim: string | null
   situacao: Situacao
   situacao_em: string | null
+  /** Aderencia a janela pela regra TEC1 (D-099). */
+  tec1: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
   inicio: string | null
   fim: string | null
   tempo_deslocamento: string | null
@@ -140,7 +142,7 @@ export const SELECT_RELATORIO = `
   cliente_nome, tipo_pessoa, tipo_residencia, telefones,
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim,
-  situacao, situacao_em, inicio, fim, tempo_deslocamento,
+  situacao, situacao_em, inicio, fim, tempo_deslocamento, tec1,
   observacao, bloqueado_em, criado_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
@@ -216,6 +218,20 @@ function aderencia(v: VisitaLinha): string {
   return 'DENTRO'
 }
 
+/**
+ * TEC1 no relatorio, escrito como a operacao fala: "TEC1 - PADRAO".
+ *
+ * Vazio nao e falha: quer dizer que a regra NAO SE APLICA -- atividade
+ * que nao esta Concluida nem Nao Concluida no TOA, sem janela, ou
+ * manutencao que passou da janela sem executar. Ver D-099.
+ */
+export function rotuloTec1(t: string | null | undefined): string {
+  if (t === 'PADRAO') return 'TEC1 - PADRÃO'
+  if (t === 'SEM_PADRAO') return 'TEC1 - SEM PADRÃO'
+  if (t === 'EXPURGADA') return 'TEC1 - EXPURGADA'
+  return ''
+}
+
 const endereco = (v: VisitaLinha) =>
   [v.logradouro, v.complemento].filter(Boolean).join(', ')
 
@@ -241,7 +257,7 @@ const CAB_VISITA = [
   'Cliente', 'Tipo de pessoa', 'Tipo de residência', 'Telefones',
   'Endereço', 'Bairro', 'CEP', 'Cidade', 'UF', 'Lat', 'Lng',
   'Início', 'Fim', 'Tempo de conclusão', 'Tempo de deslocamento',
-  'Aderência à janela',
+  'Aderência à janela', 'TEC1',
   'Observação',
   'Equipamento instalado', 'Equipamento retirado',
   'Serviço anterior — data', 'Serviço anterior — dias',
@@ -282,7 +298,7 @@ function linhaVisita(v: VisitaLinha): string[] {
     v.lat == null ? '' : String(v.lat), v.lng == null ? '' : String(v.lng),
     dt(v.inicio), dt(v.fim), duracao(v.inicio, v.fim),
     v.tempo_deslocamento ?? '',
-    aderencia(v),
+    aderencia(v), rotuloTec1(v.tec1),
     v.observacao ?? '',
     eq(inst), eq(retr),
     r?.anterior ? dia(r.anterior.data_agendada) : '',
