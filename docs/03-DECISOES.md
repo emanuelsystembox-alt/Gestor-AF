@@ -1686,3 +1686,86 @@ Quem abre Equipes vem ver o dia das equipes que **existem**. A fila de
 cadastro é trabalho de fundo: precisa aparecer — e continua aparecendo
 inteira, com o contador na linha do abrigo —, mas não empurra o painel
 para fora da primeira tela.
+
+### D-097 · O código de baixa decide a situação — o status, não
+> *"Analise os 2 meses do analítico do concorrente: quais códigos devem
+> ir para cancelado, concluído ou reagendado. (…) Quando o técnico
+> finaliza no TOA, com status concluído ou não concluído, o contrato foi
+> baixado de fato — aí o sistema deve baixar automático, ou ter um
+> controle para habilitar e desativar."* — Emanuel, 08/09
+
+Cruzamento de **67.485 linhas** (meses 06 e 07/2026), `Código De Baixa`
+× `Situação`:
+
+| Situação | Linhas |
+|---|---|
+| Concluido | 41.952 |
+| Reagendamento | 11.779 |
+| Cancelado | 9.829 |
+| Entrada / execução / deslocamento / pendente | 3.925 |
+
+**203 dos 206 códigos são determinísticos** — cada um cai sempre na
+mesma situação, em 57.281 das 63.560 linhas com resultado final. Não é
+tendência, é regra:
+
+```
+409 · Instalacao Efetuada ....... CONCLUIDA      21.222×  100%
+106 · Cliente Ausente ........... REAGENDAMENTO   3.550×  100%
+301 · Tipo de OS Incorreta ...... CANCELADA         882×  100%
+```
+
+Os 3 que não são puros entram com a **pureza medida**, em vez de virarem
+regra silenciosa: `800 · Desatribuido` (90,2% cancelado) e `217 ·
+BACKBONE GPON` (85,6% reagendado); o terceiro é linha sem código.
+
+> ⚠ **O status da operadora NÃO decide a situação.** Foi a primeira
+> hipótese que testei, porque era o caminho óbvio — e o dado desmentiu:
+>
+> ```
+> EXECUTADA     → Concluído 33.688 · Reagendamento 1.075 · Cancelado 657
+> NÃO EXECUTADA → Reagendamento 6.597 · Cancelado 2.090 · Concluído 502
+> ```
+>
+> O status diz que **houve baixa**; o código diz **o que ela significa**.
+> Confundir os dois mandaria 1.732 contratos EXECUTADA para "concluída"
+> sendo que foram reagendados ou cancelados.
+
+Por isso as duas coisas são separadas no banco:
+`codigo_baixa.situacao_destino` (o significado) e o parâmetro
+`baixa_automatica` (se agimos sozinhos quando a baixa chega).
+
+**A baixa automática nasce desligada**, e ligá-la é ato de ADMIN, na
+tela — não da migration. Quando ligada, na importação:
+
+- só age se **todas** as O.S. da visita têm código com destino — meia
+  baixa não é baixa;
+- o resultado é o da O.S. **mais grave**: cancelada > reagendada >
+  concluída, senão o cancelamento sumiria do painel;
+- **não sobrescreve contrato tocado pelo campo** (`bloqueado_em`);
+- deixa **evento** — situação que muda sozinha sem registro é a que
+  ninguém consegue explicar depois.
+
+Hoje, ligada, ela mudaria **104 das 935 visitas**. O número aparece
+antes de ligar, não depois.
+
+O painel fica em **Configurações → Baixa e situação**, e distingue o que
+veio de `análise` do que alguém declarou (`cadastro`) — pela mesma razão
+do D-089: dedução minha, ainda que de 67 mil linhas, não é declaração de
+quem opera. O que o usuário muda vira cadastro e não é mais tocado.
+
+**23 dos 168 códigos ficaram sem destino** — nenhum deles aparece em
+O.S. do banco hoje. A tela lista e avisa: visita com código sem destino
+não é baixada sozinha.
+
+### D-098 · O menu recolhe, e lembra disso
+> *"Menu precisa ser retrátil, por favor."* — Emanuel, 08/09
+
+A lateral fixa come 224px. Em tela de 1366 isso é a diferença entre ver
+a coluna "Ordens de serviço" inteira ou não.
+
+Recolhido, o menu **não some**: vira uma faixa de 56px com as iniciais e
+o nome no `title`. Sumir de vez tiraria a navegação da tela — a ideia é
+ganhar espaço, não se perder. A preferência fica no navegador, como a do
+tema (D-084): preferência que volta ao normal a cada F5 não é
+preferência. No celular nada muda — lá a navegação é a barra inferior, e
+não há lateral para recolher.

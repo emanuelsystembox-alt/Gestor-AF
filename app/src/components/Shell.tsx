@@ -1,10 +1,32 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTema } from '../lib/tema'
 import { Marca } from './ui'
 
 interface Item { para: string; rotulo: string; contagem?: number; futuro?: boolean }
+
+/**
+ * Menu recolhido: a preferencia fica no navegador, como a do tema.
+ *
+ * Quem trabalha em tela de 1366 quer os 224px da lateral de volta para
+ * a tabela; quem tem monitor grande quer o menu escrito. E preferencia,
+ * e preferencia que volta ao normal a cada F5 nao e preferencia.
+ *
+ * Recolhido, a lateral NAO some: vira uma faixa de iniciais. Sumir de
+ * vez tiraria a navegacao da tela -- a ideia e ganhar espaco, nao se
+ * perder.
+ */
+const CHAVE_MENU = 'afline:menu-recolhido'
+
+function lerRecolhido(): boolean {
+  try { return localStorage.getItem(CHAVE_MENU) === '1' } catch { return false }
+}
+
+/** A inicial que representa o item quando so cabe um caractere. */
+function sigla(rotulo: string): string {
+  return rotulo.trim().charAt(0).toUpperCase()
+}
 
 const OPERACAO: Item[] = [
   { para: '/controle', rotulo: 'Dashboard' },
@@ -26,33 +48,46 @@ const FUTURO: Item[] = [
   { para: '/frota', rotulo: 'Frota', futuro: true },
 ]
 
-function Grupo({ titulo, itens }: { titulo: string; itens: Item[] }) {
+function Grupo({ titulo, itens, recolhido }: {
+  titulo: string; itens: Item[]; recolhido?: boolean
+}) {
   const local = useLocation()
   return (
-    <div className="mb-5">
-      <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-graf-600">
-        {titulo}
-      </p>
+    <div className={recolhido ? 'mb-3' : 'mb-5'}>
+      {recolhido ? (
+        // Um traco no lugar do titulo: o agrupamento continua legivel
+        // sem a palavra, que nao caberia em 3rem.
+        <div className="mx-3 mb-1.5 border-t border-graf-800" />
+      ) : (
+        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-graf-600">
+          {titulo}
+        </p>
+      )}
       <nav className="space-y-0.5">
         {itens.map(i => {
           const ativo = local.pathname === i.para
           if (i.futuro) return (
             <span key={i.para}
-              className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5
-                         text-sm text-graf-600"
-              title="Ainda não construído — Fase 2">
-              {i.rotulo}
-              <span className="ml-auto rounded bg-graf-800 px-1.5 py-0.5 text-[9px]
-                               font-semibold uppercase text-graf-500">em breve</span>
+              className={`flex cursor-not-allowed items-center gap-2 rounded-md py-1.5
+                          text-sm text-graf-600 ${recolhido ? 'justify-center px-0' : 'px-3'}`}
+              title={recolhido ? `${i.rotulo} — ainda não construído` : 'Ainda não construído — Fase 2'}>
+              {recolhido ? sigla(i.rotulo) : i.rotulo}
+              {!recolhido && (
+                <span className="ml-auto rounded bg-graf-800 px-1.5 py-0.5 text-[9px]
+                                 font-semibold uppercase text-graf-500">em breve</span>
+              )}
             </span>
           )
           return (
-            <NavLink key={i.para} to={i.para}
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition ${
+            // Recolhido, o `title` e a unica pista do que e o item --
+            // sem ele a faixa de iniciais vira adivinhacao.
+            <NavLink key={i.para} to={i.para} title={recolhido ? i.rotulo : undefined}
+              className={`flex items-center gap-2 rounded-md py-1.5 text-sm transition ${
+                recolhido ? 'justify-center px-0' : 'px-3'} ${
                 ativo ? 'bg-af-600/15 font-medium text-af-300 ring-1 ring-af-600/30'
                       : 'text-graf-300 hover:bg-graf-800'}`}>
-              {i.rotulo}
-              {i.contagem !== undefined && (
+              {recolhido ? sigla(i.rotulo) : i.rotulo}
+              {!recolhido && i.contagem !== undefined && (
                 <span className="tabular ml-auto rounded bg-graf-800 px-1.5 text-[11px]">
                   {i.contagem}
                 </span>
@@ -68,18 +103,27 @@ function Grupo({ titulo, itens }: { titulo: string; itens: Item[] }) {
 export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactNode }) {
   const { perfil, papeis, sair } = useAuth()
   const [tema, setTema] = useTema()
+  const [recolhido, setRecolhido] = useState(lerRecolhido)
+
+  useEffect(() => {
+    try { localStorage.setItem(CHAVE_MENU, recolhido ? '1' : '0') } catch { /* sem storage */ }
+  }, [recolhido])
 
   return (
     <div className="sup-controle flex min-h-screen">
       {/* ---------- lateral ---------- */}
-      <aside className="hidden w-56 shrink-0 border-r border-graf-800 bg-graf-900 lg:block">
+      <aside className={`hidden shrink-0 border-r border-graf-800 bg-graf-900
+                         transition-[width] duration-150 lg:block
+                         ${recolhido ? 'w-14' : 'w-56'}`}>
         <div className="sticky top-0">
-          <div className="px-4 py-4"><Marca /></div>
+          <div className={`flex items-center py-4 ${recolhido ? 'justify-center px-0' : 'px-4'}`}>
+            <Marca compacto={recolhido} />
+          </div>
           <div className="px-2">
-            <Grupo titulo="Operação" itens={OPERACAO} />
-            <Grupo titulo="Entrada de dados" itens={ENTRADA} />
-            <Grupo titulo="Ajustes" itens={AJUSTES} />
-            <Grupo titulo="Próximas fases" itens={FUTURO} />
+            <Grupo titulo="Operação" itens={OPERACAO} recolhido={recolhido} />
+            <Grupo titulo="Entrada de dados" itens={ENTRADA} recolhido={recolhido} />
+            <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={recolhido} />
+            <Grupo titulo="Próximas fases" itens={FUTURO} recolhido={recolhido} />
           </div>
         </div>
       </aside>
@@ -88,6 +132,16 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
         {/* ---------- topo ---------- */}
         <header className="sticky top-0 z-30 border-b border-graf-800 bg-graf-950/95 backdrop-blur">
           <div className="flex items-center gap-3 px-4 py-2.5">
+            {/* So no desktop: no celular a navegacao e a barra de baixo,
+                e nao ha lateral para recolher. */}
+            <button onClick={() => setRecolhido(r => !r)}
+              title={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
+              aria-label={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
+              className="hidden rounded-md border border-graf-700 px-2 py-1 text-xs
+                         leading-none text-graf-400 hover:border-af-600
+                         hover:text-af-400 lg:block">
+              {recolhido ? '»' : '«'}
+            </button>
             <div className="lg:hidden"><Marca compacto /></div>
             <span className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1
                              text-xs font-medium text-graf-300">

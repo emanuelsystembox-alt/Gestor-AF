@@ -136,6 +136,9 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 043 | **Cadastro sem autor não roteia**; técnico se desliga, não se apaga |
 | 044 | O nome do técnico vem do TOA (coluna `Recurso`), não do palpite |
 | 045 | Skill do técnico: ADESÃO, MANUTENÇÃO, DESCONEXÃO — e a comissão por skill |
+| 046 | **O código de baixa decide a situação** (67.485 linhas analisadas) + `parametro` |
+| 046b | Baixa automática no importador |
+| 046c | `codigo_baixa` é catálogo global — correção do filtro por empresa |
 
 ---
 
@@ -158,7 +161,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 96 decisões
+## As 98 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

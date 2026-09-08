@@ -143,6 +143,12 @@ o técnico acha `meta_tecnico` e `faixa_comissao`. Gravar uma skill que
 não tem faixa zera o "a receber" em silêncio. `SINGLE MASTER` foi
 default nosso (037), não veio do TOA. Ver D-094.
 
+**O status da operadora NÃO diz a situação; o CÓDIGO diz.** No analítico
+do ngestor, `EXECUTADA` virou Reagendamento 1.075 vezes e Cancelado 657.
+`codigo_baixa.situacao_destino` guarda o significado (derivado de 67.485
+linhas); o parâmetro `baixa_automatica` decide se agimos sozinhos. Ver
+D-097.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
@@ -192,7 +198,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 38 migrations, as 96 decisões, o que já corrigimos do
+> reais do banco, as 41 migrations, as 98 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -228,7 +234,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 96 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 98 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |
