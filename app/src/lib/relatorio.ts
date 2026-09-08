@@ -235,7 +235,9 @@ export function rotuloTec1(t: string | null | undefined): string {
   return ''
 }
 
-/** Os pendentes numa celula so, agrupados: "NETFLIX x3 | COMODATO". */
+/** Um por O.S.: o primeiro pendente do Ponto de cada uma (D-107).
+ *  Quando duas O.S. pedem o mesmo produto, some o "x2" -- sao duas
+ *  O.S. de verdade, e a repeticao aqui e informacao. */
 export function produtosPendentes(lista: string[] | null | undefined): string {
   if (!lista?.length) return ''
   const m = new Map<string, number>()

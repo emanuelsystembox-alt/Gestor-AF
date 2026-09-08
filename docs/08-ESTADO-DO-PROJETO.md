@@ -145,6 +145,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 050 | **O status do TOA não conclui**; `finalizado_toa`; baixa automática ligada |
 | 051 | Atividade **suspensa** não entra na importação |
 | 052 | **Produto pendente** lido da coluna `Produto` do TOA |
+| 053 | O produto é **da O.S., pelo Ponto** — corrige o 052 |
 
 ---
 
@@ -167,7 +168,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 106 decisões
+## As 107 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

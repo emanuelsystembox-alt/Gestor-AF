@@ -161,8 +161,9 @@ D-103.
 
 **A coluna `Produto` do TOA vem com os itens COLADOS**, sem separador:
 `id|NOME|pendente` seguido direto do próximo id. Lê-se com
-`(\d+)\|([^|]+?)\|([a-z]+)`. E o id do item **não** é o número da
-O.S. — o produto amarra no contrato. Ver D-106.
+`(\d+)\|([^|]+?)\|([a-z]+)`. O id do item é o **Ponto**, que casa com
+`ordem_servico.ponto` (1.127 de 1.128) — e NÃO com o número da O.S.
+Ver D-107.
 
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
@@ -213,7 +214,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 48 migrations, as 106 decisões, o que já corrigimos do
+> reais do banco, as 49 migrations, as 107 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -249,7 +250,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 106 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 107 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

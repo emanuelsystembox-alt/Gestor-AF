@@ -2042,3 +2042,37 @@ tamanho do serviço.
 
 Aparece nas duas telas (é o mesmo componente, D-095) e vira coluna
 **Produtos pendentes** no relatório exportado.
+
+
+### D-107 · O produto é da O.S. — pelo Ponto. CORRIGE o D-106
+> *"Ele trouxe mais produto do que devia. Quero que traga somente o
+> primeiro pendente que aparece da O.S. selecionada; se tiver mais
+> pendentes, não vamos trazer da mesma O.S."* — Emanuel, 08/09
+
+**Eu errei no D-106.** Escrevi lá que o produto não amarrava na O.S.
+porque comparei o id do item com o **número** da O.S., não bateu em
+nenhuma das 240 linhas, e conclui que o vínculo não existia.
+
+O vínculo existia. A tela "Produtos" do TOA chama aquela coluna de
+**Ponto** — e a planilha traz `Ponto 1..10` bem ao lado de `Número da
+O.S 1..10`. Eu tinha a coluna certa em mãos e comparei com a errada; a
+captura de tela que o Emanuel mandou trazia o cabeçalho escrito.
+
+Conferido contra a tela do TOA, contrato 225826503:
+
+| O.S. | Ponto | Pendentes daquele ponto |
+|---|---|---|
+| 2607853470 | 34668915 | ACESSO VIRTUA |
+| 2607853481 | 34668916 | BL 500M SINGLE…, COMODATO, ACESSO GRATIS |
+
+Cobertura: das **1.128 O.S. com ponto, 1.127 casam** com produto.
+
+Cada O.S. passa a mostrar **o primeiro pendente do ponto dela** — o que
+vai ser feito ali. Os outros continuam em `visita_produto`, para quem
+precisar do detalhe; o que a lista precisa é do primeiro. O maior
+contrato saiu de **33 etiquetas para 7**, e as 7 dizem alguma coisa.
+
+> A lição, que já é a terceira do mesmo tipo: **não concluir que um
+> vínculo não existe sem olhar todas as colunas que poderiam carregá-lo.**
+> "Comparei com o número da O.S. e não bateu" respondia uma pergunta
+> menor do que a que eu tinha feito.

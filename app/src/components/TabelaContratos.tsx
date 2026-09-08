@@ -36,7 +36,7 @@ export const SELECT_CONTRATO = `
   equipe:equipe_id ( codigo, nome, supervisor_nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula ),
   ordem_servico (
-    id, sequencia, numero_os, status_operadora,
+    id, sequencia, numero_os, status_operadora, ponto, produto_pendente,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao, natureza, responsabilidade ),
@@ -48,6 +48,10 @@ export const SELECT_CONTRATO = `
 
 /** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
 export type OSDupla = Visita['ordem_servico'][number] & {
+  /** O que ainda falta fazer NESTA O.S. -- o primeiro pendente do Ponto
+   *  dela (D-107). Os demais ficam em `visita_produto`. */
+  produto_pendente: string | null
+  ponto: string | null
   baixa_afline: { codigo: number; descricao: string
                   natureza: string | null; responsabilidade: string | null } | null
   sub_falha: { nome: string; categoria: string | null } | null
@@ -60,9 +64,8 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
   /** Aderencia a janela (D-099). Nulo = a regra nao se aplica. */
   tec1?: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
-  /** O que ainda vai ser feito no cliente: os produtos com situacao
-   *  "pendente" no analitico do TOA (D-106). Vem com repeticao -- o
-   *  mesmo produto em varios itens da assinatura --, e a tela agrupa. */
+  /** Um por O.S.: o primeiro pendente do Ponto de cada uma (D-107).
+   *  Serve para a visao compacta, onde as O.S. nao aparecem. */
   produtos_pendentes?: string[] | null
   /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
@@ -349,6 +352,16 @@ export function TabelaContratos({
                         ) : (
                           <span className="text-graf-600">sem baixa do TOA</span>
                         )}
+                        {/* O que vai ser feito NESTA O.S. — o primeiro
+                            pendente do Ponto dela (D-107). */}
+                        {o.produto_pendente && (
+                          <span title="Produto pendente desta O.S. (pelo Ponto)"
+                            className="rounded bg-amber-900/30 px-1.5 py-0.5 text-amber-200
+                                       ring-1 ring-amber-700/40">
+                            <span className="mr-1 opacity-70">Pendente</span>
+                            {o.produto_pendente}
+                          </span>
+                        )}
                         {/* Baixa da AFLINE — a nossa, com sub-falha */}
                         {o.baixa_afline && (
                           <span title="Baixa da AFLINE"
@@ -367,30 +380,6 @@ export function TabelaContratos({
                     ))}
                   </div>
                 )}
-
-                {/* O que ainda falta fazer no cliente. Fica junto das
-                    O.S. porque e a mesma pergunta: o que este contrato
-                    ainda deve? (D-106) */}
-                {detalhada && (() => {
-                  const ps = agrupaProdutos(v.produtos_pendentes)
-                  if (!ps.length) return null
-                  return (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <span className="text-[9px] font-semibold uppercase tracking-wide
-                                       text-amber-400/80">pendente</span>
-                      {ps.map(p => (
-                        <span key={p.nome}
-                          className="rounded bg-amber-900/30 px-1.5 py-0.5 text-[10px]
-                                     text-amber-200 ring-1 ring-amber-700/40">
-                          {p.nome}
-                          {p.qtd > 1 && (
-                            <span className="ml-1 font-semibold opacity-80">×{p.qtd}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                })()}
 
                 {/* Marcadores — os indicadores de qualidade apontados. */}
                 {detalhada && marcados.length > 0 && (
