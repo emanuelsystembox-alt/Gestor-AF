@@ -248,7 +248,7 @@ export function TabelaContratos({
                 )}
               </td>
 
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 align-top">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Pill situacao={v.situacao} />
                   {v.bloqueado_em && (
@@ -282,7 +282,7 @@ export function TabelaContratos({
                 )}
               </td>
 
-              <td className="whitespace-nowrap px-3 py-2 text-xs">
+              <td className="whitespace-nowrap px-3 py-2 align-top text-xs">
                 {v.tipo_servico?.nome ?? <span className="text-graf-600">—</span>}
                 <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
                   ? 'italic text-graf-600' : 'text-graf-500'}`}>
@@ -323,7 +323,7 @@ export function TabelaContratos({
               )}
 
               {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}
-              <td className={`px-3 py-2 align-top ${detalhada ? '' : 'tabular text-center'}`}>
+              <td className={`px-3 py-2 align-top ${detalhada ? 'min-w-[20rem]' : 'tabular text-center'}`}>
                 {!detalhada ? (
                   v.ordem_servico.length > 0
                     ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
@@ -332,50 +332,75 @@ export function TabelaContratos({
                 ) : v.ordem_servico.length === 0 ? (
                   <span className="text-[11px] text-graf-600">—</span>
                 ) : (
-                  <div className="space-y-0.5">
+                  /*
+                   * Cada O.S. em DUAS LINHAS, com hierarquia (D-108):
+                   *
+                   *   2607386471  12 · MUDANCA DE ENDERECO      ACESSO VIRTUA
+                   *   └ 409 · INSTALAÇÃO EFETUADA
+                   *
+                   * Linha 1 é a identidade — número, tipo e o que falta
+                   * fazer, que é o que o COP procura primeiro. Linha 2 é
+                   * o resultado, recuado, porque só interessa depois de
+                   * saber de qual O.S. se fala. Tudo em fila única, como
+                   * estava, obrigava a ler etiqueta por etiqueta para
+                   * achar onde uma O.S. terminava e a outra começava.
+                   */
+                  <div className="space-y-1.5">
                     {[...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia).map(o => (
-                      <div key={o.id} className="flex flex-wrap items-center gap-x-2 text-[11px]">
-                        <span className="tabular font-medium text-graf-200">
-                          {o.numero_os ?? '—'}
-                        </span>
-                        <span className="text-graf-400">
-                          {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
-                        </span>
-                        {/* Baixa da OPERADORA — vem do TOA */}
-                        {o.codigo_baixa ? (
-                          <span title="Baixa da operadora (TOA)"
-                            className={`rounded px-1.5 py-0.5 font-medium
-                                        ${corBaixa(o.codigo_baixa.natureza)}`}>
-                            <span className="mr-1 opacity-70">Baixa TOA</span>
-                            {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
+                      <div key={o.id}
+                        className="border-l-2 border-graf-700/70 pl-2 text-[11px]">
+                        {/* ---- linha 1: que O.S. é, e o que falta ---- */}
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="tabular font-semibold text-graf-200">
+                            {o.numero_os ?? '—'}
                           </span>
-                        ) : (
-                          <span className="text-graf-600">sem baixa do TOA</span>
-                        )}
-                        {/* O que vai ser feito NESTA O.S. — o primeiro
-                            pendente do Ponto dela (D-107). */}
-                        {o.produto_pendente && (
-                          <span title="Produto pendente desta O.S. (pelo Ponto)"
-                            className="rounded bg-amber-900/30 px-1.5 py-0.5 text-amber-200
-                                       ring-1 ring-amber-700/40">
-                            <span className="mr-1 opacity-70">Pendente</span>
-                            {o.produto_pendente}
+                          <span className="min-w-0 flex-1 text-graf-400">
+                            {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
                           </span>
-                        )}
-                        {/* Baixa da AFLINE — a nossa, com sub-falha */}
-                        {o.baixa_afline && (
-                          <span title="Baixa da AFLINE"
-                            className={`rounded px-1.5 py-0.5 font-medium ring-1
-                                        ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
-                            <span className="mr-1 opacity-70">Baixa ngestor</span>
-                            {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
-                            {o.sub_falha && (
-                              <span className="ml-1 font-normal opacity-80">
-                                › {o.sub_falha.nome}
-                              </span>
-                            )}
-                          </span>
-                        )}
+                          {/* O produto pendente anda junto da O.S. — é o
+                              que vai ser feito ali (D-107). */}
+                          {o.produto_pendente && (
+                            <span title="Produto pendente desta O.S. (pelo Ponto)"
+                              className="rounded bg-amber-900/25 px-1.5 py-0.5
+                                         font-medium text-amber-200 ring-1 ring-amber-700/30">
+                              {o.produto_pendente}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* ---- linha 2: o resultado ---- */}
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          {/* Baixa da OPERADORA — vem do TOA */}
+                          {o.codigo_baixa ? (
+                            <span title="Baixa da operadora (TOA)"
+                              className={`rounded px-1.5 py-0.5 font-medium
+                                          ${corBaixa(o.codigo_baixa.natureza)}`}>
+                              {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
+                            </span>
+                          ) : (
+                            <span className="text-graf-600">sem baixa do TOA</span>
+                          )}
+                          {/* Baixa da AFLINE — a nossa, com sub-falha */}
+                          {o.baixa_afline && (
+                            <span title="Baixa da AFLINE (ngestor)"
+                              className={`rounded px-1.5 py-0.5 font-medium ring-1
+                                          ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
+                              <span className="mr-1 opacity-70">AFLINE</span>
+                              {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
+                              {o.sub_falha && (
+                                <span className="ml-1 font-normal opacity-80">
+                                  › {o.sub_falha.nome}
+                                </span>
+                              )}
+                            </span>
+                          )}
+                          {o.status_operadora === 'NAO_EXECUTADA' && (
+                            <span title="O TOA marcou esta O.S. como não executada"
+                              className="text-[10px] uppercase tracking-wide text-graf-500">
+                              não executada
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

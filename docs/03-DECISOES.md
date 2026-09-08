@@ -2076,3 +2076,35 @@ contrato saiu de **33 etiquetas para 7**, e as 7 dizem alguma coisa.
 > vínculo não existe sem olhar todas as colunas que poderiam carregá-lo.**
 > "Comparei com o número da O.S. e não bateu" respondia uma pergunta
 > menor do que a que eu tinha feito.
+
+
+### D-108 · A linha da O.S. em dois andares
+> *"Precisa organizar melhor a visualização das informações em cada
+> linha. Pra mim o produto fica ao lado da O.S. e o código mais abaixo."*
+> — Emanuel, 08/09
+
+A célula de O.S. tinha virado uma fila corrida: número, tipo, baixa TOA,
+produto e baixa AFLINE, tudo lado a lado, quebrando onde a largura
+mandasse. Com cinco O.S. no mesmo contrato ninguém achava onde uma
+terminava e a outra começava.
+
+Agora cada O.S. é um bloco de **dois andares**, com barra à esquerda:
+
+
+
+- **Andar de cima — identidade e pendência.** Número, tipo e o produto
+  que falta fazer, à direita. É o que se procura primeiro: qual O.S. é
+  esta e o que ela pede.
+- **Andar de baixo — resultado.** As baixas, recuadas. Só interessam
+  depois de saber de qual O.S. se fala.
+
+Três detalhes que vieram junto:
+
+- O rótulo "Baixa TOA" saiu da etiqueta. Numa coluna chamada "Ordens de
+  serviço", onde a baixa está sempre no mesmo lugar, repetir a palavra
+  em toda linha era ruído. A da AFLINE mantém o rótulo, porque é a
+  exceção e precisa se distinguir.
+- **Situação e Grupo passaram a alinhar no topo.** Numa linha com cinco
+  O.S. eles flutuavam no meio da célula, desalinhados de tudo.
+- O.S. marcada como não executada pelo TOA ganhou etiqueta discreta —
+  antes só dava para saber abrindo o contrato.
