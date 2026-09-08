@@ -103,6 +103,7 @@ conta a história.
 | 040 | Vínculo supervisor ↔ equipes e a etiqueta de origem do login | ✓ |
 | 041 | **Login TOA no cadastro de acesso** — liga o login ao técnico (`tecnico.usuario_id`) | ✓ |
 | 042 | **Só o cadastro roteia** — revoga o critério 3; equipe "Sem login definido"; tela para declarar | ✓ |
+| 043 | **Sem autor não é cadastro** — `equipe_do_login` exige `criado_por`; desfaz os 9 seeds; DELETE de técnico/equipe só ADMIN e barrado por histórico; `mudar_situacao_tecnico` | ✓ |
 
 ---
 

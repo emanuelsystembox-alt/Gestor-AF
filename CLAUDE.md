@@ -108,11 +108,20 @@ e roteava jornada para uma equipe qualquer, em silêncio. Ver D-070.
 E CTE com função de conjunto referenciada uma vez é *inline*: use
 `as materialized`. Ver D-081.
 
-**Só o cadastro roteia contrato para equipe.** O sistema pode SUGERIR,
-e deve mostrar que sugeriu; o que ele não pode é declarar no lugar de
-quem opera — nem gravando cadastro que ninguém digitou (D-079), nem
-roteando por dedução calada (D-088). Login sem cadastro vai para a
-equipe **"Sem login definido"**, visível, até alguém dizer de quem é.
+**Só o cadastro roteia contrato para equipe, e cadastro sem AUTOR não é
+cadastro.** O sistema não declara no lugar de quem opera — nem gravando
+cadastro que ninguém digitou (D-079), nem roteando por dedução calada
+(D-088), nem sugerindo o que o usuário só teria de clicar (D-089).
+Login sem cadastro vai para a equipe **"Sem login definido"**, visível,
+até alguém dizer de quem é. `equipe_do_login` lê **só**
+`equipe_login_toa` com `criado_por is not null`: "estava lá antes" não
+é prova de nada — a 039 preservou 9 seeds de migration achando que eram
+declaração, e eles rotearam 121 contratos.
+
+**Técnico se desliga, não se apaga.** DELETE em `tecnico`/`equipe` é só
+para ADMIN (policy), e trigger recusa quem tem histórico — inclusive
+para o ADMIN. A tela só oferece Desligar/Reativar, via
+`mudar_situacao_tecnico`. Ver D-090.
 
 **`toISOString()` devolve a data em UTC.** Em Manaus (UTC−4) o dia vira
 às 20h e a tela abre no dia seguinte, vazia. Use `isoLocal()` de
@@ -168,11 +177,11 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 34 migrations, as 87 decisões, o que já corrigimos do
+> reais do banco, as 36 migrations, as 89 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **40 tabelas, 81 funções, 76 policies, zero tabela sem RLS**,
+Resumo: **40 tabelas, 84 funções, 80 policies, zero tabela sem RLS**,
 zero função `SECURITY DEFINER` alcançável pelo `anon`. 617 visitas,
 736 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
 1.466 sub-falhas, 1.021 regras de pontuação. **Doze telas no ar.**
@@ -203,7 +212,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 87 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 89 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

@@ -36,7 +36,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**40 tabelas · 2 views · 81 funções · 76 policies · zero tabela sem RLS ·
+**40 tabelas · 2 views · 84 funções · 80 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
@@ -133,6 +133,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 040 | Vínculo supervisor ↔ equipes; origem do login na tela |
 | 041 | Login TOA no cadastro de acesso |
 | 042 | **Só o cadastro roteia**; equipe "Sem login definido" |
+| 043 | **Cadastro sem autor não roteia**; técnico se desliga, não se apaga |
 
 ---
 
@@ -155,7 +156,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 87 decisões
+## As 89 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { isoLocal } from '../lib/formato'
+import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Pill, Vazio } from '../components/ui'
 
@@ -85,12 +86,12 @@ interface LoginEquipe {
   visitas: number
 }
 /** Login que aparece no TOA e ninguém disse de quem é. Enquanto não
- *  disser, o contrato dele fica na equipe "Sem login definido". */
+ *  disser, o contrato dele fica na equipe "Sem login definido".
+ *
+ *  Sem sugestão de nome nem de equipe (D-089): deduzir pela matrícula
+ *  acerta quase sempre, e é por isso que ninguém confere. */
 interface LoginSemDono {
   login: string; visitas: number; primeira: string; ultima: string
-  tecnico_nome: string | null
-  equipe_sugerida_id: string | null
-  equipe_sugerida: string | null
 }
 interface Orfao {
   matricula: string; visitas: number
@@ -117,6 +118,11 @@ const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
 export default function Equipes() {
+  const { pode, temPapel } = useAuth()
+  // Quem edita equipe desliga o técnico. Apagar não está aqui para
+  // ninguém: o que ele executou fica gravado (D-090).
+  const podeEditar = temPapel('ADMIN') || pode('equipes.editar')
+
   const [aba, setAba] = useState<'equipes' | 'tecnicos'>('equipes')
   // Vazia até sabermos qual é o último dia com visita. Iniciar em "hoje"
   // e corrigir depois dispara DOIS carregamentos concorrentes, e o mais
@@ -299,6 +305,27 @@ export default function Equipes() {
     setOcupado(false)
   }
 
+  /** Técnico desligado não sai do sistema — some da operação e continua
+   *  respondendo pelo que executou. Por isso a única ação aqui é mudar a
+   *  situação; apagar nem aparece, e o banco recusa quem tem histórico. */
+  async function mudarSituacao(t: Tec, para: 'ATIVO' | 'DESLIGADO') {
+    const desligando = para === 'DESLIGADO'
+    if (desligando && !confirm(
+      `Desligar ${t.nome} (${t.matricula})?\n\n`
+      + 'Ele sai da operação e para de aparecer como ativo. '
+      + 'Tudo o que já executou continua gravado no histórico da equipe.')) return
+    setOcupado(true); setErro(null); setOk(null)
+    const { data: d, error } = await supabase.rpc('mudar_situacao_tecnico',
+      { p_tecnico: t.id, p_situacao: para })
+    if (error) setErro(error.message)
+    else {
+      const r = d as { matricula: string; nome: string }
+      setOk(`${r.nome} (${r.matricula}) ${desligando ? 'desligado' : 'reativado'}.`)
+      await recarregar()
+    }
+    setOcupado(false)
+  }
+
   const areas = useMemo(() =>
     [...new Set(painel.map(e => e.area).filter(Boolean) as string[])].sort(), [painel])
   const supervisores = useMemo(() =>
@@ -397,28 +424,18 @@ export default function Equipes() {
             <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
               Os contratos desses logins estão em{' '}
               <strong>Sem login definido</strong> e ficam fora da produtividade até
-              alguém dizer de quem é cada um. O nome do técnico ao lado é
-              <strong> sugestão</strong> da planilha de equipes — quem decide a equipe
-              é você.
+              alguém dizer de quem é cada um.
             </p>
 
             <div className="mt-3 space-y-1.5">
               {semDono.map(l => {
-                const escolhida = equipeDoLogin[l.login] ?? l.equipe_sugerida_id ?? ''
+                const escolhida = equipeDoLogin[l.login] ?? ''
                 return (
                   <div key={l.login}
                     className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                       <span className="tabular font-semibold">{l.login}</span>
                       <span className="text-graf-400">{l.visitas} visitas</span>
-                      {l.tecnico_nome && (
-                        <span className="text-xs text-graf-400">
-                          {l.tecnico_nome}
-                          {l.equipe_sugerida && (
-                            <span className="text-graf-500"> · sugerida {l.equipe_sugerida}</span>
-                          )}
-                        </span>
-                      )}
                       <span className="text-xs text-graf-600">
                         {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}
                         {l.primeira !== l.ultima &&
@@ -840,6 +857,7 @@ export default function Equipes() {
                     <th className="px-3 py-2 font-medium">Área</th>
                     <th className="px-3 py-2 font-medium">Supervisor</th>
                     <th className="px-3 py-2 font-medium">Situação</th>
+                    <th className="px-3 py-2 text-right font-medium">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -861,11 +879,36 @@ export default function Equipes() {
                           {t.situacao.toLowerCase()}
                         </span>
                       </td>
+                      <td className="px-3 py-2 text-right">
+                        {podeEditar && (
+                          t.situacao === 'ATIVO' ? (
+                            <button disabled={ocupado} onClick={() => mudarSituacao(t, 'DESLIGADO')}
+                              title="Sai da operação; o histórico dele fica"
+                              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs
+                                         text-graf-300 hover:border-af-600 hover:text-af-300
+                                         disabled:opacity-40">
+                              Desligar
+                            </button>
+                          ) : (
+                            <button disabled={ocupado} onClick={() => mudarSituacao(t, 'ATIVO')}
+                              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs
+                                         text-graf-300 hover:border-emerald-600
+                                         hover:text-emerald-300 disabled:opacity-40">
+                              Reativar
+                            </button>
+                          )
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="border-t border-graf-800 px-3 py-2.5 text-xs text-graf-500">
+              Técnico não se apaga, se <strong className="text-graf-300">desliga</strong>:
+              apagar levaria junto o histórico de contratos que ele executou. O banco
+              recusa a exclusão de quem tem histórico — inclusive para o ADMIN.
+            </p>
           </section>
         )}
 

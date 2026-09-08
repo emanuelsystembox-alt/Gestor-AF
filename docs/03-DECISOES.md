@@ -1424,3 +1424,79 @@ botão "é desta equipe".
 > D-088):** o sistema pode sugerir, e deve mostrar que sugeriu. O que
 > ele não pode é declarar no lugar de quem opera — nem gravando cadastro
 > que ninguém digitou (D-079), nem roteando por dedução calada (D-088).
+
+### D-089 · Sem autor não é cadastro — e a tela para de sugerir
+> *"A sugestão não quero que apareça, todos sabem que precisa ter
+> cadastro. Outra coisa: por que tem 1 técnico que tem os contratos na
+> equipe? Eu não cadastrei nenhum usuário ainda."* — Emanuel, 07/09
+
+Duas coisas na mesma frase, e a segunda é a mais grave.
+
+**A sugestão sai.** O nome do técnico e a equipe dele saíam de casar o
+login com a matrícula da planilha — a mesma dedução que o D-088 tirou do
+roteamento, sobrevivendo como texto na tela e como valor já escolhido no
+select. Botão que só precisa de um clique para confirmar um palpite não
+é confirmação, é aprovação automática. O bloco mostra agora só login,
+número de visitas e datas; quem sabe de quem é o login é quem opera.
+
+**A 039 preservou 9 cadastros que ninguém fez.** Ela apagou os 45 que eu
+tinha deduzido e manteve 9 porque "já estavam lá em 06/09". Só que as
+nove linhas de `equipe_login_toa` têm o **mesmo `criado_em`**
+(2026-09-06 04:06:04.121795) e **`criado_por` nulo**: seed de migration,
+não declaração. Eram elas que punham 121 contratos em equipe sem
+ninguém ter dito nada — inclusive os 7 da 011 que o Emanuel viu.
+
+> **"Estava lá antes" não é prova de cadastro. Prova de cadastro é ter
+> AUTOR.**
+
+Por isso o autor virou **critério**, não só carimbo de auditoria:
+`equipe_do_login` exige `criado_por is not null`, `equipe_login_toa`
+ganhou `check (criado_por is not null)` e default `auth.uid()`. Nenhum
+seed futuro consegue se passar por declaração.
+
+Junto saiu o critério 2 (`equipe.login_toa` solto): a coluna não guarda
+quem disse nem desde quando, então qualquer rotina que a preenchesse
+voltaria a rotear calada. Ela continua existindo para a tela mostrar o
+login corrente da equipe; deixou é de decidir. **Fonte única de
+roteamento: `equipe_login_toa` com autor.**
+
+Depois de desfazer: 1 cadastro (027 · Z428441, feito pelo Emanuel na
+tela), 455 contratos no abrigo, 3 em equipe, 159 de jornada. Os 121 que
+voltaram levaram **evento de transferência** — ninguém descobre depois
+que a equipe mudou sozinha.
+
+### D-090 · Técnico se desliga; apagar é conserto de cadastro
+> *"Quando um técnico for desligado, o usuário não vai poder apagar ele,
+> somente o admin, só pode aparecer o botão desativar — não podemos
+> perder o histórico de contratos executados da equipe, tudo precisa
+> ficar gravado."* — Emanuel, 07/09
+>
+> *"Ninguém precisa apagar, até porque precisamos muito do histórico.
+> Porém só pode ser apagado se for cadastrado errado, ou seja, o técnico
+> não tem histórico nenhum."* — Emanuel, 07/09
+
+São **duas operações diferentes** que a tela tratava como uma só:
+
+| | Desligar | Apagar |
+|---|---|---|
+| O que é | a pessoa saiu da empresa | o cadastro nunca deveria existir |
+| Quem faz | quem tem `equipes.editar` | só **ADMIN** |
+| Histórico | fica inteiro | não há |
+| Onde está | botão na tela | em lugar nenhum da tela |
+
+`tecnico_escrita` era uma policy `ALL` para gestor: **qualquer COP podia
+dar DELETE** e levar junto a autoria de cada baixa. Virou três policies
+— insert/update para gestor, delete só para `tem_papel('ADMIN')`.
+
+A policy diz *quem* apaga. Quem diz *o que* não se apaga é **trigger**:
+policy não olha as outras tabelas, e um DELETE barrado por FK devolveria
+`violates foreign key constraint` — verdade, e ilegível para quem só
+queria desligar o técnico que saiu. `tecnico_nao_se_apaga` conta visita,
+evento, evidência, movimento de equipamento e perfil vinculado, e manda
+desligar. Vale **para o ADMIN também**: com histórico, ninguém apaga.
+Mesma proteção na `equipe`, mais a recusa de apagar o abrigo.
+
+Desligar não é UPDATE direto: RLS não restringe COLUNA (D-050), e um
+update liberado por linha deixaria mexer em matrícula e equipe de
+carona. A tela chama `mudar_situacao_tecnico`, que muda só a situação e
+grava `situacao_em` e `situacao_por` — quem desligou, e quando.
