@@ -81,30 +81,41 @@ export default function Servicos() {
     })
   }
 
-  /** Exclusao em lote. O motivo e obrigatorio no banco -- e aqui
-   *  tambem, porque contrato que some sem explicacao vira discussao
-   *  com a CLARO depois. */
+  /**
+   * Exclusao em lote — DELETE de verdade (D-101).
+   *
+   * Duas confirmacoes, porque nao se desfaz: o motivo (que o banco
+   * exige) e a palavra APAGAR digitada. Clicar duas vezes em "ok" e
+   * facil de fazer sem ler; digitar, nao.
+   */
   async function excluirSelecionados() {
     const ids = [...selecionados]
     if (!ids.length) return
+
     const motivo = prompt(
-      `Excluir ${ids.length} contrato(s).\n\n`
-      + 'Eles saem da tela e continuam no banco, com quem excluiu e por quê.\n'
+      `APAGAR ${ids.length} contrato(s) do banco.\n\n`
+      + 'Isto NÃO se desfaz: some o contrato, as O.S., o histórico e as fotos.\n'
+      + 'Fica registrado quem apagou, quando e por quê.\n\n'
       + 'Informe o motivo:')
     if (!motivo || !motivo.trim()) return
+
+    const confirma = prompt(
+      `Última confirmação.\n\n`
+      + `${ids.length} contrato(s) serão apagados e não voltam.\n`
+      + 'Digite APAGAR para continuar:')
+    if ((confirma ?? '').trim().toUpperCase() !== 'APAGAR') return
+
     setExcluindo(true)
-    const { data, error } = await supabase.rpc('excluir_visitas',
+    const { data, error } = await supabase.rpc('excluir_visitas_definitivo',
       { p_visitas: ids, p_motivo: motivo.trim() })
     if (error) {
       setErro(error.message)
     } else {
-      const r = data as { excluidos: number; ja_estavam: number; erros: number }
+      const r = data as { apagados: number }
       setErro(null)
       setSelecionados(new Set())
       setVersao(v => v + 1)
-      alert(`${r.excluidos} contrato(s) excluído(s).`
-        + (r.ja_estavam ? ` ${r.ja_estavam} já estava(m).` : '')
-        + (r.erros ? ` ${r.erros} recusado(s).` : ''))
+      alert(`${r.apagados} contrato(s) apagado(s) do banco.`)
     }
     setExcluindo(false)
   }
@@ -433,10 +444,13 @@ export default function Servicos() {
                              hover:text-graf-200">
                   limpar seleção
                 </button>
+                <span className="text-xs text-graf-400">
+                  apagar aqui é definitivo — não se desfaz
+                </span>
                 <button onClick={excluirSelecionados} disabled={excluindo}
                   className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold
                              text-white hover:bg-af-500 disabled:opacity-50">
-                  {excluindo ? 'Excluindo…' : `Excluir ${selecionados.size}`}
+                  {excluindo ? 'Apagando…' : `Apagar ${selecionados.size} do banco`}
                 </button>
               </div>
             )}

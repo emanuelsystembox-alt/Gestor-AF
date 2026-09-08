@@ -1840,3 +1840,30 @@ Três decisões de segurança:
 
 A exclusão continua **lógica**: o contrato sai da tela e permanece no
 banco, com autor e motivo.
+
+
+### D-101 · Apagar de vez — REVOGA a exclusão lógica no lote
+> *"Eles precisam sair do banco de vez ok."* — Emanuel, 08/09
+
+A exclusão era lógica (`excluido_em`): fora da tela, dentro do banco.
+Agora o lote dá **DELETE**. Vai junto, por CASCADE: O.S., eventos,
+marcadores, evidências, equipamentos e a reincidência.
+
+Três travas, porque isto não se desfaz:
+
+- **Só ADMIN.** A exclusão lógica é de gestor e controlador; esta não.
+  Quem marca é um papel, quem apaga é outro.
+- **Duas confirmações**: o motivo (que o banco exige) e a palavra
+  `APAGAR` digitada. Clicar "ok" duas vezes é fácil de fazer sem ler.
+- **Registro em `exclusao_definitiva`**, gravado *antes* do delete — só
+  a função escreve nele, e ele não guarda nome, telefone nem endereço:
+  dado pessoal também tem de sair do banco (LGPD). Guarda o que responde
+  "quem apagou o contrato X, quando e por quê".
+
+> ⚠ **O contrato apagado volta se o mesmo arquivo for reimportado.** O
+> importador procura por `toa_atividade_id` e não filtra excluídas — com
+> exclusão lógica ele encontrava a linha e a mantinha excluída; sem a
+> linha, ele cria de novo. Por isso o registro guarda o
+> `toa_atividade_id`: a lista para o importador respeitar a exclusão já
+> existe, e vira uma linha de código no dia em que o Emanuel disser que
+> é para respeitar.
