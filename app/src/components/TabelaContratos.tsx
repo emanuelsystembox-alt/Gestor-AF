@@ -110,6 +110,21 @@ export function corBaixa(natureza: string | null | undefined): string {
   return 'bg-graf-800 text-graf-400'
 }
 
+/**
+ * A baixa da AFLINE VAZADA, a do TOA cheia (D-109).
+ *
+ * As duas costumam ter o mesmo código e a mesma cor -- "409 ·
+ * INSTALAÇÃO EFETUADA" nas duas --, e lado a lado viravam a mesma
+ * etiqueta repetida. Cor não distingue o que é igual em cor: o que
+ * distingue é a FORMA. Cheia = veio do TOA, é a palavra da operadora;
+ * vazada = é a nossa, digitada aqui.
+ */
+export function corBaixaAfline(natureza: string | null | undefined): string {
+  if (natureza === 'SUCESSO') return 'text-emerald-300 ring-emerald-700/50'
+  if (natureza === 'IMPRODUTIVA') return 'text-af-300 ring-af-700/50'
+  return 'text-graf-400 ring-graf-600/50'
+}
+
 interface Props {
   linhas: ContratoLinha[]
   /** Detalhada traz O.S. e baixa para dentro da linha. */
@@ -370,22 +385,33 @@ export function TabelaContratos({
 
                         {/* ---- linha 2: o resultado ---- */}
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                          {/* Baixa da OPERADORA — vem do TOA */}
+                          {/* Baixa da OPERADORA — CHEIA. É a palavra do
+                              TOA sobre o serviço. */}
                           {o.codigo_baixa ? (
-                            <span title="Baixa da operadora (TOA)"
-                              className={`rounded px-1.5 py-0.5 font-medium
-                                          ${corBaixa(o.codigo_baixa.natureza)}`}>
+                            <span title="Baixa da operadora, vinda do TOA"
+                              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5
+                                          font-medium ${corBaixa(o.codigo_baixa.natureza)}`}>
+                              <span className="rounded-sm bg-black/25 px-1 text-[9px]
+                                               font-bold uppercase tracking-wider opacity-90">
+                                TOA
+                              </span>
                               {o.codigo_baixa.codigo} · {o.codigo_baixa.descricao}
                             </span>
                           ) : (
                             <span className="text-graf-600">sem baixa do TOA</span>
                           )}
-                          {/* Baixa da AFLINE — a nossa, com sub-falha */}
+                          {/* Baixa da AFLINE — VAZADA. É a nossa, digitada
+                              aqui, e costuma repetir o código do TOA
+                              (D-109). */}
                           {o.baixa_afline && (
-                            <span title="Baixa da AFLINE (ngestor)"
-                              className={`rounded px-1.5 py-0.5 font-medium ring-1
-                                          ring-sky-700/40 ${corBaixa(o.baixa_afline.natureza)}`}>
-                              <span className="mr-1 opacity-70">AFLINE</span>
+                            <span title="Baixa da AFLINE — lançada no nosso sistema"
+                              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5
+                                          font-medium ring-1
+                                          ${corBaixaAfline(o.baixa_afline.natureza)}`}>
+                              <span className="rounded-sm px-1 text-[9px] font-bold uppercase
+                                               tracking-wider ring-1 ring-inherit opacity-90">
+                                AFLINE
+                              </span>
                               {o.baixa_afline.codigo} · {o.baixa_afline.descricao}
                               {o.sub_falha && (
                                 <span className="ml-1 font-normal opacity-80">

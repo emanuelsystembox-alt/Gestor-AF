@@ -2111,3 +2111,27 @@ Três detalhes que vieram junto:
   O.S. eles flutuavam no meio da célula, desalinhados de tudo.
 - O.S. marcada como não executada pelo TOA ganhou etiqueta discreta —
   antes só dava para saber abrindo o contrato.
+
+
+### D-109 · A baixa do TOA é cheia; a da AFLINE, vazada
+> *"Falta ele informar melhor a baixa TOA do que é baixa ngestor — ele
+> meio que colocou todos como igual."* — Emanuel, 08/09
+
+No D-108 eu tirei o rótulo "Baixa TOA" da etiqueta para reduzir ruído.
+Foi longe demais: as duas baixas ficaram **idênticas** na tela, porque
+elas costumam ser idênticas no conteúdo — mesmo código, mesma descrição,
+mesma cor. `409 · INSTALAÇÃO EFETUADA` duas vezes seguidas parece
+repetição, não duas fontes.
+
+Cor não distingue o que já é igual em cor — as duas são verdes quando
+deu certo, vermelhas quando não deu, e a natureza precisa continuar
+mandando na cor. **O que distingue é a forma:**
+
+| | Aparência | Significado |
+|---|---|---|
+| `TOA` | etiqueta **cheia** | a palavra da operadora, veio no arquivo |
+| `AFLINE` | etiqueta **vazada** (só contorno) | a nossa, lançada aqui |
+
+Mais o prefixo curto dentro de cada uma, que resolve no texto o que a
+forma resolve no relance. Cheio = veio de fora e não se discute;
+vazado = é nosso, foi alguém aqui que digitou.
