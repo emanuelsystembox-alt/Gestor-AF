@@ -29,6 +29,7 @@ export const SELECT_CONTRATO = `
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
+  finalizado_toa,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo, apelido ),
@@ -59,6 +60,10 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
   /** Aderencia a janela (D-099). Nulo = a regra nao se aplica. */
   tec1?: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
+  /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
+   *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
+   *  quem nao encerrou (D-103). */
+  finalizado_toa?: boolean
   node: string | null
   complemento: string | null
   area: { codigo: string; apelido: string | null } | null
@@ -219,7 +224,7 @@ export function TabelaContratos({
               <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
                 {v.janela_inicio?.slice(0, 5) ?? '—'}
                 {v.janela_fim && <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>}
-                {detalhada && v.fim && (
+                {detalhada && v.fim && v.finalizado_toa && (
                   <div className="text-[10px] text-graf-500">encerrou {hora(v.fim)}</div>
                 )}
               </td>

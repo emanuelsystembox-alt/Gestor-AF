@@ -1900,3 +1900,47 @@ Agora as duas telas têm o mesmo modal e o mesmo menu. Tirar a coluna
 contrato quer a data escrita nele — o Emanuel pediu de volta e ela
 voltou. Fora fica só a coluna **Equipe**, que dentro da equipe
 repetiria o cabeçalho em cada linha.
+
+
+### D-103 · O status do TOA não conclui contrato — e o "encerrou" some
+> *"Esse 'encerrou' tira, se o técnico nem encerrou ainda."*
+>
+> *"Uma W.O. foi reagendada, código 101, e a outra foi executada. O
+> sistema acabou baixando uma de forma automática."* — Emanuel, 08/09
+
+Um contrato só, o **227014948**, mostrou as duas pontas do mesmo
+defeito:
+
+| WO | Status no TOA | A tela dizia | O código diz |
+|---|---|---|---|
+| 231344870 | concluído | **CONCLUÍDA** | 101 Endereço Não Localizado → **reagendamento** |
+| 231380148 | iniciado | **EM EXECUÇÃO** | 409 Instalação Efetuada → **concluída** |
+
+Uma concluída sem ter sido feita; a outra feita sem ser concluída. É o
+D-097 outra vez, agora doendo: **o status diz que a atividade encerrou;
+o código diz o que aconteceu.**
+
+Medido no banco antes de corrigir: **110 contratos com a situação
+errada, 77 deles marcados como concluídos** sem terem sido. Esse número
+ia direto para produtividade e faturamento.
+
+Daqui em diante `situacao_do_toa` **não conclui nada**. Ela leva até
+onde é operação — entrada, deslocamento, execução, cancelada — e a
+conclusão vem de quem tem competência para dizer: a baixa automática,
+pelo código, ou o técnico, na tela de campo. É exatamente o modo
+desligado que o Emanuel descreveu no D-097: *"fazer somente a leitura
+dos códigos e contratos e dá deslocamento e em execução"*.
+
+**O "encerrou" era o mesmo erro na camada de cima.** `fim` vem
+preenchido mesmo em atividade só iniciada — a tela mostrava "encerrou
+12:00" em **329 das 947 visitas** que ninguém tinha fechado. Agora a
+coluna `finalizado_toa` guarda se o status é Concluído ou Não Concluído,
+e só aí o horário aparece.
+
+Duas decisões dele, perguntado com os números na mão:
+
+- **A baixa automática foi ligada.** Sem ela, com o status já não
+  concluindo, todo contrato ficaria em execução esperando baixa manual.
+- **Os 110 contratos antigos ficam como estão.** A correção vale daqui
+  para a frente; quem quiser acertar um dia antigo reimporta o arquivo
+  daquele dia.
