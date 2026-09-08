@@ -1,4 +1,5 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
+import { isoLocal } from './formato'
 
 export interface OS {
   id: string
@@ -92,7 +93,8 @@ export function calcular(visitas: Visita[], agora = new Date()) {
     ? (concluidas.length / produtivas.length) * 100 : 0
 
   // Janela em risco: ainda aberta e faltando menos de 60 min para o fim.
-  const hojeStr = agora.toISOString().slice(0, 10)
+  // Data local, não UTC: em Manaus (UTC−4) o dia virava às 20h.
+  const hojeStr = isoLocal(agora)
   const emRisco = emAberto.filter(v => {
     if (!v.janela_fim) return false
     // Janela "estourando" so tem sentido para HOJE. Num periodo historico

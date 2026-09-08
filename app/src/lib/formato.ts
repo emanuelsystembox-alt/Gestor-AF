@@ -25,6 +25,32 @@ export const reais = (n: number | string | null | undefined) =>
   n == null ? '' : Number(n).toLocaleString('pt-BR',
     { style: 'currency', currency: 'BRL' })
 
+/**
+ * A data de HOJE como a pessoa vê no relógio dela — não em UTC.
+ *
+ * ┌─ O ERRO QUE ISTO CONSERTA ───────────────────────────────────────┐
+ * │ `new Date().toISOString().slice(0,10)` devolve a data em **UTC**. │
+ * │ Manaus é UTC−4: às 22:03 do dia 7, em UTC já é dia 8. O painel    │
+ * │ abria no dia seguinte e mostrava "Nenhuma visita neste período"   │
+ * │ para uma operação que ainda estava trabalhando.                   │
+ * │                                                                   │
+ * │ Toda tela que abre "em hoje" passava por aqui — eram nove         │
+ * │ cópias da mesma linha errada.                                     │
+ * └───────────────────────────────────────────────────────────────────┘
+ *
+ * ⚠ Usa o fuso do computador de quem olha. Para as 18 praças (AM e RO
+ *   em UTC−4, as demais em UTC−3) isso significa que cada um vê o
+ *   próprio dia — o que é o comportamento certo enquanto a tela for de
+ *   uma praça só. Se um dia o COP em Manaus precisar olhar o dia de
+ *   Belém, isto vira `base.fuso` e uma conversão explícita.
+ */
+export function isoLocal(d: Date = new Date()): string {
+  const ano = d.getFullYear()
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
+}
+
 /** `07/09` — dia e mês, para coluna estreita de lista. */
 export const diaMes = (iso: string) =>
   new Date(iso + 'T12:00').toLocaleDateString('pt-BR',

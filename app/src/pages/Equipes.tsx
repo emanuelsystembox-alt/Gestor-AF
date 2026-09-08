@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
+import { isoLocal } from '../lib/formato'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Pill, Vazio } from '../components/ui'
 
@@ -102,7 +103,7 @@ const SELECT_VISITA = `
   )
 `
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
+
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null)
 const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
@@ -160,7 +161,7 @@ export default function Equipes() {
       .order('data_agendada', { ascending: false }).limit(1)
       .then(({ data: d }) => {
         const ultima = (d as { data_agendada: string }[] | null)?.[0]?.data_agendada
-        setData(ultima ?? iso(new Date()))
+        setData(ultima ?? isoLocal(new Date()))
       })
   }, [])
 
@@ -330,7 +331,7 @@ export default function Equipes() {
   const emCampo = painel.filter(e => e.visitas > 0).length
   const ociosas = painel.filter(e => e.ocioso).length
   const totalOrfaos = orfaos.reduce((s, o) => s + o.visitas, 0)
-  const ehHoje = data === iso(new Date())
+  const ehHoje = data === isoLocal(new Date())
 
   const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
 

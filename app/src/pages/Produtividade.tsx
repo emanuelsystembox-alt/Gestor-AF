@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar } from '../components/ui'
-import { num2, pts, reais } from '../lib/formato'
+import { isoLocal, num2, pts, reais } from '../lib/formato'
 
 /**
  * Produtividade e comissão.
@@ -53,14 +53,14 @@ interface Faixa { id: string; pontos_de: number; pontos_ate: number; fator: numb
 
 type Dimensao = 'tecnico' | 'equipe' | 'supervisor'
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
+
 
 /** Primeiro e último dia do mês corrente — comissão é mensal. */
 function mesCorrente() {
   const h = new Date()
   return {
-    de: iso(new Date(h.getFullYear(), h.getMonth(), 1)),
-    ate: iso(new Date(h.getFullYear(), h.getMonth() + 1, 0)),
+    de: isoLocal(new Date(h.getFullYear(), h.getMonth(), 1)),
+    ate: isoLocal(new Date(h.getFullYear(), h.getMonth() + 1, 0)),
   }
 }
 

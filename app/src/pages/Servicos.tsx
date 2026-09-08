@@ -5,7 +5,7 @@ import type { Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
 import { Alerta, Pill, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
-import { pts, dataBR, diaSemana } from '../lib/formato'
+import { dataBR, diaSemana, isoLocal, pts } from '../lib/formato'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 
 const SELECT = `
@@ -58,8 +58,7 @@ type V = Omit<Visita, 'ordem_servico'> & {
   visita_marcador: Marcador[]
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
-const hoje = () => iso(new Date())
+
 const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
@@ -186,7 +185,7 @@ export default function Servicos() {
     supabase.from('visita').select('data_agendada')
       .order('data_agendada', { ascending: false }).limit(1)
       .then(({ data }) => {
-        const ultima = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? hoje()
+        const ultima = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? isoLocal()
         setDe(ultima); setAte(ultima)
       })
   }, [])

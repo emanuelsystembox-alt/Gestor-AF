@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Alerta } from './ui'
+import { isoLocal } from '../lib/formato'
 
 /**
  * Cadastro manual de contrato — a "Nova Ordem de Serviço" do sistema atual.
@@ -45,7 +46,7 @@ interface OSNova {
 
 const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs ' +
               'outline-none focus:border-af-500'
-const hoje = () => new Date().toISOString().slice(0, 10)
+
 
 /** As janelas que o TOA usa. Fora delas, o usuário digita à mão. */
 const PERIODOS = ['08:00-11:00', '08:00-12:00', '11:00-14:00', '12:00-15:00', '15:00-18:00']
@@ -76,7 +77,7 @@ export function NovoContratoModal({
     telefones: '', logradouro: '', complemento: '', bairro: '',
     cidade: 'MANAUS', uf: 'AM', cep: '', node: '', area_id: '',
     tipo_servico_id: '', equipe_id: '', wo_numero: '', observacao: '',
-    data_agendada: hoje(), janela_inicio: '', janela_fim: '',
+    data_agendada: isoLocal(), janela_inicio: '', janela_fim: '',
   })
   const set = (k: string, v: string) => setF(a => ({ ...a, [k]: v }))
 

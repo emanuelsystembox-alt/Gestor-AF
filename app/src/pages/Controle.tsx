@@ -9,6 +9,7 @@ import {
   BarraEmpilhada, BarrasHorizontais, ColunasPorHora,
   Indicador, Painel, TabelaSimples,
 } from '../components/graficos'
+import { isoLocal } from '../lib/formato'
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, cliente_nome, logradouro, bairro,
@@ -28,24 +29,24 @@ const SELECT = `
 
 type Periodo = 'HOJE' | 'SETE' | 'MES' | 'MES_ANTERIOR' | 'PERSONALIZADO'
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
+
 
 function intervalo(p: Periodo, de: string, ate: string): [string, string] {
   const hoje = new Date()
   switch (p) {
-    case 'HOJE': return [iso(hoje), iso(hoje)]
+    case 'HOJE': return [isoLocal(hoje), isoLocal(hoje)]
     case 'SETE': {
       const d = new Date(hoje); d.setDate(d.getDate() - 6)
-      return [iso(d), iso(hoje)]
+      return [isoLocal(d), isoLocal(hoje)]
     }
     case 'MES': {
       const d = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-      return [iso(d), iso(hoje)]
+      return [isoLocal(d), isoLocal(hoje)]
     }
     case 'MES_ANTERIOR': {
       const i = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
       const f = new Date(hoje.getFullYear(), hoje.getMonth(), 0)
-      return [iso(i), iso(f)]
+      return [isoLocal(i), isoLocal(f)]
     }
     default: return [de, ate]
   }
@@ -58,8 +59,8 @@ const ROTULO_PERIODO: Record<Periodo, string> = {
 
 export default function Controle() {
   const [periodo, setPeriodo] = useState<Periodo>('HOJE')
-  const [de, setDe] = useState(iso(new Date()))
-  const [ate, setAte] = useState(iso(new Date()))
+  const [de, setDe] = useState(isoLocal(new Date()))
+  const [ate, setAte] = useState(isoLocal(new Date()))
   const [origem, setOrigem] = useState('TODAS')
   const [equipe, setEquipe] = useState('TODAS')
   const [tipo, setTipo] = useState('TODOS')

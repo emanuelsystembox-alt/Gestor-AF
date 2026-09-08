@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Alerta, Logo, Pill, Vazio } from '../components/ui'
-import { num2, pts, reais } from '../lib/formato'
+import { isoLocal, num2, pts, reais } from '../lib/formato'
 
 interface VisitaCard {
   id: string
@@ -22,7 +22,7 @@ interface VisitaCard {
                    codigo_baixa_afline_id: string | null }[]
 }
 
-const hojeISO = () => new Date().toISOString().slice(0, 10)
+
 
 /** Produção do técnico no mês corrente — a linha dele em
  *  `produtividade_periodo`, que é DEFINER e já filtra pelo escopo. */
@@ -38,16 +38,15 @@ interface Producao {
 
 function mesCorrente() {
   const h = new Date()
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
   return {
-    de: iso(new Date(h.getFullYear(), h.getMonth(), 1)),
-    ate: iso(new Date(h.getFullYear(), h.getMonth() + 1, 0)),
+    de: isoLocal(new Date(h.getFullYear(), h.getMonth(), 1)),
+    ate: isoLocal(new Date(h.getFullYear(), h.getMonth() + 1, 0)),
   }
 }
 
 export default function Campo() {
   const { perfil, sair } = useAuth()
-  const [data, setData] = useState(hojeISO())
+  const [data, setData] = useState(isoLocal())
   const [visitas, setVisitas] = useState<VisitaCard[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)

@@ -7,7 +7,7 @@ import {
 } from '../lib/relatorio'
 import { Shell } from '../components/Shell'
 import { Alerta } from '../components/ui'
-import { pts } from '../lib/formato'
+import { isoLocal, pts } from '../lib/formato'
 
 /**
  * Relatórios — por contrato e por O.S.
@@ -17,7 +17,7 @@ import { pts } from '../lib/formato'
  * e por que a pontuação sai só na primeira O.S. do endereço.
  */
 
-const iso = (d: Date) => d.toISOString().slice(0, 10)
+
 
 export default function Relatorios() {
   const [de, setDe] = useState('')
@@ -41,7 +41,7 @@ export default function Relatorios() {
     supabase.from('visita').select('data_agendada')
       .order('data_agendada', { ascending: false }).limit(1)
       .then(({ data }) => {
-        const u = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? iso(new Date())
+        const u = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? isoLocal(new Date())
         setDe(u); setAte(u)
       })
     supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
