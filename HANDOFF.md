@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **07/09/2026**, por Claude (Opus 5).
+Última atualização: **08/09/2026**, por Claude (Opus 5).
 
 ---
 
@@ -23,7 +23,8 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | Repositório | `github.com/emanuelsystembox-alt/Gestor-AF` |
 | Pasta local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
 | Banco | Supabase `AFLINE manager` · `kqfflkxjijzdtnfshdlv` · sa-east-1 |
-| App | `cd app && npm install && npm run dev` → localhost:5173 |
+| App (local) | `cd app && npm install && npm run dev` → localhost:5173 |
+| **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
 
 O `.env` já está preenchido e **não** vai para o Git.
@@ -85,10 +86,13 @@ terceira: ele demora a atualizar.
 
 ## O que está pronto e testado
 
-**Banco:** 40 tabelas, 81 funções, 76 policies, zero tabela sem RLS, zero
+**Banco:** 44 tabelas, 99 funções, 86 policies, zero tabela sem RLS, zero
 `SECURITY DEFINER` alcançável pelo `anon`, bateria de policy verde (16/16).
 
-**Doze telas**, todas verificadas com dado real:
+**O sistema está no ar em https://gestor-af.pages.dev** (Cloudflare
+Pages). Para republicar depois de mudar o código, ver `docs/09-PUBLICAR.md`.
+
+**Treze telas**, todas verificadas com dado real:
 
 | Rota | Estado |
 |---|---|
@@ -96,18 +100,25 @@ terceira: ele demora a atualizar.
 | `/controle` | painel: cartões de situação, volume × pontos, improdutivas por responsabilidade |
 | `/controle/servicos` | 9 filtros, duas densidades, cor por situação, botão direito, contrato em janela, **+ Nova O.S.**; contrato na 1ª coluna e busca por contrato = histórico dia a dia |
 | `/controle/equipes` | painel por dia: períodos, situações, OCIOSO, contratos por equipe, **bolinha do técnico**; abre só com quem tem contrato |
+| `/controle/rota` | **rota do dia**: alertas (retorno a bairro, salto longo, bairro pulverizado), linha do tempo por técnico com o bairro no bloco, e os bairros no espaço |
 | `/controle/produtividade` | **produtividade e comissão**: técnico · equipe · supervisor, meta, fator e a receber |
 | `/controle/relatorios` | por contrato (**72 colunas**) e por O.S. (**87**), com **pontuação** e **serviço anterior**, Excel e CSV |
 | `/controle/importar` | importação do TOA com prévia e histórico |
 | `/controle/sub-falhas` | importa os conjuntos da CLARO e escolhe o vigente |
-| `/controle/configuracoes` | status, indicadores de qualidade e tabela de pontuação |
-| `/controle/administracao` | usuários, cargos, perfis de acesso e permissões |
+| `/controle/configuracoes` | status, **baixa e situação** (de/para dos 168 códigos + interruptor da baixa automática), indicadores e tabela de pontuação |
+| `/controle/administracao` | usuários (com RG, nascimento e skill), cargos, perfis, permissões e **contratos apagados** |
 | `/controle/visita/:id` | detalhe completo, histórico **com login**, transferência |
 | `/campo` e `/campo/visita/:id` | agenda e execução: a caminho → cheguei → baixa com sub-falha → impedimento com observação → finalizar, e o passo a passo **com o login** |
 
-**Dados:** 551 visitas, 652 O.S., 89 equipes, 104 técnicos, 18 praças,
-168 códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
-Três dias: 04, 05 e 06/09/2026.
+**Dados:** 955 visitas, 1.181 O.S., 107 equipes, 104 técnicos, 18 praças,
+168 códigos de baixa (**todos com situação de destino**), 5.505 itens de
+produto, 1.466 sub-falhas, 1.021 regras de pontuação. Cinco dias: 04 a
+08/09/2026.
+
+**A baixa automática está LIGADA** (parâmetro `baixa_automatica`): a
+importação aplica a situação que o código manda, quando todas as O.S. da
+visita têm código com destino. Ligada por decisão do Emanuel em 08/09,
+com os números na mão.
 
 **Também no ar:** tema claro no controle (o campo continua claro sempre,
 por condição de trabalho — D-011/D-065) e
@@ -169,7 +180,7 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 | O quê | Por quê |
 |---|---|
 | ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: NÃO vale** — D-088 revoga o D-082. Só o login cadastrado leva contrato para equipe; o resto fica em "Sem login definido". |
-| **Declarar os 46 logins sem dono** | 337 visitas em "Sem login definido" até você dizer de quem é cada login. A tela de Equipes faz num clique, com a equipe sugerida preenchida — D-088. |
+| **Declarar os 58 logins sem dono** | Os contratos deles ficam em "Sem login definido" e fora da produtividade até alguém dizer de quem é cada um. A tela de Equipes faz num clique — **sem sugestão de equipe** (D-089): o nome ao lado é o `Recurso` do TOA, que diz de quem é o login, não para onde ele vai. |
 | **Criar os logins (supervisores e técnicos)** | Criar conta é ação sua, em Administração → Usuários. O campo **Login TOA** já liga o acesso ao técnico na hora — D-087. |
 | **Faixa de comissão: piso ou intervalo fechado?** | Mudei para piso porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Isso difere da tabela literal do sistema atual. Se a AFLINE quiser estrito, é uma linha em dois lugares. Ver D-077. |
 | **Logins de teste** | Só o Emanuel cria: exige a `service_role`, que não pode passar pelo assistente nem pelo navegador. `app/scripts/criar-usuarios-teste.mjs` faz tudo e tem `--remover`. |
@@ -181,9 +192,14 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 | **Abas de equipamento na baixa** | Dependem do almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
 | **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
-| **`equipe.skill`** | O sistema atual mostra "SINGLE MASTER"; não modelamos porque não sabemos o domínio. |
+| ~~**`equipe.skill`**~~ | **RESOLVIDO em 08/09:** o domínio é ADESÃO · MANUTENÇÃO · DESCONEXÃO, em tabela (D-094). `SINGLE MASTER` era default nosso e virou legado. **Falta o Emanuel passar meta e faixas de cada uma** — enquanto não vierem, técnico com skill nova fica sem tabela de comissão, e a tela avisa. |
 | **34 regras de pontuação marcadas `CONFERIR`** | O relatório traz mais de um valor para a mesma chave — provavelmente tabela de preço diferente. |
 | **448 regras coringa** | Copiam a de CASA quando o endereço não diz a edificação. É o palpite menos ruim, não o dado. |
+| **Meta e faixas de ADESÃO, MANUTENÇÃO e DESCONEXÃO** | O Emanuel decidiu que cada skill tem as suas (D-094). Até chegarem, quem for movido para uma delas fica sem fator — a tela de Produtividade avisa em amarelo e o cadastro também. |
+| **Contrato apagado volta se o dia for reimportado** | O importador procura por `toa_atividade_id` e não consulta `exclusao_definitiva`. O registro já guarda esse id: fazer o importador respeitá-lo é uma linha, e a decisão é do Emanuel (D-101). |
+| **110 contratos com situação antiga errada** | Corrigimos a regra em 08/09, mas o Emanuel decidiu **não mexer no que já passou**. Reimportar o dia acerta aquele dia (D-103). |
+| **Limites da Rota do Dia** | 10 km de salto e 5 técnicos por bairro saíram do próprio dia 08/09, não de meta da CLARO. Se a operação tiver os números reais, é troca de dois valores (D-111). |
+| **`Recurso` na jornada** | 50 apontamentos de jornada sem login têm o nome do técnico preenchido. Não usamos: reconhecer a pessoa não a cadastra (D-093). |
 
 ---
 
@@ -232,6 +248,23 @@ login que entra e não vê nada, sem erro visível.
 
 **Confiei no lint do Supabase para segurança.** Só a consulta a
 `has_function_privilege` mostrou a verdade.
+
+**Concluí que o produto não amarrava na O.S. sem olhar todas as colunas.**
+Comparei o id do item com o **número** da O.S., não bateu em 240 linhas, e
+dei o vínculo por inexistente. Era o **Ponto** — coluna que a planilha
+traz ao lado do número da O.S. e que eu tinha em mãos. A captura de tela
+do Emanuel, com o cabeçalho escrito, é que resolveu (D-107).
+
+**Preservei 9 cadastros de login porque "já estavam lá".** A migration
+039 apagou 45 deduzidos e manteve 9 com o argumento de que eram
+anteriores. Todos os 9 tinham o mesmo `criado_em` e `criado_por` nulo:
+eram seed de migration, e rotearam 121 contratos. **"Estava lá antes" não
+é prova de cadastro; prova de cadastro é ter autor** (D-089).
+
+**Tirei rótulos e colunas "para reduzir ruído" duas vezes seguidas, e as
+duas doeram.** Sem o rótulo "Baixa TOA", as duas baixas ficaram idênticas
+na tela; sem a coluna Data, a visão de equipe perdeu informação que se
+usa. Ruído se corta olhando o que sobra, não o que sai (D-102, D-109).
 
 **Semeei cadastro que ninguém cadastrou.** Preenchi `equipe.login_toa`
 em 45 equipes deduzindo da matrícula do técnico. A tela passou a mostrar

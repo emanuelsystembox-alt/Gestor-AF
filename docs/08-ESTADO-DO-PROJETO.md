@@ -1,4 +1,4 @@
-# Estado do projeto — 07/09/2026
+# Estado do projeto — 08/09/2026
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -28,6 +28,8 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 | Front-end | Vite + React 18 + TypeScript + Tailwind v4 |
 | Edge Function | `admin-usuarios` — criação de login com `service_role` |
 | Local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
+| **No ar** | **https://gestor-af.pages.dev** — Cloudflare Pages, projeto `gestor-af` |
+| Publicar | `cd app && npm run build && npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true` |
 
 **Fora do escopo:** o Supabase `BANCO PRO - AFLINE 360` é outro projeto
 (camada analítica, 350+ migrations). Não tocamos nele desde 04/09.
@@ -36,7 +38,7 @@ Nasce **multi-empresa**: o Emanuel pretende vendê-lo a outras credenciadas.
 
 ## Banco — números reais
 
-**41 tabelas · 2 views · 85 funções · 82 policies · zero tabela sem RLS ·
+**44 tabelas · 2 views · 99 funções · 86 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` alcançável pelo `anon`**
 
 E, desde 07/09, uma **bateria de teste de policy com 16 cenários**:
@@ -76,19 +78,25 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | | |
 |---|---|
 | Empresas | 1 (AFLINE) · Praças **18** |
-| Equipes | **89** · Técnicos **104** · Supervisores 5 |
-| Visitas | **504** em 3 dias (04/09: 344 · 05/09: 129 · 06/09: 31) |
-| Ordens de serviço | **610** |
-| Produtivas × jornada | 349 produtivas · 152 de jornada · 3 sem tipo |
-| Códigos de baixa | **168** classificados |
+| Equipes | **107** · Técnicos **104** · Supervisores 5 |
+| Visitas | **955** em 5 dias (04/09 a 08/09) |
+| Ordens de serviço | **1.181** |
+| Códigos de baixa | **168**, e agora **todos com situação de destino** — 145 derivados da análise, **23 declarados pelo Emanuel na tela** em 08/09 |
+| Itens de produto | **5.505** lidos da coluna `Produto` do TOA · 1.933 pendentes |
+| Visitas com TEC1 | **494** avaliadas pela regra de aderência |
 | Sub-falhas | **1.466** — CASO 1 (528) e NÍVEL HARD (938) |
 | Conjunto vigente | **NÍVEL HARD** |
 | Indicadores de qualidade | **7** |
 | Combinações de O.S. | **546** · Regras de pontuação **1.021** |
-| Cobertura da pontuação | **95,4%** das produtivas · 386,06 pontos |
+| Skills | 3 ativas (ADESÃO · MANUTENÇÃO · DESCONEXÃO) + SINGLE MASTER como legado |
 | Cargos / perfis de acesso / permissões | 10 / 6 / 26 |
 | Usuários com login | **1** (o admin) |
-| Eventos de auditoria | 508 |
+
+### Parâmetros da operação
+
+| Chave | Valor | O que muda |
+|---|---|---|
+| `baixa_automatica` | **ligada** em 08/09 | A importação aplica a situação que o código de baixa manda, quando todas as O.S. da visita têm código com destino |
 
 ---
 
@@ -158,12 +166,13 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | `/controle` | Painel: cartões de situação, **volume × pontos** por tipo de serviço, improdutivas por responsabilidade, encerramentos por hora, tempo por etapa, CSV |
 | `/controle/servicos` | Lista com 9 filtros, duas densidades, faixa de cor por situação, menu no botão direito, **contrato em janela** e **+ Nova O.S.** (cadastro manual) |
 | `/controle/equipes` | Painel por dia: contratos, períodos, situações, OCIOSO, contratos de cada equipe, **bolinha do técnico**; abre só com quem tem contrato |
+| `/controle/rota` | **Rota do dia**: alertas de rota, linha do tempo por técnico com o bairro no bloco, e os bairros no espaço |
 | `/controle/produtividade` | **Produtividade e comissão** em três dimensões (técnico · equipe · supervisor): pontos, dias, média/dia, previsão, meta, fator e **a receber**; edita a tabela de comissão com a permissão `comissao.editar` |
 | `/controle/relatorios` | Relatório **por contrato** (72 colunas) e **por O.S.** (87), com **pontuação** e **serviço anterior**, filtros, Excel e CSV; marca a primeira O.S. do endereço |
 | `/controle/importar` | Importação do TOA com prévia e **histórico com log** |
 | `/controle/sub-falhas` | Importa os conjuntos da CLARO (arquivo largo) e escolhe o vigente |
-| `/controle/configuracoes` | Status, indicadores de qualidade e **tabela de pontuação** (1.021 regras) |
-| `/controle/administracao` | Usuários, cargos, perfis de acesso e matriz de permissões |
+| `/controle/configuracoes` | Status, **baixa e situação** (o de/para dos 168 códigos + o interruptor da baixa automática), indicadores de qualidade e **tabela de pontuação** (1.021 regras) |
+| `/controle/administracao` | Usuários (com RG, nascimento e skill), cargos, perfis de acesso, matriz de permissões e **contratos apagados** (o log da exclusão definitiva) |
 | `/controle/visita/:id` | Detalhe completo do contrato, com histórico e transferência |
 | `/campo` e `/campo/visita/:id` | Agenda e execução do técnico (tema claro, alvo de toque 48px): a caminho → cheguei → baixa com sub-falha → impedimento com observação → finalizar, e o **passo a passo com o login** de quem fez cada etapa |
 
@@ -193,6 +202,87 @@ Function · **D-054 teste de policy vem antes de mexer em policy** ·
 **Produto** — D-011 duas linguagens visuais · D-029 carga sob demanda por
 causa do técnico no 4G · D-043 excluir é arquivar · D-056 o contrato abre
 em janela
+
+---
+
+---
+
+## O dia 08/09 — 22 commits, 12 migrations
+
+Uma sessão inteira de trabalho, na ordem em que aconteceu. Quase tudo
+nasceu de o Emanuel olhar a tela e apontar o que estava errado — e em
+metade dos casos o defeito era maior do que ele tinha visto.
+
+### O que ele apontou, e o que estava por baixo
+
+| O que ele viu | O que era de fato |
+|---|---|
+| "Não cadastrei nenhum usuário, por que tem contrato em equipe?" | 9 cadastros de login **semeados por migration**, sem autor, roteando 121 contratos (D-089) |
+| "A sugestão não quero que apareça" | A equipe vinha **pré-selecionada** no campo: um clique confirmava um palpite meu (D-089) |
+| "Os dois arquivos do TOA são aceitos?" | Sim — e a coluna a mais era o **nome do técnico**, guardado no banco e nunca lido (D-091) |
+| "Precisa ter skill: ADESÃO, MANUTENÇÃO, DESCONEXÃO" | `tecnico.skill` é a **chave da comissão**; gravar uma skill sem faixa zeraria o "a receber" (D-094) |
+| "Esse *encerrou* tira, o técnico nem encerrou" | `fim` vinha preenchido em atividade só iniciada: a tela mentia em **329 das 947 visitas** (D-103) |
+| "Uma W.O. foi reagendada e o sistema baixou" | O importador concluía pelo **status**, não pelo código: **110 contratos com situação errada**, 77 "concluídos" sem terem sido (D-103) |
+| "Acho que ele leu a atividade suspensa" | Exatamente isso — e a suspensa virava COM IMPEDIMENTO num contrato já executado (D-104) |
+| "Trouxe mais produto do que devia" | Eu tinha errado no D-106: o produto **amarra na O.S. pelo Ponto**, e eu comparei com o número da O.S. (D-107) |
+
+### O que foi construído
+
+**Cadastro e identidade**
+- Cadastro sem autor deixou de rotear contrato; `equipe_do_login` exige
+  `criado_por` (D-089)
+- Técnico se desliga, não se apaga: DELETE só para ADMIN e barrado por
+  histórico (D-090)
+- O nome do técnico passou a vir da coluna `Recurso` do TOA (D-091)
+- RG, nascimento e skill no cadastro de acesso (D-094)
+
+**A regra do dinheiro e da situação**
+- **67.485 linhas** do analítico do concorrente cruzadas: 203 dos 206
+  códigos de baixa caem sempre na mesma situação (D-097)
+- Painel do de/para em Configurações, com a origem de cada regra —
+  `análise` ou `cadastro` (D-097)
+- O status do TOA **deixou de concluir contrato**: quem conclui é o
+  código ou o técnico (D-103)
+- Baixa automática ligada, por decisão do Emanuel com os números na mão
+
+**Medição**
+- **TEC1** — a regra de aderência à janela lida do painel dele próprio,
+  não inventada: 363 padrão, 14 sem padrão no dia (D-099)
+- **Rota do Dia**, a terceira visão: 676 km, 38 de 50 bairros com mais de
+  um técnico, 50 retornos a bairro já visitado (D-111)
+
+**Operação**
+- Exclusão em lote e depois **definitiva**, com log em
+  `exclusao_definitiva` para investigação (D-100, D-101, D-102)
+- Atividade suspensa não entra mais na importação (D-104)
+- Busca por **grupo de contratos**, com ou sem o período (D-105)
+- **Produto pendente** lido do "monte de texto" do TOA (D-106, D-107)
+
+**Tela**
+- Uma linha de contrato só, em Serviços e em Equipes (D-095)
+- A fila de cadastro foi para o rodapé (D-096)
+- Grade translúcida, linha da O.S. em dois andares, baixa do TOA cheia e
+  da AFLINE vazada (D-092, D-108, D-109)
+- Ícones no menu e lateral que abre no hover (D-110)
+
+**Infraestrutura**
+- O sistema **entrou no ar**: `gestor-af.pages.dev` (`docs/09-PUBLICAR.md`)
+
+### Erros meus, registrados
+
+Ficam aqui porque custaram tempo e podem voltar:
+
+1. **Afirmei que o produto não amarrava na O.S.** Comparei o id do item
+   com o número da O.S., não bateu, e conclui que não havia vínculo. Era
+   o **Ponto** — coluna que eu tinha em mãos e não olhei (D-107).
+2. **Tirei o rótulo "Baixa TOA" para reduzir ruído** e as duas baixas
+   ficaram idênticas na tela (D-108 → D-109).
+3. **Tirei a coluna Data da visão de equipe** por economia; ela fazia
+   falta (D-102).
+4. **`unaccent_simples` não existe** neste banco, e variável record
+   chamada `v` colide com o alias `v` da tabela (D-099).
+5. **Filtrei `codigo_baixa` por empresa**, e ele é catálogo global — a
+   função recusava um código que existe (migration 046c).
 
 ---
 
