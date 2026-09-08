@@ -37,6 +37,9 @@ interface Usuario {
   ativo: boolean; atualizado_em: string | null; whatsapp: string | null
   cargo: { nome: string } | null
   perfil_acesso: { nome: string; papel: string | null } | null
+  /** Preenchido quando o acesso responde por um técnico — é o que liga
+   *  a pessoa à agenda dela (`tecnico.usuario_id`, que o RLS lê). */
+  tecnico: { matricula: string; nome: string } | null
 }
 
 const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs ' +
@@ -65,6 +68,7 @@ export default function Administracao() {
   const [novo, setNovo] = useState({
     nome: '', email: '', apelido: '', whatsapp: '',
     cargo_id: '', perfil_acesso_id: '', cpf: '', matricula_ponto: '',
+    login_toa: '',
   })
   const [senhaGerada, setSenhaGerada] = useState<{ email: string; senha: string } | null>(null)
 
@@ -82,7 +86,8 @@ export default function Administracao() {
       supabase.from('perfil')
         .select(`id, nome, email, apelido, ativo, atualizado_em, whatsapp,
                  cargo:cargo_id ( nome ),
-                 perfil_acesso:perfil_acesso_id ( nome, papel )`)
+                 perfil_acesso:perfil_acesso_id ( nome, papel ),
+                 tecnico:tecnico_id ( matricula, nome )`)
         .order('nome'),
       supabase.from('usuario_papel').select('usuario_id, papel'),
       supabase.from('cargo').select('*').order('ordem'),
@@ -142,14 +147,38 @@ export default function Administracao() {
         perfil_acesso_id: novo.perfil_acesso_id || null,
       },
     })
-    const r = data as { ok?: boolean; erro?: string; senha_gerada?: string | null; email?: string } | null
+    const r = data as {
+      ok?: boolean; erro?: string; senha_gerada?: string | null
+      email?: string; usuario_id?: string
+    } | null
     if (error || r?.erro) setErro(traduzir(r?.erro ?? error?.message ?? 'Falha ao criar.'))
     else {
-      setOk(`Acesso criado para ${novo.email.trim().toLowerCase()}.`)
+      let recado = `Acesso criado para ${novo.email.trim().toLowerCase()}.`
+
+      // O login do TOA é o que liga o acesso ao TÉCNICO — e é
+      // `tecnico.usuario_id` que o RLS consulta para saber qual agenda a
+      // pessoa enxerga. Sem isto o técnico entra e vê a tela vazia.
+      const loginTOA = novo.login_toa.trim()
+      if (loginTOA && r?.usuario_id) {
+        const { data: v, error: ev } = await supabase.rpc(
+          'vincular_tecnico_ao_usuario',
+          { p_usuario: r.usuario_id, p_login_toa: loginTOA })
+        if (ev) {
+          // O acesso foi criado; só o vínculo falhou. Dizer as duas
+          // coisas evita que alguém crie o usuário de novo.
+          recado += ` Mas o vínculo com o técnico falhou: ${traduzir(ev.message)}`
+        } else {
+          const t = v as { tecnico: string; matricula: string; equipe: string | null }
+          recado += ` Vinculado ao técnico ${t.matricula} · ${t.tecnico}`
+            + (t.equipe ? `, equipe ${t.equipe}.` : '.')
+        }
+      }
+      setOk(recado)
       if (r?.senha_gerada) setSenhaGerada({ email: r.email!, senha: r.senha_gerada })
       setCriando(false)
       setNovo({ nome: '', email: '', apelido: '', whatsapp: '',
-                cargo_id: '', perfil_acesso_id: '', cpf: '', matricula_ponto: '' })
+                cargo_id: '', perfil_acesso_id: '', cpf: '', matricula_ponto: '',
+                login_toa: '' })
       await recarregar()
     }
     setOcupado(false)
@@ -308,6 +337,7 @@ export default function Administracao() {
                     {([['nome', 'Nome completo *'], ['email', 'E-mail *'],
                        ['apelido', 'Apelido'], ['whatsapp', 'WhatsApp'],
                        ['cpf', 'CPF'], ['matricula_ponto', 'Matrícula do ponto'],
+                       ['login_toa', 'Login TOA (matrícula do técnico)'],
                       ] as [keyof typeof novo, string][]).map(([k, rot]) => (
                       <label key={k} className="text-xs text-graf-400">
                         <span className="mb-1 block">{rot}</span>
@@ -381,6 +411,15 @@ export default function Administracao() {
                                 )}
                               </div>
                               <div className="text-xs text-graf-500">{u.email}</div>
+                              {u.tecnico && (
+                                <div className="mt-0.5 text-[11px] text-graf-400">
+                                  <span className="rounded bg-sky-900/40 px-1.5 py-0.5
+                                                   text-[9px] font-semibold uppercase
+                                                   text-sky-300">login TOA</span>{' '}
+                                  <span className="tabular">{u.tecnico.matricula}</span>
+                                  {' · '}{u.tecnico.nome}
+                                </div>
+                              )}
                             </td>
                             <td className="px-3 py-2 text-xs">
                               {ed ? (
