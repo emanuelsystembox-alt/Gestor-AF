@@ -39,6 +39,17 @@ interface Usuario {
   perfil_acesso: { nome: string; papel: string | null } | null
 }
 
+/** Um supervisor do TOA e o usuário que responde por ele.
+ *  `equipe.supervisor_nome` é texto do TOA; `equipe.supervisor_id` é o
+ *  login. Sem o segundo, o papel SUPERVISOR entra e não vê nada (D-066). */
+interface SupervisorEquipes {
+  supervisor_nome: string
+  equipes: number
+  vinculadas: number
+  usuario_id: string | null
+  usuario_nome: string | null
+}
+
 const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs ' +
               'outline-none focus:border-af-500'
 
@@ -46,7 +57,9 @@ export default function Administracao() {
   const { perfil, temPapel } = useAuth()
   const souAdmin = temPapel('ADMIN')
 
-  const [aba, setAba] = useState<'usuarios' | 'perfis' | 'cargos'>('usuarios')
+  const [aba, setAba] = useState<'usuarios' | 'perfis' | 'cargos' | 'supervisores'>('usuarios')
+  const [supers, setSupers] = useState<SupervisorEquipes[]>([])
+  const [vinculo, setVinculo] = useState<Record<string, string>>({})
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [papeisPorUsuario, setPapeisPorUsuario] = useState<Map<string, string[]>>(new Map())
   const [cargos, setCargos] = useState<Cargo[]>([])
@@ -78,7 +91,7 @@ export default function Administracao() {
 
   async function recarregar() {
     setCarregando(true); setErro(null)
-    const [u, up, c, pa, pm, pap] = await Promise.all([
+    const [u, up, c, pa, pm, pap, sv] = await Promise.all([
       supabase.from('perfil')
         .select(`id, nome, email, apelido, ativo, atualizado_em, whatsapp,
                  cargo:cargo_id ( nome ),
@@ -89,7 +102,9 @@ export default function Administracao() {
       supabase.from('perfil_acesso').select('*').order('ordem'),
       supabase.from('permissao').select('*').order('modulo').order('ordem'),
       supabase.from('perfil_acesso_permissao').select('perfil_acesso_id, permissao_chave'),
+      supabase.rpc('supervisores_das_equipes'),
     ])
+    setSupers((sv.data ?? []) as SupervisorEquipes[])
     if (u.error) setErro(u.error.message)
     else setUsuarios((u.data ?? []) as unknown as Usuario[])
 
@@ -124,6 +139,19 @@ export default function Administracao() {
       return 'O banco recusou: seu usuário não tem papel ADMIN. A barreira é do RLS, não da tela.'
     if (/duplicate key/i.test(msg)) return 'Já existe um registro com esse nome.'
     return msg
+  }
+
+  /** Executa uma RPC, mostra o recado e recarrega. Cada tela desta
+   *  página repetia esse mesmo bloco de cinco linhas. */
+  async function agir(
+    fn: () => PromiseLike<{ error: { message: string } | null }>,
+    msg: string,
+  ) {
+    setOcupado(true); setErro(null); setOk(null)
+    const { error } = await fn()
+    if (error) setErro(traduzir(error.message))
+    else { setOk(msg); await recarregar() }
+    setOcupado(false)
   }
 
   async function criarUsuario() {
@@ -276,6 +304,7 @@ export default function Administracao() {
 
         <div className="flex rounded-lg bg-graf-900 p-0.5">
           {([['usuarios', 'Usuários', usuarios.length],
+             ['supervisores', 'Supervisores', supers.length],
              ['perfis', 'Perfis de acesso', perfis.length],
              ['cargos', 'Cargos', cargos.length]] as const).map(([a, rot, n]) => (
             <button key={a} onClick={() => { setAba(a); setEditando(null) }}
@@ -490,6 +519,103 @@ export default function Administracao() {
               autoria de cada baixa, marcador, transferência e exclusão que ele fez. E o
               banco não deixa tirar o último ADMIN ativo — nem você desativar a si mesmo.
             </p>
+          </section>
+        ) : aba === 'supervisores' ? (
+          <section className="card-controle overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-2.5">
+              <h2 className="text-sm font-semibold">Supervisores e suas equipes</h2>
+              <p className="mt-1 max-w-3xl text-xs text-graf-400">
+                O TOA manda o <strong>nome</strong> do supervisor em cada equipe. O que
+                decide o que ele enxerga no sistema é o <strong>login</strong>. Enquanto
+                os dois não estiverem ligados, quem entra com papel SUPERVISOR vê a tela
+                vazia — e isso não é defeito, é falta de cadastro.
+              </p>
+              <p className="mt-1 text-xs text-graf-500">
+                Não achou o supervisor na lista de usuários? Crie o login primeiro na aba
+                <strong className="text-graf-300"> Usuários</strong>, com o papel
+                SUPERVISOR — o vínculo aqui exige o papel.
+              </p>
+            </div>
+
+            <table className="w-full text-sm">
+              <thead className="border-b border-graf-800 bg-graf-900 text-left
+                                text-[11px] uppercase tracking-wide text-graf-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Supervisor no TOA</th>
+                  <th className="px-3 py-2 text-right font-medium">Equipes</th>
+                  <th className="px-3 py-2 font-medium">Login vinculado</th>
+                  <th className="px-3 py-2 font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                {supers.map(sv => {
+                  const cands = usuarios.filter(u =>
+                    u.ativo && (papeisPorUsuario.get(u.id) ?? []).includes('SUPERVISOR'))
+                  return (
+                    <tr key={sv.supervisor_nome} className="border-b border-graf-800/60">
+                      <td className="px-3 py-2.5 font-medium">{sv.supervisor_nome}</td>
+                      <td className="tabular px-3 py-2.5 text-right text-graf-300">
+                        {sv.equipes}
+                        {sv.vinculadas > 0 && sv.vinculadas < sv.equipes && (
+                          <div className="text-[10px] text-amber-400">
+                            {sv.vinculadas} vinculada(s)
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {sv.usuario_nome ? (
+                          <span className="rounded bg-emerald-900/40 px-2 py-0.5 text-[11px]
+                                           font-medium text-emerald-300">
+                            {sv.usuario_nome}
+                          </span>
+                        ) : cands.length === 0 ? (
+                          <span className="text-[11px] text-graf-600">
+                            nenhum usuário com papel SUPERVISOR ainda
+                          </span>
+                        ) : (
+                          <select className={`${campo} w-56`}
+                            value={vinculo[sv.supervisor_nome] ?? ''}
+                            onChange={e => setVinculo(v =>
+                              ({ ...v, [sv.supervisor_nome]: e.target.value }))}>
+                            <option value="">— escolha o login —</option>
+                            {cands.map(u => (
+                              <option key={u.id} value={u.id}>{u.nome} · {u.email}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {sv.usuario_id ? (
+                          <button disabled={!souAdmin || ocupado}
+                            onClick={() => agir(
+                              () => supabase.rpc('limpar_supervisor_das_equipes',
+                                { p_usuario: sv.usuario_id }),
+                              `Vínculo de ${sv.supervisor_nome} desfeito.`)}
+                            className="rounded-md border border-graf-700 px-3 py-1 text-xs
+                                       text-graf-400 hover:border-af-600 hover:text-af-400
+                                       disabled:opacity-40">
+                            desvincular
+                          </button>
+                        ) : (
+                          <button
+                            disabled={!souAdmin || ocupado || !vinculo[sv.supervisor_nome]}
+                            onClick={() => agir(
+                              () => supabase.rpc('definir_supervisor_das_equipes', {
+                                p_usuario: vinculo[sv.supervisor_nome],
+                                p_supervisor_nome: sv.supervisor_nome,
+                              }),
+                              `${sv.supervisor_nome}: ${sv.equipes} equipe(s) vinculada(s).`)}
+                            className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium
+                                       text-white hover:bg-af-500 disabled:opacity-40">
+                            vincular {sv.equipes} equipe(s)
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </section>
         ) : aba === 'perfis' ? (
           <section className="space-y-3">

@@ -110,7 +110,9 @@ E CTE com função de conjunto referenciada uma vez é *inline*: use
 
 **Dedução do sistema não pode ocupar a cadeira do cadastro.** Semeei
 `equipe.login_toa` a partir da matrícula do técnico; a tela passou a
-mostrar como se o usuário tivesse cadastrado. Ver D-079.
+mostrar como se o usuário tivesse cadastrado. Ver D-079. O conserto não
+foi parar de deduzir — foi a tela dizer que deduziu (D-082).
+**Dedução calada é o problema; dedução etiquetada é informação.**
 
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
@@ -158,7 +160,7 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 31 migrations, as 80 decisões, o que já corrigimos do
+> reais do banco, as 32 migrations, as 82 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
@@ -193,7 +195,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 80 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 82 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |

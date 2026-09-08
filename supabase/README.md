@@ -100,6 +100,7 @@ conta a história.
 | 037 | **Meta e comissão do técnico** + `produtividade_periodo` | ✓ |
 | 038 | **A receber = pontuação × fator**, e a faixa por piso (sem buraco) | ✓ |
 | 039 | Desfaz o cadastro de login deduzido (D-079) e o abrigo (D-080) | ✓ |
+| 040 | **Vínculo supervisor ↔ equipes** e a etiqueta de origem do login (CADASTRADO / PELA MATRÍCULA) | ✓ |
 
 ---
 

@@ -75,6 +75,14 @@ interface Tec {
   equipe: { codigo: string; nome: string; supervisor_nome: string | null
             area: { apelido: string | null } | null } | null
 }
+/** De onde veio o login que roteou o contrato para esta equipe.
+ *  CADASTRO = alguém digitou. MATRICULA = saiu da planilha de equipes,
+ *  pela matrícula do técnico. A diferença importa (D-079). */
+interface LoginEquipe {
+  equipe_id: string; login: string
+  origem: 'CADASTRO' | 'MATRICULA' | 'SEM_CADASTRO'
+  visitas: number
+}
 interface Orfao {
   matricula: string; visitas: number
   primeira: string; ultima: string; equipes_sugeridas: string | null
@@ -109,6 +117,7 @@ export default function Equipes() {
   const [painel, setPainel] = useState<EquipePainel[]>([])
   const [tecnicos, setTecnicos] = useState<Tec[]>([])
   const [orfaos, setOrfaos] = useState<Orfao[]>([])
+  const [logins, setLogins] = useState<LoginEquipe[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -166,6 +175,15 @@ export default function Equipes() {
     return m
   }, [tecnicos])
 
+  const porLogin = useMemo(() => {
+    const m = new Map<string, LoginEquipe[]>()
+    for (const l of logins) {
+      const a = m.get(l.equipe_id) ?? []
+      a.push(l); m.set(l.equipe_id, a)
+    }
+    return m
+  }, [logins])
+
   const pedido = useRef(0)
 
   async function recarregar() {
@@ -173,7 +191,7 @@ export default function Equipes() {
     const meu = ++pedido.current
     setCarregando(true); setErro(null)
     setAberta(null); setDetalhe({})
-    const [p, t, o] = await Promise.all([
+    const [p, t, o, lg] = await Promise.all([
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
         .select(`id, matricula, nome, situacao, equipe_id, foto_url,
@@ -181,12 +199,14 @@ export default function Equipes() {
                                     area:area_id ( apelido ) )`)
         .order('matricula'),
       supabase.rpc('tecnicos_nao_cadastrados'),
+      supabase.rpc('logins_das_equipes', { p_data: data }),
     ])
     if (meu !== pedido.current) return
     if (p.error) setErro(p.error.message)
     else setPainel((p.data ?? []) as EquipePainel[])
     if (t.data) setTecnicos(t.data as unknown as Tec[])
     if (o.data) setOrfaos(o.data as Orfao[])
+    setLogins((lg.data ?? []) as LoginEquipe[])
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [data])
@@ -557,12 +577,31 @@ export default function Equipes() {
                                     )}
                                   </div>
                                   <div className="mt-0.5 text-[11px] leading-relaxed text-graf-400">
-                                    {e.login_toa ? (
-                                      <span>Login TOA <span className="tabular text-graf-300">
-                                        {e.login_toa}</span></span>
-                                    ) : (
-                                      <span className="text-graf-600">sem login TOA no dia</span>
-                                    )}
+                                    {(() => {
+                                      const ls = porLogin.get(e.equipe_id) ?? []
+                                      if (!ls.length) return (
+                                        <span className="text-graf-600">sem login TOA no dia</span>
+                                      )
+                                      return ls.map(l => (
+                                        <span key={l.login} className="mr-2 inline-block">
+                                          Login TOA{' '}
+                                          <span className="tabular text-graf-300">{l.login}</span>
+                                          {/* Dizer de onde veio o login é o que
+                                              impede confundir dedução com cadastro. */}
+                                          {l.origem === 'CADASTRO' ? (
+                                            <span title="Cadastrado por alguém desta operação"
+                                              className="ml-1 rounded bg-emerald-900/40 px-1
+                                                         text-[9px] font-semibold uppercase
+                                                         text-emerald-300">cadastrado</span>
+                                          ) : (
+                                            <span title="Deduzido da planilha de equipes: o login bate com a matrícula do técnico"
+                                              className="ml-1 rounded bg-graf-800 px-1 text-[9px]
+                                                         font-semibold uppercase text-graf-400">
+                                              pela matrícula</span>
+                                          )}
+                                        </span>
+                                      ))
+                                    })()}
                                     {e.tecnicos > 0 && <span> · {e.tecnicos} téc.</span>}
                                     <br />
                                     {e.supervisor ?? '—'}

@@ -168,7 +168,8 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 | O quê | Por quê |
 |---|---|
-| **O critério 3 conta como cadastro?** | `equipe_do_login` resolve por (1) cadastro de login da equipe, (2) login corrente, (3) **matrícula do técnico → equipe**, que vem da planilha de equipes. Hoje o critério 3 roteia **323 visitas (73% das produtivas), de 45 logins**. Se ele NÃO valer como cadastro, essas 323 ficam sem equipe até alguém cadastrar login por login. **Decisão do Emanuel.** Ver D-080. |
+| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: vale.** A tela passou a etiquetar cada login como CADASTRADO ou PELA MATRÍCULA, e `cadastrar_login_da_equipe()` promove um para o outro — D-082. |
+| **Criar os logins dos 5 supervisores** | A aba *Supervisores* em Administração vincula 21 equipes em um clique, mas os supervisores não têm conta. Criar conta é ação sua (Administração → Usuários, papel SUPERVISOR) — D-083. |
 | **Faixa de comissão: piso ou intervalo fechado?** | Mudei para piso porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Isso difere da tabela literal do sistema atual. Se a AFLINE quiser estrito, é uma linha em dois lugares. Ver D-077. |
 | **Logins de teste** | Só o Emanuel cria: exige a `service_role`, que não pode passar pelo assistente nem pelo navegador. `app/scripts/criar-usuarios-teste.mjs` faz tudo e tem `--remover`. |
 | ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator` (D-077). |

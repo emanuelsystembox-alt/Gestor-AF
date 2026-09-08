@@ -130,6 +130,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 037 | Meta, comissão e `produtividade_periodo` |
 | 038 | **A receber = pontuação × fator**; faixa por piso |
 | 039 | Desfaz o cadastro deduzido e o abrigo |
+| 040 | Vínculo supervisor ↔ equipes; origem do login na tela |
 
 ---
 
@@ -152,7 +153,7 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 
 ---
 
-## As 80 decisões
+## As 82 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -218,9 +219,9 @@ em janela
 | O quê | Por que está parado |
 |---|---|
 | ~~**`pontos_equipe`**~~ | **RESOLVIDO em 07/09:** `a receber = pontuação × fator`, com o fator saindo da faixa do mês (D-077). Meta e faixas viraram cadastro editável. |
-| **O critério 3 conta como cadastro?** | `equipe_do_login` resolve por cadastro de login da equipe, login corrente e **matrícula do técnico → equipe**. O terceiro roteia hoje **323 visitas (73% das produtivas), de 45 logins**. Se não valer como cadastro, elas ficam sem equipe até alguém cadastrar login por login. **Decisão do Emanuel** — D-080. |
+| ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: vale**, e a tela passou a dizer de onde cada login veio (CADASTRADO / PELA MATRÍCULA) — D-082. |
 | **Faixa de comissão: piso ou intervalo fechado?** | Está por piso, porque a tabela em inteiros deixava buraco (199,50 pts → R$ 0,00). Difere da tabela literal do sistema atual — D-077. |
-| **Vincular supervisor ao usuário** | `equipe.supervisor_id` está em **0 de 89**. Enquanto ficar assim, o papel SUPERVISOR entra e não enxerga nada — o caminho no RLS já existe desde a 031, falta o dado. `supervisor_nome` (85 de 89) é texto do TOA e não serve de chave. **Depende do Emanuel.** |
+| **Criar os logins dos 5 supervisores** | A aba *Supervisores* em Administração já vincula em um clique, mas os 5 supervisores do TOA não têm conta nenhuma. Criar conta é ação do Emanuel (Administração → Usuários, papel SUPERVISOR) — D-083. |
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
 | **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |

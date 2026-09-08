@@ -1250,3 +1250,49 @@ Conferido com usuário temporário ligado a um técnico real, e desfeito:
 19 visitas visíveis (só a equipe dele), 0 de outras, 1 linha de produção,
 etapa gravada com `login Z656921 · origem MOBILE`, e conclusão sem baixa
 barrada nomeando a O.S.
+
+### D-082 · O critério 3 vale — mas a tela diz que é ele
+O Emanuel delegou a decisão. **Fica valendo.**
+
+`tecnico.matricula → tecnico.equipe_id` saiu da planilha de equipes: é
+dado declarado por quem opera, não dedução minha. Tirá-lo deixaria 323
+visitas — 73% das produtivas — sem equipe, e a produtividade quase
+vazia, sem ganho nenhum em troca.
+
+O que estava errado na 034 nunca foi *usar* o critério 3. Foi **copiá-lo
+para dentro de `equipe.login_toa`** e fazê-lo passar por cadastro
+(D-079). O conserto certo não é remover o critério: é dizer de onde cada
+login veio.
+
+A lista de equipes passou a mostrar a etiqueta ao lado do login:
+
+- **CADASTRADO** — alguém digitou o login nesta equipe
+- **PELA MATRÍCULA** — veio da planilha de equipes, pelo técnico
+
+Medido em 07/09, no dia com serviço: 6 equipes resolvem pela matrícula
+(45 visitas) e 1 por cadastro (7 visitas). `cadastrar_login_da_equipe()`
+promove uma dedução a cadastro quando o gestor confirma — e aí a
+declaração é dele, com autor e data.
+
+> **A regra geral:** dado deduzido pode decidir, desde que a tela diga
+> que foi deduzido. O problema nunca é a dedução; é a dedução calada.
+
+### D-083 · Vincular supervisor é do gestor, e exige o papel antes
+`equipe.supervisor_nome` é texto do TOA — 85 de 89 equipes, 5
+supervisores. `equipe.supervisor_id` é o vínculo com o login, e estava em
+**0 de 89**: por isso o papel SUPERVISOR entrava e via a tela vazia
+(D-066).
+
+Nome não serve de chave: bate por acaso e deixa de bater por acento. Mas
+serve de **filtro** para o gestor dizer "estas 21 equipes são do Luiz
+Henrique, e o login dele é este". A aba *Supervisores* em Administração
+faz isso em um clique por supervisor, em vez de 21.
+
+`definir_supervisor_das_equipes()` **exige que o usuário já tenha o papel
+SUPERVISOR**. Sem o papel, o vínculo não abre nada — e a pessoa acharia
+que estava feito.
+
+> ⚠ **Ainda depende do Emanuel:** os cinco supervisores não têm login
+> nenhum. Criar conta é ação dele — a tela de Administração faz isso pela
+> Edge Function `admin-usuarios` (D-051). Depois de criado o login com o
+> papel SUPERVISOR, o vínculo é um clique.
