@@ -2090,7 +2090,10 @@ terminava e a outra começava.
 
 Agora cada O.S. é um bloco de **dois andares**, com barra à esquerda:
 
-
+```
+| 2607386471  12 · MUDANCA DE ENDERECO          ACESSO VIRTUA
+| 409 · INSTALAÇÃO EFETUADA
+```
 
 - **Andar de cima — identidade e pendência.** Número, tipo e o produto
   que falta fazer, à direita. É o que se procura primeiro: qual O.S. é
