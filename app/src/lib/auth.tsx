@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, carregarSituacoes } from './supabase'
 
@@ -40,12 +40,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissoes, setPermissoes] = useState<string[]>([])
   const [carregando, setCarregando] = useState(true)
 
+  /**
+   * ┌─ POR QUE ESTE useRef EXISTE ─────────────────────────────────────┐
+   * │ O `supabase-js` renova o token sozinho e dispara                 │
+   * │ `onAuthStateChange` toda vez que a aba volta a receber foco. O   │
+   * │ objeto de sessão vem NOVO a cada disparo — mesma pessoa, mesma   │
+   * │ permissão, referência diferente.                                 │
+   * │                                                                  │
+   * │ Guardar esse objeto direto no estado fazia o React remontar a    │
+   * │ árvore inteira: a tela piscava o "Carregando…", refazia perfil,  │
+   * │ papéis e permissões, e cada página refazia as consultas dela.    │
+   * │ Sair para olhar outra coisa e voltar recarregava tudo.           │
+   * │                                                                  │
+   * │ O que a aplicação usa da sessão é o ID de quem está logado. Se o │
+   * │ ID não mudou, nada mudou para a tela — e o token renovado o      │
+   * │ próprio cliente já usa por dentro.                               │
+   * └──────────────────────────────────────────────────────────────────┘
+   */
+  const idLogado = useRef<string | null>(null)
+
   useEffect(() => {
+    let vivo = true
     supabase.auth.getSession().then(({ data }) => {
+      if (!vivo) return
+      idLogado.current = data.session?.user.id ?? null
       setSession(data.session)
       if (!data.session) setCarregando(false)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      const novo = s?.user.id ?? null
+      // Token renovado da mesma pessoa: ignora e não re-renderiza nada.
+      if (novo === idLogado.current) return
+      idLogado.current = novo
       setSession(s)
       if (!s) {
         setPerfil(null)
@@ -54,11 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCarregando(false)
       }
     })
-    return () => sub.subscription.unsubscribe()
+    return () => { vivo = false; sub.subscription.unsubscribe() }
   }, [])
 
+  // Depende do ID, não do objeto: ver o comentário do `idLogado`.
+  const usuarioId = session?.user.id ?? null
+
   useEffect(() => {
-    if (!session) return
+    if (!usuarioId) return
     let vivo = true
     ;(async () => {
       setCarregando(true)
@@ -67,8 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // banco em vez da constante compilada.
       carregarSituacoes()
       const [p, r, q] = await Promise.all([
-        supabase.from('perfil').select('id, nome, email, tecnico_id').eq('id', session.user.id).maybeSingle(),
-        supabase.from('usuario_papel').select('papel').eq('usuario_id', session.user.id),
+        supabase.from('perfil').select('id, nome, email, tecnico_id').eq('id', usuarioId).maybeSingle(),
+        supabase.from('usuario_papel').select('papel').eq('usuario_id', usuarioId),
         supabase.rpc('minhas_permissoes'),
       ])
       if (!vivo) return
@@ -78,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCarregando(false)
     })()
     return () => { vivo = false }
-  }, [session])
+  }, [usuarioId])
 
   const temPapel = (...p: Papel[]) => p.some(x => papeis.includes(x))
 

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { Shell } from '../components/Shell'
@@ -141,6 +141,11 @@ export default function Equipes() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [previa, setPrevia] = useState<Record<string, string>[] | null>(null)
   const [faltando, setFaltando] = useState<string[]>([])
+  // Arquivo do TOA largado na importação de equipes. Acontece porque os
+  // dois botões se chamam "Importar planilha"; dizer "faltam colunas"
+  // manda a pessoa procurar defeito num arquivo que está certo — só
+  // está na tela errada.
+  const [ehArquivoTOA, setEhArquivoTOA] = useState(false)
   const [ocupado, setOcupado] = useState(false)
 
   // cadastro avulso
@@ -229,6 +234,11 @@ export default function Equipes() {
     setErro(null); setOk(null)
     try {
       const r = await lerPlanilha(f, 'Equipes')
+      // A planilha do TOA tem estas duas colunas e a de equipes não tem
+      // nenhuma delas — é assinatura suficiente para não confundir.
+      const doTOA = r.cabecalhos.includes('ID da Atividade')
+                 && r.cabecalhos.includes('Status da Atividade')
+      setEhArquivoTOA(doTOA)
       setFaltando(COLUNAS.filter(c => !r.cabecalhos.includes(c)))
       setPrevia(r.linhas)
     } catch (x) {
@@ -413,14 +423,29 @@ export default function Equipes() {
           <section className="card-controle space-y-3 p-4">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="font-medium">Prévia da importação</h2>
-              <button onClick={() => setPrevia(null)}
+              <button onClick={() => { setPrevia(null); setEhArquivoTOA(false) }}
                 className="text-sm text-graf-400 hover:text-af-400">Cancelar</button>
             </div>
             <p className="text-sm text-graf-300">
               <strong className="tabular text-lg">{previa.length}</strong> linhas.
               Equipe e técnico já existentes são <strong>atualizados</strong>, não duplicados.
             </p>
-            {faltando.length > 0 && (
+            {ehArquivoTOA ? (
+              <Alerta tipo="aviso">
+                <strong>Esta é a planilha de ATIVIDADES do TOA</strong>, não a de
+                equipes — ela tem <code>ID da Atividade</code> e{' '}
+                <code>Status da Atividade</code>. O arquivo está certo; só está na
+                tela errada.{' '}
+                <Link to="/controle/importar"
+                  className="font-medium underline underline-offset-2 hover:text-af-400">
+                  Importar TOA é aqui →
+                </Link>
+                <span className="mt-1 block text-xs opacity-80">
+                  Nesta tela entra a planilha de <strong>equipes</strong>, com as
+                  colunas {COLUNAS.join(', ')}.
+                </span>
+              </Alerta>
+            ) : faltando.length > 0 && (
               <Alerta tipo="aviso">
                 Colunas ausentes: <strong>{faltando.join(', ')}</strong>.
                 Use a <code>equipes-manaus.xlsx</code>, aba <code>Equipes</code>.
