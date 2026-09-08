@@ -2213,3 +2213,140 @@ Duas decisões que valem registro:
 Jornada fica de fora: "Na Base" e "Refeição" não são deslocamento para
 cliente. A proposta que o Emanuel aprovou está em
 `docs/proposta-rota-do-dia.html`.
+
+
+### D-112 · O aplicativo do técnico é Expo, e mora em `campo/`
+> *"tenho que desenvolver para Android e iPhone, técnico tem que tirar
+> foto, vídeos e usar a geolocalização"* — Emanuel, 08/09
+
+A tela `/campo` da web já fazia o passo a passo e a baixa. O que ela não
+faz — e não vai fazer — é **câmera de verdade e GPS de verdade**. No
+navegador do celular a foto passa por um seletor de arquivos, o vídeo
+depende de codec, e a localização só existe enquanto a aba está aberta e
+o usuário disse "permitir" naquela sessão.
+
+Escolhas, com o porquê:
+
+- **Expo (SDK 57), não React Native puro.** O técnico testa hoje pelo
+  **Expo Go**, sem loja, sem build. Câmera, vídeo e GPS funcionam no
+  Expo Go — nada que a gente use exige build nativo. Publicar na Play
+  Store e na App Store é `eas build` depois, com o mesmo código.
+- **Projeto separado, não monorepo.** `app/` é Vite + Tailwind, `campo/`
+  é Metro + StyleSheet. As duas árvores não compartilham build, e
+  compartilhar `node_modules` entre elas custaria mais do que os ~150
+  linhas de domínio que realmente se repetem (`src/lib/dominio.ts` e
+  `formato.ts` são gêmeos de propósito — a duplicação é escrita e
+  declarada, não acidental).
+- **A web `/campo` continua.** Serve o controlador conferindo do
+  computador e o técnico sem o aplicativo instalado.
+
+A tela inicial é a **agenda**, não um menu. O concorrente abre com doze
+ícones (Ranking, Meta, Premiação, Portaria, Abastecer…) e enterra o
+trabalho do dia atrás de dois toques. O técnico abre o aplicativo para
+fazer visita.
+
+
+### D-113 · O técnico só baixa com o GPS ligado
+> *"o técnico só pode baixar se estiver ligado"* — Emanuel, 08/09
+
+**Ligado é o GPS** — perguntado e confirmado antes de escrever
+qualquer linha.
+
+A baixa é o momento em que a AFLINE afirma à CLARO o que aconteceu no
+endereço do assinante. Afirmar isso sem dizer **de onde** é exatamente o
+que o sistema atual permite. `baixar_os` agora recusa a chamada do campo
+sem `lat/lng` (055-G), e o mesmo vale para **encerrar a visita**
+(`registrar_etapa` para situação terminal): encerrar é a mesma
+afirmação, feita pela outra porta.
+
+Três limites deliberados:
+
+- **Andar pela tela não exige coordenada.** "A caminho" e "Cheguei"
+  passam sem GPS. Travar o passo a passo por causa de satélite é pior
+  que registrar sem ele.
+- **Foto sem GPS ainda sobe.** Ela guarda `lat`, `lng` e `precisao_m`
+  quando dá, e a tela marca "sem GPS" quando não deu. Prova fraca é
+  melhor que nenhuma prova — desde que ninguém confunda as duas.
+- **Não é cerca eletrônica.** Não conferimos se a coordenada bate com o
+  endereço. A tela mostra a distância ("340 m do endereço") e deixa a
+  leitura para quem audita. Definir raio aceitável é regra de negócio
+  que ninguém pediu.
+
+A assinatura de `baixar_os` mudou de 5 para 7 parâmetros, e a de
+`baixar_visita` de 3 para 5. A versão antiga foi **derrubada**, não
+mantida ao lado: duas funções com o mesmo nome e defaults deixariam a
+chamada de 5 argumentos ambígua para o PostgREST.
+
+
+### D-114 · Baixa dada não se desfaz pelo campo
+> *"o técnico não tem o poder de tirar do cancelado, reagendado,
+> executado, uma vez que o sistema baixa ou ele baixar não vai poder"*
+> — Emanuel, 08/09
+
+Duas travas, uma ideia:
+
+1. **O.S. com baixa da AFLINE não aceita segunda baixa do campo.** A
+   tela web tinha um "Trocar código" que agora só o controlador vê.
+2. **Situação terminal não volta.** A trava de 032 pegava `CONCLUIDA` e
+   `CANCELADA` e **deixava `REAGENDAMENTO` passar** — justamente a
+   situação que a baixa automática do TOA aplica sozinha 1.075 vezes
+   (D-097). Agora a lista é `situacoes_terminais()` (035), a mesma que
+   as outras portas usam.
+
+Quem corrige é o controlador, que tem `reverter_situacao` e deixa motivo
+(D-030). "Campo" aqui é quem **só** tem o papel do campo: um controlador
+que também está cadastrado como técnico não perde os poderes de
+controlador por abrir o aplicativo.
+
+
+### D-115 · Depois de baixado ele ainda anexa — mas só no dia
+> *"ele vai poder editar foto depois de baixado, ou anexar equipamento
+> ou foto não lançada"* — Emanuel, 08/09
+
+Foto que não subiu e equipamento que ele esqueceu de lançar são o caso
+comum, não a exceção. Fechar a visita para anexo empurraria isso para o
+WhatsApp — que é onde está hoje.
+
+A janela é **o dia do contrato**, escolha do Emanuel entre "sem prazo",
+"48 horas" e "só hoje". `pode_anexar_na_visita` (055-D) é o único lugar
+onde essa conta é feita, e ela usa **`hoje_local()`**, não
+`current_date`: o Postgres da Supabase está em UTC, e em Manaus o dia
+vira às 20h — a regra medida em UTC tiraria o celular do técnico do ar
+quatro horas antes da meia-noite dele. É o D-084 do lado do banco.
+
+Anexo é **inserção, nunca edição**: não há policy de UPDATE nem de
+DELETE no bucket, e não há RPC para apagar evidência. Prova que se
+apaga não é prova.
+
+> **Em aberto:** foto errada (dedo na lente, contrato trocado) hoje só
+> sai pelo `service_role`. Se isso incomodar na prática, a saída é uma
+> RPC de *ocultar com motivo*, não um DELETE.
+
+
+### D-116 · O caminho do arquivo é a chave da permissão
+Evidência mora no bucket privado `evidencia`, sempre em
+`<visita_id>/<arquivo>`. O prefixo não é organização: é o que a policy
+do Storage usa para descobrir de qual contrato o arquivo é. A regra
+inteira é uma linha:
+
+```sql
+visita_do_path(name) in (select id from visita)
+```
+
+O subselect passa pelo RLS da `visita`, então o arquivo é visível para
+**exatamente** quem já podia ver o contrato — sem uma segunda cópia da
+regra de escopo para divergir da primeira.
+
+`visita_do_path` existe porque `substring(name,1,36)::uuid` estoura em
+qualquer objeto cujo nome não seja um UUID, e policy que estoura vira
+negação silenciosa em cima de tudo. O `CASE` garante a ordem de
+avaliação.
+
+A foto é reduzida a 1600 px e qualidade 0,7 **antes** de subir: a câmera
+de um celular atual entrega 4 a 8 MB por foto, o que no 4G de rua é meio
+minuto por evidência — e técnico não espera meio minuto. Vídeo tem teto
+de 60 s e 50 MB, checado na gravação e no bucket.
+
+Quando a rede cai, a evidência **entra numa fila** no aparelho e sobe
+sozinha depois. Item que falha cinco vezes sai da fila: o arquivo
+temporário já foi limpo pelo sistema e insistir só trava a tela.

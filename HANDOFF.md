@@ -24,6 +24,7 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | Pasta local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
 | Banco | Supabase `AFLINE manager` · `kqfflkxjijzdtnfshdlv` · sa-east-1 |
 | App (local) | `cd app && npm install && npm run dev` → localhost:5173 |
+| **Aplicativo do técnico** | `cd campo && npm install && npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
 
@@ -128,6 +129,43 @@ Administração não faz. Ver D-067.
 
 ---
 
+## O aplicativo do técnico (08/09)
+
+`campo/` — **Expo SDK 57**, Android e iPhone, rodando hoje no **Expo Go**
+sem passar por loja. Existe porque o navegador não entrega o que o campo
+precisa: câmera, vídeo e GPS de verdade. Ver D-112 a D-116.
+
+Quatro telas: **Entrar · Agenda · Visita · Captura**. A agenda é a tela
+inicial — o concorrente abre com doze ícones e enterra o trabalho do dia
+atrás de dois toques.
+
+O que ele faz e a web não fazia:
+
+- **foto e vídeo** direto da câmera, reduzidos antes de subir (1600 px,
+  qualidade 0,7 — a foto crua tem 4 a 8 MB e o 4G da rua não perdoa);
+- **fila offline**: sem sinal, a evidência fica guardada no aparelho e
+  sobe sozinha depois;
+- **equipamento** com serial normalizado, tipo e modelo;
+- a **distância até o endereço** e a precisão do GPS, à vista.
+
+As quatro regras que o Emanuel pediu **moram no banco**, não na tela
+(migration 055), e têm bateria própria:
+
+```sql
+select * from testar_campo();   -- 14 cenários, todos passam
+```
+
+1. Sem GPS não há baixa — nem encerramento (D-113).
+2. Baixa dada não se desfaz pelo campo; encerrado não volta (D-114).
+3. Depois de baixado ele ainda anexa — no dia do contrato (D-115).
+4. Quem carimba o autor é o servidor (D-061).
+
+> **Para testar você precisa de um login de técnico vinculado.**
+> `tecnico.usuario_id` está em 0 de 104 — sem esse vínculo a agenda vem
+> vazia e não é bug. Ver "O que está parado".
+
+---
+
 ## O que descobrimos, e que mudou o modelo
 
 Isto é o mais importante desta passagem de bastão. Cada item saiu de
@@ -189,7 +227,8 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 | **Formato do número de O.S. manual** | Geramos `AF-00000001` para não colidir com os 10 dígitos da CLARO. Formato escolhido por nós, não observado no dado — **confirmar com o Emanuel**. |
 | **"Data de Abertura"** | A tela do sistema atual tem o campo; a planilha do TOA não traz nada equivalente. Não criamos a coluna: daria 100% de vazio no que é importado. Se a CLARO expuser a data em algum lugar, vira coluna de verdade. |
 | **ITEM / CONSOLID / VALOR na O.S.** | O detalhe do sistema atual tem essas três colunas, e elas são a **LPU** — o tipo de O.S. consolidado que é faturado. Continua **não modelado** (ver Vocabulário no `CLAUDE.md`); não inventamos rateio de pontos por O.S. |
-| **Abas de equipamento na baixa** | Dependem do almoxarifado, que não existe. Sem cadastro de serial e movimento, seriam campo de texto fingindo ser controle de estoque. |
+| **Nenhum técnico está vinculado a um usuário** | `tecnico.usuario_id` está em **0 de 104**. Enquanto ficar assim, ninguém consegue usar o aplicativo do campo: a pessoa entra e a agenda vem vazia, porque `equipes_visiveis()` não acha equipe nenhuma para ela. **É o primeiro passo para testar o aplicativo** — Administração → Usuários, campo **Login TOA** (D-087). |
+| **Abas de equipamento na baixa** | O aplicativo já lança serial, tipo e modelo (`registrar_equipamento`, 055-F) e o histórico diz quem lançou. O que continua faltando é o **almoxarifado**: sem cadastro de serial não há conferência — hoje é o técnico digitando, não estoque batendo. |
 | **Miscelânea** | Não sabemos o que é. No export do ngestor é 100% "Não" em 454 registros — parece funcionalidade morta. |
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
 | ~~**`equipe.skill`**~~ | **RESOLVIDO em 08/09:** o domínio é ADESÃO · MANUTENÇÃO · DESCONEXÃO, em tabela (D-094). `SINGLE MASTER` era default nosso e virou legado. **Falta o Emanuel passar meta e faixas de cada uma** — enquanto não vierem, técnico com skill nova fica sem tabela de comissão, e a tela avisa. |

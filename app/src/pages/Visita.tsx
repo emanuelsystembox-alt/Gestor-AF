@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { rotuloEvento } from '../lib/eventos'
+import { useAuth } from '../lib/auth'
 import { Alerta, Pill } from '../components/ui'
 
 /**
@@ -76,8 +77,16 @@ const SELECT = `
 const hora = (ts: string) =>
   new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
-/** GPS é bom ter, não é condição. Travar o técnico por causa de sinal
- *  de satélite seria pior que registrar sem coordenada. */
+/**
+ * Para ANDAR pela tela — a caminho, cheguei — o GPS é bom ter, não é
+ * condição: travar o passo a passo por causa de sinal de satélite seria
+ * pior que registrar sem coordenada.
+ *
+ * Para BAIXAR, virou condição — "o técnico só pode baixar se estiver
+ * ligado" (Emanuel, 08/09). A trava está em `baixar_os` (migration
+ * 055-G): a chamada do campo sem lat/lng é recusada pelo banco. Aqui a
+ * tela só antecipa o recado, para o botão não falhar sem explicar.
+ */
 async function posicao(): Promise<{ lat: number | null; lng: number | null }> {
   try {
     const p = await new Promise<GeolocationPosition>((ok, falha) =>
@@ -90,9 +99,22 @@ async function posicao(): Promise<{ lat: number | null; lng: number | null }> {
   }
 }
 
+const SEM_GPS =
+  'Ligue a localização e autorize o navegador para dar baixa. ' +
+  'A baixa registra de onde ela foi dada.'
+
+/** Espelha `situacoes_terminais()` (migration 035). Encerrado não volta
+ *  pela mão do técnico — para isso existe `reverter_situacao` (D-030). */
+const TERMINAIS: string[] = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
+
 export default function Visita() {
   const { id } = useParams<{ id: string }>()
   const navegar = useNavigate()
+  const { ehTecnico, ehGestor, temPapel } = useAuth()
+  // "Campo" é quem SÓ tem o papel do campo — a mesma conta que o banco
+  // faz em `baixar_os` (055-G). Controlador que também é técnico não
+  // perde os poderes de controlador por abrir esta tela.
+  const ehCampo = ehTecnico && !ehGestor && !temPapel('CONTROLADOR', 'SUPERVISOR')
 
   const [v, setV] = useState<Detalhe | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
@@ -160,6 +182,10 @@ export default function Visita() {
     if (!v) return
     setSalvando(true); setErro(null)
     const { lat, lng } = await posicao()
+    // Encerrar é a mesma afirmação da baixa, pela outra porta.
+    if (ehCampo && TERMINAIS.includes(nova) && (lat == null || lng == null)) {
+      setErro(SEM_GPS); setSalvando(false); return
+    }
     const { error } = await supabase.rpc('registrar_etapa', {
       p_visita: v.id, p_situacao: nova,
       p_observacao: observacao?.trim() || null, p_lat: lat, p_lng: lng,
@@ -172,10 +198,15 @@ export default function Visita() {
   async function confirmarBaixa(osId: string) {
     if (!codEscolhido) return
     setSalvando(true); setErro(null)
+    const { lat, lng } = await posicao()
+    if (ehCampo && (lat == null || lng == null)) {
+      setErro(SEM_GPS); setSalvando(false); return
+    }
     const { error } = await supabase.rpc('baixar_os', {
       p_os: osId, p_codigo: codEscolhido.codigo,
       p_sub_falha: subSel || null,
       p_observacao: obsBaixa.trim() || null, p_situacao: null,
+      p_lat: lat, p_lng: lng,
     })
     if (error) setErro(error.message)
     else {
@@ -310,10 +341,17 @@ export default function Visita() {
                     {os.baixa_observacao && (
                       <p className="mt-0.5 text-xs opacity-70">{os.baixa_observacao}</p>
                     )}
-                    <button onClick={() => abrir(os.id)}
-                      className="mt-1.5 text-xs font-medium underline opacity-70">
-                      Trocar código
-                    </button>
+                    {/* Baixa dada não se desfaz pelo campo (055-G). O
+                        botão sai da tela de quem o banco vai recusar —
+                        oferecer uma ação que falha é pior que não
+                        oferecer. Trocar código é do controlador, que
+                        tem `reverter_situacao` e deixa motivo (D-030). */}
+                    {!ehCampo && (
+                      <button onClick={() => abrir(os.id)}
+                        className="mt-1.5 text-xs font-medium underline opacity-70">
+                        Trocar código
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button onClick={() => abrir(os.id)}

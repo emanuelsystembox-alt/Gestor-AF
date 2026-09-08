@@ -155,6 +155,8 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 052 | **Produto pendente** lido da coluna `Produto` do TOA |
 | 053 | O produto é **da O.S., pelo Ponto** — corrige o 052 |
 | 054 | **Rota do Dia** — `rota_do_dia`, `rota_bairros`, `rota_alertas` |
+| 055 | **O campo no celular** — bucket `evidencia`, `registrar_evidencia`, `registrar_equipamento`, `agenda_do_campo`, `hoje_local`, e as travas da baixa (GPS, baixa que não se desfaz, terminal que não volta, anexo só no dia) |
+| 056 | **`testar_campo()`** — 14 cenários das travas da 055, INVOKER (D-054) |
 
 ---
 
@@ -175,6 +177,22 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | `/controle/administracao` | Usuários (com RG, nascimento e skill), cargos, perfis de acesso, matriz de permissões e **contratos apagados** (o log da exclusão definitiva) |
 | `/controle/visita/:id` | Detalhe completo do contrato, com histórico e transferência |
 | `/campo` e `/campo/visita/:id` | Agenda e execução do técnico (tema claro, alvo de toque 48px): a caminho → cheguei → baixa com sub-falha → impedimento com observação → finalizar, e o **passo a passo com o login** de quem fez cada etapa |
+
+### E o aplicativo — `campo/`, Expo SDK 57 (Android e iPhone)
+
+Roda hoje no **Expo Go**, sem loja e sem build. Ver `campo/README.md` e
+D-112 a D-116.
+
+| Tela | O que faz |
+|---|---|
+| Entrar | mesmo login do sistema, sessão guardada no aparelho |
+| Agenda | o dia em uma chamada só (`agenda_do_campo`): **a fazer · baixadas**, minha produção do mês, estado do GPS e fila de evidência esperando sinal |
+| Visita | endereço com rota e telefone, O.S. com as duas baixas, **evidência (foto e vídeo)**, **equipamento**, histórico com login, e a distância até o endereço |
+| Captura | câmera e vídeo (teto de 60 s), com o tipo da evidência escolhido antes |
+
+O que só o aplicativo faz: câmera e vídeo nativos, GPS de verdade (com
+precisão registrada), e **fila offline** — sem sinal a evidência fica no
+aparelho e sobe sozinha depois.
 
 ---
 

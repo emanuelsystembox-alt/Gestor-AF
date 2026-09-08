@@ -169,6 +169,22 @@ Ver D-107.
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
 
+**`current_date` no Postgres da Supabase é UTC.** Em Manaus o dia vira
+às 20h. Qualquer regra que o usuário enxergue ("só anexa no contrato de
+hoje") medida em `current_date` tira o técnico do ar quatro horas antes
+da meia-noite dele. Use `hoje_local()`. É o D-084 do lado do banco.
+
+**Assinatura de função com default não convive com a versão antiga.**
+`baixar_os` de 5 e de 7 parâmetros ao mesmo tempo deixa a chamada de 5
+argumentos nomeados **ambígua** para o PostgREST — as duas casam. Ou
+derruba a antiga (`drop function`) e atualiza os chamadores, ou não
+acrescenta parâmetro. Ver 055-G.
+
+**Policy do Storage que estoura vira negação em cima de tudo.**
+`substring(name,1,36)::uuid` num bucket com nome que não é UUID derruba
+a policy inteira, em silêncio. Por isso existe `visita_do_path()`, com
+`CASE` — que garante a ordem de avaliação. Ver D-116.
+
 ## Estrutura
 
 ```
@@ -189,9 +205,19 @@ app/                     front-end (Vite + React + TS + Tailwind v4)
                          os 11 icones do menu, SVG a mao (D-110)
   src/pages/             Login · Controle · Servicos · Equipes · Rota ·
                          Importacao · Campo · Visita
+campo/                   APLICATIVO do técnico (Expo · Android e iPhone)
+  README.md              como rodar no Expo Go, e o que falta para publicar
+  src/lib/gps.ts         a trava do D-113 ("só baixa com o GPS ligado")
+  src/lib/midia.ts       foto/vídeo → Storage → evidência, com fila offline
+  src/telas/             Entrar · Agenda · Visita · Captura
 docs/                    mapeamento, domínio, decisões, mapa do concorrente
 supabase/migrations/     schema, em ordem
 ```
+
+**`campo/` é projeto Node separado**, com `node_modules` próprio. Metro,
+não Vite; `StyleSheet`, não Tailwind. Rodar: `cd campo && npm install &&
+npx expo start`. `src/lib/dominio.ts` e `formato.ts` duplicam a web **de
+propósito** — a duplicação é declarada, não acidental (D-112).
 
 **Gráficos são SVG escrito à mão**, sem biblioteca. Foi decisão: controle
 de tema, bundle pequeno, nada para manter. Todo gráfico tem "Ver tabela".
@@ -206,24 +232,36 @@ Classes `.sup-controle` / `.sup-campo` em `src/styles.css`.
 
 ## Como rodar
 
+Web (controle):
+
 ```bash
 cd app && npm install && cp .env.example .env && npm run dev
 ```
 
-Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.
-Sempre `npx tsc --noEmit` antes de commitar.
+Aplicativo do técnico — abre no celular pelo **Expo Go**, sem build:
 
-## Estado atual — 07/09/2026
+```bash
+cd campo && npm install && cp .env.example .env && npx expo start
+```
+
+Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.
+Sempre `npx tsc --noEmit` antes de commitar — **nos dois projetos**. No
+`campo/`, também `npx expo export --platform android`: é o teste de
+bundle, e pega import quebrado que o `tsc` não vê.
+
+## Estado atual — 08/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 50 migrations, as 111 decisões, o que já corrigimos do
+> reais do banco, as 56 migrations, as 116 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **41 tabelas, 85 funções, 82 policies, zero tabela sem RLS**,
-zero função `SECURITY DEFINER` alcançável pelo `anon`. 617 visitas,
-736 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
-1.466 sub-falhas, 1.021 regras de pontuação. **Treze telas no ar.**
+Resumo: **44 tabelas, 106 funções, 86 policies** (mais 2 no Storage),
+**zero tabela sem RLS**, zero função `SECURITY DEFINER` alcançável pelo
+`anon`, e as duas baterias verdes (16/16 e 14/14). 18 praças, 168
+códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
+**Treze telas na web, mais o aplicativo do técnico** (`campo/`, Expo —
+Android e iPhone, rodando no Expo Go).
 
 **A regra do dinheiro fechou** (D-077): `a receber = pontuação × fator`,
 com o fator saindo da faixa do mês. Produtividade e comissão numa tela
@@ -243,13 +281,19 @@ nenhum arquivo e depende do Emanuel levantar as Regras de Comissionamento.
 
 ```sql
 select * from testar_policies();   -- 16 cenários, todos têm que passar
+select * from testar_campo();      -- 14 cenários das travas do campo
 ```
+
+A segunda cobre o que a primeira não alcança: as regras da 055 não são
+policy, são guarda dentro de função `SECURITY DEFINER` — que ignora RLS
+por definição. As duas são INVOKER de propósito (D-054).
 
 ## Índice da documentação
 
 | Arquivo | Para quê |
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
+| `campo/README.md` | o aplicativo do técnico: rodar no Expo Go e publicar |
 | `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 111 decisões, com o porquê de cada uma |
