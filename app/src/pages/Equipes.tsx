@@ -84,6 +84,14 @@ interface LoginEquipe {
   origem: 'CADASTRO' | 'MATRICULA' | 'SEM_CADASTRO'
   visitas: number
 }
+/** Login que aparece no TOA e ninguém disse de quem é. Enquanto não
+ *  disser, o contrato dele fica na equipe "Sem login definido". */
+interface LoginSemDono {
+  login: string; visitas: number; primeira: string; ultima: string
+  tecnico_nome: string | null
+  equipe_sugerida_id: string | null
+  equipe_sugerida: string | null
+}
 interface Orfao {
   matricula: string; visitas: number
   primeira: string; ultima: string; equipes_sugeridas: string | null
@@ -119,6 +127,8 @@ export default function Equipes() {
   const [tecnicos, setTecnicos] = useState<Tec[]>([])
   const [orfaos, setOrfaos] = useState<Orfao[]>([])
   const [logins, setLogins] = useState<LoginEquipe[]>([])
+  const [semDono, setSemDono] = useState<LoginSemDono[]>([])
+  const [equipeDoLogin, setEquipeDoLogin] = useState<Record<string, string>>({})
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -197,7 +207,7 @@ export default function Equipes() {
     const meu = ++pedido.current
     setCarregando(true); setErro(null)
     setAberta(null); setDetalhe({})
-    const [p, t, o, lg] = await Promise.all([
+    const [p, t, o, lg, sd] = await Promise.all([
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
         .select(`id, matricula, nome, situacao, equipe_id, foto_url,
@@ -206,6 +216,7 @@ export default function Equipes() {
         .order('matricula'),
       supabase.rpc('tecnicos_nao_cadastrados'),
       supabase.rpc('logins_das_equipes', { p_data: data }),
+      supabase.rpc('logins_sem_cadastro'),
     ])
     if (meu !== pedido.current) return
     if (p.error) setErro(p.error.message)
@@ -213,6 +224,7 @@ export default function Equipes() {
     if (t.data) setTecnicos(t.data as unknown as Tec[])
     if (o.data) setOrfaos(o.data as Orfao[])
     setLogins((lg.data ?? []) as LoginEquipe[])
+    setSemDono((sd.data ?? []) as LoginSemDono[])
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [data])
@@ -335,6 +347,25 @@ export default function Equipes() {
 
   const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
 
+  /** Declara de quem é o login e leva os contratos junto — cadastrar e
+   *  continuar com 337 contratos no abrigo faria o cadastro parecer
+   *  inútil. */
+  async function cadastrarLogin(login: string, equipeId: string) {
+    setOcupado(true); setErro(null); setOk(null)
+    const { data, error } = await supabase.rpc('cadastrar_login_da_equipe',
+      { p_equipe: equipeId, p_login: login })
+    if (error) setErro(error.message)
+    else {
+      const r = data as { equipe: string; contratos_movidos: number; desde: string }
+      setOk(`Login ${login} é da equipe ${r.equipe}. `
+        + `${r.contratos_movidos} contrato(s) movido(s), desde `
+        + new Date(r.desde + 'T12:00').toLocaleDateString('pt-BR') + '.')
+      await recarregar()
+    }
+    setOcupado(false)
+  }
+
+
   return (
     <Shell acoes={
       <div className="flex items-center gap-2">
@@ -354,6 +385,73 @@ export default function Equipes() {
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
         {/* ====== técnicos vistos em campo e fora do cadastro ====== */}
+        {/* ====== logins sem dono ======
+            O contrato só vai para uma equipe quando alguém diz de quem é
+            o login. Até lá fica em "Sem login definido", visível, em vez
+            de a gente adivinhar pela matrícula e acertar calado. */}
+        {semDono.length > 0 && (
+          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
+            <h2 className="font-medium text-amber-200">
+              {semDono.length} login(s) sem equipe definida
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
+              Os contratos desses logins estão em{' '}
+              <strong>Sem login definido</strong> e ficam fora da produtividade até
+              alguém dizer de quem é cada um. O nome do técnico ao lado é
+              <strong> sugestão</strong> da planilha de equipes — quem decide a equipe
+              é você.
+            </p>
+
+            <div className="mt-3 space-y-1.5">
+              {semDono.map(l => {
+                const escolhida = equipeDoLogin[l.login] ?? l.equipe_sugerida_id ?? ''
+                return (
+                  <div key={l.login}
+                    className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <span className="tabular font-semibold">{l.login}</span>
+                      <span className="text-graf-400">{l.visitas} visitas</span>
+                      {l.tecnico_nome && (
+                        <span className="text-xs text-graf-400">
+                          {l.tecnico_nome}
+                          {l.equipe_sugerida && (
+                            <span className="text-graf-500"> · sugerida {l.equipe_sugerida}</span>
+                          )}
+                        </span>
+                      )}
+                      <span className="text-xs text-graf-600">
+                        {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}
+                        {l.primeira !== l.ultima &&
+                          ` a ${new Date(l.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
+                      </span>
+
+                      <select value={escolhida} className={`${sel} ml-auto w-56`}
+                        onChange={e => setEquipeDoLogin(v =>
+                          ({ ...v, [l.login]: e.target.value }))}>
+                        <option value="">— escolha a equipe —</option>
+                        {painel
+                          .filter(e => e.codigo !== 'SEM-LOGIN')
+                          .map(e => (
+                            <option key={e.equipe_id} value={e.equipe_id}>
+                              {e.codigo} · {e.nome}
+                            </option>
+                          ))}
+                      </select>
+
+                      <button disabled={ocupado || !escolhida}
+                        onClick={() => cadastrarLogin(l.login, escolhida)}
+                        className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium
+                                   text-white hover:bg-af-500 disabled:opacity-40">
+                        é desta equipe
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {orfaos.length > 0 && (
           <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
             <h2 className="font-medium text-amber-200">
@@ -608,6 +706,13 @@ export default function Equipes() {
                                       if (!ls.length) return (
                                         <span className="text-graf-600">sem login TOA no dia</span>
                                       )
+                                      // O abrigo junta dezenas de logins; listar
+                                      // todos vira parede de texto. Conta e pronto.
+                                      if (e.codigo === 'SEM-LOGIN') return (
+                                        <span className="text-amber-400">
+                                          {ls.length} login(s) esperando cadastro
+                                        </span>
+                                      )
                                       return ls.map(l => (
                                         <span key={l.login} className="mr-2 inline-block">
                                           Login TOA{' '}
@@ -620,10 +725,10 @@ export default function Equipes() {
                                                          text-[9px] font-semibold uppercase
                                                          text-emerald-300">cadastrado</span>
                                           ) : (
-                                            <span title="Deduzido da planilha de equipes: o login bate com a matrícula do técnico"
-                                              className="ml-1 rounded bg-graf-800 px-1 text-[9px]
-                                                         font-semibold uppercase text-graf-400">
-                                              pela matrícula</span>
+                                            <span title="Ninguém disse de quem é este login — o contrato dele está na equipe Sem login definido"
+                                              className="ml-1 rounded bg-amber-900/40 px-1 text-[9px]
+                                                         font-semibold uppercase text-amber-300">
+                                              sem cadastro</span>
                                           )}
                                         </span>
                                       ))
