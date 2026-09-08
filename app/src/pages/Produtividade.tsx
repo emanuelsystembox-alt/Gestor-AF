@@ -94,6 +94,11 @@ export default function Produtividade() {
   const [editando, setEditando] = useState(false)
   const [rascunho, setRascunho] = useState<Faixa[]>([])
   const [metaNova, setMetaNova] = useState('')
+  /** A tabela é POR SKILL (D-094). Enquanto era só "SINGLE MASTER" dava
+   *  para fixar no código; com ADESÃO, MANUTENÇÃO e DESCONEXÃO, fixar
+   *  significaria não ter onde cadastrar as outras duas. */
+  const [skills, setSkills] = useState<{ nome: string; ativo: boolean }[]>([])
+  const [skillSel, setSkillSel] = useState('SINGLE MASTER')
   const [ocupado, setOcupado] = useState(false)
   const [ok, setOk] = useState<string | null>(null)
 
@@ -101,16 +106,21 @@ export default function Produtividade() {
     const [f, m] = await Promise.all([
       supabase.from('faixa_comissao')
         .select('id, pontos_de, pontos_ate, fator')
-        .eq('skill', 'SINGLE MASTER').eq('ativo', true).order('pontos_de'),
+        .eq('skill', skillSel).eq('ativo', true).order('pontos_de'),
       supabase.from('meta_tecnico').select('meta_pontos')
-        .eq('skill', 'SINGLE MASTER').eq('ativo', true)
+        .eq('skill', skillSel).eq('ativo', true)
         .order('vigencia_inicio', { ascending: false }).limit(1).maybeSingle(),
     ])
     setFaixas((f.data ?? []) as Faixa[])
     setMeta((m.data as { meta_pontos: number } | null)?.meta_pontos ?? null)
   }
 
-  useEffect(() => { carregarFaixas() }, [])
+  useEffect(() => { setEditando(false); carregarFaixas() }, [skillSel])
+
+  useEffect(() => {
+    supabase.from('skill').select('nome, ativo').order('ordem')
+      .then(({ data }) => setSkills((data ?? []) as { nome: string; ativo: boolean }[]))
+  }, [])
 
   useEffect(() => {
     if (!de || !ate) return
@@ -178,7 +188,7 @@ export default function Produtividade() {
   async function salvarFaixas() {
     setOcupado(true); setErro(null); setOk(null)
     const { error } = await supabase.rpc('definir_faixas_comissao', {
-      p_skill: 'SINGLE MASTER',
+      p_skill: skillSel,
       p_faixas: rascunho.map(f => ({
         de: Number(f.pontos_de), ate: Number(f.pontos_ate), fator: Number(f.fator),
       })),
@@ -186,7 +196,7 @@ export default function Produtividade() {
     if (error) { setErro(error.message); setOcupado(false); return }
     if (metaNova.trim()) {
       const { error: e2 } = await supabase.rpc('definir_meta_comissao', {
-        p_skill: 'SINGLE MASTER', p_meta: Number(metaNova.replace(',', '.')),
+        p_skill: skillSel, p_meta: Number(metaNova.replace(',', '.')),
       })
       if (e2) { setErro(e2.message); setOcupado(false); return }
     }
@@ -379,10 +389,29 @@ export default function Produtividade() {
         <section className="card-controle overflow-hidden">
           <div className="flex flex-wrap items-center gap-2 border-b border-graf-800 px-4 py-2.5">
             <div>
-              <h2 className="text-sm font-semibold">Tabela de comissão · SINGLE MASTER</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">Tabela de comissão ·</h2>
+                <select value={skillSel} onChange={e => setSkillSel(e.target.value)}
+                  className="rounded-md border border-graf-700 bg-graf-900 px-2 py-1
+                             text-xs font-semibold">
+                  {skills.map(s => (
+                    <option key={s.nome} value={s.nome}>
+                      {s.nome}{s.ativo ? '' : ' (legado)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <p className="mt-0.5 text-xs text-graf-400">
-                Meta de <strong className="tabular">{meta == null ? '—' : num2(Number(meta))}</strong>
-                {' '}pontos no mês. Abaixo dela não há fator.
+                {faixas.length === 0 && meta == null ? (
+                  <span className="text-amber-400">
+                    {skillSel} ainda não tem meta nem faixa. Técnico com esta skill
+                    fica com “a receber” R$ 0 até a tabela existir.
+                  </span>
+                ) : (<>
+                  Meta de{' '}
+                  <strong className="tabular">{meta == null ? '—' : num2(Number(meta))}</strong>
+                  {' '}pontos no mês. Abaixo dela não há fator.
+                </>)}
               </p>
             </div>
             {/* Quem edita é quem tem a permissão "Editar meta e comissão do

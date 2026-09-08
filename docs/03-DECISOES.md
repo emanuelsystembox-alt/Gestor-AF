@@ -1594,3 +1594,49 @@ ninguém conferiu.
 foto, contato) não existe em tela. Enquanto não existir, "técnico
 cadastrado" e "técnico que apareceu na planilha" são indistinguíveis —
 e o D-090 (desligar em vez de apagar) opera sobre linhas de planilha.
+
+### D-094 · A skill do técnico é a chave do dinheiro, não um rótulo
+> *"Falo do cadastro do técnico, que precisa ser nessa parte. Precisa ter
+> skill, se é ADESÃO, MANUTENÇÃO, DESCONEXÃO. Não precisa mudar nada,
+> somente dados a mais na tela de cadastro, como RG e nascimento e
+> skill, que está faltando."* — Emanuel, 07/09
+
+O cadastro do técnico é a tela de **Administração → Usuários** — a mesma
+que cria o acesso. Não há ficha separada, e não precisa haver.
+
+**RG e nascimento não custaram nada:** `perfil.rg` e
+`perfil.data_nascimento` já existiam, e a Edge Function `admin-usuarios`
+já os aceitava no corpo. Só a tela não mandava.
+
+**A skill custou**, porque `tecnico.skill` não é rótulo: é a chave por
+onde o técnico acha `meta_tecnico` e `faixa_comissao` (D-077). Os 104
+valem `SINGLE MASTER` — valor que **eu** pus como default na 037, não
+que veio do TOA. A "Habilidade de Trabalho" da planilha é outra coisa
+(`Instalação(1/100), Escada(1/100)…`).
+
+Gravar `ADESÃO` num técnico sem existir faixa de ADESÃO faz o "a
+receber" dele virar **R$ 0 em silêncio**. Perguntado, o Emanuel decidiu:
+as três substituem, **e cada uma terá meta e faixas próprias**, que ele
+vai levantar.
+
+Daí as três peças:
+
+1. **Domínio em tabela, não em `check`** — skill nova é decisão de
+   operação; ninguém deveria precisar de migration para acrescentar uma.
+   As três entram ativas; `SINGLE MASTER` fica **inativa**: não se
+   escolhe mais, mas continua valendo para os 104 que ainda são ela e
+   cujas faixas funcionam. **Esta migration não converte ninguém** —
+   converter seria mandar 104 técnicos para uma tabela de comissão que
+   não existe.
+
+2. **`definir_skill_tecnico(login_toa, skill)`** grava e **devolve
+   quantas faixas aquela skill tem**. Quem cadastra precisa saber na
+   hora que acabou de deixar o técnico fora da tabela — a tela repete o
+   aviso ao escolher e ao salvar.
+
+3. **A tabela de comissão deixou de ser fixa em SINGLE MASTER.** Estava
+   escrita no código em 4 lugares. Enquanto havia uma skill só, dava
+   para fixar; com três, fixar significaria *não ter onde cadastrar as
+   outras duas* — a decisão do Emanuel ("cada uma tem faixas próprias")
+   seria impossível de executar na tela que ele tem. Agora há um seletor,
+   e a skill sem tabela diz isso em amarelo em vez de devolver R$ 0.

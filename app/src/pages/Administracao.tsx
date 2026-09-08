@@ -32,6 +32,9 @@ interface Permissao {
   chave: string; modulo: string; rotulo: string
   descricao: string | null; ordem: number; disponivel: boolean
 }
+/** Skill do técnico — ADESÃO, MANUTENÇÃO, DESCONEXÃO. Não é rótulo: é a
+ *  chave que liga o técnico à meta e à faixa de comissão (D-094). */
+interface Skill { id: string; nome: string; ativo: boolean; ordem: number }
 interface Usuario {
   id: string; nome: string; email: string; apelido: string | null
   ativo: boolean; atualizado_em: string | null; whatsapp: string | null
@@ -67,9 +70,14 @@ export default function Administracao() {
   const [criando, setCriando] = useState(false)
   const [novo, setNovo] = useState({
     nome: '', email: '', apelido: '', whatsapp: '',
-    cargo_id: '', perfil_acesso_id: '', cpf: '', matricula_ponto: '',
-    login_toa: '',
+    cargo_id: '', perfil_acesso_id: '', cpf: '', rg: '', data_nascimento: '',
+    matricula_ponto: '', login_toa: '', skill: '',
   })
+  const [skills, setSkills] = useState<Skill[]>([])
+  /** Quais skills já têm faixa de comissão. Escolher uma que não tem
+   *  deixa o técnico fora da tabela — e isso tem de aparecer na hora,
+   *  não no fim do mês. */
+  const [skillComFaixa, setSkillComFaixa] = useState<Set<string>>(new Set())
   const [senhaGerada, setSenhaGerada] = useState<{ email: string; senha: string } | null>(null)
 
   // edição de usuário
@@ -82,7 +90,7 @@ export default function Administracao() {
 
   async function recarregar() {
     setCarregando(true); setErro(null)
-    const [u, up, c, pa, pm, pap] = await Promise.all([
+    const [u, up, c, pa, pm, pap, sk, fx] = await Promise.all([
       supabase.from('perfil')
         .select(`id, nome, email, apelido, ativo, atualizado_em, whatsapp,
                  cargo:cargo_id ( nome ),
@@ -94,6 +102,8 @@ export default function Administracao() {
       supabase.from('perfil_acesso').select('*').order('ordem'),
       supabase.from('permissao').select('*').order('modulo').order('ordem'),
       supabase.from('perfil_acesso_permissao').select('perfil_acesso_id, permissao_chave'),
+      supabase.from('skill').select('id, nome, ativo, ordem').order('ordem'),
+      supabase.from('faixa_comissao').select('skill').eq('ativo', true),
     ])
     if (u.error) setErro(u.error.message)
     else setUsuarios((u.data ?? []) as unknown as Usuario[])
@@ -114,6 +124,9 @@ export default function Administracao() {
       dp.get(r.perfil_acesso_id)!.add(r.permissao_chave)
     }
     setDoPerfil(dp)
+    setSkills((sk.data ?? []) as Skill[])
+    setSkillComFaixa(new Set(
+      ((fx.data ?? []) as { skill: string }[]).map(x => x.skill)))
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [])
@@ -142,6 +155,9 @@ export default function Administracao() {
         apelido: novo.apelido.trim() || null,
         whatsapp: novo.whatsapp.trim() || null,
         cpf: novo.cpf.trim() || null,
+        rg: novo.rg.trim() || null,
+        // date vazio vira '' e o Postgres recusa '' como data.
+        data_nascimento: novo.data_nascimento || null,
         matricula_ponto: novo.matricula_ponto.trim() || null,
         cargo_id: novo.cargo_id || null,
         perfil_acesso_id: novo.perfil_acesso_id || null,
@@ -171,14 +187,33 @@ export default function Administracao() {
           const t = v as { tecnico: string; matricula: string; equipe: string | null }
           recado += ` Vinculado ao técnico ${t.matricula} · ${t.tecnico}`
             + (t.equipe ? `, equipe ${t.equipe}.` : '.')
+
+          // A skill decide meta e faixa de comissão. Se a escolhida
+          // ainda não tem tabela, o recado diz — senão o técnico fica
+          // com "a receber R$ 0" e ninguém sabe por quê (D-094).
+          if (novo.skill) {
+            const { data: s, error: es } = await supabase.rpc(
+              'definir_skill_tecnico',
+              { p_login_toa: loginTOA, p_skill: novo.skill })
+            if (es) recado += ` A skill não foi gravada: ${traduzir(es.message)}`
+            else {
+              const r2 = s as { faixas: number; meta: number | null }
+              recado += ` Skill ${novo.skill}.`
+              if (!r2.faixas) {
+                recado += ` ATENÇÃO: ${novo.skill} ainda não tem faixa de comissão`
+                  + ' — a receber ficará R$ 0 até cadastrar a tabela em Produtividade.'
+              }
+            }
+          }
         }
       }
       setOk(recado)
       if (r?.senha_gerada) setSenhaGerada({ email: r.email!, senha: r.senha_gerada })
       setCriando(false)
       setNovo({ nome: '', email: '', apelido: '', whatsapp: '',
-                cargo_id: '', perfil_acesso_id: '', cpf: '', matricula_ponto: '',
-                login_toa: '' })
+                cargo_id: '', perfil_acesso_id: '', cpf: '', rg: '',
+                data_nascimento: '', matricula_ponto: '', login_toa: '',
+                skill: '' })
       await recarregar()
     }
     setOcupado(false)
@@ -334,17 +369,39 @@ export default function Administracao() {
               {criando && (
                 <div className="mt-3 space-y-3 border-t border-graf-800 pt-3">
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {([['nome', 'Nome completo *'], ['email', 'E-mail *'],
-                       ['apelido', 'Apelido'], ['whatsapp', 'WhatsApp'],
-                       ['cpf', 'CPF'], ['matricula_ponto', 'Matrícula do ponto'],
-                       ['login_toa', 'Login TOA (matrícula do técnico)'],
-                      ] as [keyof typeof novo, string][]).map(([k, rot]) => (
+                    {([['nome', 'Nome completo *', 'text'], ['email', 'E-mail *', 'text'],
+                       ['apelido', 'Apelido', 'text'], ['whatsapp', 'WhatsApp', 'text'],
+                       ['cpf', 'CPF', 'text'], ['rg', 'RG', 'text'],
+                       ['data_nascimento', 'Nascimento', 'date'],
+                       ['matricula_ponto', 'Matrícula do ponto', 'text'],
+                       ['login_toa', 'Login TOA (matrícula do técnico)', 'text'],
+                      ] as [keyof typeof novo, string, string][]).map(([k, rot, tipo]) => (
                       <label key={k} className="text-xs text-graf-400">
                         <span className="mb-1 block">{rot}</span>
-                        <input value={novo[k]} className={`${campo} w-full`}
+                        <input value={novo[k]} type={tipo} className={`${campo} w-full`}
                           onChange={e => setNovo(n => ({ ...n, [k]: e.target.value }))} />
                       </label>
                     ))}
+                    {/* Skill é do TÉCNICO, não do acesso: sem login do
+                        TOA não há em quem gravar. */}
+                    <label className="text-xs text-graf-400">
+                      <span className="mb-1 block">
+                        Skill do técnico
+                        {!novo.login_toa.trim() && (
+                          <span className="ml-1 text-graf-600">— precisa do login TOA</span>
+                        )}
+                      </span>
+                      <select value={novo.skill} disabled={!novo.login_toa.trim()}
+                        className={`${campo} w-full disabled:opacity-40`}
+                        onChange={e => setNovo(n => ({ ...n, skill: e.target.value }))}>
+                        <option value="">— sem skill —</option>
+                        {skills.filter(s => s.ativo || s.nome === novo.skill).map(s => (
+                          <option key={s.id} value={s.nome}>
+                            {s.nome}{skillComFaixa.has(s.nome) ? '' : ' (sem faixa ainda)'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label className="text-xs text-graf-400">
                       <span className="mb-1 block">Cargo</span>
                       <select value={novo.cargo_id} className={`${campo} w-full`}
@@ -368,6 +425,14 @@ export default function Administracao() {
                     O papel vem do perfil de acesso escolhido. A senha é gerada pelo
                     servidor e mostrada uma vez — o sistema nunca guarda senha em texto.
                   </p>
+                  {novo.skill && !skillComFaixa.has(novo.skill) && (
+                    <p className="text-xs text-amber-400">
+                      <strong>{novo.skill}</strong> ainda não tem meta nem faixa de
+                      comissão. O técnico é cadastrado do mesmo jeito, mas o
+                      "a receber" dele fica R$ 0 até a tabela existir — cadastre em
+                      Produtividade.
+                    </p>
+                  )}
                   <button onClick={criarUsuario}
                     disabled={ocupado || !novo.nome.trim() || !novo.email.trim()}
                     className="rounded-md bg-af-600 px-5 py-2 text-xs font-medium text-white

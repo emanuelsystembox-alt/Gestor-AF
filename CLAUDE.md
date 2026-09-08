@@ -138,6 +138,11 @@ Ver D-091.
 reemite a sessão a cada foco na aba; guardar o objeto no estado
 remontava a aplicação inteira. Guarde o ID. Ver D-085.
 
+**`tecnico.skill` não é rótulo: é a chave do dinheiro.** É por ela que
+o técnico acha `meta_tecnico` e `faixa_comissao`. Gravar uma skill que
+não tem faixa zera o "a receber" em silêncio. `SINGLE MASTER` foi
+default nosso (037), não veio do TOA. Ver D-094.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.
@@ -184,11 +189,11 @@ Sempre `npx tsc --noEmit` antes de commitar.
 ## Estado atual — 07/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 37 migrations, as 92 decisões, o que já corrigimos do
+> reais do banco, as 38 migrations, as 94 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **40 tabelas, 84 funções, 80 policies, zero tabela sem RLS**,
+Resumo: **41 tabelas, 85 funções, 82 policies, zero tabela sem RLS**,
 zero função `SECURITY DEFINER` alcançável pelo `anon`. 617 visitas,
 736 O.S., 89 equipes, 104 técnicos, 18 praças, 168 códigos de baixa,
 1.466 sub-falhas, 1.021 regras de pontuação. **Doze telas no ar.**
@@ -219,7 +224,7 @@ select * from testar_policies();   -- 16 cenários, todos têm que passar
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 92 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 94 decisões, com o porquê de cada uma |
 | `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
 | `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
 | `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |
