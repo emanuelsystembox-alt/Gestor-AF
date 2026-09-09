@@ -12,7 +12,11 @@ import {
 } from '../lib/formato'
 import { ondeEstou, type EstadoGps } from '../lib/gps'
 import { quantosPendentes, sincronizar } from '../lib/midia'
+import {
+  assinarAvisos, carregarAvisos, marcarLidos, type Aviso as AvisoCampo,
+} from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Vazio } from '../ui/componentes'
+import { PainelAvisos } from '../ui/PainelAvisos'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -69,7 +73,7 @@ function mesCorrente() {
 type Props = NativeStackScreenProps<Pilha, 'Agenda'>
 
 export default function Agenda({ navigation }: Props) {
-  const { perfil, sair } = useAuth()
+  const { perfil, equipeId, sair } = useAuth()
   const [data, setData] = useState(isoLocal())
   const [linhas, setLinhas] = useState<LinhaAgenda[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -79,6 +83,7 @@ export default function Agenda({ navigation }: Props) {
   const [producao, setProducao] = useState<Producao | null>(null)
   const [gps, setGps] = useState<EstadoGps | null>(null)
   const [pendentes, setPendentes] = useState(0)
+  const [avisos, setAvisos] = useState<AvisoCampo[]>([])
 
   const carregar = useCallback(async (dia: string) => {
     setErro(null)
@@ -107,6 +112,33 @@ export default function Agenda({ navigation }: Props) {
 
   useEffect(() => { ondeEstou().then(setGps) }, [])
 
+  // Os avisos vêm por dois caminhos, e os dois são necessários:
+  // a leitura traz o que aconteceu enquanto o aplicativo estava
+  // fechado ou sem sinal; a assinatura traz o que acontecer agora.
+  const soNaoLidos = (lista: AvisoCampo[]) => lista.filter(a => !a.lido)
+
+  useEffect(() => {
+    let vivo = true
+    carregarAvisos().then(l => { if (vivo) setAvisos(soNaoLidos(l)) }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
+
+  useEffect(() => {
+    if (!equipeId) return
+    // O cancelamento no cleanup não é opcional: canal aberto depois da
+    // tela morrer é conexão pendurada no servidor.
+    return assinarAvisos(equipeId, novo => {
+      setAvisos(atual => atual.some(a => a.id === novo.id) ? atual : [novo, ...atual])
+      // O aviso mudou o dia dele — a lista embaixo tem de acompanhar.
+      carregar(data)
+    })
+  }, [equipeId, data, carregar])
+
+  async function dispensar(ids: number[]) {
+    setAvisos(atual => atual.filter(a => !ids.includes(a.id)))
+    await marcarLidos(ids).catch(() => {})
+  }
+
   useEffect(() => {
     if (!perfil?.tecnico_id) return
     const m = mesCorrente()
@@ -129,6 +161,7 @@ export default function Agenda({ navigation }: Props) {
     setAtualizando(true)
     const r = await sincronizar()
     await carregar(data)
+    await carregarAvisos().then(l => setAvisos(soNaoLidos(l))).catch(() => {})
     setPendentes(r.restam)
     setGps(await ondeEstou())
     setAtualizando(false)
@@ -187,6 +220,16 @@ export default function Agenda({ navigation }: Props) {
         }
       >
         {erro && <Aviso tipo="erro">Não consegui carregar: {erro}</Aviso>}
+
+        <PainelAvisos
+          avisos={avisos}
+          aoAbrir={a => {
+            dispensar([a.id])
+            if (a.visita_id) navigation.navigate('Visita', { id: a.visita_id })
+          }}
+          aoDispensar={a => dispensar([a.id])}
+          aoDispensarTodos={() => dispensar(avisos.map(a => a.id))}
+        />
 
         {/* O estado do GPS fica visível o tempo todo, e não só na hora
             da baixa. Descobrir que a localização estava desligada

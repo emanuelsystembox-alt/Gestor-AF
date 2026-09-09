@@ -2466,3 +2466,81 @@ depois:  visita 121 ms → 7 ms   (17x)
 > maiúscula — e a minha expressão procurava `select` minúsculo. A
 > conferência tem de ser `~*`, e o `regexp_replace` da migration tem de
 > usar o flag `gi`; senão uma segunda passada envolve tudo de novo.
+
+
+### D-119 · O aviso chega ao campo — e sobrevive à falta de sinal
+> *"apenas status do contrato... o operador tem esse poder de mudar o
+> status e colocar obs para cada mudança, quando ele fizer isso o
+> técnico precisa ver essa mudança"* — Emanuel, 09/09
+
+Hoje o técnico só descobre o que mudou se puxar a tela. O controlador
+cancela às 9h e o técnico chega no endereço às 10h.
+
+**A "mensagem livre" não virou chat, e isso foi decisão do Emanuel.**
+Perguntei se ele queria conversa COP ↔ técnico; a resposta foi que a
+mensagem é a **observação que já acompanha cada mudança de status**.
+Isso poupa um recurso inteiro — leitura, resposta, histórico, quem
+respondeu a quem — e resolve o que trava a operação: o porquê viaja
+colado à mudança, não num canal paralelo que alguém tem de abrir.
+
+**A linha é a verdade; o Realtime é só o carregador.** Realtime é
+*fire-and-forget*: quem estava no elevador, no subsolo ou sem 4G não
+recebe o evento e nunca saberia que ele existiu. No campo isso não é
+exceção, é o dia. Por isso o aviso é uma **linha em `aviso`**; a
+assinatura só encurta o caminho quando há sinal.
+
+**O gatilho mora em `visita_evento`, e não nas RPCs.** Toda mudança já
+passa por lá — são cinco portas:
+
+```
+IMPORTADA/IMPORTACAO ..... 1.320   contrato novo
+SITUACAO/IMPORTACAO ......   530   a operadora mexeu
+TRANSFERENCIA/SISTEMA ....   465   trocou de equipe
+SITUACAO/WEB|TELA ........     8   o controlador mexeu
+REVERSAO/WEB .............     —   o controlador reabriu
+```
+
+Pendurar o aviso em cada RPC seria escrever a mesma regra cinco vezes e
+esquecer na sexta. Um gatilho no funil pega todas — inclusive as que
+ainda não existem.
+
+Três detalhes que o dado obrigou:
+
+- **`origem = 'MOBILE'` não vira aviso.** O que o próprio técnico fez no
+  celular ele já viu acontecer.
+- **A transferência gera DOIS avisos, de lugares diferentes.**
+  `transferir_visita` grava a equipe **antiga** no evento e só *depois*
+  altera a visita — então, no instante do gatilho, `visita.equipe_id`
+  ainda é a antiga. O "saiu" sai de `evento.equipe_id`; o "chegou" sai
+  de `para->>'equipe'`, que guarda o **código**, não o id.
+- **O gatilho engole o próprio erro.** Se ele estourar, leva junto a
+  baixa do técnico ou a importação inteira. Aviso é conveniência; baixa
+  é dinheiro. Falhou, vira `raise warning` no log e a vida segue.
+
+**Só `aviso` entra no Realtime, e é o ponto que faz isto aguentar 300
+técnicos** (o número que o Emanuel deu):
+
+- a linha é **magra** — não trafega nome, telefone nem endereço de
+  assinante pela rede (LGPD). O aparelho recebe o aviso e vai buscar o
+  contrato se precisar;
+- o aplicativo assina **filtrando por `equipe_id`**, então cada evento
+  vai para os poucos aparelhos daquela equipe. Publicar `visita` seria o
+  contrário: uma importação que mexe em 300 linhas viraria 90 mil
+  entregas, cada uma com o RLS avaliado por conexão. O travamento que
+  ele quer evitar, empurrado para a rede.
+
+Lido é por **pessoa**, não por aviso (`aviso_leitura`): uma equipe pode
+ter mais de um técnico, e o que um leu o outro não leu.
+
+Testado ponta a ponta dentro de uma transação desfeita no fim — o
+controlador reabriu, mudou o status e transferiu; o técnico recebeu os
+três, com a observação de cada um:
+
+```
+[REABERTO] O controlador reabriu este contrato
+           — "Cliente ligou pedindo para ir depois das 14h"
+[SITUACAO] O status mudou
+           — "Sem viabilidade na rua — nao va"
+[SAIU]     Contrato saiu da sua agenda
+           — "Passando para a 027, mais perto"
+```
