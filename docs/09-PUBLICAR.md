@@ -70,6 +70,23 @@ deployments → Connect to Git), com **Root directory `app`**, build
 a ser necessárias no painel**, porque o build deixa de acontecer aqui.
 Enquanto o deploy for manual, não são.
 
+## Como conferir que subiu de verdade
+
+O "Success" do Wrangler diz que o upload terminou, não que a SUA
+mudança está no ar — e o bundle é dividido em pedaços, então olhar só o
+`index.js` engana: as telas moram em arquivos próprios
+(`Servicos-*.js`, `VisitaDetalhe-*.js`).
+
+O jeito honesto é baixar do ar e comparar com o local:
+
+```powershell
+curl -s https://gestor-af.pages.dev/assets/VisitaDetalhe-XXXX.js -o baixado.js
+cmp dist/assets/VisitaDetalhe-XXXX.js baixado.js
+```
+
+Em 09/09 foi assim que confirmei o tempo real e a galeria de evidência:
+os dois arquivos vieram byte a byte iguais aos compilados aqui.
+
 ## O que foi conferido no ar
 
 - A rota profunda `/controle/servicos` carrega e redireciona ao login.

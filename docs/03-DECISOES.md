@@ -2544,3 +2544,53 @@ três, com a observação de cada um:
 [SAIU]     Contrato saiu da sua agenda
            — "Passando para a 027, mais perto"
 ```
+
+
+### D-120 · A evidência tem de ser olhada, não listada
+> *"como faço para essas fotos subirem na visão que temos hoje do web?
+> era pra ser nessa aba quando clica em página inteira"* — Emanuel, 09/09
+
+A aba **Anexos** existia desde antes e listava **nome de arquivo**, data
+e tamanho. O controlador sabia que a foto existia e não conseguia
+olhar — meia funcionalidade: servia para o técnico cumprir a obrigação,
+não para a AFLINE provar nada para a CLARO.
+
+Agora a aba traz a imagem, e clicar abre em tela cheia com a **ficha da
+prova** ao lado: quem registrou (nome e matrícula, carimbados pelo
+servidor), quando, onde com link para o mapa, a origem (aplicativo ou
+web) e a observação.
+
+**Três coisas que estavam no banco e nenhuma tela mostrava:**
+
+**1. A precisão do GPS, ao lado da coordenada.** É a diferença entre
+prova e enfeite. A primeira foto real do sistema saiu com **±55 m** —
+suficiente para registrar, insuficiente para afirmar presença na porta.
+Com ±8 m o técnico estava lá; com ±2.000 m ele podia estar na antena
+mais próxima. Mostrar a coordenada sem a incerteza faz quem audita
+concluir errado, com confiança.
+
+**2. "sem GPS" em cima da miniatura** quando a foto não trouxe
+coordenada. Prova fraca continua sendo prova — desde que ninguém
+confunda as duas. É a mesma regra do D-117: *zero e desconhecido não são
+a mesma coisa*.
+
+**3. Vídeo tem player e duração.** Antes nem aparecia que era vídeo.
+
+**As URLs são assinadas em lote.** O bucket é privado (D-116): um
+`<img src>` no caminho cru volta 400 e a tela mostra um quadrado cinza
+sem explicação — pior que não mostrar nada. `createSignedUrls` assina o
+lote inteiro numa ida; assinar uma a uma seriam N viagens para abrir uma
+aba.
+
+Conferido com a foto real que já estava no bucket, simulando os papéis:
+
+```
+técnico da 074 abre a foto de outra equipe?  false
+admin abre?                                  true
+caminho inválido derruba a policy?           false, sem erro
+```
+
+O terceiro é o que importa e quase ninguém testa:
+`substring(name,1,36)::uuid` num objeto cujo nome não é UUID **estoura e
+derruba a policy inteira, em silêncio** — negando tudo, para todos. É a
+razão de `visita_do_path` existir com `CASE`.

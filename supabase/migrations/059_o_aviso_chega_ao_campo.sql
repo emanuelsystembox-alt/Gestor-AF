@@ -203,6 +203,13 @@ begin
 end;
 $fn$;
 
+-- Função de gatilho também precisa de revoke: o Supabase concede
+-- EXECUTE nominal a `anon` em TODA função nova do schema public, e
+-- DEFINER alcançável pelo anon é o defeito que este projeto não aceita.
+-- (Faltou aqui e foi corrigido na 061 — a conferência do CLAUDE.md
+-- pegou.)
+revoke all on function aviso_do_evento() from public, anon, authenticated;
+
 drop trigger if exists trg_aviso_do_evento on visita_evento;
 create trigger trg_aviso_do_evento after insert on visita_evento
   for each row execute function aviso_do_evento();

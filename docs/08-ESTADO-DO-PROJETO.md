@@ -157,6 +157,11 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 054 | **Rota do Dia** — `rota_do_dia`, `rota_bairros`, `rota_alertas` |
 | 055 | **O campo no celular** — bucket `evidencia`, `registrar_evidencia`, `registrar_equipamento`, `agenda_do_campo`, `hoje_local`, e as travas da baixa (GPS, baixa que não se desfaz, terminal que não volta, anexo só no dia) |
 | 056 | **`testar_campo()`** — 14 cenários das travas da 055, INVOKER (D-054) |
+| 057 | **O cartão do técnico diz quanto vale** — `agenda_do_campo` com pontos, `pontos_achou` e node (D-117) |
+| 058 | **O escopo resolve uma vez** — 86 policies reescritas; 121 ms → 7 ms (D-118) |
+| 059 | **O aviso chega ao campo** — tabela `aviso`, gatilho em `visita_evento`, Realtime por equipe (D-119) |
+| 060 | **O controle vê ao vivo** — `visita_evento` publicado no Realtime |
+| 061 | Fecha `aviso_do_evento` para o `anon` — regressão da 059, pega pela conferência |
 
 ---
 
@@ -196,7 +201,7 @@ aparelho e sobe sozinha depois.
 
 ---
 
-## As 116 decisões
+## As 120 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

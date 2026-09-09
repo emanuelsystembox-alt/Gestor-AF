@@ -280,11 +280,11 @@ bundle, e pega import quebrado que o `tsc` não vê.
 ## Estado atual — 08/09/2026
 
 > **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 56 migrations, as 116 decisões, o que já corrigimos do
+> reais do banco, as 60 migrations, as 120 decisões, o que já corrigimos do
 > sistema atual e o que está pendente. Este arquivo aqui é o *como
 > trabalhar*; aquele é o *onde estamos*.
 
-Resumo: **44 tabelas, 106 funções, 86 policies** (mais 2 no Storage),
+Resumo: **46 tabelas, 111 funções, 88 policies** (mais 2 no Storage),
 **zero tabela sem RLS**, zero função `SECURITY DEFINER` alcançável pelo
 `anon`, e as duas baterias verdes (16/16 e 14/14). 18 praças, 168
 códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
