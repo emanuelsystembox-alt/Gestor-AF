@@ -24,6 +24,12 @@ interface Evento {
 interface Evidencia {
   id: string; tipo: string; arquivo_path: string; tamanho_bytes: number | null
   lat: number | null; lng: number | null; capturada_em: string | null; criado_em: string
+  /** FOTO ou VIDEO — decide se a tela renderiza <img> ou player (055). */
+  midia: string; mime: string | null; duracao_seg: number | null
+  /** Raio de incerteza do GPS. Foto com 2 km de precisão não prova
+   *  presença; quem audita precisa ver isso, não só a coordenada. */
+  precisao_m: number | null
+  observacao: string | null; login: string | null; origem: string | null
   tecnico: { nome: string; matricula: string } | null
 }
 interface Det {
@@ -107,6 +113,33 @@ export default function VisitaDetalhe() {
   const [v, setV] = useState<Det | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [anexos, setAnexos] = useState<Evidencia[]>([])
+  /**
+   * ┌─ POR QUE PRECISA DE URL ASSINADA ──────────────────────────────┐
+   * │ O bucket `evidencia` é PRIVADO (055-C). Um `<img src>` apontando │
+   * │ para o caminho cru volta 400 e a tela mostra um quadrado cinza   │
+   * │ sem explicação — que é pior que não mostrar nada.                │
+   * │                                                                   │
+   * │ `createSignedUrls` assina o LOTE inteiro numa ida só. Assinar     │
+   * │ uma a uma seriam N viagens para abrir uma aba.                    │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  /** A evidência aberta em tela cheia. */
+  const [ampliada, setAmpliada] = useState<Evidencia | null>(null)
+
+  useEffect(() => {
+    const caminhos = anexos.map(a => a.arquivo_path)
+    if (caminhos.length === 0) return
+    let vivo = true
+    supabase.storage.from('evidencia').createSignedUrls(caminhos, 3600)
+      .then(({ data }) => {
+        if (!vivo || !data) return
+        const mapa: Record<string, string> = {}
+        for (const u of data) if (u.path && u.signedUrl) mapa[u.path] = u.signedUrl
+        setUrls(mapa)
+      })
+    return () => { vivo = false }
+  }, [anexos])
   const [anteriores, setAnteriores] = useState<Det[]>([])
   const [equipes, setEquipes] = useState<{ id: string; codigo: string }[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -134,6 +167,7 @@ export default function VisitaDetalhe() {
         .eq('visita_id', id!).order('criado_em', { ascending: false }),
       supabase.from('evidencia')
         .select(`id, tipo, arquivo_path, tamanho_bytes, lat, lng, capturada_em, criado_em,
+                 midia, mime, duracao_seg, precisao_m, observacao, login, origem,
                  tecnico:tecnico_id ( nome, matricula )`)
         .eq('visita_id', id!).order('criado_em'),
       supabase.from('equipe').select('id, codigo').order('codigo'),
@@ -509,6 +543,10 @@ export default function VisitaDetalhe() {
         )}
 
         {/* ================= ANEXOS ================= */}
+        {/* Antes esta aba listava NOME DE ARQUIVO: o controlador sabia
+            que a foto existia e não conseguia olhar. Meia
+            funcionalidade — servia para o técnico cumprir, não para a
+            AFLINE provar nada para a CLARO. */}
         {aba === 'anexos' && (
           <section className="card-controle p-4">
             {anexos.length === 0 ? (
@@ -517,34 +555,165 @@ export default function VisitaDetalhe() {
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {anexos.map(a => (
-                  <div key={a.id} className="rounded-lg border border-graf-800 bg-graf-900 p-2.5">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px]
-                                       font-semibold uppercase text-graf-300">
-                        {a.tipo.replace(/_/g, ' ')}
-                      </span>
-                      {a.lat && a.lng && (
-                        <a href={`https://www.google.com/maps?q=${a.lat},${a.lng}`}
-                           target="_blank" rel="noopener noreferrer"
-                           className="text-xs text-af-400">◉</a>
-                      )}
-                    </div>
-                    <p className="truncate text-xs text-graf-300" title={a.arquivo_path}>
-                      {a.arquivo_path.split('/').pop()}
-                    </p>
-                    <p className="mt-1 text-[11px] text-graf-500">
-                      {dt(a.capturada_em ?? a.criado_em)}
-                      {a.tamanho_bytes && ` · ${(a.tamanho_bytes / 1024).toFixed(0)} KB`}
-                    </p>
-                    {a.tecnico && (
-                      <p className="text-[11px] text-graf-500">por {a.tecnico.nome}</p>
-                    )}
-                  </div>
-                ))}
+                {anexos.map(a => {
+                  const url = urls[a.arquivo_path]
+                  const ehVideo = a.midia === 'VIDEO'
+                  return (
+                    <button
+                      key={a.id} onClick={() => setAmpliada(a)}
+                      className="group overflow-hidden rounded-lg border border-graf-800
+                                 bg-graf-900 text-left transition hover:border-graf-600"
+                    >
+                      <div className="relative flex h-36 items-center justify-center
+                                      overflow-hidden bg-graf-950">
+                        {url && !ehVideo && (
+                          <img src={url} alt={a.tipo} loading="lazy"
+                               className="h-full w-full object-cover transition
+                                          group-hover:scale-105" />
+                        )}
+                        {url && ehVideo && <span className="text-2xl text-graf-400">▶</span>}
+                        {!url && <span className="text-[11px] text-graf-600">carregando…</span>}
+
+                        {/* Foto sem coordenada é prova fraca, e a tela
+                            diz isso em vez de sumir com a informação. */}
+                        {!a.lat && (
+                          <span className="absolute right-1.5 top-1.5 rounded bg-amber-500/90
+                                           px-1.5 py-0.5 text-[10px] font-bold text-graf-950">
+                            sem GPS
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px]
+                                           font-semibold uppercase text-graf-300">
+                            {a.tipo.replace(/_/g, ' ')}
+                          </span>
+                          {ehVideo && a.duracao_seg && (
+                            <span className="tabular text-[10px] text-graf-400">
+                              {Math.floor(a.duracao_seg / 60)}:
+                              {String(a.duracao_seg % 60).padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-graf-500">
+                          {dt(a.capturada_em ?? a.criado_em)}
+                          {a.tamanho_bytes ? ` · ${(a.tamanho_bytes / 1024).toFixed(0)} KB` : ''}
+                        </p>
+                        <p className="truncate text-[11px] text-graf-500">
+                          {a.tecnico?.nome ?? a.login ?? '—'}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             )}
           </section>
+        )}
+
+        {/* ---------- a evidência em tela cheia ---------- */}
+        {ampliada && (
+          <div
+            onClick={() => setAmpliada(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center
+                       bg-graf-950/95 p-4 backdrop-blur"
+          >
+            <div onClick={e => e.stopPropagation()}
+                 className="flex max-h-full w-full max-w-6xl flex-col gap-3
+                            lg:flex-row lg:items-start">
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                {ampliada.midia === 'VIDEO' ? (
+                  <video src={urls[ampliada.arquivo_path]} controls autoPlay
+                         className="max-h-[80vh] w-full rounded-lg bg-black" />
+                ) : (
+                  <img src={urls[ampliada.arquivo_path]} alt={ampliada.tipo}
+                       className="max-h-[85vh] rounded-lg object-contain" />
+                )}
+              </div>
+
+              {/* A ficha da prova. Coordenada sem PRECISÃO não prova
+                  presença: ±8 m é o técnico na porta, ±2.000 m é a
+                  antena mais próxima. */}
+              <aside className="card-controle w-full shrink-0 p-4 text-sm lg:w-72">
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <h3 className="font-semibold uppercase tracking-wide text-graf-300">
+                    {ampliada.tipo.replace(/_/g, ' ')}
+                  </h3>
+                  <button onClick={() => setAmpliada(null)}
+                          className="text-lg leading-none text-graf-400 hover:text-graf-200">
+                    ✕
+                  </button>
+                </div>
+
+                <dl className="space-y-2 text-xs">
+                  <div>
+                    <dt className="text-graf-500">Quem registrou</dt>
+                    <dd>{ampliada.tecnico
+                      ? `${ampliada.tecnico.nome} (${ampliada.tecnico.matricula})`
+                      : ampliada.login ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-graf-500">Quando</dt>
+                    <dd className="tabular">
+                      {dt(ampliada.capturada_em ?? ampliada.criado_em)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-graf-500">Onde</dt>
+                    <dd>
+                      {ampliada.lat && ampliada.lng ? (
+                        <>
+                          <a href={`https://www.google.com/maps?q=${ampliada.lat},${ampliada.lng}`}
+                             target="_blank" rel="noopener noreferrer"
+                             className="tabular text-af-400 underline">
+                            {Number(ampliada.lat).toFixed(5)}, {Number(ampliada.lng).toFixed(5)}
+                          </a>
+                          {ampliada.precisao_m != null && (
+                            <span className="ml-1 text-graf-500">
+                              ±{Math.round(Number(ampliada.precisao_m))} m
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-amber-400">
+                          sem coordenada — não prova presença
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-graf-500">Origem</dt>
+                    <dd>{ampliada.origem === 'MOBILE' ? 'aplicativo do técnico' : 'web'}</dd>
+                  </div>
+                  {ampliada.observacao && (
+                    <div>
+                      <dt className="text-graf-500">Observação</dt>
+                      <dd>{ampliada.observacao}</dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="text-graf-500">Arquivo</dt>
+                    <dd className="break-all text-graf-400">
+                      {ampliada.arquivo_path.split('/').pop()}
+                      {ampliada.tamanho_bytes
+                        ? ` · ${(ampliada.tamanho_bytes / 1024).toFixed(0)} KB` : ''}
+                    </dd>
+                  </div>
+                </dl>
+
+                {urls[ampliada.arquivo_path] && (
+                  <a href={urls[ampliada.arquivo_path]} target="_blank"
+                     rel="noopener noreferrer"
+                     className="mt-4 block rounded-md border border-graf-700 py-2
+                                text-center text-xs font-semibold hover:bg-graf-800">
+                    Abrir original
+                  </a>
+                )}
+              </aside>
+            </div>
+          </div>
         )}
 
         {/* ================= SERVIÇOS ANTERIORES ================= */}
