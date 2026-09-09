@@ -1,335 +1,143 @@
-# Gestor AF — guia para quem (ou o que) for trabalhar neste repositório
+# Gestor AF
+
+A **AFLINE** é prestadora da **CLARO**: recebe ordens de serviço pelo
+**TOA (Oracle Field Service)**, manda técnico a campo, executa e dá
+baixa. Este projeto é a camada operacional própria — importar,
+despachar, executar, medir e cobrar — substituindo o **Alfa Gestor /
+ngestor**, que é caro e cujo roadmap não controlamos.
 
 **Assumindo o projeto agora? Leia `HANDOFF.md` primeiro.**
 
-Leia isto antes de mexer em qualquer coisa. Este arquivo existe para que
-outra pessoa — ou outra IA — entre no projeto sem repetir descobertas que
-já custaram caro.
-
-## O negócio em cinco linhas
-
-A **AFLINE** é prestadora da **CLARO**. Recebe ordens de serviço pelo
-**TOA (Oracle Field Service)** da CLARO, manda técnico a campo, executa e
-dá baixa. Hoje isso roda num sistema de terceiro (**Alfa Gestor /
-ngestor**) que fica caro e cujo roadmap não controlamos. Este projeto é a
-camada operacional própria: importar, despachar, executar, medir e cobrar.
-
-## Regras de ouro
+# Regras de ouro
 
 1. **Não invente regra de negócio.** Se não souber, **pergunte ao
-   Emanuel**. Ele pediu isso explicitamente. Preferir uma pergunta a um
-   palpite bem-intencionado.
-2. **Derive do dado real.** O de/para de grupo de serviço não foi
-   inventado: saiu do cruzamento de dois exports pela WO. Faça o mesmo.
-3. **Planilha de cliente não entra no Git.** `*.xlsx` e `*.csv` estão no
-   `.gitignore`. Nome, telefone e endereço de assinante são LGPD.
+   Emanuel**. Prefira a pergunta ao palpite bem-intencionado.
+2. **Derive do dado real.** O de/para de grupo de serviço saiu do
+   cruzamento de dois exports pela WO. Faça o mesmo, e diga de onde veio.
+3. **Planilha de cliente não entra no Git.** Nome, telefone e endereço
+   de assinante são LGPD.
 4. **Permissão vive no banco.** RLS no Postgres, não na tela.
 5. **Documente a decisão E o porquê** em `docs/03-DECISOES.md`.
+6. **Zero e desconhecido não são a mesma coisa.** Quando o sistema não
+   sabe, ele diz que não sabe.
 
-## Vocabulário — não confunda estes três
-
-| Termo | O que é | Onde vive |
-|---|---|---|
-| **Visita** (Atividade no TOA) | uma ida a um endereço | `visita` |
-| **O.S.** | uma ordem de serviço; **1 visita tem de 1 a 10** | `ordem_servico` |
-| **Tipo de atividade** | como o **TOA** chama (`Instalacao`, `Visita Tecnica`) | `tipo_atividade` |
-| **Grupo/Tipo de serviço** | como a **operação e a CLARO** agrupam (`ADESAO`, `VISITA TECNICA`, `MIGRACAO GPON`) | `tipo_servico` |
-| **Tipo de O.S.** | o código numérico da CLARO (`1`, `43`, `191`) | `tipo_os` |
-| **Tipo de O.S. Consolidado** | o item da **LPU** que é faturado | *ainda não modelado* |
-
-> O.S. com número `AF-00000001` nasceu **aqui**, não na CLARO — é
-> cadastro manual (D-063). Os números da operadora têm 10 dígitos.
->
-> O caso mais comum é **2 O.S. por visita**. Achatar em "1 linha = 1 O.S."
-> conta o deslocamento em dobro **e erra o faturamento** — ver Pontuação.
-
-## Armadilhas que já morderam
-
-**A planilha do TOA tem cabeçalhos repetidos.** `Tipo de Atividade`
-aparece nas posições 19 e 20 (categoria e tipo real). Ler "pela chave"
-perde a primeira em silêncio. `src/lib/toa.ts` lê **por posição** e
-sufixa com `__2`. Nunca troque por `sheet_to_json` com header padrão.
-
-**`revoke ... from public` não remove concessão nominal.** O Supabase
-concede `EXECUTE` explicitamente a `anon` em toda função criada no
-schema `public`. Tem que ser `revoke ... from anon`. E `CREATE OR
-REPLACE` preserva a ACL, mas função criada do zero (após um `RENAME`)
-nasce aberta de novo. **Confira sempre com
-`has_function_privilege('anon', oid, 'EXECUTE')`, não com o lint.**
-
-**RLS não restringe COLUNA.** Policy de `UPDATE` liberada por linha
-libera a linha inteira — inclusive as colunas que dão poder. Para
-proteger coluna, o instrumento é trigger. Ver D-050.
-
-**Teste de policy escrito como `SECURITY DEFINER` não testa nada.**
-Definer roda como o owner, que tem `BYPASSRLS`: todos os cenários passam
-sem o RLS ser consultado. Use INVOKER + `set local role authenticated`.
-Ver D-054.
-
-**`SECURITY DEFINER` ignora o RLS.** Se a função faz algo privilegiado,
-cheque o papel **dentro** dela. Ver `importar_toa`.
-
-**Não meça tempo a partir de `visita.criado_em`.** É a hora da
-importação, não do evento. Medir "fila" assim deu 0 min. Medir da
-atribuição do TOA deu 878 min (a atribuição é 00:23 e o técnico começa
-08:00 — mede a noite). A métrica útil é **aderência à janela**.
-
-**Jornada não entra em produtividade.** `Na Base` e `Refeição` foram 103
-de 344 apontamentos num dia. `tipo_atividade.natureza` separa
-`PRODUTIVA` de `JORNADA`. Sempre filtre.
-
-**O PostgREST tem cache de schema.** Depois de `ALTER TABLE`, o front
-recebe `PGRST100 — failed to parse select parameter` apontando uma coluna
-que **está** no banco. Não é sintaxe: é cache. `notify pgrst, 'reload
-schema';`
-
-**FK com UNIQUE vira um-para-um, e o embed devolve OBJETO, não array.**
-`reincidencia` tem `unique (visita_id)`; `reincidencia[0]` derrubou a
-tela de Relatórios inteira. Duas FKs para a mesma tabela deixam o embed
-ambíguo e exigem o nome da constraint
-(`reincidencia!reincidencia_visita_id_fkey`).
-
-**O `supabase-js` remove TODO espaço em branco do `select`.** Se for
-testar um select na unha com `curl`, replique isso — senão você caça um
-erro de sintaxe que só existe no seu teste.
-
-**Autor de evento não pode vir do cliente.** A tela do campo mandava
-`usuario_id` no INSERT; quem carimba quem fez é o servidor, em
-`registrar_etapa` e `baixar_os`. Ver D-061.
-
-**`norm_txt(NULL)` devolve STRING VAZIA, não NULL** — e coluna nula
-normaliza para a mesma string vazia, então as duas casam.
-`equipe_do_login(base, NULL, data)` devolvia a primeira equipe sem login
-e roteava jornada para uma equipe qualquer, em silêncio. Ver D-070.
-
-**Medir desempenho como owner mente igual a testar policy como owner.**
-`produtividade_periodo` fazia 402 ms como dono e estourava o timeout como
-`authenticated`, porque o RLS reavaliava as funções de escopo por linha.
-E CTE com função de conjunto referenciada uma vez é *inline*: use
-`as materialized`. Ver D-081.
-
-**Só o cadastro roteia contrato para equipe, e cadastro sem AUTOR não é
-cadastro.** O sistema não declara no lugar de quem opera — nem gravando
-cadastro que ninguém digitou (D-079), nem roteando por dedução calada
-(D-088), nem sugerindo o que o usuário só teria de clicar (D-089).
-Login sem cadastro vai para a equipe **"Sem login definido"**, visível,
-até alguém dizer de quem é. `equipe_do_login` lê **só**
-`equipe_login_toa` com `criado_por is not null`: "estava lá antes" não
-é prova de nada — a 039 preservou 9 seeds de migration achando que eram
-declaração, e eles rotearam 121 contratos.
-
-**Técnico se desliga, não se apaga.** DELETE em `tecnico`/`equipe` é só
-para ADMIN (policy), e trigger recusa quem tem histórico — inclusive
-para o ADMIN. A tela só oferece Desligar/Reativar, via
-`mudar_situacao_tecnico`. Ver D-090.
-
-**O TOA exporta em dois formatos, e os dois entram.** Diferem em uma
-coluna: `Recurso`, o **nome** de quem estava logado — não o login, que
-os dois trazem. Coluna a mais no começo não desloca nada, porque
-`toa.ts` desduplica por posição e depois indexa por chave. `Recurso`
-mora em `dados_origem` e é a resposta para "de quem é este login".
-Ver D-091.
-
-**`toISOString()` devolve a data em UTC.** Em Manaus (UTC−4) o dia vira
-às 20h e a tela abre no dia seguinte, vazia. Use `isoLocal()` de
-`lib/formato.ts`. Ver D-084.
-
-**Objeto novo com conteúdo igual é re-render garantido.** O `supabase-js`
-reemite a sessão a cada foco na aba; guardar o objeto no estado
-remontava a aplicação inteira. Guarde o ID. Ver D-085.
-
-**`tecnico.skill` não é rótulo: é a chave do dinheiro.** É por ela que
-o técnico acha `meta_tecnico` e `faixa_comissao`. Gravar uma skill que
-não tem faixa zera o "a receber" em silêncio. `SINGLE MASTER` foi
-default nosso (037), não veio do TOA. Ver D-094.
-
-**O status da operadora NÃO diz a situação; o CÓDIGO diz.** No analítico
-do ngestor, `EXECUTADA` virou Reagendamento 1.075 vezes e Cancelado 657.
-`codigo_baixa.situacao_destino` guarda o significado (derivado de 67.485
-linhas); o parâmetro `baixa_automatica` decide se agimos sozinhos. Ver
-D-097.
-
-**Variável record chamada `v` colide com alias `v` da tabela.** O
-plpgsql resolve `v.id` como a variável ainda não atribuída e estoura
-"record v is not assigned yet". E `unaccent_simples` não existe aqui:
-quem normaliza é `norm_txt`. Ver D-099.
-
-**`visita.fim` vem preenchido mesmo em atividade só INICIADA.** Mostrar
-"encerrou" a partir dele mentia em 329 das 947 visitas. Quem diz que
-fechou é `finalizado_toa` (status Concluído ou Não Concluído). Ver
-D-103.
-
-**A coluna `Produto` do TOA vem com os itens COLADOS**, sem separador:
-`id|NOME|pendente` seguido direto do próximo id. Lê-se com
-`(\d+)\|([^|]+?)\|([a-z]+)`. O id do item é o **Ponto**, que casa com
-`ordem_servico.ponto` (1.127 de 1.128) — e NÃO com o número da O.S.
-Ver D-107.
-
-**Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
-Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
-como inteiro; `extrai_codigo()` lê só o número do início.
-
-**`current_date` no Postgres da Supabase é UTC.** Em Manaus o dia vira
-às 20h. Qualquer regra que o usuário enxergue ("só anexa no contrato de
-hoje") medida em `current_date` tira o técnico do ar quatro horas antes
-da meia-noite dele. Use `hoje_local()`. É o D-084 do lado do banco.
-
-**Assinatura de função com default não convive com a versão antiga.**
-`baixar_os` de 5 e de 7 parâmetros ao mesmo tempo deixa a chamada de 5
-argumentos nomeados **ambígua** para o PostgREST — as duas casam. Ou
-derruba a antiga (`drop function`) e atualiza os chamadores, ou não
-acrescenta parâmetro. Ver 055-G.
-
-**O terminal do Emanuel é o Windows PowerShell 5.1, e ele não tem `&&`.**
-`cd campo && npm install` estoura com *"O token '&&' não é um separador
-de instruções válido nesta versão"*. Comando que você deixar na
-documentação ou mandar para ele vai ser colado ali: use uma linha por
-comando, ou `;`. `cp`, `ls` e `cat` funcionam — são apelidos de cmdlet;
-o que não existe é o encadeamento do bash.
-
-**Função de escopo solta na policy é chamada POR LINHA.**
-`empresa_id = minha_empresa()` custa uma chamada por linha avaliada;
-`empresa_id = (select minha_empresa())` custa uma por consulta. Nas
-1.320 visitas de hoje deu **121 ms contra 7 ms**, e o custo é linear —
-com as ~70 mil/ano da operação, vira travamento. Vale para
-`minha_empresa`, `eh_gestor`, `eh_global`, `auth.uid`, `tem_papel`,
-`tem_permissao`. Ver D-118.
-
-**`pg_policies` devolve o texto na forma canônica do Postgres.**
-`(select minha_empresa())` volta como
-`( SELECT minha_empresa() AS minha_empresa)`, com `SELECT` MAIÚSCULO.
-Qualquer conferência ou reescrita em cima desse texto precisa ignorar
-caixa (`~*`, flag `gi`) — senão acusa falso positivo e reescreve o que
-já estava certo. Ver D-118.
-
-**Policy do Storage que estoura vira negação em cima de tudo.**
-`substring(name,1,36)::uuid` num bucket com nome que não é UUID derruba
-a policy inteira, em silêncio. Por isso existe `visita_do_path()`, com
-`CASE` — que garante a ordem de avaliação. Ver D-116.
-
-## Estrutura
+# Stack
 
 ```
-app/                     front-end (Vite + React + TS + Tailwind v4)
-  src/lib/toa.ts         leitor da planilha do TOA (cabeçalho por posição)
-  src/lib/planilha.ts    leitor genérico
-  src/lib/metricas.ts    todo o cálculo do painel
-  src/lib/relatorio.ts   colunas do relatório + o SELECT que as alimenta
-  src/lib/eventos.ts     rótulos do histórico, iguais nas duas telas
-  src/lib/tema.ts        tema claro/escuro — só do controle
-  src/lib/supabase.ts    cliente + domínios de situação
-  src/lib/auth.tsx       sessão, perfil e papéis
-  src/components/        Shell (navegação), graficos (SVG puro), ui
-  src/components/TabelaContratos.tsx
-                         a linha do contrato + o SELECT que a alimenta —
-                         uma só, em Serviços e em Equipes (D-095)
-  src/components/icones.tsx
-                         os 11 icones do menu, SVG a mao (D-110)
-  src/pages/             Login · Controle · Servicos · Equipes · Rota ·
-                         Importacao · Campo · Visita
-campo/                   APLICATIVO do técnico (Expo · Android e iPhone)
-  README.md              como rodar no Expo Go, e o que falta para publicar
-  src/lib/gps.ts         a trava do D-113 ("só baixa com o GPS ligado")
-  src/lib/midia.ts       foto/vídeo → Storage → evidência, com fila offline
-  src/telas/             Entrar · Agenda · Visita · Captura
-docs/                    mapeamento, domínio, decisões, mapa do concorrente
-supabase/migrations/     schema, em ordem
+app/     web do controle    Vite 5 · React 18 · TypeScript 5.6 · Tailwind 4
+campo/   app do técnico     Expo SDK 57 · React Native 0.86 · React 19 · TS 6
+banco    Supabase           Postgres + PostgREST + Storage + Realtime  (plano Free)
+deploy   web → Cloudflare Pages (manual) · app → Expo Go / EAS Build
+Node 24 · npm · Windows PowerShell 5.1 (sem `&&`)
 ```
 
-**`campo/` é projeto Node separado**, com `node_modules` próprio. Metro,
-não Vite; `StyleSheet`, não Tailwind. Rodar: `cd campo`, `npm install`,
-`npx expo start`. `src/lib/dominio.ts` e `formato.ts` duplicam a web **de
-propósito** — a duplicação é declarada, não acidental (D-112).
+> **Verificar à mão:** a web está em React 18 / Vite 5 enquanto o
+> aplicativo já usa React 19. Existem majors mais novos dos dois; a
+> checagem de versão não pôde ser feita na sessão de setup.
 
-**Gráficos são SVG escrito à mão**, sem biblioteca. Foi decisão: controle
-de tema, bundle pequeno, nada para manter. Todo gráfico tem "Ver tabela".
+# Comandos
 
-## Duas linguagens visuais (D-011)
-
-- **Controle** (COP/Controlador): escuro, denso. Passa horas na tela.
-- **Campo** (Técnico): **claro**, espaçado, alvo de toque 48px. É usado
-  no sol — tela clara é muito mais legível sob luz direta.
-
-Classes `.sup-controle` / `.sup-campo` em `src/styles.css`.
-
-## Como rodar
-
-Web (controle):
-
-```bash
+```powershell
+# Web — instalar e rodar
 cd app
 npm install
 cp .env.example .env
 npm run dev
-```
 
-Aplicativo do técnico — abre no celular pelo **Expo Go**, sem build:
-
-```bash
+# Aplicativo — abre no celular pelo Expo Go, sem build
 cd campo
 npm install
 cp .env.example .env
 npx expo start
+
+# Conferir (nos dois projetos, antes de commitar)
+npx tsc --noEmit
+npm run build                                    # só na web
+npx expo export --platform android --output-dir ../.tmp-export   # só no app
+
+# Publicar a web
+cd app
+npm run build
+npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
 ```
 
-Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.
-Sempre `npx tsc --noEmit` antes de commitar — **nos dois projetos**. No
-`campo/`, também `npx expo export --platform android`: é o teste de
-bundle, e pega import quebrado que o `tsc` não vê.
+**Uma linha por comando** — o PowerShell 5.1 não tem `&&`.
 
-## Estado atual — 08/09/2026
-
-> **Leia `docs/08-ESTADO-DO-PROJETO.md`.** Ele consolida tudo: números
-> reais do banco, as 60 migrations, as 120 decisões, o que já corrigimos do
-> sistema atual e o que está pendente. Este arquivo aqui é o *como
-> trabalhar*; aquele é o *onde estamos*.
-
-Resumo: **46 tabelas, 111 funções, 88 policies** (mais 2 no Storage),
-**zero tabela sem RLS**, zero função `SECURITY DEFINER` alcançável pelo
-`anon`, e as duas baterias verdes (16/16 e 14/14). 18 praças, 168
-códigos de baixa, 1.466 sub-falhas, 1.021 regras de pontuação.
-**Treze telas na web, mais o aplicativo do técnico** (`campo/`, Expo —
-Android e iPhone, rodando no Expo Go).
-
-**A regra do dinheiro fechou** (D-077): `a receber = pontuação × fator`,
-com o fator saindo da faixa do mês. Produtividade e comissão numa tela
-só, com três dimensões, no lugar dos 16 relatórios do sistema atual.
-
-O relatório saiu de 25/29 colunas para **72 (por contrato) e 87 (por
-O.S.)**, com pontuação, e sai em Excel. O contrato tem **cadastro
-manual**, edição e volta de situação. O histórico diz **quem** fez cada
-etapa, com o login. O controle tem **tema claro**.
-
-**A pontuação deixou de ser bloqueio** (D-045): a regra é combinação de
-O.S. × edificação, derivada do relatório mensal, com 95,4% de cobertura.
-O que falta é `pontos_equipe` — o que a equipe recebe —, que não está em
-nenhum arquivo e depende do Emanuel levantar as Regras de Comissionamento.
-
-**Antes de commitar mudança em RLS, papel ou permissão:**
+Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
 select * from testar_policies();   -- 16 cenários, todos têm que passar
 select * from testar_campo();      -- 14 cenários das travas do campo
 ```
 
-A segunda cobre o que a primeira não alcança: as regras da 055 não são
-policy, são guarda dentro de função `SECURITY DEFINER` — que ignora RLS
-por definição. As duas são INVOKER de propósito (D-054).
+# Estrutura
 
-## Índice da documentação
+```
+app/                  web do controle (13 telas)
+  src/lib/            toa.ts (leitor da planilha) · metricas · relatorio
+                      supabase · auth · tempoReal · formato
+  src/components/     Shell, gráficos (SVG à mão), TabelaContratos, ui
+  src/pages/          Controle · Servicos · Equipes · Rota · Produtividade
+                      Relatorios · Importacao · Administracao · Visita…
+  scripts/            criar-usuarios-teste.mjs (exige service_role)
+campo/                APLICATIVO do técnico (Expo) — projeto Node separado
+  src/lib/            gps · midia · avisos · dominio · formato · auth
+  src/telas/          Entrar · Agenda · Visita · Captura
+docs/                 mapeamento, domínio, 120 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (61)
+agent_docs/           o contexto profundo — ver abaixo
+```
+
+# Regras de trabalho
+
+- Rode `tsc --noEmit` e o build **antes** de considerar a tarefa pronta.
+- Mexeu em RLS/papel/permissão → as duas baterias, verdes, sem exceção.
+- Mexeu em DDL → `notify pgrst, 'reload schema';`
+- Mexeu no que a tela faz → **republique a web no mesmo dia** da
+  migration. Commit não publica nada.
+- Meça e teste como `authenticated`, nunca como owner — owner tem
+  `BYPASSRLS` e mente.
+- Não mande `usuario_id` do cliente: quem carimba autor é o servidor.
+- Diga o que **não** foi verificado. "Compila" não é "funciona".
+
+# Contexto profundo (leia quando for relevante)
+
+Estes arquivos não são carregados inteiros toda sessão — leia o que a
+tarefa pedir.
+
+- Regras de negócio e domínio: @agent_docs/business-rules.md
+- Armadilhas que já morderam: @agent_docs/traps.md
+- Segurança, RLS e chaves: @agent_docs/security.md
+- Padrões de engenharia: @agent_docs/engineering-standards.md
+- Arquitetura e decisões estruturais: @agent_docs/architecture.md
+- Ferramentas e publicação: @agent_docs/productivity.md
+- Convenções por caminho: `.claude/rules/`
+
+# Índice da documentação
 
 | Arquivo | Para quê |
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
-| `docs/10-APP-DO-TECNICO.md` | **o aplicativo do técnico**: o concorrente tela a tela, o que copiamos e recusamos, arquitetura, regras e o que falta |
-| `campo/README.md` | rodar no Expo Go, vincular o técnico, publicar nas lojas |
-| `docs/09-PUBLICAR.md` | o site no ar: gestor-af.pages.dev, e como republicar |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 111 decisões, com o porquê de cada uma |
-| `docs/01-MAPEAMENTO-DADOS.md` | o que vem do TOA e do ngestor |
-| `docs/02-MODELO-DOMINIO.md` | entidades e máquina de estados |
-| `docs/05-MAPA-TELAS-NGESTOR.md` | mapa do sistema concorrente |
-| `docs/07-TELAS-DETALHADAS.md` | telas destrinchadas + 12 lacunas |
+| `docs/03-DECISOES.md` | as 120 decisões, com o porquê de cada uma |
+| `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
+| `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |
-| `docs/04-DESCOBERTA-AFLINE-360.md` | o outro Supabase, fora de escopo |
+| `docs/01` `02` `05` `07` | mapeamento, domínio, concorrente, telas |
 | `supabase/README.md` | ordem das migrations e conferências |
+| `campo/README.md` | rodar no Expo Go e publicar nas lojas |
+
+# Mantendo este arquivo vivo
+
+Se durante o trabalho aparecer algo que deveria ser regra permanente —
+uma regra de negócio, uma restrição de segurança, uma decisão de
+arquitetura, um erro que não pode se repetir — **não aplique em
+silêncio**. Pergunte se entra, e coloque no arquivo certo acima, não
+neste. Quando você errar porque faltava uma regra, isso é sinal de que a
+documentação precisa mudar: **diga isso**.
+
+# Idioma
+
+Responda sempre em **português do Brasil**, e escreva a documentação e
+os comentários de código em português — o repositório inteiro é assim, e
+quem lê é a equipe da AFLINE.

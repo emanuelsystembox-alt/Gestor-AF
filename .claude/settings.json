@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -q \"git commit\" || exit 0; cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; { cd app && ./node_modules/.bin/tsc --noEmit && cd ../campo && ./node_modules/.bin/tsc --noEmit ; } || { echo \"Typecheck falhou — corrija antes de commitar. Rode: cd app; npx tsc --noEmit\" >&2 ; exit 2 ; }",
+            "shell": "bash",
+            "timeout": 300,
+            "statusMessage": "Conferindo os tipos antes do commit…"
+          }
+        ]
+      }
+    ]
+  }
+}
