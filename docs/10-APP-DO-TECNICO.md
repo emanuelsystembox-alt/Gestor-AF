@@ -414,7 +414,10 @@ conferindo do computador e o técnico sem o aplicativo instalado.
 ## Como rodar
 
 ```bash
-cd campo && npm install && cp .env.example .env && npx expo start
+cd campo
+npm install
+cp .env.example .env
+npx expo start
 ```
 
 Instale o **Expo Go**, aponte a câmera para o QR Code. Celular e
@@ -438,7 +441,9 @@ quem o banco reconhece como técnico de uma equipe:
 O projeto EAS já existe (`afline-manager`). Falta ligar a pasta:
 
 ```bash
-cd campo && npx eas-cli@latest init --id <id-do-projeto>
+cd campo
+npx eas-cli@latest login
+npx eas-cli@latest init --id <id-do-projeto>
 npx eas-cli@latest build --platform android --profile preview
 ```
 

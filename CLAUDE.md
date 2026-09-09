@@ -180,6 +180,13 @@ argumentos nomeados **ambígua** para o PostgREST — as duas casam. Ou
 derruba a antiga (`drop function`) e atualiza os chamadores, ou não
 acrescenta parâmetro. Ver 055-G.
 
+**O terminal do Emanuel é o Windows PowerShell 5.1, e ele não tem `&&`.**
+`cd campo && npm install` estoura com *"O token '&&' não é um separador
+de instruções válido nesta versão"*. Comando que você deixar na
+documentação ou mandar para ele vai ser colado ali: use uma linha por
+comando, ou `;`. `cp`, `ls` e `cat` funcionam — são apelidos de cmdlet;
+o que não existe é o encadeamento do bash.
+
 **Policy do Storage que estoura vira negação em cima de tudo.**
 `substring(name,1,36)::uuid` num bucket com nome que não é UUID derruba
 a policy inteira, em silêncio. Por isso existe `visita_do_path()`, com
@@ -215,8 +222,8 @@ supabase/migrations/     schema, em ordem
 ```
 
 **`campo/` é projeto Node separado**, com `node_modules` próprio. Metro,
-não Vite; `StyleSheet`, não Tailwind. Rodar: `cd campo && npm install &&
-npx expo start`. `src/lib/dominio.ts` e `formato.ts` duplicam a web **de
+não Vite; `StyleSheet`, não Tailwind. Rodar: `cd campo`, `npm install`,
+`npx expo start`. `src/lib/dominio.ts` e `formato.ts` duplicam a web **de
 propósito** — a duplicação é declarada, não acidental (D-112).
 
 **Gráficos são SVG escrito à mão**, sem biblioteca. Foi decisão: controle
@@ -235,13 +242,19 @@ Classes `.sup-controle` / `.sup-campo` em `src/styles.css`.
 Web (controle):
 
 ```bash
-cd app && npm install && cp .env.example .env && npm run dev
+cd app
+npm install
+cp .env.example .env
+npm run dev
 ```
 
 Aplicativo do técnico — abre no celular pelo **Expo Go**, sem build:
 
 ```bash
-cd campo && npm install && cp .env.example .env && npx expo start
+cd campo
+npm install
+cp .env.example .env
+npx expo start
 ```
 
 Migrations: rodar em ordem no SQL Editor do Supabase, ou via MCP.

@@ -11,7 +11,10 @@ câmera, vídeo e GPS de verdade. Ver `docs/03-DECISOES.md`, D-112 a D-116.
 ## Rodar agora, no seu celular
 
 ```bash
-cd campo && npm install && cp .env.example .env && npx expo start
+cd campo
+npm install
+cp .env.example .env
+npx expo start
 ```
 
 1. Instale o **Expo Go** (Play Store / App Store).
@@ -44,7 +47,9 @@ não acha equipe nenhuma para ela. Não é bug do aplicativo.
 O projeto EAS já existe (`afline-manager`). Falta ligar esta pasta a ele:
 
 ```bash
-cd campo && npx eas-cli@latest init --id <id-do-projeto-eas>
+cd campo
+npx eas-cli@latest login
+npx eas-cli@latest init --id <id-do-projeto-eas>
 ```
 
 Depois:
@@ -108,7 +113,8 @@ select * from testar_policies();   -- 16 cenários
 ## Antes de commitar
 
 ```bash
-cd campo && npx tsc --noEmit
+cd campo
+npx tsc --noEmit
 npx expo export --platform android --output-dir ../.tmp-export
 ```
 

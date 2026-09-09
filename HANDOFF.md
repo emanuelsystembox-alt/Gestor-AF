@@ -23,8 +23,8 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | Repositório | `github.com/emanuelsystembox-alt/Gestor-AF` |
 | Pasta local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
 | Banco | Supabase `AFLINE manager` · `kqfflkxjijzdtnfshdlv` · sa-east-1 |
-| App (local) | `cd app && npm install && npm run dev` → localhost:5173 |
-| **Aplicativo do técnico** | `cd campo && npm install && npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
+| App (local) | `cd app; npm install; npm run dev` → localhost:5173 |
+| **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
 
@@ -61,7 +61,9 @@ O `.env` já está preenchido e **não** vai para o Git.
 ## Antes de commitar qualquer coisa
 
 ```bash
-cd app && npx tsc --noEmit && npm run build
+cd app
+npx tsc --noEmit
+npm run build
 ```
 
 ```sql
