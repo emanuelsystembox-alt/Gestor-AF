@@ -2350,3 +2350,60 @@ de 60 s e 50 MB, checado na gravação e no bucket.
 Quando a rede cai, a evidência **entra numa fila** no aparelho e sobe
 sozinha depois. Item que falha cinco vezes sai da fila: o arquivo
 temporário já foi limpo pelo sistema e insistir só trava a tela.
+
+
+### D-117 · O cartão do técnico diz quanto vale, e onde é
+> *"faltou mais informações na tela dele — número do contrato, pts do
+> contrato, node"* — Emanuel, 09/09, depois de rodar o aplicativo
+
+Três campos, e um deles trouxe uma decisão junto.
+
+**O contrato e o node saíram da letra miúda.** O contrato é o que o
+técnico fala ao telefone com o COP; o node é o pedaço da planta onde ele
+está, e é por ele que se abre chamado com a operadora. Estavam em cinza
+12 px — o node nem estava. A coluna `visita.node` vinha do TOA desde a
+004 e **nunca tinha sido lida por tela nenhuma** (249 das 364 visitas de
+hoje têm valor).
+
+**Os pontos são `pontos_claro`, e não outro número.** É exatamente o que
+`produtividade_periodo` soma para dizer "Minha produção no mês" (037), na
+mesma tela. Dois números diferentes ali seriam lidos como erro — e com
+razão. `pontos_equipe` continua fora: não está em arquivo nenhum
+(D-045).
+
+**E aqui está a decisão que o dado forçou.** Ao medir para escrever a
+função, apareceu isto:
+
+```
+visitas de 09/09:  364
+com regra de pontuação:  239
+sem regra:               125   ← 34%
+```
+
+A cobertura histórica é de 95,4% (D-045); a do dia corrente, não. Se a
+coluna devolvesse `0` nas 125, a tela afirmaria **"este serviço não vale
+nada"** — e o técnico que lê isso reclama do pagamento. A verdade é
+outra: *ainda não sabemos quanto vale*. Então `agenda_do_campo` devolve
+`pontos` **NULO** com `pontos_achou = false`, e o cartão escreve **"sem
+regra"** em âmbar em vez de um zero.
+
+> Zero e desconhecido não são a mesma coisa, e a diferença entre os dois
+> é quem leva a culpa quando o pagamento sai errado.
+
+**De quebra, uma lição de D-081 repetida.** A primeira versão calculava
+a pontuação com `pontos_por_periodo(dia, dia)` — o dia inteiro, 364
+visitas, para o técnico usar 4. Medido como `authenticated` (não como
+dono, que mente): **474 ms**. Trocando por um `cross join lateral` sobre
+as visitas que a pessoa já enxerga: **31 ms** para o técnico, 173 ms
+para o ADMIN com 250. Quinze vezes.
+
+E `create or replace` não aceita coluna nova no `returns table`
+("cannot change return type"). Tem de derrubar — e função recriada do
+zero **nasce com a ACL aberta** (CLAUDE.md), então o `revoke ... from
+anon` logo abaixo não é decoração.
+
+> **Recusado no mesmo pedido:** um menu de "baixadas · pendentes · em
+> entrada" abaixo das abas. O próprio Emanuel voltou atrás — *"acho que
+> já tá separado, deixa, não precisa"*. As duas abas **A fazer** e
+> **Baixadas** já fazem esse corte, e um terceiro nível dentro delas
+> seria navegação para esconder quatro cartões.

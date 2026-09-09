@@ -19,11 +19,15 @@ import type { Pilha } from '../navegacao'
 export interface LinhaAgenda {
   visita_id: string
   contrato: string | null
+  wo_numero: string | null
   cliente_nome: string | null
   logradouro: string | null
   complemento: string | null
   bairro: string | null
   cep: string | null
+  /** Nó da rede da CLARO. O técnico usa para saber em que pedaço da
+   *  planta está e para abrir chamado com a operadora. */
+  node: string | null
   telefones: string[] | null
   lat: number | null
   lng: number | null
@@ -36,6 +40,12 @@ export interface LinhaAgenda {
   os_baixadas: number
   evidencias: number
   equipamentos: number
+  /** `pontos_claro` — o MESMO número que a produção do mês soma. NULO
+   *  quando não há regra para a combinação: 125 das 364 visitas de
+   *  09/09 caem nisso, e mostrar 0,00 nelas seria afirmar que o serviço
+   *  não vale nada. Ver D-117. */
+  pontos: number | null
+  pontos_achou: boolean
 }
 
 interface Producao {
@@ -252,10 +262,34 @@ export default function Agenda({ navigation }: Props) {
                 </Text>
               )}
               <Etiqueta situacao={l.situacao} />
+
+              {/* Quanto vale, onde o olho cai primeiro. É o mesmo número
+                  que a produção do mês soma — dois valores diferentes na
+                  mesma tela seriam lidos como erro, e com razão. */}
+              <View style={e.espaco} />
+              {l.pontos_achou
+                ? <Text style={e.pontos}>{num2(Number(l.pontos))} pts</Text>
+                : <Text style={e.semPontos}>sem regra</Text>}
             </View>
 
             <Text style={e.servico}>{l.servico}</Text>
-            {l.contrato && <Text style={e.contrato}>contrato {l.contrato}</Text>}
+
+            {/* Contrato e node deixaram de ser letra miúda cinza: o
+                contrato é o que o técnico fala ao telefone com o COP, e
+                o node é o pedaço da planta onde ele está. */}
+            <View style={e.linhaIds}>
+              {l.contrato && (
+                <Text style={e.identificador}>
+                  <Text style={e.rotuloId}>contrato </Text>{l.contrato}
+                </Text>
+              )}
+              {l.node && (
+                <Text style={e.identificador}>
+                  <Text style={e.rotuloId}>node </Text>{l.node}
+                </Text>
+              )}
+            </View>
+
             {l.cliente_nome && <Text style={e.cliente}>{l.cliente_nome}</Text>}
             {l.logradouro && (
               <Text style={e.endereco}>
@@ -358,8 +392,14 @@ const e = StyleSheet.create({
     backgroundColor: cor.graf50, paddingHorizontal: 8, paddingVertical: 3,
     borderRadius: 6, overflow: 'hidden',
   },
+  espaco: { flex: 1 },
+  pontos: { fontSize: 15, fontWeight: '800', color: cor.tinta },
+  semPontos: { fontSize: 12, fontWeight: '700', color: cor.ambar },
+
   servico: { fontSize: 16, fontWeight: '700', color: cor.tinta },
-  contrato: { fontSize: 12, color: cor.graf400 },
+  linhaIds: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 2 },
+  identificador: { fontSize: 13, fontWeight: '600', color: cor.graf600 },
+  rotuloId: { fontWeight: '400', color: cor.graf400 },
   cliente: { fontSize: 14, color: cor.graf600, marginTop: 2 },
   endereco: { fontSize: 14, color: cor.graf500, marginTop: 3, lineHeight: 19 },
   selos: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
