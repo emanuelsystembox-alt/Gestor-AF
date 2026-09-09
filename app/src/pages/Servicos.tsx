@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
@@ -35,6 +36,9 @@ export default function Servicos() {
   const [novo, setNovo] = useState(false)
   // Sobe de 1 quando o modal muda algo; os carregamentos ouvem.
   const [versao, setVersao] = useState(0)
+  /** Mudanças que chegaram ao vivo enquanto o controlador estava com
+   *  contratos marcados. Ver o bloco de tempo real mais abaixo. */
+  const [mudancasEmEspera, setMudancasEmEspera] = useState(0)
 
   // filtros
   const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(
@@ -238,6 +242,32 @@ export default function Servicos() {
       })
     return () => { vivo = false }
   }, [de, ate, versao, contratosBuscados, contratoNoPeriodo])
+
+  /**
+   * ┌─ O CONTROLE DEIXA DE CLICAR EM ATUALIZAR ─────────────────────┐
+   * │ O técnico sai, chega e baixa; a lista aqui reflete na hora.    │
+   * │                                                                 │
+   * │ Mas recarregar por baixo de quem está trabalhando é pior que    │
+   * │ o botão: se o controlador tem contratos MARCADOS, ele está a    │
+   * │ um clique de transferir ou apagar em lote — trocar as linhas    │
+   * │ nesse instante é como puxar o papel da mesa.                    │
+   * │                                                                 │
+   * │ Então: lista livre recarrega sozinha; lista com seleção guarda  │
+   * │ o aviso e deixa ele decidir quando.                             │
+   * └─────────────────────────────────────────────────────────────────┘
+   */
+  const temSelecao = useRef(false)
+  temSelecao.current = selecionados.size > 0
+
+  const aoVivo = useMudancasAoVivo(quantas => {
+    if (temSelecao.current) setMudancasEmEspera(n => n + quantas)
+    else setVersao(v => v + 1)
+  })
+
+  function aplicarMudancas() {
+    setMudancasEmEspera(0)
+    setVersao(v => v + 1)
+  }
 
   const base = useMemo(() => soProdutivas
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
@@ -468,6 +498,31 @@ export default function Servicos() {
             </button>
           </Alerta>
         )}
+
+        {/* ====== o pulso do tempo real ====== */}
+        {/* A bolinha existe para o controlador saber em que mundo ele
+            está: verde, a tela se atualiza sozinha; apagada, ele voltou
+            a depender do F5 e precisa saber disso. Silêncio de rede é
+            indistinguível de silêncio de operação. */}
+        <div className="flex flex-wrap items-center gap-3 px-0.5">
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-graf-500">
+            <span className={`h-1.5 w-1.5 rounded-full ${
+              aoVivo ? 'bg-emerald-500' : 'bg-graf-600'}`} />
+            {aoVivo ? 'ao vivo' : 'sem conexão ao vivo — recarregue a página'}
+          </span>
+
+          {mudancasEmEspera > 0 && (
+            <button
+              onClick={aplicarMudancas}
+              className="rounded-md bg-af-600 px-2.5 py-1 text-[11px] font-semibold
+                         text-white hover:bg-af-500"
+            >
+              {mudancasEmEspera === 1
+                ? '1 mudança no campo — atualizar'
+                : `${mudancasEmEspera} mudanças no campo — atualizar`}
+            </button>
+          )}
+        </div>
 
         {/* ====== tabela ====== */}
         <section className="card-controle overflow-hidden">
