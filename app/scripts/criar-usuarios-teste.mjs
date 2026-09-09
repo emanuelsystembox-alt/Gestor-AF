@@ -22,6 +22,12 @@
  * O script é idempotente: rodar de novo não duplica nada. Se o usuário
  * já existe, ele só reaplica perfil, papel e vínculo com o técnico.
  *
+ * O técnico de teste é escolhido PELO DADO — aquele cuja equipe tem
+ * mais contrato em aberto hoje —, para o login não cair numa agenda
+ * vazia quando a escala do TOA muda. Para fixar um:
+ *
+ *   $env:MATRICULA_TECNICO = "Z656921"
+ *
  * As senhas são sorteadas aqui e impressas UMA vez. Não ficam gravadas
  * em lugar nenhum — se perder, rode com --resetar-senha.
  *
@@ -76,14 +82,87 @@ const USUARIOS = [
     // Vinculado a um técnico REAL, com visitas reais: é a única forma
     // de ver a agenda do campo com conteúdo. O RLS faz o resto — ele
     // enxerga as visitas dele e mais nenhuma.
+    //
+    // A matrícula NÃO tem default fixo. Já teve: `Z674378`, escolhido
+    // quando ele tinha visitas. O dia seguinte chegou, o TOA trouxe
+    // outra escala, e a equipe dele ficou com ZERO contratos — quem
+    // rodasse o script entrava no aplicativo e via a agenda vazia,
+    // achando que era defeito. Agora quem escolhe é `escolherTecnico()`,
+    // olhando o dado de hoje.
     email: 'tecnico@teste.local',
     nome: 'Técnico de Teste',
     papeis: ['TECNICO'],
     perfilAcesso: 'Tecnico de Campo',
     cargo: 'INSTALADOR I',
-    matriculaTecnico: process.env.MATRICULA_TECNICO ?? 'Z674378',
+    matriculaTecnico: process.env.MATRICULA_TECNICO ?? null,
   },
 ]
+
+/** O dia de HOJE em Manaus, não em UTC. Ver D-084: às 20h daqui o
+ *  `toISOString()` já virou o dia, e a busca sairia vazia. */
+function hojeLocal() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Manaus' })
+}
+
+/**
+ * Escolhe o técnico de teste pelo DADO, não por palpite: aquele cuja
+ * equipe tem mais contrato produtivo em aberto hoje.
+ *
+ * Sem isto, o login de teste do campo é uma loteria — a escala muda
+ * todo dia, e técnico sem contrato é indistinguível de aplicativo
+ * quebrado para quem está testando.
+ */
+async function escolherTecnico() {
+  if (process.env.MATRICULA_TECNICO) return process.env.MATRICULA_TECNICO
+
+  const EM_ABERTO = ['ENTRADA', 'ATRIBUIDA', 'EM_DESLOCAMENTO',
+                     'EM_EXECUCAO', 'COM_IMPEDIMENTO']
+
+  for (const [dia, rotulo] of [[hojeLocal(), 'hoje'], [null, 'o dia mais recente']]) {
+    let q = sb.from('visita')
+      .select('equipe_id, situacao, data_agendada, tipo_atividade:tipo_atividade_id(natureza)')
+      .is('excluido_em', null)
+      .not('equipe_id', 'is', null)
+    q = dia ? q.eq('data_agendada', dia)
+            : q.order('data_agendada', { ascending: false }).limit(500)
+
+    const { data, error } = await q
+    if (error) throw new Error(`buscando visitas: ${error.message}`)
+
+    // Jornada (Na Base, Refeição) não entra — é o mesmo filtro que
+    // `agenda_do_campo` faz, senão a contagem promete o que a tela
+    // do técnico não vai mostrar.
+    const porEquipe = new Map()
+    for (const v of data ?? []) {
+      if ((v.tipo_atividade?.natureza ?? 'PRODUTIVA') !== 'PRODUTIVA') continue
+      const p = porEquipe.get(v.equipe_id) ?? { total: 0, abertas: 0 }
+      p.total += 1
+      if (EM_ABERTO.includes(v.situacao)) p.abertas += 1
+      porEquipe.set(v.equipe_id, p)
+    }
+    if (porEquipe.size === 0) continue
+
+    const { data: tecs, error: et } = await sb.from('tecnico')
+      .select('matricula, nome, equipe_id')
+      .eq('situacao', 'ATIVO')
+      .in('equipe_id', [...porEquipe.keys()])
+    if (et) throw new Error(`buscando tecnicos: ${et.message}`)
+    if (!tecs?.length) continue
+
+    const melhor = tecs
+      .map(t => ({ ...t, ...porEquipe.get(t.equipe_id) }))
+      .sort((a, b) => b.abertas - a.abertas || b.total - a.total)[0]
+
+    console.log(
+      `· técnico de teste escolhido pelo dado (${rotulo}): ` +
+      `${melhor.matricula} · ${melhor.nome} — ` +
+      `${melhor.total} contrato(s), ${melhor.abertas} em aberto`)
+    return melhor.matricula
+  }
+
+  console.log('  ⚠ nenhum técnico ATIVO tem contrato. O login vai entrar com agenda vazia.')
+  return null
+}
 
 const senhaSorteada = () => randomBytes(9).toString('base64url')
 
@@ -110,6 +189,12 @@ async function main() {
   const empresaId = await um('empresa', { nome: 'AFLINE' })
   const baseId = await um('base', { codigo: 'MAN' })
   if (!empresaId || !baseId) throw new Error('Empresa AFLINE ou base MAN não encontradas.')
+
+  // Resolvido uma vez, antes do laço: a busca vale para os três.
+  if (!remover) {
+    const alvo = USUARIOS.find(u => 'matriculaTecnico' in u)
+    if (alvo && !alvo.matriculaTecnico) alvo.matriculaTecnico = await escolherTecnico()
+  }
 
   const criadas = []
 
