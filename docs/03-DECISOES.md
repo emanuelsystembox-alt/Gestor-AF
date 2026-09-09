@@ -2407,3 +2407,62 @@ anon` logo abaixo não é decoração.
 > já tá separado, deixa, não precisa"*. As duas abas **A fazer** e
 > **Baixadas** já fazem esse corte, e um terceiro nível dentro delas
 > seria navegação para esconder quatro cartões.
+
+
+### D-118 · O escopo resolve uma vez, não uma vez por linha
+> *"pensa que esse sistema vai atender muitas pessoas... quero que seja
+> otimizado, sistema rápido sem travamento"* — Emanuel, 09/09
+
+Medido antes de mexer, como `authenticated` e nunca como dono (D-081),
+contando as 1.320 visitas:
+
+```
+RLS como estava .......... 121 ms
+escopo resolvido 1 vez ....  34 ms
+```
+
+A causa: `minha_empresa()` e `eh_gestor()` escritos **soltos** dentro da
+policy são chamados **uma vez por linha avaliada**. 45 das 86 policies
+faziam isso com `minha_empresa()`, 19 com `eh_gestor()`, 29 com
+`tem_papel()`.
+
+O custo é **linear no número de linhas** — e é aí que a coisa muda de
+tamanho. O banco tem 5 dias de dado hoje. A operação gera ~190 visitas
+por dia, ou **~70 mil por ano**. A mesma consulta que hoje leva 121 ms
+passaria a levar segundos, e segundos numa lista que o COP abre o dia
+inteiro não é lentidão: é a tela travando.
+
+A correção é a mesma ideia do D-081, do lado da policy: `(select f())`
+em vez de `f()`. O planner resolve como **InitPlan**, uma vez por
+consulta. O resultado é idêntico — função STABLE sem argumento da linha
+devolve o mesmo valor de qualquer jeito.
+
+Foi junto uma troca semântica que vale mais amanhã do que hoje:
+
+```sql
+-- materializa TODAS as visitas visíveis para decidir sobre UMA evidência
+visita_id IN (SELECT visita.id FROM visita)
+-- usa a chave primária e para na primeira linha
+EXISTS (SELECT 1 FROM visita v WHERE v.id = visita_id)
+```
+
+**A reescrita foi automática, e isso foi decisão.** Mexer à mão em 86
+regras de acesso é onde se abre buraco sem perceber: um `AND` que vira
+`OR`, um parêntese que fecha no lugar errado, e uma equipe passa a ver a
+de outra. A transformação é textual, feita a partir do que o próprio
+Postgres devolve em `pg_policies`, e a prova são as duas baterias.
+
+```
+depois:  visita 121 ms → 7 ms   (17x)
+         ordem_servico 5 ms · visita_evento 4 ms
+         função de escopo solta: 0 de 86
+         testar_policies() 16/16 · testar_campo() 14/14
+```
+
+> **A pegadinha que quase me enganou.** A conferência de que não sobrou
+> função solta acusou **53 policies**. Não sobrou nenhuma: o Postgres
+> devolve o sub-select na forma canônica dele —
+> `( SELECT minha_empresa() AS minha_empresa)`, com `SELECT` em
+> maiúscula — e a minha expressão procurava `select` minúsculo. A
+> conferência tem de ser `~*`, e o `regexp_replace` da migration tem de
+> usar o flag `gi`; senão uma segunda passada envolve tudo de novo.

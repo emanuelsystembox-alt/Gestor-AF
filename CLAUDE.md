@@ -187,6 +187,21 @@ documentação ou mandar para ele vai ser colado ali: use uma linha por
 comando, ou `;`. `cp`, `ls` e `cat` funcionam — são apelidos de cmdlet;
 o que não existe é o encadeamento do bash.
 
+**Função de escopo solta na policy é chamada POR LINHA.**
+`empresa_id = minha_empresa()` custa uma chamada por linha avaliada;
+`empresa_id = (select minha_empresa())` custa uma por consulta. Nas
+1.320 visitas de hoje deu **121 ms contra 7 ms**, e o custo é linear —
+com as ~70 mil/ano da operação, vira travamento. Vale para
+`minha_empresa`, `eh_gestor`, `eh_global`, `auth.uid`, `tem_papel`,
+`tem_permissao`. Ver D-118.
+
+**`pg_policies` devolve o texto na forma canônica do Postgres.**
+`(select minha_empresa())` volta como
+`( SELECT minha_empresa() AS minha_empresa)`, com `SELECT` MAIÚSCULO.
+Qualquer conferência ou reescrita em cima desse texto precisa ignorar
+caixa (`~*`, flag `gi`) — senão acusa falso positivo e reescreve o que
+já estava certo. Ver D-118.
+
 **Policy do Storage que estoura vira negação em cima de tudo.**
 `substring(name,1,36)::uuid` num bucket com nome que não é UUID derruba
 a policy inteira, em silêncio. Por isso existe `visita_do_path()`, com

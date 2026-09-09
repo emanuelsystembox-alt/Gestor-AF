@@ -32,11 +32,31 @@ O `_redirects` não é detalhe: sem ele, abrir direto em
 servidor não conhece essa rota. Conferido no ar: a rota profunda carrega
 e cai no login, como tem que ser.
 
+## Commit NÃO publica
+
+Vale dizer com todas as letras, porque já custou confusão: o deploy é
+**manual**. Mudar o código, rodar o `tsc` e commitar não muda nada em
+`gestor-af.pages.dev` — o site continua servindo o `dist` do último
+envio, mesmo que o banco já tenha mudado.
+
+Isso fica perigoso quando a migration e a tela andam juntas. Em 09/09 a
+055 passou a exigir GPS na baixa e a esconder o "Trocar código" do
+campo; o banco foi atualizado na hora, e o site publicado ficou horas
+oferecendo um botão que o servidor já recusava.
+
+**Regra:** migration que muda o que a tela faz → republique a tela no
+mesmo dia.
+
 ## Republicar depois de mudar o código
 
-```bash
-cd app && npm run build && npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
+```powershell
+cd app
+npm run build
+npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
 ```
+
+> Uma linha por comando: o terminal aqui é PowerShell 5.1, que **não
+> tem `&&`** (CLAUDE.md). Encadeado com `&&` isto nem chega a rodar.
 
 Cada envio gera também um endereço só daquela versão (tipo
 `https://874da8e7.gestor-af.pages.dev`), útil para comparar antes e
