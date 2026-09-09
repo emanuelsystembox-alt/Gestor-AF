@@ -53,6 +53,12 @@
         }
       ],
       "expo-image"
-    ]
+    ],
+    "owner": "afline-instalacao-e-manutencao-eletrica",
+    "extra": {
+      "eas": {
+        "projectId": "24f5284f-5f83-4a9d-8e9c-f76ab94bc12d"
+      }
+    }
   }
 }

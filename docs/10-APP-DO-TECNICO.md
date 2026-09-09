@@ -438,16 +438,22 @@ quem o banco reconhece como técnico de uma equipe:
 
 ### Publicar
 
-O projeto EAS já existe (`afline-manager`). Falta ligar a pasta:
+A pasta **está ligada** a
+`@afline-instalacao-e-manutencao-eletrica/afline-manager`
+(`24f5284f-5f83-4a9d-8e9c-f76ab94bc12d`), com três perfis no `eas.json`:
+`development`, `preview` (APK para instalar sem loja) e `production`.
 
 ```bash
 cd campo
-npx eas-cli@latest login
-npx eas-cli@latest init --id <id-do-projeto>
 npx eas-cli@latest build --platform android --profile preview
 ```
 
 iPhone exige conta paga de desenvolvedor Apple; Android não.
+
+**As variáveis do Supabase vivem no `env` de cada perfil**, não no
+`.env` — que é gitignorado e não sobe para a nuvem da EAS. Sem isso o
+build sai e o aplicativo abre reclamando de variável faltando. A chave é
+publishable: quem protege os dados é o RLS, não o segredo dela.
 
 ---
 
@@ -475,7 +481,6 @@ celular. O primeiro teste com o Expo Go é o que fecha isso.
 | O quê | Por quê |
 |---|---|
 | **Vincular técnico a usuário** | 0 de 104. É o que destrava o teste do aplicativo. Administração → Usuários, campo **Login TOA** (D-087) |
-| **Ligar a pasta ao projeto EAS** | falta o id completo do projeto `afline-manager` |
 | **Apagar/ocultar foto errada** | dedo na lente, contrato trocado. Hoje só pelo `service_role`. A saída certa é **ocultar com motivo**, não DELETE — prova que se apaga não é prova. **Decisão do Emanuel** |
 | **Leitor de código de barras no serial** | o concorrente tem. Depende do almoxarifado para valer alguma coisa: sem cadastro de serial, é digitação com câmera |
 | **Terminais · Aceites de Materiais · Miscelâneas** | dependem do almoxarifado, que não existe |

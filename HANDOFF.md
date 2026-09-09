@@ -163,6 +163,11 @@ select * from testar_campo();   -- 14 cenários, todos passam
 3. Depois de baixado ele ainda anexa — no dia do contrato (D-115).
 4. Quem carimba o autor é o servidor (D-061).
 
+O projeto EAS está ligado
+(`@afline-instalacao-e-manutencao-eletrica/afline-manager`), com perfis
+de build no `eas.json` — `npx eas-cli@latest build --platform android
+--profile preview` gera um APK para instalar sem loja.
+
 > **Para testar você precisa de um login de técnico vinculado.**
 > `tecnico.usuario_id` está em 0 de 104 — sem esse vínculo a agenda vem
 > vazia e não é bug. Ver "O que está parado".

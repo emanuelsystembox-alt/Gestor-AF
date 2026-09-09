@@ -44,15 +44,15 @@ não acha equipe nenhuma para ela. Não é bug do aplicativo.
 
 ## Publicar nas lojas
 
-O projeto EAS já existe (`afline-manager`). Falta ligar esta pasta a ele:
+A pasta **já está ligada** ao projeto EAS
+`@afline-instalacao-e-manutencao-eletrica/afline-manager`
+(`24f5284f-5f83-4a9d-8e9c-f76ab94bc12d`), e o `eas.json` tem três perfis:
 
-```bash
-cd campo
-npx eas-cli@latest login
-npx eas-cli@latest init --id <id-do-projeto-eas>
-```
-
-Depois:
+| perfil | para quê |
+|---|---|
+| `development` | build de desenvolvimento, com dev client |
+| `preview` | **APK** para instalar no celular sem loja — é o que você quer para testar em equipe |
+| `production` | build de loja, com `autoIncrement` do número de versão |
 
 ```bash
 npx eas-cli@latest build --platform android --profile preview
@@ -60,6 +60,14 @@ npx eas-cli@latest build --platform ios --profile production
 ```
 
 O iPhone exige conta paga de desenvolvedor Apple; o Android não.
+
+> **As variáveis do Supabase estão no `env` de cada perfil do
+> `eas.json`, e isso é de propósito.** O `.env` local não vai para o Git
+> nem sobe para a nuvem da EAS: sem isto, o build sai e o aplicativo
+> abre com *"Faltam EXPO_PUBLIC_SUPABASE_URL…"*. A chave é
+> **publishable** — ela não dá acesso a nada sozinha; quem protege os
+> dados é o RLS (migration 005). É a mesma chave que já está em
+> `app/.env.example`, versionada.
 
 ---
 
