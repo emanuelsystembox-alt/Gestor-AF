@@ -65,3 +65,42 @@ export const diaSemana = (iso: string) =>
   new Date(iso + 'T12:00')
     .toLocaleDateString('pt-BR', { weekday: 'short' })
     .replace('.', '')
+
+/**
+ * O nome de uma equipe, sempre igual: **`001 - EQUIPE`**.
+ *
+ * ┌─ por que existe ─────────────────────────────────────────────────┐
+ * │ A mesma equipe aparecia de três jeitos: `74` na coluna da tabela, │
+ * │ `074` no painel e `074 · 074 - EQUIPE` no seletor de             │
+ * │ transferência — porque uns lugares mostravam o `codigo` e outros  │
+ * │ `codigo · nome`, e o `nome` no banco JÁ é "074 - EQUIPE".         │
+ * │                                                                   │
+ * │ Pior que feio: `importar_equipes` tira o código de                │
+ * │ `split_part(nome,'-',1)`, então a planilha que escrever           │
+ * │ "45 - EQUIPE" cria a equipe `45` — e `unique (base_id, codigo)`   │
+ * │ deixa `45` e `045` conviverem como DUAS equipes diferentes. O     │
+ * │ zero à esquerda deixa de ser enfeite e vira identidade.           │
+ * └───────────────────────────────────────────────────────────────────┘
+ *
+ * Código numérico vira três dígitos. Código que não é número — a
+ * equipe abrigo `SEM-LOGIN` — mantém o nome escrito, que se lê melhor
+ * que a sigla.
+ */
+export function equipeRotulo(
+  codigo: string | null | undefined,
+  nome?: string | null,
+): string {
+  const c = (codigo ?? '').trim()
+  const n = (nome ?? '').trim()
+  if (!c) return n || '—'
+  // A equipe abrigo é uma só em todo o sistema, e o nome dela explica o
+  // que ela é; a sigla, não. Quem chama nem sempre tem o `nome` em mãos
+  // (a lista de filtro só carrega o código), então ele mora aqui.
+  if (c === 'SEM-LOGIN') return n || 'Sem login definido'
+  if (!/^\d+$/.test(c)) return n || c
+
+  // Tira um prefixo numérico que já venha no nome, para não sair
+  // "045 - 45 - EQUIPE" quando a planilha trouxe o código sem o zero.
+  const semPrefixo = n.replace(/^\s*\d+\s*[-–·]\s*/, '').trim()
+  return `${c.padStart(3, '0')} - ${semPrefixo || 'EQUIPE'}`
+}

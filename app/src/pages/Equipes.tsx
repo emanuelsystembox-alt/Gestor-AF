@@ -2,11 +2,12 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
-import { isoLocal } from '../lib/formato'
-import { useAuth } from '../lib/auth'
+import { dataBR, equipeRotulo, isoLocal } from '../lib/formato'
+import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
+import { BarraComposicao, FaixaPeriodos } from '../components/telemetria'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
 // linha só, um componente só (D-095).
 import {
@@ -38,6 +39,10 @@ interface EquipePainel {
   nome: string
   area: string | null
   supervisor: string | null
+  /** O supervisor mostrado é alguém DESTA casa — declarado na tela — ou
+   *  o texto que veio da planilha de equipes? Sem esta distinção a tela
+   *  apresenta um nome de fora como se fosse do time (069). */
+  supervisor_declarado: boolean | null
   login_toa: string | null
   tecnicos: number
   visitas: number
@@ -54,6 +59,14 @@ interface Tec {
   id: string; matricula: string; nome: string; situacao: string
   equipe_id: string | null
   foto_url: string | null
+  /** A OPERAÇÃO: a cidade onde ele atua (migration 063). `regiao` é o
+   *  agrupamento comercial, e é nula nas praças que o relatório do
+   *  Emanuel não cobria. */
+  base: { nome: string; regiao: string | null } | null
+  /** O supervisor DECLARADO (068). Tem precedência sobre o nome que vem
+   *  da planilha na equipe — e a tela precisa dizer qual dos dois está
+   *  mostrando, senão os dois fatos divergem em silêncio. */
+  supervisor: { nome: string } | null
   equipe: { codigo: string; nome: string; supervisor_nome: string | null
             area: { apelido: string | null } | null } | null
 }
@@ -89,17 +102,15 @@ const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
 export default function Equipes() {
-  const { pode, temPapel } = useAuth()
-  // Quem edita equipe desliga o técnico. Apagar não está aqui para
-  // ninguém: o que ele executou fica gravado (D-090).
-  const podeEditar = temPapel('ADMIN') || pode('equipes.editar')
 
-  const [aba, setAba] = useState<'equipes' | 'tecnicos'>('equipes')
-  // Vazia até sabermos qual é o último dia com visita. Iniciar em "hoje"
-  // e corrigir depois dispara DOIS carregamentos concorrentes, e o mais
-  // velho pode chegar por último — a tela ficava com o painel do dia
-  // errado e o "Carregando…" preso.
-  const [data, setData] = useState<string>('')
+  /** A tela é só de equipes desde a D-137. `aba` fica como constante
+   *  para as condições existentes continuarem legíveis. */
+  const aba = 'equipes' as const
+
+  // HOJE, e só. Abria no último dia com visita, o que mostrava o painel
+  // de ontem sob a data de hoje (ver lib/dia.ts). Como a data já nasce
+  // certa, também some o segundo carregamento que corrigia a primeira.
+  const [data, setData] = useState<string>(isoLocal())
   const [painel, setPainel] = useState<EquipePainel[]>([])
   const [tecnicos, setTecnicos] = useState<Tec[]>([])
   const [orfaos, setOrfaos] = useState<Orfao[]>([])
@@ -107,6 +118,11 @@ export default function Equipes() {
   const [semDono, setSemDono] = useState<LoginSemDono[]>([])
   const [equipeDoLogin, setEquipeDoLogin] = useState<Record<string, string>>({})
   const [carregando, setCarregando] = useState(true)
+  /** Último dia com contrato, quando NÃO é o dia na tela. Vira atalho
+   *  no estado vazio — nunca troca a data sozinho (ver lib/dia.ts). */
+  const outroDia = useDiaAnteriorComMovimento(data)
+
+
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
@@ -182,17 +198,6 @@ export default function Equipes() {
     })
   }, [data])
 
-  // A data padrão é o último dia COM visita — não adianta abrir no dia
-  // corrente se a importação mais recente é de anteontem.
-  useEffect(() => {
-    supabase.from('visita').select('data_agendada')
-      .order('data_agendada', { ascending: false }).limit(1)
-      .then(({ data: d }) => {
-        const ultima = (d as { data_agendada: string }[] | null)?.[0]?.data_agendada
-        setData(ultima ?? isoLocal(new Date()))
-      })
-  }, [])
-
   // Cada carregamento carimba um número; resposta de pedido velho é
   // descartada. Trocar de data rápido não embaralha mais o painel.
   // Quem aparece na bolinha da equipe: o tecnico dela. Uma equipe pode
@@ -229,6 +234,8 @@ export default function Equipes() {
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
         .select(`id, matricula, nome, situacao, equipe_id, foto_url,
+                 base:base_id ( nome, regiao ),
+                 supervisor:supervisor_id ( nome ),
                  equipe:equipe_id ( codigo, nome, supervisor_nome,
                                     area:area_id ( apelido ) )`)
         .order('matricula'),
@@ -238,7 +245,23 @@ export default function Equipes() {
     ])
     if (meu !== pedido.current) return
     if (p.error) setErro(p.error.message)
-    else setPainel((p.data ?? []) as EquipePainel[])
+    else {
+      /*
+       * ┌─ o abrigo só aparece quando está segurando alguma coisa ─────┐
+       * │ `SEM-LOGIN` existe uma vez por base — são 18 linhas que não   │
+       * │ são equipe de campo: são a sala de espera do contrato cujo    │
+       * │ login ninguém declarou. Enquanto havia 107 equipes elas se    │
+       * │ diluíam; depois da limpeza viraram 18 de 21, e o painel       │
+       * │ passou a dizer "21 equipes, 18 sem técnico" — contando        │
+       * │ prateleira vazia como equipe sem gente.                       │
+       * │                                                               │
+       * │ Abrigo com contrato continua aparecendo, e tem de aparecer:   │
+       * │ é o aviso de que há trabalho sem dono.                        │
+       * └───────────────────────────────────────────────────────────────┘
+       */
+      const linhas = (p.data ?? []) as EquipePainel[]
+      setPainel(linhas.filter(e => e.codigo !== 'SEM-LOGIN' || e.visitas > 0))
+    }
     if (t.data) setTecnicos(t.data as unknown as Tec[])
     if (o.data) setOrfaos(o.data as Orfao[])
     setLogins((lg.data ?? []) as LoginEquipe[])
@@ -320,23 +343,6 @@ export default function Equipes() {
   /** Técnico desligado não sai do sistema — some da operação e continua
    *  respondendo pelo que executou. Por isso a única ação aqui é mudar a
    *  situação; apagar nem aparece, e o banco recusa quem tem histórico. */
-  async function mudarSituacao(t: Tec, para: 'ATIVO' | 'DESLIGADO') {
-    const desligando = para === 'DESLIGADO'
-    if (desligando && !confirm(
-      `Desligar ${t.nome} (${t.matricula})?\n\n`
-      + 'Ele sai da operação e para de aparecer como ativo. '
-      + 'Tudo o que já executou continua gravado no histórico da equipe.')) return
-    setOcupado(true); setErro(null); setOk(null)
-    const { data: d, error } = await supabase.rpc('mudar_situacao_tecnico',
-      { p_tecnico: t.id, p_situacao: para })
-    if (error) setErro(error.message)
-    else {
-      const r = d as { matricula: string; nome: string }
-      setOk(`${r.nome} (${r.matricula}) ${desligando ? 'desligado' : 'reativado'}.`)
-      await recarregar()
-    }
-    setOcupado(false)
-  }
 
   const areas = useMemo(() =>
     [...new Set(painel.map(e => e.area).filter(Boolean) as string[])].sort(), [painel])
@@ -373,13 +379,17 @@ export default function Equipes() {
     return tecnicos.filter(x => {
       if (area !== 'TODAS' && x.equipe?.area?.apelido !== area) return false
       if (!t) return true
-      return [x.matricula, x.nome, x.equipe?.codigo, x.equipe?.supervisor_nome]
+      return [x.matricula, x.nome, x.base?.nome, x.equipe?.codigo,
+              x.supervisor?.nome, x.equipe?.supervisor_nome]
         .some(y => y?.toLowerCase().includes(t))
     })
   }, [tecnicos, busca, area])
 
   const semTecnico = painel.filter(e => e.tecnicos === 0).length
   const emCampo = painel.filter(e => e.visitas > 0).length
+  /** Nenhuma equipe rodou neste dia — diferente de "o filtro escondeu
+   *  todas", e o estado vazio precisa dizer qual dos dois é. */
+  const diaSemMovimento = emCampo === 0
   const ociosas = painel.filter(e => e.ocioso).length
   const totalOrfaos = orfaos.reduce((s, o) => s + o.visitas, 0)
   const ehHoje = data === isoLocal(new Date())
@@ -464,39 +474,79 @@ export default function Equipes() {
           </section>
         )}
 
-        {/* ====== resumo ====== */}
-        <section className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+        {/* ====== o estado da operacao ======
+            ┌─ por que uma regua e nao seis cartoes ───────────────────┐
+            │ Eram seis cartoes iguais, lado a lado, cada um com um    │
+            │ numero grande. Seis cartoes iguais dizem "seis coisas    │
+            │ igualmente importantes" -- e nao sao. A pergunta de quem │
+            │ abre esta tela e UMA: quantas equipes estao rodando hoje │
+            │ e o que esta faltando. Entao a primeira celula responde  │
+            │ isso com a proporcao desenhada, e o resto e contagem de  │
+            │ apoio, menor, na mesma regua.                            │
+            │                                                          │
+            │ O que e ALERTA acende em vermelho; o que e zero medido   │
+            │ fica cinza. E o que NAO SE SABE (ocioso em dia passado)  │
+            │ escreve "—" e diz por que -- zero e desconhecido nao sao │
+            │ a mesma coisa.                                           │
+            └──────────────────────────────────────────────────────────┘ */}
+        <section className="painel-estado sobe" aria-label="Estado da operação no dia">
+          <div className="flex-[2_1_18rem]">
+            <div className="flex items-baseline gap-2">
+              <span className="tabular text-2xl font-semibold leading-none">{emCampo}</span>
+              <span className="text-sm text-graf-300">
+                de <span className="tabular">{painel.length}</span> equipes com serviço no dia
+              </span>
+            </div>
+            <div className="mistura mt-2.5" aria-hidden
+              title={`${emCampo} com serviço · ${Math.max(0, painel.length - emCampo)} sem nada no dia`}>
+              <span style={{ flex: `${emCampo} 0 0`,
+                             ['--fatia-cor' as string]: 'var(--st-execucao)' }} />
+              <span style={{ flex: `${Math.max(0, painel.length - emCampo)} 0 0`,
+                             ['--fatia-cor' as string]: 'var(--color-graf-700)' }} />
+            </div>
+          </div>
+
           {([
-            ['Equipes', painel.length, false],
-            ['Com serviço no dia', emCampo, false],
-            ['Técnicos', tecnicos.length, false],
-            ['Sem técnico', semTecnico, semTecnico > 0],
-            ['Fora do cadastro', orfaos.length, orfaos.length > 0],
-            [ehHoje ? 'Ociosas agora' : 'Ocioso (só hoje)', ehHoje ? ociosas : 0, ehHoje && ociosas > 0],
-          ] as [string, number, boolean][]).map(([r, v, alerta]) => (
-            <div key={r} className={`card-controle px-3.5 py-3 ${alerta ? 'ring-1 ring-af-600/50' : ''}`}>
-              <div className="tabular text-2xl font-semibold leading-none"
+            ['Técnicos', tecnicos.length, false, 'Técnicos ativos no cadastro'],
+            ['Sem técnico', semTecnico, semTecnico > 0,
+              'Equipe cadastrada sem ninguém vinculado — o contrato dela não chega a celular nenhum'],
+            ['Fora do cadastro', orfaos.length, orfaos.length > 0,
+              'Matrícula que apareceu no TOA e não está na planilha de equipes'],
+          ] as [string, number, boolean, string][]).map(([r, v, alerta, dica]) => (
+            <div key={r} title={dica}>
+              <div className="tabular text-xl font-semibold leading-none"
                    style={alerta ? { color: 'var(--st-conflito)' } : undefined}>
-                {r.startsWith('Ocioso') ? '—' : v}
+                {v}
               </div>
-              <div className="mt-1.5 text-[11px] uppercase tracking-wide text-graf-400">{r}</div>
+              <div className="mt-1.5 flex items-center gap-1.5 text-[11px] uppercase
+                              tracking-wide text-graf-400">
+                {alerta && <span aria-hidden
+                  className="h-1.5 w-1.5 rounded-full bg-af-500" />}
+                {r}
+              </div>
             </div>
           ))}
+
+          <div title={ehHoje
+            ? 'Equipes sem encerramento há mais tempo que o limite'
+            : 'OCIOSO só é calculado para o dia corrente — em dia passado não sabemos'}>
+            <div className="tabular text-xl font-semibold leading-none"
+                 style={ehHoje && ociosas > 0 ? { color: 'var(--st-conflito)' } : undefined}>
+              {ehHoje ? ociosas : '—'}
+            </div>
+            <div className="mt-1.5 text-[11px] uppercase tracking-wide text-graf-400">
+              {ehHoje ? 'Ociosas agora' : 'Ocioso · só hoje'}
+            </div>
+          </div>
         </section>
 
         {/* ====== filtros ====== */}
         <section className="card-controle flex flex-wrap items-center gap-2 p-3">
-          <div className="flex rounded-lg bg-graf-900 p-0.5">
-            {(['equipes', 'tecnicos'] as const).map(a => (
-              <button key={a} onClick={() => setAba(a)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                  aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
-                {a === 'equipes' ? 'Equipes' : 'Técnicos'}
-                <span className="tabular ml-1.5 opacity-60">
-                  {a === 'equipes' ? painel.length : tecnicos.length}
-                </span>
-              </button>
-            ))}
+          {/* A aba "Técnicos" saiu daqui e foi para Administração (D-137):
+              desligar técnico é cadastro, não despacho, e não pode ficar a
+              um clique de quem está olhando o dia. */}
+          <div className="rounded-lg bg-af-600 px-3 py-1.5 text-xs font-medium text-white">
+            Equipes<span className="tabular ml-1.5 opacity-60">{painel.length}</span>
           </div>
 
           <input value={busca} onChange={e => setBusca(e.target.value)}
@@ -537,10 +587,36 @@ export default function Equipes() {
         ) : aba === 'equipes' ? (
           eqFiltradas.length === 0 ? (
             <div className="card-controle">
-              <Vazio titulo="Nenhuma equipe para este filtro"
-                descricao={painel.length === 0
-                  ? 'Importe a planilha de equipes para popular o cadastro.'
-                  : 'Ajuste a busca ou os filtros.'} />
+              {/* O motivo do vazio não é sempre o mesmo, e dizer o motivo
+                  errado manda a pessoa mexer no filtro quando o que falta
+                  é a importação do dia. */}
+              <Vazio
+                titulo={diaSemMovimento
+                  ? `Nenhuma equipe com serviço em ${dataBR(data)}`
+                  : 'Nenhuma equipe para este filtro'}
+                descricao={diaSemMovimento
+                  ? `O painel é do dia escolhido, e neste dia não há contrato importado.`
+                    + ` As ${painel.length} equipes continuam cadastradas.`
+                  : 'Ajuste a busca ou os filtros.'}
+                acao={
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {diaSemMovimento && soAtivas && painel.length > 0 && (
+                      <button onClick={() => setSoAtivas(false)}
+                        className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                                   text-graf-300 hover:border-af-600 hover:text-af-400">
+                        ver as {painel.length} equipes cadastradas
+                      </button>
+                    )}
+                    {/* O atalho existe; a troca de dia é decisão de quem olha. */}
+                    {outroDia && (
+                      <button onClick={() => setData(outroDia)}
+                        className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                                   text-graf-300 hover:border-af-600 hover:text-af-400">
+                        ver {dataBR(outroDia)} — último dia com movimento
+                      </button>
+                    )}
+                  </div>
+                } />
             </div>
           ) : (
             <div className="space-y-4">
@@ -577,9 +653,24 @@ export default function Equipes() {
                           return (
                             <Fragment key={e.equipe_id}>
                               <tr onClick={() => abrir(e)}
-                                  className={`cursor-pointer border-b border-graf-800 align-top
-                                              hover:bg-graf-850 ${exp ? 'bg-graf-850' : ''}`}>
-                                <td className="px-2 py-2.5 text-graf-500">{exp ? '▾' : '▸'}</td>
+                                  className={`linha-equipe cursor-pointer border-b border-graf-800
+                                              align-top ${exp ? 'aberta' : ''}`}>
+                                {/* A seta e um BOTAO de verdade: a linha inteira
+                                    responde ao mouse, mas quem navega por teclado
+                                    precisava de um alvo com nome e estado, e
+                                    `<tr onClick>` nao e alcancavel por Tab. */}
+                                <td className="px-2 py-2.5">
+                                  <button
+                                    onClick={ev => { ev.stopPropagation(); abrir(e) }}
+                                    aria-expanded={exp}
+                                    aria-label={`${exp ? 'Fechar' : 'Abrir'} os contratos da equipe ${e.codigo}`}
+                                    className={`grid h-6 w-6 place-items-center rounded text-sm
+                                                leading-none transition-transform duration-200
+                                                hover:text-af-400
+                                                ${exp ? 'rotate-90 text-af-400' : 'text-graf-500'}`}>
+                                    ▸
+                                  </button>
+                                </td>
 
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-start gap-2.5">
@@ -598,7 +689,9 @@ export default function Equipes() {
                                   })()}
                                   <div className="min-w-0">
                                   <div className="flex items-baseline gap-2">
-                                    <span className="tabular font-semibold">{e.codigo}</span>
+                                    <span className="tabular font-semibold">
+                                      {equipeRotulo(e.codigo, e.nome)}
+                                    </span>
                                     {e.tecnicos === 0 && (
                                       <span className="rounded bg-af-900/40 px-1.5 py-0.5
                                                        text-[10px] font-semibold text-af-300">
@@ -606,44 +699,91 @@ export default function Equipes() {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="mt-0.5 text-[11px] leading-relaxed text-graf-400">
+                                  {/* ┌─ o cartão da equipe ────────────────────┐
+                                      │ > "precisamos melhorar mais essa parte  │
+                                      │ >  da foto do técnico, equipe […]       │
+                                      │ >  colocar as informações completas"    │
+                                      │ >  — Emanuel                            │
+                                      │                                         │
+                                      │ Era uma linha corrida onde login, nome  │
+                                      │ e supervisor se misturavam. Agora é     │
+                                      │ rótulo e valor, um por linha: o olho    │
+                                      │ acha o LOGIN sempre no mesmo lugar,     │
+                                      │ em qualquer equipe da lista.            │
+                                      └─────────────────────────────────────────┘ */}
+                                  <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2
+                                                 gap-y-0.5 text-[11px] leading-tight">
                                     {(() => {
+                                      const ts = porEquipe.get(e.equipe_id) ?? []
                                       const ls = porLogin.get(e.equipe_id) ?? []
-                                      if (!ls.length) return (
-                                        <span className="text-graf-600">sem login TOA no dia</span>
-                                      )
-                                      // O abrigo junta dezenas de logins; listar
-                                      // todos vira parede de texto. Conta e pronto.
+                                      // O abrigo não é equipe: é a fila de quem
+                                      // ainda não tem dono. Rótulo de técnico ali
+                                      // seria inventar gente.
                                       if (e.codigo === 'SEM-LOGIN') return (
-                                        <span className="text-amber-400">
-                                          {ls.length} login(s) esperando cadastro
-                                        </span>
+                                        <>
+                                          <dt className="text-graf-600">AGUARDANDO</dt>
+                                          <dd className="text-amber-400">
+                                            {ls.length} login(s) esperando cadastro
+                                          </dd>
+                                        </>
                                       )
-                                      return ls.map(l => (
-                                        <span key={l.login} className="mr-2 inline-block">
-                                          Login TOA{' '}
-                                          <span className="tabular text-graf-300">{l.login}</span>
-                                          {/* Dizer de onde veio o login é o que
-                                              impede confundir dedução com cadastro. */}
-                                          {l.origem === 'CADASTRO' ? (
-                                            <span title="Cadastrado por alguém desta operação"
-                                              className="ml-1 rounded bg-emerald-900/40 px-1
-                                                         text-[9px] font-semibold uppercase
-                                                         text-emerald-300">cadastrado</span>
-                                          ) : (
-                                            <span title="Ninguém disse de quem é este login — o contrato dele está na equipe Sem login definido"
-                                              className="ml-1 rounded bg-amber-900/40 px-1 text-[9px]
-                                                         font-semibold uppercase text-amber-300">
-                                              sem cadastro</span>
-                                          )}
-                                        </span>
-                                      ))
+                                      return (
+                                        <>
+                                          <dt className="text-graf-600">NOME</dt>
+                                          <dd className="min-w-0 truncate text-graf-200"
+                                              title={ts.map(x => x.nome).join(' · ')}>
+                                            {ts.length
+                                              ? ts.map(x => x.nome).join(' · ')
+                                              : <span className="text-af-400">sem técnico cadastrado</span>}
+                                          </dd>
+
+                                          <dt className="text-graf-600">LOGIN</dt>
+                                          <dd className="min-w-0">
+                                            {ls.length === 0 ? (
+                                              <span className="text-graf-600">sem login TOA no dia</span>
+                                            ) : ls.map(l => (
+                                              <span key={l.login} className="mr-2 inline-block">
+                                                <span className="tabular text-graf-300">{l.login}</span>
+                                                {/* Dizer de onde veio o login é o que
+                                                    impede confundir dedução com cadastro. */}
+                                                {l.origem === 'CADASTRO' ? (
+                                                  <span title="Cadastrado por alguém desta operação"
+                                                    className="ml-1 rounded bg-emerald-900/40 px-1
+                                                               text-[9px] font-semibold uppercase
+                                                               text-emerald-300">cadastrado</span>
+                                                ) : (
+                                                  <span title="Ninguém disse de quem é este login — o contrato dele está na equipe Sem login definido"
+                                                    className="ml-1 rounded bg-amber-900/40 px-1
+                                                               text-[9px] font-semibold uppercase
+                                                               text-amber-300">sem cadastro</span>
+                                                )}
+                                              </span>
+                                            ))}
+                                          </dd>
+
+                                          <dt className="text-graf-600">SUPERVISOR</dt>
+                                          <dd className="min-w-0 truncate">
+                                            {e.supervisor ? (
+                                              e.supervisor_declarado ? (
+                                                <span className="text-graf-200">{e.supervisor}</span>
+                                              ) : (
+                                                <span
+                                                  title="Nome que veio da planilha de equipes — ninguém desta casa foi declarado supervisor destes técnicos ainda"
+                                                  className="text-graf-500">
+                                                  {e.supervisor}
+                                                  <span className="ml-1 text-[9px] uppercase
+                                                                   tracking-wide text-graf-600">
+                                                    da planilha
+                                                  </span>
+                                                </span>
+                                              )
+                                            ) : <span className="text-graf-600">não definido</span>}
+                                          </dd>
+
+                                        </>
+                                      )
                                     })()}
-                                    {e.tecnicos > 0 && <span> · {e.tecnicos} téc.</span>}
-                                    <br />
-                                    {e.supervisor ?? '—'}
-                                    {e.area && <span className="text-graf-500"> · {e.area}</span>}
-                                  </div>
+                                  </dl>
                                   </div>
                                   </div>
                                 </td>
@@ -655,29 +795,45 @@ export default function Equipes() {
                                   {e.ordens || <span className="text-graf-600">—</span>}
                                 </td>
 
+                                {/* As dez linhas de "08:00 - 11:00 (20)" viravam
+                                    meia tela por equipe e nao respondiam a pergunta
+                                    ("a manha esta cheia?"). A regua responde; os
+                                    numeros continuam escritos embaixo. */}
                                 <td className="px-3 py-2.5">
-                                  {e.periodos?.length ? (
-                                    <div className="space-y-0.5">
-                                      {e.periodos.map(p => (
-                                        <div key={p.janela} className="tabular text-[11px] text-graf-300">
-                                          {p.janela}
-                                          <span className="ml-1 text-graf-500">({p.qtd})</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : <span className="text-graf-600">—</span>}
+                                  {e.periodos?.length
+                                    ? <FaixaPeriodos periodos={e.periodos} />
+                                    : <span className="text-graf-600">—</span>}
                                 </td>
 
+                                {/* Seis etiquetas do mesmo tamanho para 163 e 17
+                                    fazem os dois numeros parecerem vizinhos. A barra
+                                    poe cada um no seu tamanho; a contagem embaixo
+                                    continua exata, na ordem do maior para o menor. */}
                                 <td className="px-3 py-2.5">
                                   {e.situacoes?.length ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {e.situacoes.map(s => (
-                                        <span key={s.situacao} className="pill text-[10px]"
-                                          style={{ ['--pill-cor' as string]:
-                                            SITUACAO_INFO[s.situacao]?.cor ?? '#64748b' }}>
-                                          {SITUACAO_INFO[s.situacao]?.label ?? s.situacao} ({s.qtd})
-                                        </span>
-                                      ))}
+                                    <div className="min-w-44 max-w-64 space-y-1.5">
+                                      <BarraComposicao fatias={[...e.situacoes]
+                                        .sort((a, b) => b.qtd - a.qtd)
+                                        .map(s => ({
+                                          chave: s.situacao,
+                                          rotulo: SITUACAO_INFO[s.situacao]?.label ?? s.situacao,
+                                          cor: SITUACAO_INFO[s.situacao]?.cor ?? '#64748b',
+                                          qtd: s.qtd,
+                                        }))} />
+                                      <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[10px]">
+                                        {[...e.situacoes].sort((a, b) => b.qtd - a.qtd).map(s => (
+                                          <span key={s.situacao}
+                                            className="inline-flex items-center gap-1 text-graf-400">
+                                            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full"
+                                              style={{ background:
+                                                SITUACAO_INFO[s.situacao]?.cor ?? '#64748b' }} />
+                                            <span className="tabular font-semibold text-graf-200">
+                                              {s.qtd}
+                                            </span>
+                                            {(SITUACAO_INFO[s.situacao]?.label ?? s.situacao).toLowerCase()}
+                                          </span>
+                                        ))}
+                                      </div>
                                     </div>
                                   ) : <span className="text-graf-600">—</span>}
                                 </td>
@@ -711,7 +867,17 @@ export default function Equipes() {
                                       painel é por dia, mas quem olha o contrato
                                       quer ver a data escrita nele (D-095). */}
                                   <td colSpan={7} className="p-0">
-                                    <div className="overflow-x-auto border-y border-graf-800">
+                                    {/* A gaveta e da EQUIPE: o trilho vermelho a
+                                        esquerda amarra o painel a linha que o abriu,
+                                        em vez de mais uma tabela colada no meio da
+                                        outra. E ela rola por dentro -- SEM-LOGIN tem
+                                        270 contratos, e despejar 270 linhas no meio
+                                        da pagina empurra as outras equipes para
+                                        fora do mundo. */}
+                                    <div className="sobe border-y border-graf-800"
+                                      style={{ boxShadow: 'inset 3px 0 0 0 var(--color-af-500)' }}>
+                                      <div className="quadro"
+                                        style={{ ['--quadro-altura' as string]: '26rem' }}>
                                       <TabelaContratos
                                         linhas={detalhe[e.equipe_id] ?? []}
                                         colunas={{ equipe: false }}
@@ -797,6 +963,7 @@ export default function Equipes() {
                                           )}
                                         </>)}
                                       />
+                                      </div>
                                     </div>
                                   </td>
                                 </tr>
@@ -811,73 +978,7 @@ export default function Equipes() {
               ))}
             </div>
           )
-        ) : (
-          <section className="card-controle overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-graf-700 bg-graf-900 text-left
-                                  text-[11px] uppercase tracking-wide text-graf-400">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Matrícula</th>
-                    <th className="px-3 py-2 font-medium">Nome</th>
-                    <th className="px-3 py-2 font-medium">Equipe</th>
-                    <th className="px-3 py-2 font-medium">Área</th>
-                    <th className="px-3 py-2 font-medium">Supervisor</th>
-                    <th className="px-3 py-2 font-medium">Situação</th>
-                    <th className="px-3 py-2 text-right font-medium">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tecFiltrados.map(t => (
-                    <tr key={t.id} className="border-b border-graf-800 hover:bg-graf-850">
-                      <td className="tabular px-3 py-2 font-medium">{t.matricula}</td>
-                      <td className="px-3 py-2 text-graf-300">{t.nome}</td>
-                      <td className="px-3 py-2 text-xs text-graf-400">
-                        {t.equipe?.codigo ?? <span className="text-af-400">sem equipe</span>}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-graf-400">
-                        {t.equipe?.area?.apelido ?? '—'}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-graf-400">
-                        {t.equipe?.supervisor_nome ?? '—'}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className={t.situacao === 'ATIVO' ? 'text-emerald-400' : 'text-graf-500'}>
-                          {t.situacao.toLowerCase()}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {podeEditar && (
-                          t.situacao === 'ATIVO' ? (
-                            <button disabled={ocupado} onClick={() => mudarSituacao(t, 'DESLIGADO')}
-                              title="Sai da operação; o histórico dele fica"
-                              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs
-                                         text-graf-300 hover:border-af-600 hover:text-af-300
-                                         disabled:opacity-40">
-                              Desligar
-                            </button>
-                          ) : (
-                            <button disabled={ocupado} onClick={() => mudarSituacao(t, 'ATIVO')}
-                              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs
-                                         text-graf-300 hover:border-emerald-600
-                                         hover:text-emerald-300 disabled:opacity-40">
-                              Reativar
-                            </button>
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="border-t border-graf-800 px-3 py-2.5 text-xs text-graf-500">
-              Técnico não se apaga, se <strong className="text-graf-300">desliga</strong>:
-              apagar levaria junto o histórico de contratos que ele executou. O banco
-              recusa a exclusão de quem tem histórico — inclusive para o ADMIN.
-            </p>
-          </section>
-        )}
+        ) : null}
 
         {/* ====== o que espera cadastro ======
             No fim da página, e não no topo: quem abre Equipes vem ver
@@ -939,7 +1040,7 @@ export default function Equipes() {
                           .filter(e => e.codigo !== 'SEM-LOGIN')
                           .map(e => (
                             <option key={e.equipe_id} value={e.equipe_id}>
-                              {e.codigo} · {e.nome}
+                              {equipeRotulo(e.codigo, e.nome)}
                             </option>
                           ))}
                       </select>

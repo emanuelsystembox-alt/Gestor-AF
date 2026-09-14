@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
-import { isoLocal } from '../lib/formato'
+import { equipeRotulo, isoLocal } from '../lib/formato'
+import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 
@@ -75,7 +76,9 @@ const num = (n: number | null | undefined, casas = 1) =>
 
 export default function Rota() {
   const navegar = useNavigate()
-  const [data, setData] = useState('')
+  // HOJE. Abria no último dia com visita, e a rota de ontem sob a data
+  // de hoje é a pior das confusões numa tela de despacho (lib/dia.ts).
+  const [data, setData] = useState(isoLocal())
   const [paradas, setParadas] = useState<Parada[]>([])
   const [bairros, setBairros] = useState<BairroLinha[]>([])
   const [alertas, setAlertas] = useState<AlertaLinha[]>([])
@@ -83,17 +86,9 @@ export default function Rota() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)   // login em foco
-
-  // Mesma escolha das outras telas: abre no último dia COM visita, não
-  // em "hoje" — senão a tela nasce vazia quando a importação é de ontem.
-  useEffect(() => {
-    supabase.from('visita').select('data_agendada')
-      .order('data_agendada', { ascending: false }).limit(1)
-      .then(({ data: d }) => {
-        const ultima = (d as { data_agendada: string }[] | null)?.[0]?.data_agendada
-        setData(ultima ?? isoLocal(new Date()))
-      })
-  }, [])
+  /** Atalho do estado vazio: o último dia com movimento, quando não é
+   *  o dia na tela. A rota abre em HOJE (ver lib/dia.ts). */
+  const outroDia = useDiaAnteriorComMovimento(data)
 
   useEffect(() => {
     if (!data) return
@@ -202,7 +197,15 @@ export default function Rota() {
           <p className="py-16 text-center text-graf-400">Carregando o dia…</p>
         ) : paradas.length === 0 ? (
           <Vazio titulo="Sem rota para este dia"
-            descricao="Nenhuma visita produtiva com login de técnico nesta data." />
+            descricao="Nenhuma visita produtiva com login de técnico nesta data."
+            acao={outroDia ? (
+              <button onClick={() => setData(outroDia)}
+                className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                           text-graf-300 hover:border-af-600 hover:text-af-400">
+                ver {new Date(outroDia + 'T12:00').toLocaleDateString('pt-BR')}
+                {' '}— último dia com movimento
+              </button>
+            ) : undefined} />
         ) : (<>
 
           {/* ====== 1. onde olhar ====== */}
@@ -284,7 +287,7 @@ export default function Rota() {
                         {t.login}
                       </span>
                       <span className="block truncate text-[10px] text-graf-500">
-                        {t.nome ?? (t.equipe ? `equipe ${t.equipe}` : 'sem nome no TOA')}
+                        {t.nome ?? (t.equipe ? equipeRotulo(t.equipe) : 'sem nome no TOA')}
                       </span>
                       <span className="tabular block text-[10px] text-graf-600">
                         {num(t.km, 0)} km · {t.bairros} bairros

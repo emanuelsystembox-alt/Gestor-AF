@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
-import { pts } from '../lib/formato'
+import { equipeRotulo, pts } from '../lib/formato'
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -46,6 +46,10 @@ interface Visita {
   data_agendada: string; janela_inicio: string | null; janela_fim: string | null
   situacao: Situacao; inicio: string | null; fim: string | null
   bloqueado_em: string | null; origem: string | null
+  /** Enquanto não for nulo, a importação não mexe na equipe nem no
+   *  técnico deste contrato (066). O resto continua espelhando o TOA. */
+  rota_fixada_em: string | null
+  rota_fixada_motivo: string | null
   tipo_atividade: { nome: string } | null
   tipo_servico: { nome: string } | null
   area: { codigo: string; apelido: string | null } | null
@@ -61,7 +65,7 @@ const SELECT = `
   tipo_pessoa, tipo_residencia, telefones,
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim, situacao, inicio, fim,
-  bloqueado_em, origem,
+  bloqueado_em, origem, rota_fixada_em, rota_fixada_motivo,
   tipo_atividade:tipo_atividade_id ( nome ),
   tipo_servico:tipo_servico_id ( nome ),
   area:area_id ( codigo, apelido ),
@@ -470,12 +474,61 @@ export function ContratoModal({
             )
           })()}
 
+          {/* ┌─ a chave da rota deste contrato (066) ──────────────────┐
+              │ > "quando eu quiser mandar para outro técnico, o contrato │
+              │ >  não deve retornar quando importado de novo" — Emanuel  │
+              │                                                           │
+              │ Transferir já fixa sozinho. A chave existe para os dois   │
+              │ outros casos: soltar de volta ao roteamento automático, e │
+              │ segurar um contrato onde ele está SEM transferir.         │
+              └───────────────────────────────────────────────────────────┘ */}
+          {v && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border
+                            border-graf-700 bg-graf-900 px-3 py-2.5">
+              <button
+                role="switch" aria-checked={!v.rota_fixada_em}
+                disabled={ocupado}
+                onClick={() => comAviso(() => supabase.rpc('fixar_rota_da_visita', {
+                  p_visita: id, p_fixar: !v.rota_fixada_em, p_motivo: null,
+                }), v.rota_fixada_em
+                  ? 'Roteamento do TOA religado neste contrato.'
+                  : 'Rota fixada: a importação não mexe mais na equipe deste contrato.')}
+                className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full transition
+                            disabled:opacity-40 ${
+                  v.rota_fixada_em ? 'bg-graf-700' : 'bg-emerald-600'}`}>
+                <span className={`ml-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                  v.rota_fixada_em ? 'translate-x-0' : 'translate-x-4'}`} />
+              </button>
+              <div className="min-w-0 flex-1 text-[11px] leading-snug">
+                {v.rota_fixada_em ? (
+                  <>
+                    <strong className="text-amber-300">Rota fixada.</strong>{' '}
+                    <span className="text-graf-400">
+                      A importação do TOA <strong>não</strong> mexe na equipe nem no técnico
+                      deste contrato. Situação, janela, endereço e O.S. continuam
+                      espelhando o relatório normalmente.
+                      {v.rota_fixada_motivo && <> Motivo: {v.rota_fixada_motivo}.</>}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-emerald-400">Roteamento do TOA ligado.</strong>{' '}
+                    <span className="text-graf-400">
+                      A cada importação a equipe deste contrato volta a ser a do login do
+                      técnico no relatório. Desligue para segurá-lo onde está.
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           {acao === 'transferir' && v && (
             <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
               <p className="mb-2 text-xs font-medium">
                 Transferir contrato
                 <span className="ml-2 font-normal text-graf-500">
-                  de {v.equipe?.codigo ?? 'sem equipe'} — fica no histórico
+                  de {v.equipe ? equipeRotulo(v.equipe.codigo, v.equipe.nome) : 'sem equipe'} — fica no histórico
                 </span>
               </p>
               <div className="flex flex-wrap items-end gap-2">
@@ -485,7 +538,7 @@ export function ContratoModal({
                     className={`${campo} w-56`}>
                     <option value="">— escolha —</option>
                     {equipes.filter(e => e.codigo !== v.equipe?.codigo).map(e => (
-                      <option key={e.id} value={e.id}>{e.codigo} · {e.nome}</option>
+                      <option key={e.id} value={e.id}>{equipeRotulo(e.codigo, e.nome)}</option>
                     ))}
                   </select>
                 </label>
@@ -746,7 +799,7 @@ export function ContratoModal({
                   Atendimento
                 </h3>
                 <div className="grid gap-3 rounded-lg bg-graf-900 p-3 sm:grid-cols-4">
-                  <Dado r="Equipe" v={v.equipe ? `${v.equipe.codigo} · ${v.equipe.nome}` : null} />
+                  <Dado r="Equipe" v={v.equipe ? equipeRotulo(v.equipe.codigo, v.equipe.nome) : null} />
                   <Dado r="Supervisor" v={v.equipe?.supervisor_nome} />
                   <Dado r="Técnico" v={v.tecnico ? `${v.tecnico.nome} (${v.tecnico.matricula})` : null} />
                   <Dado r="Área" v={v.area?.apelido ?? v.area?.codigo} />
@@ -876,7 +929,8 @@ export function ContratoModal({
                             ? `${e.codigo_baixa.codigo} · ${e.codigo_baixa.descricao}` : '—'}
                         </td>
                         <td className="px-2 py-1.5 text-graf-300">{e.sub_falha?.nome ?? '—'}</td>
-                        <td className="px-2 py-1.5 text-graf-400">{e.equipe?.codigo ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-graf-400">
+                          {e.equipe ? equipeRotulo(e.equipe.codigo) : '—'}</td>
                         <td className="px-2 py-1.5 text-graf-400">
                           {e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
                         </td>

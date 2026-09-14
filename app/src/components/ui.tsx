@@ -80,12 +80,21 @@ export function Avatar({ nome, foto, tamanho = 34, titulo }: {
   )
 }
 
-/** Etiqueta de situação. Mesma cor em toda a aplicação. */
-export function Pill({ situacao }: { situacao: Situacao }) {
+/** Etiqueta de situação. Mesma cor em toda a aplicação.
+ *
+ *  `vivo` faz a bolinha pulsar — deslocamento e execução são as duas
+ *  situações que estão ACONTECENDO enquanto a tela é lida. O pulso é
+ *  reforço, nunca o único portador: o rótulo continua escrito, e quem
+ *  pediu menos movimento (`prefers-reduced-motion`) vê a etiqueta
+ *  parada com a mesma informação. */
+export function Pill({ situacao, vivo = false }: {
+  situacao: Situacao; vivo?: boolean
+}) {
   const info = SITUACAO_INFO[situacao]
-  if (!info) return <span className="pill" style={{ ['--pill-cor' as string]: '#64748b' }}>{situacao}</span>
+  const classe = `pill${vivo ? ' pill-vivo' : ''}`
+  if (!info) return <span className={classe} style={{ ['--pill-cor' as string]: '#64748b' }}>{situacao}</span>
   return (
-    <span className="pill" style={{ ['--pill-cor' as string]: info.cor }}>
+    <span className={classe} style={{ ['--pill-cor' as string]: info.cor }}>
       {info.label}
     </span>
   )

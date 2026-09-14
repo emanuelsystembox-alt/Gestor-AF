@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import type { Visita } from '../lib/metricas'
 import { SITUACAO_INFO } from '../lib/supabase'
 import { Pill } from './ui'
-import { dataBR, diaSemana, pts } from '../lib/formato'
+import { FaixaJanela } from './telemetria'
+import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -27,14 +28,15 @@ import { dataBR, diaSemana, pts } from '../lib/formato'
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
-  data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
+  data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
   finalizado_toa, produtos_pendentes,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo, apelido ),
   equipe:equipe_id ( codigo, nome, supervisor_nome ),
-  tecnico:tecnico_responsavel_id ( nome, matricula ),
+  tecnico:tecnico_responsavel_id ( nome, matricula,
+                                  supervisor:supervisor_id ( nome ) ),
   ordem_servico (
     id, sequencia, numero_os, status_operadora, ponto, produto_pendente,
     tipo_os:tipo_os_id ( codigo, descricao ),
@@ -73,8 +75,14 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   finalizado_toa?: boolean
   node: string | null
   complemento: string | null
+  /** Rota decidida por gente: a importação não remaneja este (066). */
+  rota_fixada_em?: string | null
   area: { codigo: string; apelido: string | null } | null
   equipe: { codigo: string; nome: string; supervisor_nome: string | null } | null
+  /** O técnico do contrato, com o supervisor DECLARADO dele (068) — que
+   *  vale mais que o nome herdado da planilha na equipe. */
+  tecnico: { nome: string; matricula: string
+             supervisor: { nome: string } | null } | null
   ordem_servico: OSDupla[]
   visita_marcador: Marcador[]
 }
@@ -207,6 +215,10 @@ export function TabelaContratos({
         {!carregando && linhas.map(v => {
           const improd = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
           const cor = SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
+          // O que está acontecendo AGORA respira: o trilho e a bolinha
+          // da etiqueta pulsam. Só estas duas situações — se a lista
+          // inteira pulsasse, o pulso não separaria nada.
+          const vivo = v.situacao === 'EM_EXECUCAO' || v.situacao === 'EM_DESLOCAMENTO'
           const marcados = (v.visita_marcador ?? [])
             .map(m => ({ m, ind: porIndicador?.get(m.indicador_id) }))
             .filter(x => x.ind)
@@ -218,13 +230,11 @@ export function TabelaContratos({
                 onContextMenu={aoMenuContexto ? e => {
                   e.preventDefault(); aoMenuContexto(v, e)
                 } : undefined}
-                style={{
-                  borderLeft: `3px solid ${cor}`,
-                  background: `color-mix(in srgb, ${cor} 8%, transparent)`,
-                }}
-                className={`border-b border-graf-500/25
+                style={{ ['--cor-sit' as string]: cor }}
+                className={`linha-contrato ${vivo ? 'linha-viva' : ''}
+                            border-b border-graf-500/25
                             [&>td]:border-r [&>td]:border-graf-500/15
-                            [&>td:last-child]:border-r-0 hover:bg-graf-850
+                            [&>td:last-child]:border-r-0
                             ${aoAbrir ? 'cursor-pointer' : ''}`}>
               {temSelecao && (
                 <td className="px-2 py-2 align-top"
@@ -256,16 +266,30 @@ export function TabelaContratos({
               </td>
 
               <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
-                {v.janela_inicio?.slice(0, 5) ?? '—'}
-                {v.janela_fim && <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>}
+                {v.janela_inicio
+                  ? <>
+                      {v.janela_inicio.slice(0, 5)}
+                      {v.janela_fim && (
+                        <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>
+                      )}
+                    </>
+                  : <span className="text-graf-600">sem janela</span>}
                 {detalhada && v.fim && v.finalizado_toa && (
                   <div className="text-[10px] text-graf-500">encerrou {hora(v.fim)}</div>
+                )}
+                {/* A régua do dia: onde a janela cai e onde o
+                    encerramento caiu dentro dela. O texto acima continua
+                    sendo a medida; isto responde "sobrou ou estourou?"
+                    sem conta de cabeça, contrato por contrato. */}
+                {detalhada && (
+                  <FaixaJanela inicio={v.janela_inicio} fim={v.janela_fim}
+                    encerrou={v.finalizado_toa ? hora(v.fim) : null} tec1={v.tec1} />
                 )}
               </td>
 
               <td className="px-3 py-2 align-top">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Pill situacao={v.situacao} />
+                  <Pill situacao={v.situacao} vivo={vivo} />
                   {v.bloqueado_em && (
                     <span title="Tocada pelo campo — o TOA não sobrescreve mais"
                           className="text-[10px] text-af-400">●</span>
@@ -273,6 +297,13 @@ export function TabelaContratos({
                   {improd && (
                     <span title="Tem O.S. improdutiva"
                           className="text-[10px] text-amber-400">▲</span>
+                  )}
+                  {/* Rota fixada: a importação não remaneja este contrato.
+                      Sem a marca, quem olha a lista não tem como saber por
+                      que um contrato não voltou para a equipe do login. */}
+                  {v.rota_fixada_em && (
+                    <span title="Rota fixada — a importação do TOA não muda a equipe deste contrato"
+                          className="text-[10px] text-sky-400">⚲</span>
                   )}
                 </div>
                 {/* TEC1: sobe junto com a baixa do TOA. Sem etiqueta = a
@@ -318,15 +349,28 @@ export function TabelaContratos({
 
               {mostra.equipe && (
                 <td className="whitespace-nowrap px-3 py-2 align-top text-graf-300">
-                  {v.equipe?.codigo ?? <span className="text-af-400/70">sem equipe</span>}
+                  {v.equipe
+                    ? equipeRotulo(v.equipe.codigo, v.equipe.nome)
+                    : <span className="text-af-400/70">sem equipe</span>}
                   {v.tecnico && (
                     <span className="ml-1.5 text-xs text-graf-500">{v.tecnico.matricula}</span>
                   )}
-                  {detalhada && v.equipe?.supervisor_nome && (
-                    <div className="max-w-40 truncate text-[10px] text-graf-500"
-                         title={v.equipe.supervisor_nome}>
-                      {v.equipe.supervisor_nome}
-                    </div>
+                  {/* O supervisor mostrado é o DECLARADO do técnico deste
+                      contrato. Só cai no nome da planilha quando ninguém
+                      declarou — e aí sai marcado, para não passar por
+                      alguém desta casa (D-135). */}
+                  {detalhada && (v.tecnico?.supervisor || v.equipe?.supervisor_nome) && (
+                    v.tecnico?.supervisor ? (
+                      <div className="max-w-40 truncate text-[10px] text-graf-400"
+                           title={`Supervisor: ${v.tecnico.supervisor.nome}`}>
+                        {v.tecnico.supervisor.nome}
+                      </div>
+                    ) : (
+                      <div className="max-w-40 truncate text-[10px] text-graf-600"
+                           title={`${v.equipe!.supervisor_nome} — nome vindo da planilha de equipes; ninguém desta casa foi declarado supervisor deste técnico`}>
+                        {v.equipe!.supervisor_nome} · da planilha
+                      </div>
+                    )
                   )}
                 </td>
               )}

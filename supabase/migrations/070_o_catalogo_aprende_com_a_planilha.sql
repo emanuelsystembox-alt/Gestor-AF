@@ -1,0 +1,44 @@
+-- ============================================================
+-- 070 · O catálogo aprende com a planilha
+--
+-- > "você pegou o código, o número da O.S., mas não pegou o nome dela
+-- >  […] a área que fica depois do endereço não pegou também, sendo que
+-- >  eu fui olhar no analítico ela aparece" — Emanuel
+--
+-- Os dois defeitos tinham a MESMA causa: o importador procura no
+-- catálogo, não acha, e joga fora o que estava no arquivo.
+--
+--     tipo_os_id = (select id from tipo_os where codigo = extrai_codigo(...))
+--     area_id    = (select id from area_trabalho where norm_txt(codigo) = ...)
+--
+-- Nulo silencioso nos dois. E o dado estava lá, escrito:
+--
+--     Tipo O.S 1        "87 - RETIRAR EMTA"     <- codigo E nome
+--     Área de Trabalho  "ARN-AREA01"
+--
+-- O catalogo tinha 37 tipos (faltavam 32, 79 e 87) e cinco areas, todas
+-- de Manaus. A planilha era de Araguaina.
+--
+-- Agora o catalogo aprende com a planilha, que e a fonte -- *derive do
+-- dado real*. So entra quando ha DESCRICAO de verdade: se a celula
+-- trouxer so o numero, nada e inventado, fica nulo, e a tela continua
+-- dizendo que nao sabe.
+--
+-- Cirurgia com ancora (ver 066): a funcao tem ~300 linhas e o bloco
+-- ABORTA se as ancoras nao existirem mais.
+--
+-- CONFERIDO reimportando o arquivo real de 10/09:
+--     sem tipo de O.S.: 8 de 45  ->  0 de 45
+--     entraram: 32, 79, 87 e a area ARN-AREA01
+-- ============================================================
+
+-- Aplicada como bloco DO que le a definicao corrente de
+-- `importar_toa_interno`, insere dois trechos e recria a funcao:
+--
+--   1. depois de `v_equipe := equipe_do_contrato(...)`, no laco da
+--      linha: upsert de `area_trabalho` a partir de 'Área de Trabalho';
+--   2. antes de `v_cod := extrai_codigo(... 'Cód de Baixa ' ...)`, no
+--      laco da O.S.: upsert de `tipo_os` a partir de 'Tipo O.S j',
+--      separando "87" (codigo) de "RETIRAR EMTA" (descricao).
+--
+-- Os dois com `on conflict (codigo) do nothing`.

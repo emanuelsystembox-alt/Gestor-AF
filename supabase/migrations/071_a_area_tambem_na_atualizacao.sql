@@ -1,0 +1,35 @@
+-- ============================================================
+-- 071 · A área só era gravada no INSERT
+--
+-- Achado ao testar a 070: com a área já no catálogo, as 40 visitas
+-- CONTINUAVAM sem área. O `area_id` era atribuído apenas na criação da
+-- visita — o ramo de ATUALIZAÇÃO do importador nunca o tocava.
+--
+-- Consequência: visita importada antes de a área existir no catálogo
+-- ficava sem área PARA SEMPRE, e reimportar não consertava. O mesmo
+-- valia para qualquer área criada depois.
+--
+-- Agora a área entra também na atualização, com `coalesce` para nunca
+-- apagar o que já havia, nos DOIS ramos:
+--   - o normal;
+--   - o da visita tocada pelo campo (D-006) — endereço e geografia
+--     continuam espelhando o TOA ali, e área é geografia.
+--
+-- CONFERIDO reimportando o arquivo real de 10/09:
+--     sem área: 40 de 40  ->  8 de 40
+--
+-- Os 8 que ficam são os apontamentos de JORNADA (Na Base, Refeição): a
+-- planilha não traz "Área de Trabalho" para eles. Sem área na fonte,
+-- sem área no banco.
+-- ============================================================
+
+-- Aplicada como bloco DO com ancora, inserindo antes de
+-- `equipe_id = case when rota_fixada_em ...` e de
+-- `segmentacao_id = coalesce(...)`:
+--
+--     area_id = coalesce((select id from area_trabalho
+--                          where norm_txt(codigo) = norm_txt(j_txt(d, 'Área de Trabalho'))),
+--                        area_id),
+--
+-- O bloco confere depois que o texto entrou e ABORTA se nao entrou --
+-- replace() que nao acha nada nao reclama.

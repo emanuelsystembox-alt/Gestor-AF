@@ -20,8 +20,8 @@ import { isoLocal, pts } from '../lib/formato'
 
 
 export default function Relatorios() {
-  const [de, setDe] = useState('')
-  const [ate, setAte] = useState('')
+  const [de, setDe] = useState(isoLocal())
+  const [ate, setAte] = useState(isoLocal())
   const [tipo, setTipo] = useState<'contrato' | 'os'>('contrato')
   const [formato, setFormato] = useState<'xlsx' | 'csv'>('xlsx')
   const [linhas, setLinhas] = useState<VisitaLinha[]>([])
@@ -38,12 +38,9 @@ export default function Relatorios() {
   const [semJornada, setSemJornada] = useState(true)
 
   useEffect(() => {
-    supabase.from('visita').select('data_agendada')
-      .order('data_agendada', { ascending: false }).limit(1)
-      .then(({ data }) => {
-        const u = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? isoLocal(new Date())
-        setDe(u); setAte(u)
-      })
+    // O período abre em HOJE (ver lib/dia.ts). Antes vinha do último dia
+    // com visita, e um relatório que abre num dia que ninguém escolheu é
+    // um relatório que alguém exporta achando que é de hoje.
     supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data }) => setIndicadores((data ?? []) as Indicador[]))
   }, [])

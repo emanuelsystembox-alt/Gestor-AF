@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Alerta } from './ui'
-import { isoLocal } from '../lib/formato'
+import { equipeRotulo, isoLocal } from '../lib/formato'
 
 /**
  * Cadastro manual de contrato — a "Nova Ordem de Serviço" do sistema atual.
@@ -442,7 +442,7 @@ export function NovoContratoModal({
                   className={`${campo} w-full`}>
                   <option value="">— entra na fila sem equipe —</option>
                   {equipes.map(e2 => (
-                    <option key={e2.id} value={e2.id}>{e2.codigo} · {e2.nome}</option>
+                    <option key={e2.id} value={e2.id}>{equipeRotulo(e2.codigo, e2.nome)}</option>
                   ))}
                 </select>
               </label>
