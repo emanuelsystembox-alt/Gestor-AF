@@ -415,6 +415,10 @@ dias", que não informa nada. Em dia passado a coluna mostra a hora da
 última atividade e a situação com que a equipe parou.
 
 ### D-034 · Toda tela de operação abre no último dia COM dado
+> ⚠ **REVOGADA em 10/09/2026 pela D-123.** A tela passou a abrir em
+> HOJE. O que está abaixo é o raciocínio original, mantido porque
+> explica o problema que a D-123 teve de resolver de outro jeito.
+
 `vw_equipe_resumo` usava `CURRENT_DATE`. Com importação de 04 e 05/09 e
 o relógio em 06/09, a tela de Equipes devolvia zero para tudo — parecia
 vazia sem estar errada. Serviços tinha o mesmo problema: abria em "hoje".
@@ -2594,3 +2598,1051 @@ O terceiro é o que importa e quase ninguém testa:
 `substring(name,1,36)::uuid` num objeto cujo nome não é UUID **estoura e
 derruba a policy inteira, em silêncio** — negando tudo, para todos. É a
 razão de `visita_do_path` existir com `CASE`.
+
+---
+
+### D-121 · A tela deixa de contar em texto e passa a mostrar proporção
+
+> "me ajude a melhorar mais esta visão do meu acompanhamento de
+> contratos e da visão de equipes também, pra não ficar muito copiado da
+> concorrente" — Emanuel
+
+O que fazia Serviços e Equipes parecerem o concorrente não era a cor
+nem a fonte: era a **gramática de leitura**. Os dois contam tudo em
+texto de tamanho igual, e o texto de tamanho igual esconde proporção.
+
+Três lugares onde isso doía, e o que entrou no lugar:
+
+**1. As situações da equipe.** `CONCLUÍDA (163)` e `CANCELADA (17)`
+lado a lado, na mesma etiqueta, do mesmo tamanho: o olho lê "parecido".
+Entrou a **barra de composição** — uma fatia é dez vezes a outra, e
+isso se vê antes de ler. A contagem exata continua escrita embaixo,
+ordenada do maior para o menor. Ninguém deve **medir** num desenho de 8
+pixels; o desenho responde à pergunta anterior, que é *onde olhar*.
+
+**2. Os períodos da equipe.** A `SEM-LOGIN` trazia **dez linhas** de
+`08:00 - 11:00 (20)` empilhadas — meia tela por equipe, e ainda assim
+sem responder "a manhã está cheia?". Entrou a **régua do dia** (06h às
+22h): cada janela é um bloco, e a intensidade do bloco é a quantidade.
+A tabela de equipes encolheu de ~700px para ~120px.
+
+**3. A janela do contrato.** `08:00–12:00 / encerrou 09:48` obriga a
+fazer a conta de cabeça, contrato por contrato. Entrou a mesma régua,
+com um **risco vertical** no encerramento. A cor do risco **não é
+opinião nossa**: é o TEC1 que o servidor calculou (D-099) — verde
+dentro do padrão, vermelho fora, **cinza quando não há TEC1**. Sem
+janela não há régua e sai escrito "sem janela": janela ausente não é
+janela de largura zero (D-117).
+
+Os seis cartões de número grande no topo de Equipes viraram **uma
+régua só**. Seis cartões iguais afirmam "seis coisas igualmente
+importantes", e não são: a pergunta de quem abre a tela é *quantas
+equipes estão rodando hoje*. Essa ocupa a primeira célula, com a
+proporção desenhada; o resto é contagem de apoio.
+
+**O filtro de situação virou a própria etiqueta da situação.** Estava
+pintando o botão ligado de **vermelho da marca** — ou seja, "Concluída"
+ligada acendia exatamente na cor que a tela inteira usa para dizer que
+algo deu errado. Agora ligado acende na cor **dela**.
+
+**O que se mexe é o que está acontecendo.** Trilho e bolinha pulsam só
+em `EM_DESLOCAMENTO` e `EM_EXECUCAO` — 32 das 265 linhas do dia. Se a
+lista inteira pulsasse, o pulso não separaria nada. E o pulso nunca é o
+único portador: o rótulo continua escrito, e quem pediu
+`prefers-reduced-motion` vê tudo parado com a mesma informação.
+
+**Recusado:** barra de composição clicável. Seria o mesmo comando duas
+vezes na mesma tela, e fatia de 5% é alvo de clique ruim para qualquer
+pessoa. A barra é `aria-hidden`; quem filtra são os botões, com nome,
+contagem e `aria-pressed`.
+
+### D-122 · O quadro rola por dentro, e o cabeçalho fica
+
+Na segunda tela de 265 linhas o cabeçalho já foi embora, e a partir
+dali a coluna do meio é um número sem nome. A tabela passou a ter
+rolagem própria (`.quadro`), com `thead` grudado no topo dela.
+
+Duas consequências que valem tanto quanto:
+
+**A barra de exclusão em lote saiu de dentro do quadro.** Ela fala das
+linhas selecionadas e some de vista enquanto se rola a lista que ela
+apaga — o pior lugar possível para um botão que não se desfaz (D-101).
+Agora fica presa no topo do cartão.
+
+**A gaveta da equipe também rola por dentro** (26rem). A `SEM-LOGIN`
+tem 270 contratos: despejá-los inteiros no meio da página empurra as
+outras 106 equipes para fora do mundo.
+
+E a seta da equipe virou **botão de verdade**, com `aria-expanded` e
+nome: `<tr onClick>` não é alcançável por Tab, e quem trabalha no
+teclado — que é como o Controlador trabalha — não tinha como abrir uma
+equipe.
+
+**Não verificado:** o comportamento com 1.320 linhas (o dia cheio, sem
+filtro) só foi medido com as 265 de 09/09.
+
+---
+
+### D-123 · A tela abre em HOJE, e dia vazio aparece vazio
+
+> "preciso que nosso sistema quando virar o dia ele mostre somente
+> coisas do dia, se não tiver nada, ele não mostra nada entende? ele
+> ainda mostra coisas do dia anterior na data de hoje." — Emanuel
+
+**Revoga a D-034.** Serviços, Equipes, Rota do dia e Relatórios abriam
+no último dia COM visita. A intenção era evitar tela vazia; o preço era
+a tela **mentir a data**. Em 10/09 o painel abria com o movimento de
+09/09 — e a data corrigida ficava num campo pequeno no topo, que
+ninguém lê quando os números abaixo já parecem os de hoje. Um COP olha
+"165 concluídas" e entende "165 concluídas hoje".
+
+É a D-117 outra vez, do outro lado: **quando o sistema não sabe, ele
+diz que não sabe.** Dia sem importação não é um defeito a esconder — é
+a informação "ainda não chegou nada", e ela vale mais que um número
+antigo no lugar certo.
+
+O que se perdeu — descobrir sozinho onde estava o movimento — volta
+como **atalho, não como padrão**: o estado vazio oferece *"ver 09/09 —
+último dia com movimento"* num clique. A diferença é quem decide.
+Mora em `app/src/lib/dia.ts`, num lugar só, porque eram quatro cópias
+da mesma consulta.
+
+Some junto o efeito colateral que a D-034 tinha virado regra: como a
+data já nasce certa, não há mais o segundo carregamento que corrigia o
+primeiro — e nem a corrida entre os dois.
+
+### D-124 · O número da equipe agrupa; quem identifica é a pessoa
+
+> "na concorrência o id era o número da equipe, eu não quero isso […] o
+> número da equipe pode se repetir para mais de um técnico, porém o que
+> vai diferenciar mesmo é o nome dele e o cpf e rg" — Emanuel
+
+Administração → Novo usuário ganhou o campo **Número da equipe**,
+liberado quando o Login TOA é digitado — a mesma regra da Skill, e pela
+mesma razão: equipe é do TÉCNICO, e sem login não há em quem gravar.
+O login **continua opcional**; sem ele o acesso é criado e simplesmente
+não fica ligado a técnico nenhum.
+
+Duas coisas que a tela passou a fazer, e que não são enfeite:
+
+**1. Ela diz de quem é o login ANTES de gravar.** O login do TOA é a
+chave do roteamento — `importar_toa` casa `tecnico.matricula` com a
+coluna "Login do Técnico" para carimbar `tecnico_responsavel_id`.
+Digitar um login que já é de outra pessoa não é um erro de digitação
+qualquer: é passar a rota de alguém para outro alguém. A tela mostra
+nome e equipe atuais, e avisa quando aquele técnico já tem acesso —
+em vez de deixar a descoberta para a mensagem de erro do servidor.
+
+**2. O técnico passa a existir.** `vincular_tecnico_ao_usuario` só LIGA
+um acesso a um técnico que já existe; quem criava técnico era a
+planilha de equipes. Cadastrar quem ainda não veio na planilha morria
+em *"Nao existe tecnico com o login X"*. Agora o cadastro chama antes
+`cadastrar_tecnico_avulso`, que cria quando não existe e, quando já
+existe, move de equipe e religa os contratos órfãos daquele login.
+
+**O nome que vai para o técnico é o que já estava no cadastro dele**,
+não o digitado no formulário: renomear em silêncio o técnico que veio
+da planilha seria mudar dado da fonte por efeito colateral de criar um
+acesso.
+
+Um defeito apareceu no próprio teste da tela e está consertado: a
+equipe sugerida por um login **ficava grudada** ao trocar de login. Com
+Z674378 na tela ela vinha "033 - EQUIPE"; apagando e digitando outro
+login, a sugestão continuava lá — e gravar dali moveria o técnico novo
+para a equipe de alguém que nada tem a ver, em silêncio. Agora a tela
+marca o que foi ELA que preencheu: sugestão velha é substituída,
+escolha feita à mão sobrevive.
+
+CONFERIDO como `authenticated` (nunca como dono — D-081), em transação
+desfeita:
+
+```
+login Z999001, que não existia
+antes=0  depois=1  nome=FULANO DA SIMULACAO  equipe=022
+vincular={"equipe":"022","tecnico":"FULANO DA SIMULACAO","matricula":"Z999001"}
+sobrou depois do rollback: 0
+```
+
+**EM ABERTO, e é do Emanuel:** hoje o contrato importado só chega numa
+equipe se alguém tiver declarado o login dela (`equipe_login_toa`, com
+autor — D-079); sem isso vai para o abrigo "Sem login definido", mesmo
+com o técnico já identificado. Em 09/09 isso são **270 contratos no
+abrigo, dos quais 238 têm técnico com equipe conhecida**. Deixar a
+equipe do técnico valer como último critério tiraria 238 do limbo — e
+seria exatamente o "roteamento por dedução" que a D-088 proíbe. Não
+mexi.
+
+### D-125 · O código da equipe tem três dígitos
+
+> "o padrão que eu quero é esse: '001 - EQUIPE' '022 - EQUIPE'"
+> — Emanuel
+
+A mesma equipe aparecia de três jeitos: `74` na coluna da tabela, `074`
+no painel e `074 · 074 - EQUIPE` no seletor de transferência — porque
+uns lugares mostravam `codigo`, outros `codigo · nome`, e o `nome` no
+banco **já é** "074 - EQUIPE". Agora é uma função só, `equipeRotulo()`
+em `app/src/lib/formato.ts`, usada em toda tela que escreve equipe.
+
+Mais grave que a feiura, e o motivo da migration **062**:
+`importar_equipes` tirava o código de `split_part(nome,'-',1)`. Planilha
+com "45 - EQUIPE" cria a equipe `45`; com "045 - EQUIPE" cria a `045`.
+Como a chave é `unique (base_id, codigo)`, **as duas convivem como
+equipes diferentes** — mesma equipe de campo, dois cadastros, contrato
+dividido e produtividade pela metade em cada um. O zero à esquerda
+deixa de ser enfeite e vira identidade.
+
+CONFERIDO ANTES de aplicar: as 107 equipes já estão em três dígitos (as
+18 fora do padrão são as `SEM-LOGIN`, uma por base). Por isso a 062 **não
+reescreve dado existente** — não há o que reescrever, e renumerar código
+de equipe sem ninguém precisar é risco sem ganho. A normalização vale
+da próxima importação em diante.
+
+### D-126 · O Dashboard vira régua, e dois gráficos param de mentir
+
+> "acho que tem muito espaço ou tem informações de forma incorreta
+> melhore isso por favor, precisa ser fácil de entender e as informações
+> precisam fazer sentido" — Emanuel
+
+**O mesmo fato, três vezes, em duas telas de rolagem.** O painel abria
+com sete cartões de situação (188, 9, 48, 373, 41, 44, 10), mostrava a
+matriz — cuja linha **Total** é a mesma sequência —, e mais abaixo um
+quadro "Distribuição por situação" com **os mesmos sete números** outra
+vez, agora em barra empilhada com legenda. Entre eles, quatro cartões de
+indicador do mesmo tamanho dos sete primeiros.
+
+Onze cartões iguais afirmam onze assuntos igualmente importantes. São
+dois: **quanto e como está indo** (uma régua de quatro leituras) e
+**onde o dia está** (a composição). Foi o mesmo raciocínio da D-124 em
+Equipes, e a peça de CSS é literalmente a mesma (`.painel-estado` e
+`.regua` compartilham a regra).
+
+Medido no rascunho, com os números de 01–10/09: a abertura saiu de
+**~420px** (7 cartões + 4 indicadores + o quadro repetido) para **110px**
+em 1600px de largura. A primeira tela passou a caber régua + composição
++ a matriz inteira.
+
+**Dois defeitos de leitura, não de layout:**
+
+**1. "Encerramentos por hora" desenhava toda barra com 2px.** A coluna
+era filha de um flex com `items-end`, então a altura dela era o
+CONTEÚDO — e `height: 42%` de um pai sem altura definida não resolve.
+Todas caíam no `minHeight: 2`. Medido no navegador antes e depois:
+`items-end` sem `h-full` → **2px**; `stretch` com `h-full` → **88px**
+para os mesmos 50%. O gráfico existia, ocupava um quadro de largura
+inteira e não dizia nada. De quebra o eixo ia de 00h às 23h: oito horas
+mortas comiam um terço da largura. Agora o eixo é a faixa com
+movimento, e o rodapé escreve qual é — eixo cortado sem dizer onde
+corta é gráfico que mente.
+
+**2. "% do dia" em cima de um mês.** Os cartões de situação escreviam
+"26,4% do dia" com o filtro em `Este mês` (01/09 a 10/09). Sumiu junto
+com os cartões.
+
+**"Equipes por volume concluído" era o retrato de um cadastro
+incompleto, não um ranking.** No período, **534 das 556** concluídas
+produtivas (medido no banco, excluindo jornada como a tela faz) caem em
+`SEM-LOGIN` ou em visita sem equipe nenhuma. Desenhado na mesma
+escala, isso é uma barra cheia e duas riscas. O abrigo saiu do ranking e
+virou contagem escrita, com o caminho do conserto (`concluidasSemDono`
+em `metricas.ts`). Sumir com ele seria sumir com a única coisa acionável
+da tela — zero e desconhecido não são a mesma coisa, e aqui o
+desconhecido é a maioria.
+
+**O painel deixou de ser um beco sem saída.** As etiquetas de situação
+agora são links para Serviços levando `situacao`, `de` e `ate`; o nome
+do grupo na matriz leva `grupo`. Antes o cartão "Cancelada 41" abria a
+lista de HOJE, sem filtro — o drill-down mentia sobre o que tinha sido
+clicado. `Servicos.tsx` valida os parâmetros: data fora do formato ou
+situação inexistente voltam ao padrão.
+
+**O que ainda está lá, de propósito:** os dois recortes que pareciam
+duplicados não eram. A matriz conta `situacao = CONCLUIDA` (160 em
+ADESÃO); o quadro "Visitas por grupo de serviço" contava concluída SEM
+O.S. improdutiva (141) e mais 19 improdutivas — 141+19 = 160. Como o
+segundo quadro só existia por causa do alternador grupo/tipo do TOA e do
+CSV, os dois viraram botões no cabeçalho da matriz, e a coluna `%
+concl.` foi para o lado da própria coluna CONCLUÍDA: percentual cujo
+numerador está três colunas à esquerda é conta de cabeça.
+
+**Removido por ficar sem uso:** `Indicador`, `Sparkline` e
+`BarraEmpilhada` em `graficos.tsx` — a régua e o `.mistura` fazem o que
+os três faziam.
+
+VERIFICADO ATE ONDE DEU: `tsc --noEmit` limpo e `npm run build` nos dois
+casos; as pecas novas foram montadas numa pagina de rascunho (apagada
+depois) e conferidas no navegador em 1600px, 1024px e 784px, com os
+numeros reais de 01-10/09. NAO verificado: a tela logada de verdade --
+nao tenho credencial e nao entro com senha; e nada abaixo de 784px, que
+e o minimo que o painel de visualizacao desta sessao aceita, entao o
+`@media (max-width: 640px)` da regua esta escrito e nao exercitado.
+
+---
+
+### D-127 · A operação do técnico: de qual cidade ele atua
+
+> "Temos que ter agora o nome da operação que o técnico atua qual a
+> cidade […] isso tem que estar também na tela de cadastro […] é
+> importante saber de qual cidade ele atua." — Emanuel
+
+A operação **já existia**: é a `base` (praça), e as 18 linhas do banco
+batem uma a uma com o relatório — Manaus - AM, Belém - PA, Brasília -
+DF, São Luís - MA, Palmas - TO, Imperatriz - MA, Araguaína - TO,
+Marabá - PA, Gurupi - TO, Caxias - MA, Timon - MA, Paraíso - TO, mais
+seis que o relatório não mostrava (RO, PI e as duas de Rede Externa).
+
+O que faltava era a **tela perguntar**. `tecnico.base_id` é `NOT NULL`,
+então todo técnico sempre teve uma operação — só que ninguém escolhia:
+`cadastrar_tecnico_avulso` pegava `bases_visiveis() limit 1`, um palpite
+silencioso. É a D-088 de novo, do lado do cadastro: o sistema declarava
+no lugar de quem opera.
+
+Agora, em Administração → Novo usuário:
+
+- **Operação (cidade)**, liberada pelo login do TOA como a skill e a
+  equipe — pela mesma razão: operação é do TÉCNICO, e sem login não há
+  em quem gravar.
+- **A operação filtra a equipe.** Equipe mora numa praça; sem o filtro
+  dava para cadastrar técnico de Manaus em equipe de Belém, e o banco
+  recusava depois sem explicar bem. Trocar de cidade limpa a equipe
+  escolhida. Operação sem nenhuma equipe cadastrada diz isso em vez de
+  mostrar um seletor vazio, que parece defeito.
+- O aviso do login agora diz as três coisas: **quem é, em que equipe e
+  em que operação** — "O login Z674378 já é do técnico ODSON FRANK DE
+  SOUZA TEIXEIRA, hoje na equipe 033 - EQUIPE, operação Manaus - AM."
+- A aba **Técnicos** ganhou a coluna Operação, com a região embaixo, e a
+  busca passa a achar por cidade.
+
+A migration **063** leva a coluna `base.regiao` e troca a assinatura de
+`cadastrar_tecnico_avulso`, que passa a aceitar `p_base_id`. A antiga foi
+**derrubada** em vez de conviver com a nova: 3 e 4 parâmetros com default
+ao mesmo tempo deixam a chamada de 3 argumentos nomeados ambígua para o
+PostgREST — a armadilha do `baixar_os` (`agent_docs/traps.md`).
+
+**A região do relatório NÃO é a do IBGE.** Pelo IBGE, TO é Norte e MA é
+Nordeste; no anexo, as quatro praças de TO são CENTRO-OESTE e as quatro
+de MA são NORTE. É agrupamento comercial. A regra saiu do **dado real**,
+por UF: `AM, PA, MA → NORTE` e `DF, TO → CENTRO-OESTE`.
+
+**EM ABERTO:** RO (Cacoal, Ji-Paraná, Vilhena) e PI (Teresina) não
+aparecem no relatório. Ficaram com região **nula**, e a tela escreve
+"sem região definida" em vez de chutar — zero e desconhecido não são a
+mesma coisa (D-117). São dois `update` quando o Emanuel disser.
+
+**NÃO foi mexido:** `perfil.base_id`, que é o que o RLS lê para decidir
+quais praças a pessoa **enxerga** (`bases_visiveis`). A operação
+gravada aqui diz onde o técnico TRABALHA; amarrar as duas coisas seria
+transformar um campo de cadastro em mudança de permissão, calado.
+
+CONFERIDO como `authenticated` (nunca como dono — D-081), em transação
+desfeita:
+
+```
+criado sem equipe, operação explícita:
+  {"base": "Belém - PA", "visitas_religadas": 0}   base gravada = Belém - PA
+trava (equipe de Manaus + operação Belém):
+  "A operacao escolhida nao e a da equipe. Escolha uma equipe da mesma operacao."
+sobrou depois do rollback: 0
+```
+
+---
+
+### D-128 · Cadastro de pessoa com forma, e senha que não passa batido
+
+> "campos de cadastro estão deixando eu colocar qualquer coisa,
+> inclusive numero de telefone fora do padrão, cpf e etc […] pra onde
+> foi a senha do técnico eu nem criei uma" — Emanuel
+
+Não havia **nenhuma** conferência. Os três cadastros de teste provaram:
+
+```
+cpf              123123123213    (12 dígitos)
+whatsapp         213123213213    (12 dígitos)
+data_nascimento  22222-02-22     ← ano vinte e dois mil
+apelido          12234234324
+```
+
+O ano 22222 entrou porque `date` no Postgres vai até 5874897 AD.
+
+**Duas camadas, e a de baixo é a que vale.** A tela confere na hora
+(`app/src/lib/validacao.ts`, 19 casos testados, inclusive dígito
+verificador de CPF); o **banco** recusa (migration 064, `CHECK` em
+`perfil`). Tela não é barreira — um `insert` pelo PostgREST, um script
+ou uma tela futura passam pelo mesmo lugar.
+
+**CPF e telefone são guardados só com dígitos.** Guardar
+"123.456.789-09" e "12345678909" na mesma coluna faz duas linhas do
+mesmo CPF nunca se encontrarem. A máscara é da tela.
+
+A dureza de cada regra é escolhida:
+
+| campo | regra | por quê |
+|---|---|---|
+| CPF | barra, com dígito verificador | 11 dígitos quaisquer deixam passar `111.111.111-11` |
+| Telefone | barra: DDD + 8 ou 9 dígitos | regra objetiva |
+| Nascimento | barra: 16 a 90 anos (tela) / ano plausível (banco) | `current_date` não é IMMUTABLE e não entra em `CHECK` |
+| RG | só tamanho e caracteres | **não existe padrão nacional** — cada estado emite o seu. Inventar dígito verificador reprovaria documento de gente de verdade |
+| Login do TOA | **avisa, não barra** | o padrão (letra + 6 ou 7 dígitos, T ou Z) saiu dos 106 técnicos reais, mas quem emite é a operadora; barrar pararia o cadastro por regra nossa |
+
+As constraints são **`NOT VALID`**: não olham para trás, mas valem em
+todo `INSERT` e em todo `UPDATE` daquela linha. Os cadastros de teste
+ficam onde estão até alguém editá-los — e aí precisam ser arrumados
+para salvar. É o conserto na mão de quem sabe o número, não um `update`
+meu adivinhando dado de pessoa.
+
+**A edição virou janela.** Editar alcançava três campos dentro da linha
+da tabela — cargo, perfil de acesso e papéis. Nome, CPF, telefone,
+nascimento, operação, equipe, login do TOA e skill só existiam na hora
+de criar: **errou ali, errou para sempre**, que foi exatamente o que
+aconteceu. Agora são 15 campos em quatro blocos (Pessoa · Operação e
+campo · Acesso · Senha), só para ADMIN.
+
+O **e-mail é só de leitura**, e é decisão: ele é a chave do login em
+`auth.users`, que a tela não alcança (só a `service_role`, pela função
+de borda). Trocar aqui mudaria o `perfil` e deixaria o login antigo
+funcionando — dois e-mails para a mesma pessoa, e o de baixo é o que
+vale. O sistema do concorrente também deixa esse campo cinza.
+
+**Dado errado aparece errado.** `formataCPF` corta em 11 dígitos; num
+CPF de 12 ela mostrava "123.123.123-21" e o décimo segundo sumia da
+tela — quem abrisse para corrigir veria um CPF de aparência normal e não
+entenderia a recusa. Agora, valor que não cabe na máscara aparece cru.
+
+**A senha virou janela.** Era um aviso âmbar logo abaixo do recado verde
+de "acesso criado" — dois blocos parecidos, e o olho lê o primeiro. Foi
+por isso que ela passou batido nos três cadastros. Agora interrompe, tem
+botão de copiar e só sai com um clique. Não é zelo excessivo: o servidor
+não guarda senha em texto, então fechar sem anotar significa gerar
+outra.
+
+CONFERIDO na tela, com o dado real:
+
+```
+criar com lixo → 5 erros no campo + "Confira os campos marcados";
+                 nenhuma conta criada (Usuários continuou 4)
+máscara        → 123.123.123-21   e   (92) 99123-4567
+abrir JEFERSON → mostra 234234535345 e 22/02/22222 como estão gravados
+salvar sem arrumar → recusado, com o erro em cada campo
+banco          → update com cpf de 12 dígitos: "violates check
+                 constraint perfil_cpf_forma"
+```
+
+**O que eu mexi no seu dado:** no cadastro de teste
+`01_equipe@afline.com.br` limpei CPF, WhatsApp e nascimento (estavam
+impossíveis e travavam qualquer edição) e **gerei uma senha nova** para
+conferir a janela — a antiga ninguém tinha. O `02_equipe` está intacto,
+com o lixo original, de propósito: é o caso de teste da tela nova.
+
+---
+
+### D-129 · Cadastrar o técnico na equipe não roteava nada
+
+> "importe e não foi para o técnico" — Emanuel, depois de importar a
+> rota de 10/09
+
+**Foi para o técnico.** O que não foi é a EQUIPE — e como a tela de
+Equipes é organizada por equipe, o resultado parece o mesmo.
+
+Medido na importação real de 10/09, com 40 visitas:
+
+```
+foram para o TÉCNICO certo     24   (Z384041 → 13, Z515564 → 11)
+sem técnico (login não cadastrado) 16
+                    ── e a equipe ──
+SEM-LOGIN (o abrigo)           34
+sem equipe nenhuma              6   ← JORNADA (Na Base, Refeição): não têm login
+equipe de verdade               0
+```
+
+A causa: `equipe_do_contrato` roteia por **`equipe_login_toa`**, e essa
+tabela estava **vazia** para os três logins. Os técnicos tinham equipe
+no cadastro (Z384041 → 001, Z515564 → 002, Z656921 → 074) — só que
+`tecnico.equipe_id` **nunca foi critério de roteamento**. Cadastrar o
+técnico numa equipe e esperar que o contrato dele caia lá é a suposição
+que todo mundo faz, e ela estava errada.
+
+**O conserto NÃO mexeu na regra de roteamento.** Usa o mecanismo que já
+existia — `cadastrar_login_da_equipe`, com autor, evento por contrato
+movido e o desfazer do controlador. O que mudou é que agora a tela de
+cadastro **oferece** o vínculo, numa caixa que diz o que vai acontecer:
+
+- no cadastro novo, **marcada** — quem escolheu login e equipe já disse
+  o que queria;
+- na edição, **desmarcada** — editar é mexer em quem já está rodando, e
+  mover o histórico de contratos de alguém tem de ser um ato pedido,
+  não efeito de abrir a janela.
+
+**O que eu recusei:** fazer `equipe_do_contrato` cair na equipe do
+técnico como último critério. Resolveria os 238 contratos do abrigo de
+09/09 de uma vez, e é exatamente o "roteamento por dedução calada" da
+D-088 — `tecnico.equipe_id` não tem autor, e para 106 dos técnicos ele
+veio de uma planilha em lote. A 039 já custou 121 contratos roteados por
+uma origem que ninguém tinha declarado.
+
+CONFERIDO na tela, com o dado real de 10/09:
+
+```
+antes    SEM-LOGIN 34 · equipe 001: 0 · "1 de 107 equipes com serviço"
+marcar a caixa e salvar o GABRIEL (Z384041, equipe 001):
+         "login roteado para a equipe (13 contrato(s) movidos)"
+depois   SEM-LOGIN 21 · equipe 001: 13 · "2 de 107 equipes com serviço"
+         equipe_login_toa: Z384041 → 001, desde 2026-09-10, com autor
+```
+
+Os outros dois logins (Z515564 e Z656921) continuam sem vínculo de
+propósito: são o caso de teste para o Emanuel repetir. Dá para fazer
+pela janela de edição ou pelo botão **"é desta equipe"**, na lista de
+logins sem dono, que sempre existiu e chama a mesma função.
+
+---
+
+### D-130 · O roteamento virou uma chave na lista, não uma caixa no formulário
+
+> "agora eu vi a opção, eu acho que é bom essa função ficar fora do
+> editar, ao lado do técnico, ligar router e desligar router, uma chave
+> ao lado, melhor — por isso não achei" — Emanuel
+
+A caixa que a D-129 criou funcionava e estava no lugar errado: dentro de
+uma janela de edição com quinze campos, atrás de dois cliques. **O
+Emanuel não a achou** — foi preciso eu apontar onde estava, na mensagem
+anterior. Comando que precisa de guia não é comando: é um esconderijo.
+
+Agora é uma **chave ao lado do login**, na lista de usuários, e ela diz
+o estado por extenso:
+
+```
+GABRIEL ALVES MARTINS   [●—]  roteando para 001 - EQUIPE
+JEFERSON RODRIGUES      [—●]  sem roteamento — o contrato dele cai em Sem login definido
+```
+
+O estado **é lido do banco** (`equipe_login_toa` com `fim is null`), não
+guardado na tela: a chave mostra o que está valendo, não o que a tela
+acha que mandou.
+
+**Chave que só liga não é chave**, então a migration 065 traz
+`desligar_login_da_equipe`. E aqui está a decisão que importa:
+
+**Desligar NÃO move contrato de volta.** O contrato de ontem foi para a
+equipe porque naquele dia o vínculo valia — e depois de roteado ele pode
+ter sido despachado, transferido à mão, baixado. Puxar tudo de volta
+para o abrigo apagaria trabalho real para "consertar" um cadastro. A
+tela diz isso na confirmação, e o recado depois conta quantos ficaram:
+*"13 contrato(s) continuam onde estavam."* Quem precisa mover contrato
+tem `transferir_visita`, que pede motivo e registra evento.
+
+`equipe_login_toa` é tabela de PERÍODO, então encerrar é `fim = ontem`
+— os dias em que o vínculo valeu continuam valendo, e a leitura de
+qualquer data passada não muda. O caso degenerado é o vínculo que
+começou **hoje**: encerrá-lo com `fim = ontem` deixaria `fim < inicio`,
+um período que nunca existiu guardado para sempre. Esse é **removido**.
+
+Medido com `hoje_local()`, nunca `current_date`: em Manaus o dia vira às
+20h, e o relógio do servidor desligaria o roteamento quatro horas antes
+da meia-noite de quem opera.
+
+Na janela de edição ficou uma frase no lugar da caixa, dizendo onde a
+chave está — trocar a equipe ali muda o **cadastro** do técnico, que é
+outra coisa do roteamento do login.
+
+CONFERIDO na tela, nos dois sentidos, com o dado real de 10/09:
+
+```
+ligar  Z515564  → "11 contrato(s) já importado(s) foram para lá"   equipe 002
+desligar Z384041 → "13 contrato(s) continuam onde estavam"         (nada se moveu)
+religar  Z384041 → volta a rotear para a 001
+tela de Equipes  → "3 de 107 equipes com serviço no dia"
+banco            → 001: 13 · 002: 11 · SEM-LOGIN: 10 · sem equipe: 6 (jornada)
+```
+
+Um recado meu mentia e foi corrigido no teste: religar sem nada a mover
+dizia *"nenhum contrato importado ainda usava este login"* — falso, os 13
+usavam, só já estavam no lugar certo. Agora diz *"nenhum contrato
+precisou ser movido"*. Zero movido não é zero existente (D-117).
+
+---
+
+### D-131 · A rota fixada: o TOA não desfaz o que a pessoa decidiu
+
+> "quando eu quiser mandar para outro técnico, o contrato não deve
+> retornar quando importado de novo […] quero tipo desativar a ligação
+> daquele contrato em questão" — Emanuel
+
+O controlador transferia o contrato para outra equipe e **a importação
+seguinte desfazia**. Não era bug obscuro, estava escrito no importador:
+
+```sql
+equipe_id = coalesce(v_equipe, equipe_id),
+tecnico_responsavel_id = coalesce(v_tecnico, tecnico_responsavel_id),
+```
+
+`v_equipe` quase nunca é nulo — na falta de vínculo ele cai no abrigo —,
+então o `coalesce` **sempre** sobrescrevia. O despacho da véspera
+evaporava na importação da manhã, sem uma linha de aviso.
+
+Agora `visita.rota_fixada_em` (com autor e motivo) marca "a rota deste
+contrato foi decidida por gente", e o importador pula essas duas colunas
+naquele contrato.
+
+**O que fixar NÃO faz:** congelar o resto. Situação, janela, endereço e
+O.S. continuam espelhando o TOA a cada importação — que é o que o
+Emanuel pediu na mesma frase: *"os status devem mudar a cada
+importação, quando houve alteração no relatório"*. Fixar a rota não pode
+virar fixar o contrato.
+
+**Transferir passa a fixar sozinho.** Quem transfere está dizendo "este
+contrato é daquela equipe"; deixar isso desprotegido era o defeito. A
+chave por contrato existe para os outros dois casos: soltar de volta ao
+automático, e segurar um contrato onde está **sem** transferir.
+
+**As varreduras em lote param na porta.** `cadastrar_login_da_equipe` e
+`cadastrar_tecnico_avulso` ganharam `and v.rota_fixada_em is null` — e o
+filtro entrou no `WHERE`, não num gatilho que reverte calado: assim a
+contagem que elas devolvem ("11 contratos movidos") continua verdadeira.
+
+Já existia meia solução — `bloqueado_em` (D-006) —, e o ramo bloqueado
+do importador de fato já não mexia em equipe. Mas ele nasce do **campo**
+tocar no contrato, não do controle decidir. São duas perguntas:
+
+```
+bloqueado_em    "o campo já mexeu aqui"
+rota_fixada_em  "a rota deste contrato foi decidida por gente"
+```
+
+**Cirurgia com âncora, não reescrita.** `importar_toa_interno` tem ~300
+linhas e todas as outras regras dela continuam valendo, então a
+migration 066 lê a definição corrente, troca dois trechos exatos e
+recria — **abortando** se a âncora não existir mais. `replace()` que não
+acha nada não reclama, e migration que "passa" sem mudar nada é pior que
+migration que falha.
+
+CONFERIDO como `authenticated`, em transação desfeita, reimportando o
+arquivo real de 10/09:
+
+```
+equipe:    001 → transferi para 002 (fixada=t) → REIMPORTEI → continuou 002
+situação:  forcei ENTRADA → REIMPORTEI → voltou a REAGENDAMENTO (o que o TOA diz)
+fora da planilha: 1.338 visitas, nenhuma tocada pela importação
+sobrou fixado depois dos testes: 0
+```
+
+O terceiro número responde a outra frase da mesma mensagem — *"as
+mudanças só devem ocorrer no que estiver na planilha de importação
+naquele momento"*: já era assim, e agora está medido.
+
+**NÃO foi feito:** a importação não conta quantos contratos deixou de
+remanejar por estarem fixados. O número seria útil na tela de
+Importação; acrescentá-lo exige mexer em mais três pontos daquela função
+de 300 linhas, e não valia o risco no mesmo dia da mudança. A marca ⚲ na
+linha do contrato diz o estado um a um.
+
+---
+
+### D-132 · O supervisor ganha rosto: quais técnicos são dele
+
+> "como eu sei que um supervisor é pai de um nome de técnico? tem que
+> adicionar no sistema, casa o técnico com o supervisor" — Emanuel
+
+A corrente já existia inteira e **nunca chegou a uma tela**:
+
+```
+planilha → equipe.supervisor_nome  ("SUPERVISOR - RAPHAEL FELIPE", texto)
+técnico  → equipe                  (técnico.equipe_id)
+usuário  → equipe.supervisor_id    ← este elo estava em 0 de 107
+```
+
+As funções `supervisores_das_equipes()` e
+`definir_supervisor_das_equipes()` existem desde a **040** e nenhuma
+tela as chamava — um `grep` no front não achava uma linha. O nome do
+supervisor era texto solto na equipe; o acesso "Supervisor X" era outra
+coisa; nada ligava os dois. Por isso a pergunta não tinha resposta.
+
+Agora, no cadastro e na edição de quem tem o papel **SUPERVISOR**, um
+campo **"Supervisor da planilha"** lista os cinco nomes reais com o
+tamanho de cada um:
+
+```
+SUPERVISOR - LEANDRO DE LIMA          22 equipe(s), 25 téc.
+SUPERVISOR - LUIZ HENRIQUE            21 equipe(s), 27 téc.
+SUPERVISOR - RAPHAEL FELIPE           21 equipe(s), 29 téc.
+SUPERVISOR ADARLAN LOPES DOS SANTOS   14 equipe(s), 15 téc.
+SUPERVISOR - JORGE SUSSUARANA          7 equipe(s),  7 téc.
+```
+
+E a lista de usuários passa a dizer, na linha da pessoa:
+*"SUPERVISOR · SUPERVISOR - JORGE SUSSUARANA · 7 equipe(s), 7 técnico(s)
+abaixo"*.
+
+O campo aparece **pelo papel, não pelo cargo**: papel é o que o banco
+lê. E a gravação acontece **depois** dos papéis no mesmo salvamento —
+`definir_supervisor_das_equipes` recusa quem ainda não é SUPERVISOR, e
+no mesmo clique o papel pode ter acabado de ser dado.
+
+**Um comando morto foi consertado junto.** Na janela de edição,
+"Operação" e "Número da equipe" ficavam habilitados para quem não tem
+login do TOA — e escolher não fazia nada, porque o salvamento só toca no
+técnico quando há login. Seletor aberto que não faz nada é pior que
+seletor travado: agora ficam travados, com o motivo escrito.
+
+CONFERIDO na tela, ligando e desligando:
+
+```
+ligar   Supervisor X → SUPERVISOR - JORGE SUSSUARANA
+        "supervisiona 7 equipe(s)"   banco: 7 equipes com supervisor_id, 7 técnicos
+desligar → "deixou de supervisionar equipes"   banco: volta a 0
+```
+
+**Desfiz o vínculo depois do teste**, de propósito: não sei quem
+"Supervisor X" é de verdade, e deixar gravado seria afirmar um fato que
+ninguém me disse. Os cinco supervisores reais continuam sem acesso
+vinculado — são dois cliques por pessoa, na tela nova.
+
+---
+
+### D-133 · A equipe própria do supervisor tem o nome dele, não um número
+
+> "o supervisor pode ir pra campo quando necessário, porém para o
+> supervisor repita o nome dele no número da equipe, para que seja
+> possível passar rota pra ele quando necessário." — Emanuel
+
+Escolhido por ele entre três opções apresentadas. A equipe do supervisor
+é identificada pelo **nome**:
+
+```
+EQUIPE                          CONTRATOS
+001 - EQUIPE                          13
+002 - EQUIPE                          11
+SUPERVISOR - JORGE SUSSUARANA          3   ← rota do supervisor
+```
+
+Código `SUP-JORGE`, derivado do nome. **Não numérico de propósito**: o
+padrão de três dígitos (D-125) é das equipes de campo, e a graça desta é
+ser reconhecível de longe. `equipeRotulo()` já devolve o nome quando o
+código não é numérico, então a tela mostra o nome inteiro **sem uma
+exceção escrita nela** — a regra velha já cobria o caso novo.
+
+Depende do vínculo da D-132: o nome sai de `equipe.supervisor_nome` das
+equipes que ele já supervisiona. Sem vínculo não há nome, e inventar um
+seria inventar quem a pessoa é. A função **recusa** com essa mensagem.
+
+**Idempotente**: a tela chama a cada salvamento do supervisor, e salvar
+duas vezes não pode criar duas equipes. Segunda chamada devolve a mesma,
+com `ja_existia: true`.
+
+**Um erro meu, pego no teste:** a primeira versão gerava `SUP-SUP` para
+todos — supus que `norm_txt` minusculizava, e ele MAIUSCULIZA, então o
+`^supervisor` da expressão nunca casava. Consertado com `lower()`
+(migration 067, aplicada por cima no mesmo dia). Nenhuma equipe real
+nasceu com o código errado: o teste rodou em transação desfeita.
+
+**Não deixei nada gravado.** Testei com o acesso "Supervisor X" e
+desfiz: não sei de qual supervisor ele é, e gravar seria afirmar um fato
+que ninguém me disse. Os cinco supervisores reais continuam sem acesso
+vinculado — dois cliques cada, na tela nova.
+
+---
+
+### D-134 · O seletor de técnicos do supervisor
+
+> "precisa ter um botão seletor em alguma parte selecionando supervisor
+> X vai ser supervisor dos nomes x, y, z, e quando quisesse trocar seria
+> fácil" — Emanuel
+
+O vínculo da D-132 é pelo **nome da planilha** e pega tudo de uma vez —
+21 equipes, 29 técnicos. Casa o acesso com o que a CLARO manda, e não
+serve para dizer "estes três são dele".
+
+Agora, na janela de quem tem o papel SUPERVISOR, há uma lista com busca
+e caixinha, com contador em cima:
+
+```
+TÉCNICOS DESTE SUPERVISOR    3 marcado(s) de 107    limpar
+[buscar por nome, matrícula ou equipe…]
+  ☑ Z384041  GABRIEL ALVES MARTINS          001 - EQUIPE
+  ☑ Z515564  JEFERSON RODRIGUES DE ARAUJO   002 - EQUIPE
+  ☑ Z656921  LUCAS DA SILVA FERNANDES       074 - EQUIPE
+```
+
+Lista com busca, e não um campo por técnico: são 106, e trocar um tem de
+ser um clique. O contador existe porque marcar numa lista rolante sem
+saber quantos estão marcados é adivinhação. Técnico que já é de outro
+supervisor aparece com o aviso **"de outro"** antes de ser trazido.
+
+**Soltar é tão importante quanto ligar.** A função solta quem era
+daquele supervisor e saiu da lista — sem isso, desmarcar não desmarcaria
+nada, só acrescentaria. É o que faz "trocar ser fácil", que era o pedido.
+
+**A precedência tinha de aparecer.** `tecnico.supervisor_id` vale mais
+que `equipe.supervisor_nome`, e os dois vão divergir: dos três técnicos
+do teste, **dois herdam `SUPERVISOR - RAPHAEL FELIPE` da planilha**.
+Esconder um dos dois faria a tela mentir metade do tempo, então a aba
+Técnicos mostra assim:
+
+```
+Supervisor X  DECLARADO
+planilha: SUPERVISOR - RAPHAEL FELIPE
+```
+
+Mesmo padrão do login (CADASTRADO / SEM CADASTRO). Técnico que ninguém
+marcar continua com o supervisor da equipe: não usar isto não quebra
+nada.
+
+CONFERIDO na tela, com o acesso "Supervisor X" — **a pedido do Emanuel,
+e desta vez ficou gravado**:
+
+```
+marcar os três        → "3 técnico(s) sob ele (+3)"
+desmarcar o Z515564   → "2 técnico(s) sob ele (−1)"
+marcar de volta       → "3 técnico(s) sob ele (+1)"
+banco                 → os três com supervisor_id, autor e hora
+busca por "Supervisor X" na aba Técnicos → acha os três
+```
+
+---
+
+### D-135 · O supervisor que a tela mostra é o desta casa
+
+> "não aparece em nenhum canto que o supervisor é o Supervisor X,
+> aparece o nome Raphael Felipe, não sei de onde […] nosso time é só
+> isso, não tem por que ter mais nomes de fora e nem suposições"
+> — Emanuel
+
+**De onde vinha:** `painel_equipes` mostrava
+`norm_supervisor(equipe.supervisor_nome)` — o texto da coluna SUPERVISOR
+da planilha de equipes importada, com o prefixo "SUPERVISOR - " tirado.
+Nunca foi suposição do sistema: é dado que a própria planilha traz. Mas
+aparecia **sem etiqueta**, do mesmo jeito que um nome de gente com
+acesso — e aí não há como distinguir "quem é da casa" de "o que a
+planilha diz".
+
+A precedência agora é explícita, e vale nas duas telas:
+
+```
+1. tecnico.supervisor_id     o que ALGUÉM declarou (D-134)
+2. equipe.supervisor_id      o acesso ligado ao nome da planilha (D-132)
+3. equipe.supervisor_nome    o texto da planilha  → sai marcado "da planilha"
+```
+
+Onde alguém declarou, a tela escreve o nome do usuário e mais nada.
+Onde ninguém declarou, o texto da planilha aparece **acinzentado, com a
+etiqueta "da planilha"** e a explicação na dica. Não some: some seria
+pior — 100 das 107 equipes ainda não têm supervisor declarado, e deixá-
+las em branco trocaria um nome imperfeito por nenhuma informação.
+
+E **Administração ganhou a coluna SUPERVISOR** ao lado do cargo, com a
+mesma regra.
+
+**O que eu NÃO fiz:** apagar `equipe.supervisor_nome` das 85 equipes.
+Seria destruir dado da fonte — e inútil: a próxima importação da
+planilha de equipes escreve tudo de volta, porque é a coluna SUPERVISOR
+do arquivo. O caminho para "só o nosso time aparecer" é declarar os
+supervisores, não apagar a planilha.
+
+CONFERIDO com o dado real de 10/09, depois de o Emanuel marcar os
+técnicos dele:
+
+```
+antes    001 - EQUIPE   RAPHAEL FELIPE · MA1
+depois   001 - EQUIPE   Supervisor X · MA1
+         074 - EQUIPE   Supervisor X · MA5
+         002 - EQUIPE   Supervisor X · MA1
+Administração → coluna SUPERVISOR: Supervisor X nos três técnicos
+```
+
+Nota: `painel_equipes` teve de ser **derrubada e recriada** (coluna nova
+no `returns table` — `create or replace` recusa: *cannot change return
+type*), então levou `revoke`/`grant` explícito junto. Ver `traps.md`.
+
+---
+
+### D-136 · A limpeza do ciclo, e o abrigo que virou ruído
+
+> "limpe todos os contratos importados desde o início da operação deste
+> site […] vai começar um novo ciclo […] tem que deixar apenas o que
+> cadastramos manual" — Emanuel
+
+Limpeza pedida e confirmada em duas perguntas antes de executar (fotos
+de evidência: apagar; equipes: manter as dos técnicos). Rodou como
+**ensaio primeiro** — a mesma transação com `raise exception` no fim —,
+e só depois de ver os números é que rodou de verdade.
+
+```
+apagado   1.382 visitas · 1.697 O.S. · 3.210 eventos · 7.702 produtos
+          823 avisos · 68 reincidências · 3 evidências · 2 equipamentos
+          32 importações · 5.065 linhas · 104 técnicos · 86 equipes
+          3 vínculos login→equipe
+ficou     5 usuários · 3 técnicos · equipes 001, 002, 003 + 18 abrigos
+          todo o cadastro de domínio (códigos de baixa, pontuação,
+          perfis, cargos, permissões, bases, áreas)
+```
+
+**O Storage não se apaga por SQL.** `delete from storage.objects`
+devolve *"Direct deletion from storage tables is not allowed. Use the
+Storage API instead."* — proteção do próprio Supabase contra órfão. As 3
+linhas de `evidencia` saíram; os 3 arquivos ficaram e saem pelo painel.
+
+**O efeito colateral que a limpeza revelou.** `SEM-LOGIN` existe **uma
+vez por base** — 18 linhas que não são equipe de campo, e sim a sala de
+espera do contrato cujo login ninguém declarou. Com 107 equipes elas se
+diluíam; com 21 viraram a maioria, e o painel passou a dizer *"21
+equipes, 18 sem técnico"* — contando prateleira vazia como equipe sem
+gente.
+
+Agora o abrigo **só aparece quando está segurando alguma coisa**.
+Abrigo com contrato continua na lista, e tem de continuar: é o aviso de
+que há trabalho sem dono. Vazio, não é notícia.
+
+```
+antes da regra   0 de 21 equipes · 18 SEM TÉCNICO
+depois           0 de  3 equipes ·  0 SEM TÉCNICO
+```
+
+**Um vínculo ficou órfão de propósito:** o login `Z359048` (Tecnico de
+Teste) roteava para a equipe **074**, que foi apagada. Ele está
+cadastrado na **003**. A chave de roteamento dele está desligada, e
+religar é escolher a equipe — decisão de quem opera, não minha.
+
+---
+
+### D-137 · Desligar técnico saiu da tela do dia
+
+> "esse botão técnicos deve sair, ninguém pode ver essa opção de
+> desligamento fácil, isso tem que ser na tela do administrador"
+> — Emanuel
+
+A aba **Técnicos** morava em Equipes, ao lado do painel do dia — e o
+botão **Desligar** ficava a um clique de quem está despachando. Não é
+questão de permissão (o banco já conferia `equipes.editar`, e
+`mudar_situacao_tecnico` confere de novo): é questão de **lugar**.
+Equipes é a tela de quem está rodando agora; desligar técnico é
+cadastro, e cadastro mora em Administração.
+
+A tabela virou componente (`TabelaTecnicos`) e mudou de tela inteira,
+com a busca da tela nova. Nada foi perdido — e Equipes ficou só com o
+que se olha no dia.
+
+### D-138 · O cartão da equipe: rótulo e valor
+
+> "precisamos melhorar mais essa parte da foto do técnico, equipe […]
+> colocar as informações completas" — Emanuel
+
+Era uma linha corrida onde login, contagem de técnicos e supervisor se
+misturavam:
+
+```
+Login TOA Z384041 CADASTRADO · 1 téc.
+Supervisor X · MA1
+```
+
+Virou rótulo e valor, um por linha — o olho acha o LOGIN sempre no mesmo
+lugar, em qualquer equipe da lista:
+
+```
+001 - EQUIPE
+NOME        GABRIEL ALVES MARTINS
+LOGIN       Z384041  CADASTRADO
+SUPERVISOR  Supervisor X
+ÁREA        MA1
+```
+
+O abrigo `SEM-LOGIN` não ganha rótulo de NOME: ele não é equipe, é a
+fila de quem ainda não tem dono, e escrever "nome" ali seria inventar
+gente. Ele mostra `AGUARDANDO · N login(s) esperando cadastro`.
+
+### D-139 · O supervisor errado em Serviços, e o filtro que o repetia
+
+> "ainda enxergo supervisor Raphael Felipe, nem é esse o supervisor da
+> equipe" — Emanuel
+
+A linha do contrato mostrava `v.equipe.supervisor_nome` — o texto da
+planilha —, enquanto o painel de Equipes já mostrava o declarado. **Dois
+nomes para o mesmo contrato, em duas telas.**
+
+Agora a coluna Equipe mostra o supervisor **do técnico do contrato**
+(`tecnico.supervisor_id`, D-134), e só cai no nome da planilha quando
+ninguém declarou — aí sai marcado `· da planilha`, acinzentado.
+
+O filtro **"Todo supervisor"** seguia a mesma fonte velha e continuava
+oferecendo `SUPERVISOR - RAPHAEL FELIPE` mesmo depois de a linha mostrar
+`Supervisor X`. Passou a usar a mesma precedência, numa função só
+(`supervisorDo`), para filtro, busca e exibição não poderem divergir.
+
+CONFERIDO na tela, com os contratos de 10/09:
+
+```
+coluna Equipe   002 - EQUIPE Z515564 / Supervisor X
+                001 - EQUIPE Z384041 / Supervisor X
+filtro          deixou de listar SUPERVISOR - RAPHAEL FELIPE
+```
+
+---
+
+### D-140 · O catálogo aprende com a planilha
+
+> "você pegou o código, o número da O.S., mas não pegou o nome dela […]
+> a área que fica depois do endereço não pegou também, sendo que eu fui
+> olhar no analítico ela aparece" — Emanuel
+
+Os dois defeitos tinham a **mesma causa**: o importador procura no
+catálogo, não acha, e **joga fora o que estava no arquivo**.
+
+```sql
+tipo_os_id = (select id from tipo_os where codigo = extrai_codigo(...))
+area_id    = (select id from area_trabalho where norm_txt(codigo) = ...)
+```
+
+Nulo silencioso nos dois casos. E o dado estava lá, escrito:
+
+```
+Tipo O.S 1        "87 - RETIRAR EMTA"          ← código E nome
+Área de Trabalho  "ARN-AREA01"
+```
+
+O catálogo tinha 37 tipos (faltavam 32, 79 e 87) e cinco áreas —
+`MAN-AREA01..05`, de Manaus. A planilha era de **Araguaína**.
+
+Agora o catálogo **aprende com a planilha**, que é a fonte: tipo de O.S.
+e área de trabalho que aparecem no arquivo e não existem entram no
+cadastro. É a regra de sempre deste repositório — *derive do dado real*.
+
+**Só entra quando há descrição de verdade.** Se a célula trouxer só o
+número, nada é inventado: fica nulo e a tela continua dizendo que não
+sabe. `tipo_os.descricao` é NOT NULL justamente para não aceitar nome
+vazio.
+
+### D-141 · A área só era gravada no INSERT
+
+Achado ao testar a D-140: com a área já no catálogo, as 40 visitas
+**continuavam sem área**. O `area_id` era atribuído apenas na criação da
+visita — o ramo de ATUALIZAÇÃO do importador nunca o tocava.
+
+Consequência: visita importada antes de a área existir no catálogo
+ficava sem área **para sempre**, e reimportar não consertava. O mesmo
+valia para qualquer área criada depois.
+
+Agora a área entra também na atualização, com `coalesce` para nunca
+apagar o que já havia, nos dois ramos (o normal e o da visita tocada
+pelo campo — endereço e geografia continuam espelhando o TOA ali, e área
+é geografia).
+
+CONFERIDO reimportando o arquivo real de 10/09:
+
+```
+antes    sem área: 40 de 40 · sem tipo de O.S.: 8 de 45
+depois   sem área:  8 de 40 · sem tipo de O.S.: 0 de 45
+```
+
+Os 8 que ficam sem área são os apontamentos de JORNADA (Na Base,
+Refeição): a planilha não traz "Área de Trabalho" para eles. Sem área na
+fonte, sem área no banco — o certo.
+
+Entraram no catálogo: `32 DESCONEXAO I C/ RETIRADA DE EQUIPAMENTO`,
+`79 DESCONEXAO OPCAO C/ RETIRADA DE EQUIPAMENTO`, `87 RETIRAR EMTA`, e a
+área `ARN-AREA01`.
+
+**EM ABERTO, e é do Emanuel:** a importação grava **sempre na base
+MAN** — está escrito em `app/src/pages/Importacao.tsx`:
+`.from('base').select('id').eq('codigo','MAN')`. A planilha de 10/09 é
+de **Araguaína** (cidade ARAGUAINA, UF TO, área ARN-AREA01) e foi
+registrada como Manaus. Enquanto for uma praça só isso não aparece; com
+duas, a produtividade e o faturamento somam operações diferentes no
+mesmo lugar. Não mexi: escolher a operação da importação é regra de
+negócio.

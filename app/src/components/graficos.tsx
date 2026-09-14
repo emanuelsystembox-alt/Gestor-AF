@@ -11,19 +11,29 @@ import { useId, useState, type ReactNode } from 'react'
    ============================================================ */
 
 export function Painel({
-  titulo, extra, children, tabela,
+  titulo, dica, extra, children, tabela, nota, className = '',
 }: {
   titulo: string
+  /** Uma linha dizendo QUE PERGUNTA o quadro responde. O painel tinha
+   *  oito quadros com titulo de duas palavras; "Tempo medio por etapa"
+   *  nao diz o que fazer com o numero. Ver D-126. */
+  dica?: string
   extra?: ReactNode
   children: ReactNode
   tabela?: ReactNode
+  /** Rodape com a leitura em portugues — o porque, a ressalva, a fonte. */
+  nota?: ReactNode
+  className?: string
 }) {
   const [verTabela, setVerTabela] = useState(false)
   return (
-    <section className="card-controle p-4">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold">{titulo}</h2>
-        <div className="flex items-center gap-3">
+    <section className={`card-controle flex flex-col p-4 ${className}`}>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">{titulo}</h2>
+          {dica && <p className="mt-0.5 text-[11px] leading-snug text-graf-500">{dica}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           {extra}
           {tabela && (
             <button
@@ -35,130 +45,63 @@ export function Painel({
           )}
         </div>
       </div>
-      {verTabela && tabela ? tabela : children}
-    </section>
-  )
-}
-
-/** Minigráfico de tendência ao lado do número grande. */
-export function Sparkline({ valores, cor = 'var(--color-af-500)' }: {
-  valores: number[]; cor?: string
-}) {
-  if (valores.length < 2) return <div className="h-9" />
-  const min = Math.min(...valores), max = Math.max(...valores)
-  const amp = max - min || 1
-  const L = 160, A = 36
-  const pts = valores.map((v, i) => {
-    const x = (i / (valores.length - 1)) * L
-    const y = A - ((v - min) / amp) * (A - 6) - 3
-    return [x, y] as const
-  })
-  const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  const [ux, uy] = pts[pts.length - 1]
-  return (
-    <svg viewBox={`0 0 ${L} ${A}`} className="h-9 w-full" preserveAspectRatio="none" aria-hidden>
-      <path d={d} fill="none" stroke={cor} strokeWidth="1.5"
-            strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={ux} cy={uy} r="2.5" fill={cor} />
-    </svg>
-  )
-}
-
-/** Cartão de indicador: número grande, variação e meta. */
-export function Indicador({
-  rotulo, valor, sufixo = '', variacao, meta, serie, cor, alerta, detalhe,
-}: {
-  rotulo: string
-  valor: number | string
-  sufixo?: string
-  variacao?: number
-  meta?: string
-  serie?: number[]
-  cor?: string
-  alerta?: boolean
-  detalhe?: string
-}) {
-  return (
-    <div className={`card-controle p-4 ${alerta ? 'ring-1 ring-af-600/60' : ''}`}>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-graf-400">{rotulo}</p>
-      <div className="mt-1.5 flex items-baseline gap-1">
-        <span className="tabular text-4xl font-bold leading-none"
-              style={cor ? { color: cor } : undefined}>{valor}</span>
-        {sufixo && <span className="text-xl font-semibold text-graf-400">{sufixo}</span>}
-      </div>
-      <div className="mt-1.5 flex items-baseline gap-2 text-xs">
-        {variacao !== undefined && (
-          <span className={variacao < 0 ? 'font-semibold text-af-400' : 'font-semibold text-emerald-400'}>
-            {variacao > 0 ? '+' : ''}{variacao.toFixed(1)} pp
-          </span>
-        )}
-        {meta && <span className="text-graf-500">meta {meta}</span>}
-        {detalhe && <span className="text-graf-500">{detalhe}</span>}
-      </div>
-      {serie && serie.length > 1 && (
-        <div className="mt-2"><Sparkline valores={serie} cor={cor} /></div>
+      <div className="flex-1">{verTabela && tabela ? tabela : children}</div>
+      {nota && (
+        <p className="mt-3 border-t border-graf-800 pt-2.5 text-[11px] leading-snug text-graf-500">
+          {nota}
+        </p>
       )}
-    </div>
+    </section>
   )
 }
 
 export interface Fatia { rotulo: string; valor: number; cor: string }
 
-/** Barra empilhada + legenda com contagem e percentual. */
-export function BarraEmpilhada({ fatias }: { fatias: Fatia[] }) {
-  const total = fatias.reduce((s, f) => s + f.valor, 0)
-  if (total === 0) return <p className="py-6 text-center text-sm text-graf-500">Sem dados no período.</p>
-  return (
-    <div>
-      <div className="flex h-7 overflow-hidden rounded-md" role="img"
-           aria-label={fatias.filter(f => f.valor).map(f => `${f.rotulo}: ${f.valor}`).join(', ')}>
-        {fatias.filter(f => f.valor > 0).map(f => (
-          <div key={f.rotulo}
-               className="grid place-items-center text-[11px] font-bold text-white/95"
-               style={{ width: `${(f.valor / total) * 100}%`, background: f.cor }}
-               title={`${f.rotulo}: ${f.valor}`}>
-            {(f.valor / total) > 0.05 && f.valor}
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-        {fatias.map(f => (
-          <div key={f.rotulo} className="flex items-center gap-2 text-sm">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: f.cor }} />
-            <span className="text-graf-300">{f.rotulo}</span>
-            <span className="tabular ml-auto font-semibold">{f.valor}</span>
-            <span className="tabular w-12 text-right text-xs text-graf-500">
-              {total ? ((f.valor / total) * 100).toFixed(1) : '0,0'}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** Barras horizontais ordenadas — motivos, equipes, etapas. */
-export function BarrasHorizontais({ dados, cor = 'var(--color-af-600)', sufixo = '' }: {
+/** Barras horizontais ordenadas — motivos, equipes, etapas.
+ *
+ *  `parte` escreve a fatia de cada barra sobre o total. Numa lista de
+ *  motivos, "55" sozinho nao diz se e o problema do dia ou um caso
+ *  isolado; "55 · 34%" diz. */
+export function BarrasHorizontais({
+  dados, cor = 'var(--color-af-600)', sufixo = '', parte = false,
+  rotuloLargo = false, totalRef,
+}: {
   dados: { rotulo: string; valor: number; cor?: string; nota?: string }[]
   cor?: string
   sufixo?: string
+  parte?: boolean
+  rotuloLargo?: boolean
+  /** Denominador do percentual. Obrigatorio quando a lista foi CORTADA
+   *  (os 10 maiores motivos), senao a fatia sai sobre os 10 e nao sobre
+   *  o universo -- e a soma da 100% mentindo. */
+  totalRef?: number
 }) {
   if (dados.length === 0)
     return <p className="py-6 text-center text-sm text-graf-500">Sem dados no período.</p>
   const max = Math.max(...dados.map(d => d.valor)) || 1
+  const total = totalRef ?? dados.reduce((s, d) => s + d.valor, 0)
   return (
     <div className="space-y-1.5">
       {dados.map(d => (
-        <div key={d.rotulo} className="flex items-center gap-3 text-sm">
-          <span className="w-56 shrink-0 truncate text-right text-xs text-graf-300"
+        <div key={d.rotulo} className="flex items-center gap-2.5 text-sm">
+          {/* O rotulo encolhe na tela estreita: 208px fixos somados as
+              colunas de numero estouravam a largura da pagina e punham
+              rolagem horizontal no corpo. */}
+          <span className={`${rotuloLargo ? 'w-36 sm:w-52' : 'w-28 sm:w-40'}
+                            shrink-0 truncate text-right text-xs text-graf-300`}
                 title={d.rotulo}>{d.rotulo}</span>
           <div className="h-5 flex-1 rounded-sm bg-graf-900">
             <div className="h-full rounded-sm transition-all"
                  style={{ width: `${Math.max((d.valor / max) * 100, 1.5)}%`, background: d.cor ?? cor }} />
           </div>
-          <span className="tabular w-16 shrink-0 text-xs font-semibold">
+          <span className="tabular w-12 shrink-0 text-right text-xs font-semibold">
             {d.valor}{sufixo}
           </span>
+          {parte && (
+            <span className="tabular w-10 shrink-0 text-right text-[11px] text-graf-500">
+              {total ? Math.round((d.valor / total) * 100) : 0}%
+            </span>
+          )}
           {d.nota && <span className="w-24 shrink-0 text-[11px] text-graf-500">{d.nota}</span>}
         </div>
       ))}
@@ -166,55 +109,91 @@ export function BarrasHorizontais({ dados, cor = 'var(--color-af-600)', sufixo =
   )
 }
 
-/** Colunas empilhadas por hora do dia (00h–23h). */
-export function ColunasPorHora({ horas, series }: {
+/**
+ * Colunas empilhadas por hora do dia.
+ *
+ * ┌─ dois defeitos que este bloco ja teve ──────────────────────────┐
+ * │ 1. As barras nasciam com 2px SEMPRE. A coluna era filha de um   │
+ * │    flex com `items-end`, entao a altura dela era o CONTEUDO --  │
+ * │    e `height: 42%` de um pai sem altura definida nao resolve.   │
+ * │    Todas caiam no `minHeight: 2`. O grafico existia, ocupava a  │
+ * │    tela inteira e nao dizia nada. Agora a coluna e `h-full`.    │
+ * │ 2. O eixo ia das 00h as 23h. A operacao anda das 6h as 21h, e   │
+ * │    as oito horas mortas comiam um terco da largura. O eixo agora │
+ * │    e a FAIXA COM MOVIMENTO, e o rodape escreve qual e -- eixo   │
+ * │    cortado sem dizer onde corta e grafico que mente.            │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
+export function ColunasPorHora({ horas, series, altura = 'h-40' }: {
   horas: number[]
   series: { rotulo: string; cor: string; valores: number[] }[]
+  altura?: string
 }) {
   const id = useId()
   const totais = horas.map((_, i) => series.reduce((s, sr) => s + (sr.valores[i] ?? 0), 0))
-  const max = Math.max(...totais, 1)
   const temDado = totais.some(t => t > 0)
 
   if (!temDado)
     return <p className="py-6 text-center text-sm text-graf-500">Nenhum encerramento no período.</p>
 
+  // A janela do eixo: da primeira à última hora com movimento, com uma
+  // hora de folga de cada lado para a barra não encostar na borda.
+  const comDado = horas.filter((_, i) => totais[i] > 0)
+  const de = Math.max(0, Math.min(...comDado) - 1)
+  const ate = Math.min(23, Math.max(...comDado) + 1)
+  const faixa = horas.filter(h => h >= de && h <= ate)
+  const max = Math.max(...totais, 1)
+  const hh = (h: number) => String(h).padStart(2, '0')
+
   return (
     <div>
-      <div className="flex h-44 items-end gap-[3px]">
-        {horas.map((h, i) => (
-          <div key={h} className="group relative flex flex-1 flex-col justify-end"
-               title={`${String(h).padStart(2, '0')}:00 — ${totais[i]}`}>
-            {series.map(sr => {
-              const v = sr.valores[i] ?? 0
-              if (!v) return null
-              return (
-                <div key={sr.rotulo} style={{
-                  height: `${(v / max) * 100}%`, background: sr.cor, minHeight: 2,
-                }} />
-              )
-            })}
-            {totais[i] > 0 && (
-              <span className="tabular absolute -top-4 left-1/2 -translate-x-1/2 text-[10px]
-                               text-graf-400 opacity-0 group-hover:opacity-100">
-                {totais[i]}
-              </span>
-            )}
-          </div>
-        ))}
+      {/* A régua do topo diz quanto vale a barra mais alta. Sem ela o
+          desenho é proporção sem unidade, e ninguém sabe se o pico foi
+          9 ou 90 sem passar o mouse. */}
+      <div className="mb-1 flex items-center justify-between text-[10px] text-graf-500">
+        <span className="tabular">pico {max}</span>
+        <span className="tabular">{hh(de)}h–{hh(ate)}h</span>
       </div>
-      <div className="mt-1 flex gap-[3px]">
-        {horas.map(h => (
+      <div className={`flex ${altura} items-stretch gap-[2px] border-b border-graf-800`}>
+        {faixa.map(h => {
+          const i = horas.indexOf(h)
+          return (
+            <div key={h} className="group relative flex h-full flex-1 flex-col justify-end"
+                 title={`${hh(h)}:00 — ${totais[i]}`}>
+              {series.map(sr => {
+                const v = sr.valores[i] ?? 0
+                if (!v) return null
+                return (
+                  <div key={sr.rotulo} className="first:rounded-t-[2px]" style={{
+                    height: `${(v / max) * 100}%`, background: sr.cor, minHeight: 2,
+                  }} />
+                )
+              })}
+              {totais[i] > 0 && (
+                <span className="tabular absolute -top-4 left-1/2 -translate-x-1/2 text-[10px]
+                                 text-graf-300 opacity-0 group-hover:opacity-100">
+                  {totais[i]}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-1 flex gap-[2px]">
+        {faixa.map(h => (
           <span key={h} className="tabular flex-1 text-center text-[9px] text-graf-600">
-            {h % 3 === 0 ? String(h).padStart(2, '0') : ''}
+            {h % 2 === 0 ? hh(h) : ''}
           </span>
         ))}
       </div>
-      <div className="mt-3 flex flex-wrap gap-4">
+      <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
         {series.map(sr => (
           <div key={sr.rotulo} className="flex items-center gap-1.5 text-xs text-graf-300">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: sr.cor }} />
             {sr.rotulo}
+            <span className="tabular font-semibold text-graf-400">
+              {sr.valores.reduce((a, b) => a + b, 0)}
+            </span>
           </div>
         ))}
       </div>

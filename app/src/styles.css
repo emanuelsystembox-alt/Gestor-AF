@@ -254,6 +254,235 @@ body {
 }
 .sup-controle ::-webkit-scrollbar-thumb:hover { background: var(--color-graf-600); }
 
+/* ============================================================
+   TORRE DE CONTROLE — as peças do painel
+   ------------------------------------------------------------
+   O concorrente desenha planilha: linha, borda, e o olho procura.
+   Aqui a tela é um PAINEL — a informação tem posição fixa, a cor
+   vem do estado e o que está VIVO se mexe. Movimento não é enfeite:
+   é a única coisa que distingue, num relance, o contrato que está
+   acontecendo agora do que já acabou às 09:48.
+
+   Quem pediu menos movimento continua sem movimento — a regra de
+   `prefers-reduced-motion` no fim do arquivo zera todas estas
+   animações, e nenhuma delas é a ÚNICA portadora de significado:
+   toda cor tem rótulo, todo pulso tem etiqueta.
+   ============================================================ */
+
+/* ---------- O quadro: cabeçalho que não sai da tela ----------
+   265 linhas rolando levam o cabeçalho embora na segunda tela, e a
+   partir daí a coluna do meio é um número sem nome. O quadro é uma
+   janela de rolagem própria; o `thead` gruda no topo dela.
+
+   A altura sai de uma variável para a tela ajustar sem reescrever
+   regra: a barra de filtros de Serviços é mais alta que a gaveta de
+   uma equipe. */
+.quadro {
+  max-height: var(--quadro-altura, calc(100vh - 21rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* O fundo vai no TH, não no THEAD: sticky pinta a célula, e thead
+   translúcido deixa a linha rolar por baixo visível. */
+.quadro thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--color-graf-900);
+  box-shadow: inset 0 -1px 0 var(--color-graf-700);
+}
+
+/* ---------- O trilho de situação ----------
+   A faixa colorida à esquerda da linha. Era uma borda; virou sombra
+   interna para poder ENGROSSAR no hover sem empurrar a linha inteira
+   meio pixel para o lado — borda que muda de espessura faz a tabela
+   inteira tremer. */
+.linha-contrato {
+  background-color: color-mix(in srgb, var(--cor-sit) 7%, transparent);
+  transition: background-color 120ms ease-out;
+}
+.linha-contrato > td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--cor-sit);
+  transition: box-shadow 120ms ease-out;
+}
+/* A luz do hover NASCE no trilho e se apaga para a direita: reforça
+   de onde vem a cor, em vez de acender a linha toda por igual. */
+.linha-contrato:hover {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--cor-sit) 20%, transparent) 0,
+    color-mix(in srgb, var(--cor-sit) 3%, transparent) 22rem,
+    transparent 34rem);
+}
+.linha-contrato:hover > td:first-child {
+  animation: none;
+  box-shadow: inset 6px 0 0 0 var(--cor-sit);
+}
+
+/* O que está ACONTECENDO respira. Só deslocamento e execução — se
+   tudo pulsasse, nada pulsaria. */
+@keyframes trilho-vivo {
+  0%, 100% { box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--cor-sit) 40%, transparent); }
+  50%      { box-shadow: inset 3px 0 0 0 var(--cor-sit); }
+}
+.linha-viva > td:first-child { animation: trilho-vivo 2.6s ease-in-out infinite; }
+
+/* Mesmo pulso na bolinha da etiqueta — um ping de radar, sem mexer
+   no tamanho (o que reflowaria a célula). */
+@keyframes ping-ponto {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-cor) 60%, transparent); }
+  70%  { box-shadow: 0 0 0 5px color-mix(in srgb, var(--pill-cor) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-cor) 0%, transparent); }
+}
+.pill-vivo::before { animation: ping-ponto 2s ease-out infinite; }
+
+/* ---------- Etiqueta que também é filtro ----------
+   O filtro de situação pintava a etiqueta ativa de VERMELHO da marca —
+   e aí "Concluída" ligada ficava vermelha, exatamente a cor que a tela
+   inteira usa para dizer que algo deu errado. Agora o botão é a própria
+   etiqueta da situação: ligada, acende na cor DELA. */
+.pill-filtro { padding: 0.3rem 0.6rem; cursor: pointer; }
+.pill-apagada {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--pill-cor) 28%, transparent);
+  color: var(--color-graf-400);
+}
+.pill-apagada::before { opacity: 0.55; }
+.pill-apagada:hover {
+  background: color-mix(in srgb, var(--pill-cor) 12%, transparent);
+  color: var(--color-graf-200);
+}
+.pill-ativo {
+  background: color-mix(in srgb, var(--pill-cor) 26%, transparent);
+  border-color: color-mix(in srgb, var(--pill-cor) 70%, transparent);
+  box-shadow: 0 0 14px -5px var(--pill-cor);
+}
+
+/* A bolinha do "ao vivo" pisca como radar: e a unica coisa na tela
+   que afirma que a tela se atualiza sozinha, e silencio de rede e
+   indistinguivel de silencio de operacao. Parada, ela diz o contrario
+   -- e o texto ao lado diz por extenso. */
+@keyframes ping-vivo {
+  0%        { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.5); }
+  70%, 100% { box-shadow: 0 0 0 6px rgb(16 185 129 / 0); }
+}
+.ponto-vivo { animation: ping-vivo 2.2s ease-out infinite; }
+
+/* ---------- Barra de composição ----------
+   A proporção que a fila de etiquetas nunca dá: 165 concluídas e 13
+   canceladas viram dois números iguais em tamanho, e o olho lê
+   "parecido". Aqui um é treze vezes maior que o outro. */
+.mistura {
+  display: flex; width: 100%; height: 0.5rem; gap: 1px;
+  border-radius: 999px; overflow: hidden;
+  background: var(--color-graf-800);
+}
+.mistura > span {
+  min-width: 2px;
+  background: var(--fatia-cor);
+  transition: filter 120ms ease-out, opacity 120ms ease-out;
+}
+.mistura:hover > span { opacity: 0.45; }
+.mistura > span:hover { opacity: 1; filter: brightness(1.25); }
+/* Fatia apagada = filtro ligado em outra situação. */
+.mistura > span[data-apagada="1"] { opacity: 0.2; }
+
+/* ---------- Faixa do dia ----------
+   O eixo 06:00–22:00 usado na janela do contrato e nos períodos da
+   equipe. Dez linhas de texto ("08:00 - 11:00 (20)") viram uma régua
+   onde a manhã cheia e a tarde vazia se veem sem ler. */
+.faixa-dia {
+  position: relative; height: 0.875rem; border-radius: 0.25rem;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-graf-800) 0 1px,
+    transparent 1px 25%);
+  outline: 1px solid var(--color-graf-800);
+  outline-offset: 0;
+}
+.faixa-dia > .bloco {
+  position: absolute; top: 2px; bottom: 2px;
+  border-radius: 2px;
+  background: var(--bloco-cor, var(--color-graf-500));
+}
+/* O encerramento é um risco vertical, não um bloco: é um INSTANTE. */
+.faixa-dia > .risco {
+  position: absolute; top: -1px; bottom: -1px; width: 2px;
+  border-radius: 1px;
+  background: var(--risco-cor, var(--color-emerald-400));
+}
+
+/* ---------- A linha da equipe ----------
+   Mesma gramatica da linha de contrato: o hover acende, e o que esta
+   ABERTO ganha o trilho da marca -- e o mesmo trilho que aparece na
+   gaveta logo abaixo, ligando um ao outro. */
+.linha-equipe { transition: background-color 120ms ease-out; }
+.linha-equipe:hover { background-color: var(--color-graf-850); }
+.linha-equipe > td:first-child {
+  box-shadow: inset 3px 0 0 0 transparent;
+  transition: box-shadow 150ms ease-out;
+}
+.linha-equipe.aberta { background-color: var(--color-graf-850); }
+.linha-equipe.aberta > td:first-child { box-shadow: inset 3px 0 0 0 var(--color-af-500); }
+
+/* ---------- Painel de estado ----------
+   Os seis números do topo de Equipes. Eram seis cartões iguais; viram
+   uma régua só, com divisória, porque são UMA leitura ("como está a
+   operação agora"), não seis. */
+.painel-estado, .regua {
+  display: flex; flex-wrap: wrap;
+}
+.painel-estado {
+  border-radius: 0.5rem; overflow: hidden;
+  background: var(--color-graf-850);
+  border: 1px solid var(--color-graf-700);
+}
+.painel-estado > *, .regua > * {
+  position: relative; flex: 1 1 8rem; padding: 0.75rem 1rem;
+}
+.painel-estado > * + *::before, .regua > * + *::before {
+  content: ""; position: absolute; left: 0; top: 20%; bottom: 20%;
+  width: 1px; background: var(--color-graf-700);
+}
+[data-tema="claro"] .sup-controle .painel-estado {
+  box-shadow: 0 1px 2px rgb(15 17 21 / 0.05), 0 1px 3px rgb(15 17 21 / 0.04);
+}
+
+/* ---------- A regua do painel ----------
+   Mesma gramatica do `.painel-estado`, mas SEM o cartao: ela mora
+   dentro de um, junto com um rodape (as etiquetas de situacao). O
+   painel do Dashboard era uma fazenda de cartoes iguais -- sete
+   situacoes, depois quatro indicadores, todos do mesmo tamanho. Cartoes
+   iguais afirmam "sete coisas igualmente importantes", e nao sao: a
+   composicao do dia e UMA leitura, e as tres taxas ao lado sao o
+   julgamento dela. Ver D-126.
+
+   `min-width` para as quatro celulas QUEBRAREM em vez de espremerem: em
+   375px, 8rem de base com shrink virava quatro colunas de 85px e o
+   rotulo "Improdutivas por nossa conta" ocupava tres linhas. Duas por
+   linha cabem inteiras.
+
+   E, quebrando, a divisoria vertical vira o contrario do que ela e --
+   uma linha no comeco de uma linha nova nao divide nada. Embaixo de
+   640px ela deita: risco horizontal separando as duas fileiras. */
+.regua > * { min-width: 9rem; }
+@media (max-width: 640px) {
+  .regua > * + *::before { display: none; }
+  .regua > * { border-top: 1px solid var(--color-graf-800); }
+  .regua > *:nth-child(-n+2) { border-top: 0; }
+}
+
+/* ---------- Entrada escalonada ----------
+   As seções da página entram de baixo, uma logo depois da outra. É
+   curto (180ms) e só no primeiro desenho: quem trabalha aqui o dia
+   inteiro não pode esperar animação para ler número. */
+@keyframes sobe {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.sobe { animation: sobe 200ms cubic-bezier(.32,.72,0,1) both; }
+.sobe-1 { animation-delay: 40ms; }
+.sobe-2 { animation-delay: 80ms; }
+.sobe-3 { animation-delay: 120ms; }
+
 /* ---------- Respeita quem pediu menos movimento ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

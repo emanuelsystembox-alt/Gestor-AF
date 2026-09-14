@@ -1,5 +1,10 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
-import { isoLocal } from './formato'
+import { isoLocal, equipeRotulo } from './formato'
+
+/** A equipe abrigo: onde o contrato para quando ninguém disse de quem é
+ *  o login do TOA (ver `agent_docs/business-rules.md`). Mesmo código que
+ *  Equipes e Administração já tratam à parte. */
+const ABRIGO = 'SEM-LOGIN'
 
 export interface OS {
   id: string
@@ -203,15 +208,32 @@ export function calcular(visitas: Visita[], agora = new Date()) {
   const gargalo = etapas.reduce((a, b) => (b.valor > a.valor ? b : a), etapas[0])
 
   // ---------- equipes por volume ----------
-  const contaEquipe = new Map<string, number>()
+  // ┌─ por que o abrigo sai do ranking ────────────────────────────────┐
+  // │ 96% das concluídas do mês caem em `SEM-LOGIN` ("Sem login       │
+  // │ definido") ou em visita sem equipe nenhuma. Desenhadas na mesma  │
+  // │ escala das equipes de verdade, elas viram UMA barra cheia e duas │
+  // │ riscas — o gráfico deixa de ser ranking e vira o retrato de um   │
+  // │ cadastro incompleto.                                            │
+  // │                                                                 │
+  // │ Some com ele? Não: some com a única coisa acionável da tela. Ele │
+  // │ sai do ranking e vira CONTAGEM à parte, escrita, com o caminho   │
+  // │ do conserto. Zero e desconhecido não são a mesma coisa — e aqui  │
+  // │ o desconhecido é a maioria.                                     │
+  // └─────────────────────────────────────────────────────────────────┘
+  const contaEquipe = new Map<string, { rotulo: string; valor: number }>()
+  let semDono = 0
   for (const v of concluidas) {
-    const k = v.equipe?.codigo ?? '(sem equipe)'
-    contaEquipe.set(k, (contaEquipe.get(k) ?? 0) + 1)
+    const cod = v.equipe?.codigo ?? null
+    if (!cod || cod === ABRIGO) { semDono++; continue }
+    const e = contaEquipe.get(cod) ?? { rotulo: equipeRotulo(cod, v.equipe?.nome), valor: 0 }
+    e.valor++
+    contaEquipe.set(cod, e)
   }
-  const equipes = [...contaEquipe.entries()]
-    .map(([rotulo, valor]) => ({ rotulo, valor }))
+  const equipes = [...contaEquipe.values()]
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 8)
+  /** Concluídas que o ranking acima NÃO explica. */
+  const concluidasSemDono = semDono
 
   // ---------- por GRUPO DE SERVIÇO (agrupamento de negócio) ----------
   // Diferente de tipo_atividade: este é como a operação e a CLARO
@@ -272,7 +294,7 @@ export function calcular(visitas: Visita[], agora = new Date()) {
     horas, hConcluido, hImprodutivo, hImpedimento,
     porGrupo,
     etapas, gargalo, pctNaJanela, dentroDaJanela, comJanela,
-    equipes,
+    equipes, concluidasSemDono,
     porTipo,
     listaProdutivas: produtivas,
   }

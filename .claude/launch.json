@@ -4,8 +4,14 @@
     {
       "name": "afline-manager",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "app"],
-      "port": 5173
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "app"
+      ],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

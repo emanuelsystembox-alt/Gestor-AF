@@ -5,8 +5,10 @@ import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
-import { isoLocal, pts } from '../lib/formato'
+import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
+import { useUltimoDiaComVisita } from '../lib/dia'
 import { NovoContratoModal } from '../components/NovoContratoModal'
+import { BarraComposicao } from '../components/telemetria'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
 // Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
 import {
@@ -16,16 +18,41 @@ import {
 
 const SELECT = SELECT_CONTRATO
 
+/**
+ * Quem responde por este contrato.
+ *
+ * O DECLARADO do técnico primeiro (068); só cai no nome que veio da
+ * planilha de equipes quando ninguém declarou. Sem isto, o filtro
+ * "Todo supervisor" listava `SUPERVISOR - RAPHAEL FELIPE` para
+ * contratos cuja linha já mostrava "Supervisor X" — dois nomes para o
+ * mesmo contrato, na mesma tela (D-135).
+ */
+function supervisorDo(v: V): string | null {
+  return v.tecnico?.supervisor?.nome ?? v.equipe?.supervisor_nome ?? null
+}
+
 interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
 type V = ContratoLinha
 
 export default function Servicos() {
   const [params] = useSearchParams()
-  // Vazias até sabermos o último dia COM visita. Abrir sempre em "hoje"
-  // mostrava tela vazia toda vez que a importação mais recente era de
-  // ontem — e a tela não estava errada, só olhando o dia errado.
-  const [de, setDe] = useState('')
-  const [ate, setAte] = useState('')
+  // ┌─ o Dashboard entra aqui pela URL ────────────────────────────────┐
+  // │ Clicar em "Cancelada 41" no painel tem de cair nas 41 canceladas │
+  // │ DAQUELE período. Sem `de`/`ate` a lista abria em hoje e mostrava │
+  // │ outro número — o drill-down mentia sobre o que tinha sido        │
+  // │ clicado. Os parâmetros são validados: data fora do formato ou    │
+  // │ situação que não existe voltam ao padrão em vez de filtrar por   │
+  // │ lixo e devolver tela vazia sem explicação.                      │
+  // └──────────────────────────────────────────────────────────────────┘
+  const paramData = (chave: string) => {
+    const v = params.get(chave)
+    return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null
+  }
+  // HOJE, sempre. Abria no último dia COM visita, e isso fazia a tela
+  // mostrar o movimento de ontem sob a data de hoje (ver lib/dia.ts).
+  // Dia sem importação aparece VAZIO, que é a informação certa.
+  const [de, setDe] = useState(paramData('de') ?? isoLocal())
+  const [ate, setAte] = useState(paramData('ate') ?? isoLocal())
   const [linhas, setLinhas] = useState<V[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -41,13 +68,16 @@ export default function Servicos() {
   const [mudancasEmEspera, setMudancasEmEspera] = useState(0)
 
   // filtros
-  const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(
-    params.get('filtro') === 'abertas' ? 'ABERTAS' : 'TODAS')
+  const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(() => {
+    if (params.get('filtro') === 'abertas') return 'ABERTAS'
+    const s = params.get('situacao')
+    return s && (SITUACOES as readonly string[]).includes(s) ? s as Situacao : 'TODAS'
+  })
   const [busca, setBusca] = useState('')
   const [area, setArea] = useState('TODAS')
   const [supervisor, setSupervisor] = useState('TODOS')
   const [equipe, setEquipe] = useState('TODAS')
-  const [grupo, setGrupo] = useState('TODOS')
+  const [grupo, setGrupo] = useState(params.get('grupo') ?? 'TODOS')
   const [origem, setOrigem] = useState('TODAS')
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
@@ -127,6 +157,11 @@ export default function Servicos() {
   const porIndicador = useMemo(
     () => new Map(indicadores.map(i => [i.id, i])), [indicadores])
 
+  /** O último dia que tem contrato. NÃO é para onde a tela abre — é o
+   *  atalho que a tela oferece quando o dia escolhido está vazio. Quem
+   *  decide mudar de dia é quem está olhando (ver lib/dia.ts). */
+  const ultimoDia = useUltimoDiaComVisita()
+
 
   // ---- pontuação do contrato (D-045) ----
   // Uma chamada por período, não uma por linha: `pontos_por_periodo`
@@ -204,15 +239,6 @@ export default function Servicos() {
 
 
   useEffect(() => {
-    supabase.from('visita').select('data_agendada')
-      .order('data_agendada', { ascending: false }).limit(1)
-      .then(({ data }) => {
-        const ultima = (data as { data_agendada: string }[] | null)?.[0]?.data_agendada ?? isoLocal()
-        setDe(ultima); setAte(ultima)
-      })
-  }, [])
-
-  useEffect(() => {
     if (!contratosBuscados.length && (!de || !ate)) return
     let vivo = true
     setCarregando(true); setErro(null)
@@ -279,7 +305,7 @@ export default function Servicos() {
       if (situacao === 'ABERTAS' && !EM_ABERTO.includes(v.situacao)) return false
       if (situacao !== 'TODAS' && situacao !== 'ABERTAS' && v.situacao !== situacao) return false
       if (area !== 'TODAS' && v.area?.apelido !== area && v.area?.codigo !== area) return false
-      if (supervisor !== 'TODOS' && v.equipe?.supervisor_nome !== supervisor) return false
+      if (supervisor !== 'TODOS' && supervisorDo(v) !== supervisor) return false
       if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
       if (grupo !== 'TODOS' && v.tipo_servico?.nome !== grupo) return false
       if (origem !== 'TODAS' && v.origem !== origem) return false
@@ -313,7 +339,7 @@ export default function Servicos() {
   // opções derivadas do que está carregado
   const op = useMemo(() => ({
     areas: [...new Set(base.map(v => v.area?.apelido).filter(Boolean) as string[])].sort(),
-    supers: [...new Set(base.map(v => v.equipe?.supervisor_nome).filter(Boolean) as string[])].sort(),
+    supers: [...new Set(base.map(supervisorDo).filter(Boolean) as string[])].sort(),
     equipes: [...new Set(base.map(v => v.equipe?.codigo).filter(Boolean) as string[])].sort(),
     grupos: [...new Set(base.map(v => v.tipo_servico?.nome).filter(Boolean) as string[])].sort(),
   }), [base])
@@ -323,6 +349,16 @@ export default function Servicos() {
     for (const v of base) c[v.situacao] = (c[v.situacao] ?? 0) + 1
     return c
   }, [base])
+
+  /** As fatias da barra de composicao, na ordem do dominio -- da
+   *  entrada ao impedimento. Situacao sem nenhuma linha nao vira fatia
+   *  de largura zero: ela simplesmente nao esta no dia. */
+  const fatias = useMemo(() => SITUACOES.map(s => ({
+    chave: s as string,
+    rotulo: SITUACAO_INFO[s]?.label ?? s,
+    cor: SITUACAO_INFO[s]?.cor ?? '#64748b',
+    qtd: contagem[s] ?? 0,
+  })), [contagem])
 
   const abertas = base.filter(v => EM_ABERTO.includes(v.situacao)).length
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
@@ -342,7 +378,7 @@ export default function Servicos() {
       `${v.janela_inicio?.slice(0, 5) ?? ''}${v.janela_fim ? '-' + v.janela_fim.slice(0, 5) : ''}`,
       SITUACAO_INFO[v.situacao]?.label ?? v.situacao,
       v.tipo_servico?.nome ?? '', v.tipo_atividade?.nome ?? '',
-      v.equipe?.codigo ?? '', v.equipe?.supervisor_nome ?? '', v.area?.apelido ?? '',
+      v.equipe?.codigo ?? '', supervisorDo(v) ?? '', v.area?.apelido ?? '',
       v.contrato ?? '', v.logradouro ?? '', v.bairro ?? '',
       v.ordem_servico.map(o => o.numero_os).join(' '),
       v.ordem_servico.map(o => o.codigo_baixa
@@ -355,6 +391,33 @@ export default function Servicos() {
     a.download = `afline-servicos-${de}${de !== ate ? '-a-' + ate : ''}.csv`
     a.click(); URL.revokeObjectURL(a.href)
   }
+
+  /**
+   * `/` foca a busca, `Esc` limpa e sai.
+   *
+   * O controlador trabalha muito mais rapido no teclado que no mouse --
+   * o proprio design system diz isso na regra de foco visivel. Levar a
+   * mao ao mouse para clicar num campo de busca que ja esta na tela e o
+   * tipo de atrito que custa segundos, 200 vezes por turno.
+   */
+  const buscaRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    function aoTeclar(e: KeyboardEvent) {
+      const alvo = e.target as HTMLElement | null
+      const digitando = !!alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)
+      if (e.key === '/' && !digitando) {
+        e.preventDefault()
+        buscaRef.current?.focus()
+        buscaRef.current?.select()
+      }
+      if (e.key === 'Escape' && alvo === buscaRef.current) {
+        setBusca('')
+        buscaRef.current?.blur()
+      }
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [])
 
   const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs outline-none focus:border-af-500'
 
@@ -377,12 +440,24 @@ export default function Servicos() {
         {erro && <Alerta tipo="erro">Não consegui carregar: {erro}</Alerta>}
 
         {/* ====== filtros ====== */}
-        <section className="card-controle space-y-2 p-3">
+        <section className="card-controle sobe space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <input value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Cliente, endereço, WO, contrato (ou vários, colados), O.S., node, matrícula…"
-              className="min-w-72 flex-1 rounded-md border border-graf-700 bg-graf-900 px-3 py-1.5
-                         text-sm outline-none placeholder-graf-500 focus:border-af-500" />
+            <div className="relative min-w-72 flex-1">
+              <input ref={buscaRef} value={busca} onChange={e => setBusca(e.target.value)}
+                aria-label="Buscar contrato, cliente, endereço, WO, O.S., node ou matrícula"
+                placeholder="Cliente, endereço, WO, contrato (ou vários, colados), O.S., node, matrícula…"
+                className="w-full rounded-md border border-graf-700 bg-graf-900 py-1.5 pl-3 pr-16
+                           text-sm outline-none placeholder-graf-500 focus:border-af-500" />
+              {/* A tecla fica escrita: atalho que ninguem descobre nao
+                  existe. Some quando o campo esta em uso. */}
+              {!busca && (
+                <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2
+                                rounded border border-graf-700 bg-graf-800 px-1.5 py-0.5
+                                text-[10px] font-medium text-graf-500">
+                  / buscar
+                </kbd>
+              )}
+            </div>
             <button onClick={exportar} disabled={visiveis.length === 0}
               className="rounded-md border border-graf-700 px-3 py-1.5 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400 disabled:opacity-40">
@@ -406,7 +481,8 @@ export default function Servicos() {
             </select>
             <select value={equipe} onChange={e => setEquipe(e.target.value)} className={sel}>
               <option value="TODAS">Toda equipe</option>
-              {op.equipes.map(e => <option key={e} value={e}>{e}</option>)}
+              {op.equipes.map(e => (
+                <option key={e} value={e}>{equipeRotulo(e)}</option>))}
             </select>
             <select value={resultado} onChange={e => setResultado(e.target.value as typeof resultado)}
               className={sel}>
@@ -453,22 +529,42 @@ export default function Servicos() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-1 border-t border-graf-800 pt-2">
-            {(['TODAS', 'ABERTAS', ...SITUACOES] as const).map(s => {
-              const n = s === 'TODAS' ? base.length
-                : s === 'ABERTAS' ? abertas : contagem[s as Situacao] ?? 0
-              if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS') return null
-              return (
-                <button key={s} onClick={() => setSituacao(s)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    situacao === s ? 'bg-af-600 text-white'
-                                   : 'bg-graf-800 text-graf-300 hover:bg-graf-700'}`}>
-                  {s === 'TODAS' ? 'Todas' : s === 'ABERTAS' ? 'Em aberto'
-                    : SITUACAO_INFO[s as Situacao]?.label ?? s}
-                  <span className="tabular ml-1.5 opacity-60">{n}</span>
-                </button>
-              )
-            })}
+          {/* ====== a composicao do dia ======
+              A barra e a proporcao; os botoes sao o comando. 165
+              concluidas e 13 canceladas escritas em etiquetas do mesmo
+              tamanho parecem numeros vizinhos -- na barra, uma fatia e
+              treze vezes a outra, e isso se ve antes de ler.
+
+              A barra e decorativa de proposito (aria-hidden): filtrar
+              e trabalho dos botoes abaixo, que tem nome, contagem e
+              `aria-pressed`. Fatia de 5% e alvo de clique ruim para
+              qualquer pessoa. */}
+          <div className="space-y-2 border-t border-graf-800 pt-2.5">
+            <BarraComposicao fatias={fatias}
+              ativa={situacao !== 'TODAS' && situacao !== 'ABERTAS' ? situacao : null} />
+
+            <div className="flex flex-wrap gap-1.5">
+              {(['TODAS', 'ABERTAS', ...SITUACOES] as const).map(s => {
+                const n = s === 'TODAS' ? base.length
+                  : s === 'ABERTAS' ? abertas : contagem[s as Situacao] ?? 0
+                if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS') return null
+                const ativo = situacao === s
+                // A cor do botao e a cor da SITUACAO, nao a da marca:
+                // "Concluida" ligada nao pode acender em vermelho.
+                const cor = s === 'TODAS' ? 'var(--color-graf-400)'
+                  : s === 'ABERTAS' ? 'var(--st-execucao)'
+                  : SITUACAO_INFO[s as Situacao]?.cor ?? '#64748b'
+                return (
+                  <button key={s} onClick={() => setSituacao(s)} aria-pressed={ativo}
+                    style={{ ['--pill-cor' as string]: cor }}
+                    className={`pill pill-filtro ${ativo ? 'pill-ativo' : 'pill-apagada'}`}>
+                    {s === 'TODAS' ? 'Todas' : s === 'ABERTAS' ? 'Em aberto'
+                      : SITUACAO_INFO[s as Situacao]?.label ?? s}
+                    <span className="tabular font-bold opacity-70">{n}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </section>
 
@@ -507,7 +603,7 @@ export default function Servicos() {
         <div className="flex flex-wrap items-center gap-3 px-0.5">
           <span className="inline-flex items-center gap-1.5 text-[11px] text-graf-500">
             <span className={`h-1.5 w-1.5 rounded-full ${
-              aoVivo ? 'bg-emerald-500' : 'bg-graf-600'}`} />
+              aoVivo ? 'ponto-vivo bg-emerald-500' : 'bg-graf-600'}`} />
             {aoVivo ? 'ao vivo' : 'sem conexão ao vivo — recarregue a página'}
           </span>
 
@@ -525,29 +621,37 @@ export default function Servicos() {
         </div>
 
         {/* ====== tabela ====== */}
-        <section className="card-controle overflow-hidden">
-          <div className="overflow-x-auto">
-            {selecionados.size > 0 && (
-              <div className="flex flex-wrap items-center gap-3 border-b border-graf-800
-                              bg-af-900/15 px-4 py-2.5">
-                <span className="text-sm font-medium text-af-300">
-                  {selecionados.size} contrato(s) selecionado(s)
-                </span>
-                <button onClick={() => setSelecionados(new Set())}
-                  className="text-xs text-graf-400 underline underline-offset-2
-                             hover:text-graf-200">
-                  limpar seleção
-                </button>
-                <span className="text-xs text-graf-400">
-                  apagar aqui é definitivo — não se desfaz
-                </span>
-                <button onClick={excluirSelecionados} disabled={excluindo}
-                  className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold
-                             text-white hover:bg-af-500 disabled:opacity-50">
-                  {excluindo ? 'Apagando…' : `Apagar ${selecionados.size} do banco`}
-                </button>
-              </div>
-            )}
+        <section className="card-controle sobe sobe-2 overflow-hidden">
+          {/* A barra do lote fica FORA do quadro, presa no topo do
+              cartao: ela fala das linhas selecionadas, e sumir de vista
+              enquanto se rola a lista que ela apaga e o pior lugar
+              possivel para um botao que nao se desfaz. */}
+          {selecionados.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 border-b border-af-700/40
+                            bg-af-900/20 px-4 py-2.5">
+              <span className="text-sm font-medium text-af-300">
+                {selecionados.size} contrato(s) selecionado(s)
+              </span>
+              <button onClick={() => setSelecionados(new Set())}
+                className="text-xs text-graf-400 underline underline-offset-2
+                           hover:text-graf-200">
+                limpar seleção
+              </button>
+              <span className="text-xs text-graf-400">
+                apagar aqui é definitivo — não se desfaz
+              </span>
+              <button onClick={excluirSelecionados} disabled={excluindo}
+                className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold
+                           text-white hover:bg-af-500 disabled:opacity-50">
+                {excluindo ? 'Apagando…' : `Apagar ${selecionados.size} do banco`}
+              </button>
+            </div>
+          )}
+
+          {/* O quadro rola por dentro e o cabecalho fica: na segunda
+              tela de 265 linhas, a coluna do meio sem cabecalho e um
+              numero sem nome. */}
+          <div className="quadro">
             <TabelaContratos
               linhas={visiveis}
               selecionados={selecionados}
@@ -566,14 +670,31 @@ export default function Servicos() {
                 setMenuXY({ x: e.clientX, y: e.clientY })
               }}
               vazio={
-                <Vazio titulo="Nenhuma visita para este filtro"
+                <Vazio
+                  titulo={linhas.length === 0
+                    ? (de === ate ? `Nenhuma visita em ${dataBR(de)}`
+                                  : 'Nenhuma visita neste período')
+                    : 'Nenhuma visita para este filtro'}
                   descricao={linhas.length === 0
-                    ? 'Não há visitas neste período.'
+                    ? 'Dia sem importação aparece vazio — e vazio aqui quer dizer'
+                      + ' que ainda não chegou nada, não que deu erro.'
                     : `${base.length} carregadas, nenhuma passa nos ${filtrando} filtro(s).`}
                   acao={linhas.length === 0
-                    ? <Link to="/controle/importar"
-                        className="rounded-lg bg-af-600 px-4 py-2 text-sm font-medium text-white
-                                   hover:bg-af-500">Importar planilha</Link>
+                    ? <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Link to="/controle/importar"
+                          className="rounded-lg bg-af-600 px-4 py-2 text-sm font-medium text-white
+                                     hover:bg-af-500">Importar planilha</Link>
+                        {/* O atalho para o último dia com movimento existe,
+                            mas quem clica é o usuário: a tela não troca a
+                            data dele por conta própria. */}
+                        {ultimoDia && ultimoDia !== de && (
+                          <button onClick={() => { setDe(ultimoDia); setAte(ultimoDia) }}
+                            className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                                       text-graf-300 hover:border-af-600 hover:text-af-400">
+                            ver {dataBR(ultimoDia)} — último dia com movimento
+                          </button>
+                        )}
+                      </div>
                     : <button onClick={limpar}
                         className="rounded-lg border border-graf-700 px-4 py-2 text-sm
                                    text-graf-300 hover:border-af-600">Limpar filtros</button>} />

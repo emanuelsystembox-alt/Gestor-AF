@@ -3,13 +3,30 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { calcular, csvPorTipo, type Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
-import { StatusEPontos } from '../components/StatusEPontos'
+import { ReguaDoDia, MatrizGrupos } from '../components/PainelDoDia'
 import { Alerta, Vazio } from '../components/ui'
 import {
-  BarraEmpilhada, BarrasHorizontais, ColunasPorHora,
-  Indicador, Painel, TabelaSimples,
+  BarrasHorizontais, ColunasPorHora, Painel, TabelaSimples,
 } from '../components/graficos'
-import { isoLocal } from '../lib/formato'
+import { isoLocal, equipeRotulo } from '../lib/formato'
+
+/**
+ * O Dashboard — a primeira tela do controle.
+ *
+ * ┌─ o que esta tela responde, em ordem ─────────────────────────────┐
+ * │ 1. O que estou vendo?            → a barra de filtros            │
+ * │ 2. Alguma coisa pega fogo agora? → o alerta de janela            │
+ * │ 3. Quanto, e como está indo?     → a régua                       │
+ * │ 4. Onde está o volume?           → a matriz grupo × situação     │
+ * │ 5. Por que o dia não fechou?     → responsabilidade e motivos    │
+ * │ 6. Quando e quão rápido?         → hora, etapa, equipe           │
+ * │                                                                  │
+ * │ A ordem é a hierarquia. Antes desta reforma a tela abria com     │
+ * │ onze cartões do mesmo tamanho e repetia os mesmos sete números   │
+ * │ três vezes em duas telas de rolagem — o que é o mesmo que não    │
+ * │ ter hierarquia nenhuma. Ver D-126.                               │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, cliente_nome, logradouro, bairro,
@@ -28,8 +45,6 @@ const SELECT = `
 `
 
 type Periodo = 'HOJE' | 'SETE' | 'MES' | 'MES_ANTERIOR' | 'PERSONALIZADO'
-
-
 
 function intervalo(p: Periodo, de: string, ate: string): [string, string] {
   const hoje = new Date()
@@ -57,6 +72,10 @@ const ROTULO_PERIODO: Record<Periodo, string> = {
   MES_ANTERIOR: 'Mês anterior', PERSONALIZADO: 'Personalizado',
 }
 
+const dataBR = (iso: string) => new Date(iso + 'T12:00').toLocaleDateString('pt-BR')
+
+const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
+
 export default function Controle() {
   const [periodo, setPeriodo] = useState<Periodo>('HOJE')
   const [de, setDe] = useState(isoLocal(new Date()))
@@ -65,7 +84,6 @@ export default function Controle() {
   const [equipe, setEquipe] = useState('TODAS')
   const [tipo, setTipo] = useState('TODOS')
   const [semEquipe, setSemEquipe] = useState(false)
-  const [porGrupo, setPorGrupo] = useState(true)
 
   const [linhas, setLinhas] = useState<Visita[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -101,8 +119,17 @@ export default function Controle() {
 
   const m = useMemo(() => calcular(filtradas), [filtradas])
 
-  const equipesDisp = useMemo(() => [...new Set(
-    linhas.map(v => v.equipe?.codigo).filter(Boolean) as string[])].sort(), [linhas])
+  /** Código → rótulo com três dígitos e nome, como no resto do sistema.
+   *  O select trazia "074" e "SEM-LOGIN" crus; em Equipes a mesma coisa
+   *  se lê "074 - EQUIPE" e "Sem login definido". */
+  const equipesDisp = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const v of linhas) {
+      if (v.equipe?.codigo) m.set(v.equipe.codigo, equipeRotulo(v.equipe.codigo, v.equipe.nome))
+    }
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
+  }, [linhas])
+
   const tiposDisp = useMemo(() => [...new Set(
     linhas.map(v => v.tipo_atividade?.nome).filter(Boolean) as string[])].sort(), [linhas])
 
@@ -121,6 +148,12 @@ export default function Controle() {
     URL.revokeObjectURL(a.href)
   }
 
+  /** Quantas improdutivas o gráfico de motivos deixou de fora: ele
+   *  mostra os 10 maiores de propósito, e cortar sem dizer que cortou
+   *  faz a lista parecer o universo. */
+  const motivosSomados = m.motivos.reduce((s, x) => s + x.valor, 0)
+  const motivosDeFora = m.osImprodutivas - motivosSomados
+
   return (
     <Shell acoes={
       atualizado && (
@@ -130,14 +163,14 @@ export default function Controle() {
         </span>
       )
     }>
-      <div className="space-y-4 p-4">
+      <div className="space-y-3 p-4">
 
         {/* ================= filtros ================= */}
-        <section className="card-controle p-3">
+        <section className="card-controle sobe p-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg bg-graf-900 p-0.5">
               {(['HOJE', 'SETE', 'MES', 'MES_ANTERIOR', 'PERSONALIZADO'] as Periodo[]).map(p => (
-                <button key={p} onClick={() => setPeriodo(p)}
+                <button key={p} onClick={() => setPeriodo(p)} aria-pressed={periodo === p}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                     periodo === p ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
                   {ROTULO_PERIODO[p]}
@@ -148,30 +181,30 @@ export default function Controle() {
             {periodo === 'PERSONALIZADO' && (
               <div className="flex items-center gap-1.5">
                 <input type="date" value={de} onChange={e => setDe(e.target.value)}
-                  className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs" />
+                  aria-label="Data inicial" className={`tabular ${sel}`} />
                 <span className="text-graf-500">até</span>
                 <input type="date" value={ate} onChange={e => setAte(e.target.value)}
-                  className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs" />
+                  aria-label="Data final" className={`tabular ${sel}`} />
               </div>
             )}
 
             <select value={origem} onChange={e => setOrigem(e.target.value)}
-              className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs">
+              aria-label="Origem" className={sel}>
               <option value="TODAS">Todas as origens</option>
               <option value="TOA">TOA</option>
               <option value="MANUAL">Manual</option>
             </select>
 
             <select value={tipo} onChange={e => setTipo(e.target.value)}
-              className="max-w-48 rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs">
+              aria-label="Tipo de atividade" className={`max-w-48 ${sel}`}>
               <option value="TODOS">Todos os tipos</option>
               {tiposDisp.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <select value={equipe} onChange={e => setEquipe(e.target.value)}
-              className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs">
+              aria-label="Equipe" className={`max-w-52 ${sel}`}>
               <option value="TODAS">Todas as equipes</option>
-              {equipesDisp.map(t => <option key={t} value={t}>{t}</option>)}
+              {equipesDisp.map(([cod, rot]) => <option key={cod} value={cod}>{rot}</option>)}
             </select>
 
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
@@ -180,32 +213,35 @@ export default function Controle() {
                 className="accent-af-600" />
               Sem equipe
             </label>
-          </div>
 
-          {/* linha-resumo: o controlador sempre sabe o que está vendo */}
-          <p className="mt-2.5 border-t border-graf-800 pt-2.5 text-xs text-graf-400">
-            Exibindo <strong className="text-graf-200">{m.produtivas} visitas produtivas</strong>
-            {' '}e <strong className="text-graf-200">{m.os} O.S.</strong>
-            {m.jornada > 0 && <> · {m.jornada} apontamentos de jornada fora da conta</>}
-            {' · '}{origem === 'TODAS' ? 'todas as origens' : origem}
-            {' · '}{tipo === 'TODOS' ? 'todos os tipos' : tipo}
-            {' · '}{equipe === 'TODAS' ? 'todas as equipes' : `equipe ${equipe}`}
-            {' · '}{dtInicio === dtFim
-              ? new Date(dtInicio + 'T12:00').toLocaleDateString('pt-BR')
-              : `${new Date(dtInicio + 'T12:00').toLocaleDateString('pt-BR')} a ${new Date(dtFim + 'T12:00').toLocaleDateString('pt-BR')}`}
-            {temFiltro && (
-              <button onClick={limparFiltros}
-                className="ml-2 text-af-400 underline underline-offset-2">limpar filtros</button>
-            )}
-          </p>
+            {/* A linha-resumo virou UMA frase, no fim da barra: a régua
+                logo abaixo já diz quantas visitas e quantas O.S., e
+                repetir número que está 40px adiante é ruído. O que
+                sobra aqui é o RECORTE — a única coisa que a régua não
+                consegue dizer sobre si mesma. */}
+            <span className="ml-auto text-[11px] text-graf-500">
+              {dtInicio === dtFim ? dataBR(dtInicio) : `${dataBR(dtInicio)} a ${dataBR(dtFim)}`}
+              {temFiltro && <>
+                {origem !== 'TODAS' && ` · ${origem}`}
+                {tipo !== 'TODOS' && ` · ${tipo}`}
+                {equipe !== 'TODAS' && ` · ${equipesDisp.find(([c]) => c === equipe)?.[1] ?? equipe}`}
+                {semEquipe && ' · sem equipe'}
+                <button onClick={limparFiltros}
+                  className="ml-2 text-af-400 underline underline-offset-2">limpar</button>
+              </>}
+            </span>
+          </div>
         </section>
 
         {erro && <Alerta tipo="erro">Não consegui carregar: {erro}</Alerta>}
 
-        {/* ================= alerta de janela ================= */}
+        {/* ================= alerta de janela =================
+            Fica ACIMA da régua porque é a única coisa da tela com
+            hora marcada: os números embaixo continuam verdadeiros
+            daqui a uma hora, este não. */}
         {m.emRisco > 0 && (
-          <div className="flex items-start gap-2.5 rounded-lg border border-amber-700/60
-                          bg-amber-900/20 px-3.5 py-2.5 text-sm text-amber-200">
+          <div role="status" className="flex items-start gap-2.5 rounded-lg border
+                          border-amber-700/60 bg-amber-900/20 px-3.5 py-2.5 text-sm text-amber-200">
             <span aria-hidden className="mt-0.5">⚠</span>
             <p>
               <strong>{m.emRisco} visita(s) com a janela estourando</strong> — menos de 60 min
@@ -218,7 +254,12 @@ export default function Controle() {
           </div>
         )}
 
-        {carregando && <p className="py-16 text-center text-graf-400">Carregando…</p>}
+        {carregando && (
+          <div className="card-controle grid place-items-center gap-3 py-20">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-graf-700 border-t-af-500" />
+            <p className="text-sm text-graf-400">Carregando o período…</p>
+          </div>
+        )}
 
         {!carregando && linhas.length === 0 && (
           <div className="card-controle">
@@ -232,164 +273,119 @@ export default function Controle() {
           </div>
         )}
 
-        {!carregando && linhas.length > 0 && (
+        {/* Carregou, mas o filtro não deixou nada passar. É diferente de
+            "não há dado no período", e a tela diz qual dos dois é. */}
+        {!carregando && linhas.length > 0 && m.produtivas === 0 && (
+          <div className="card-controle">
+            <Vazio
+              titulo="Nenhuma visita produtiva passa nos filtros"
+              descricao={`${linhas.length} carregada(s) no período. ${
+                m.jornada > 0 ? `${m.jornada} são apontamento de jornada, que nunca entra em produtividade.` : ''}`}
+              acao={temFiltro ? (
+                <button onClick={limparFiltros}
+                  className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                             text-graf-300 hover:border-af-600">Limpar filtros</button>
+              ) : undefined}
+            />
+          </div>
+        )}
+
+        {!carregando && m.produtivas > 0 && (
           <>
-            {/* ===== situação em cartões + volume x pontos (anexos 3 e 4) ===== */}
-            <StatusEPontos linhas={linhas} de={de} ate={ate} />
+            {/* ===== 3. quanto, e como está indo ===== */}
+            <ReguaDoDia m={m} de={dtInicio} ate={dtFim} />
 
-            {/* ================= indicadores ================= */}
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Indicador rotulo="Visitas produtivas" valor={m.produtivas}
-                detalhe={`${m.os} O.S. dentro delas`} />
-              <Indicador rotulo="Taxa de conclusão"
-                valor={m.taxaConclusao.toFixed(1).replace('.', ',')} sufixo="%"
-                meta="85%" cor={m.taxaConclusao >= 85 ? 'var(--st-concluida)' : undefined}
-                detalhe={`${m.concluidas} de ${m.produtivas}`} />
-              <Indicador rotulo="Chegou dentro da janela"
-                valor={m.pctNaJanela.toFixed(1).replace('.', ',')} sufixo="%"
-                cor={m.pctNaJanela >= 90 ? 'var(--st-concluida)'
-                     : m.pctNaJanela >= 75 ? undefined : 'var(--st-reagendamento)'}
-                detalhe={`${m.dentroDaJanela} de ${m.comJanela} atendimentos`} />
-              <Indicador rotulo="Improdutivas por nossa conta"
-                valor={m.nossas}
-                cor={m.nossas > 0 ? 'var(--st-conflito)' : 'var(--st-concluida)'}
-                alerta={m.nossas > 0}
-                detalhe={m.osImprodutivas
-                  ? `${((m.nossas / m.osImprodutivas) * 100).toFixed(0)}% do total`
-                  : 'nenhuma'} />
-            </section>
+            {/* ===== 4. onde está o volume ===== */}
+            <MatrizGrupos linhas={linhas} de={dtInicio} ate={dtFim} onCSV={baixarCSV} />
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              {/* ================= distribuição ================= */}
-              <Painel titulo="Distribuição por situação"
-                tabela={<TabelaSimples colunas={['Situação', 'Qtd']}
-                  linhas={m.porSituacao.map(s => [s.rotulo, s.valor])} />}>
-                <BarraEmpilhada fatias={m.porSituacao} />
-              </Painel>
-
-              {/* ========== improdutivas por responsabilidade ==========
-                  A pergunta que o sistema atual não responde. */}
+            {/* ===== 5. por que o dia não fechou ===== */}
+            <div className="sobe sobe-2 grid gap-3 xl:grid-cols-2">
               <Painel titulo="Improdutivas por responsabilidade"
-                extra={<span className="text-xs text-graf-500">
-                  {m.osImprodutivas} de {m.osComBaixa} O.S.
+                dica="De quem foi a causa — e, portanto, quem paga."
+                extra={<span className="tabular text-xs text-graf-500">
+                  {m.osImprodutivas} de {m.osComBaixa} O.S. com baixa
                 </span>}
                 tabela={<TabelaSimples colunas={['Responsável', 'Qtd']}
-                  linhas={m.porResponsabilidade.map(r => [r.rotulo, r.valor])} />}>
+                  linhas={m.porResponsabilidade.map(r => [r.rotulo, r.valor])} />}
+                nota={m.porResponsabilidade.length > 0 && <>
+                  Cada código de baixa da CLARO foi classificado por quem deu causa.
+                  Só o que está em <span className="text-af-400">vermelho</span> é
+                  cobrável de nós — o resto é argumento na mesa com a operadora.
+                </>}>
                 {m.porResponsabilidade.length === 0 ? (
                   <p className="py-6 text-center text-sm text-graf-500">
                     Nenhuma improdutiva no período.
                   </p>
                 ) : (
-                  <>
-                    <BarrasHorizontais dados={m.porResponsabilidade} />
-                    <p className="mt-3 border-t border-graf-800 pt-2.5 text-xs text-graf-500">
-                      Cada código de baixa da CLARO foi classificado por quem deu causa.
-                      Só o que está em <span className="text-af-400">vermelho</span> é
-                      cobrável de nós — o resto é argumento na mesa com a operadora.
-                    </p>
-                  </>
+                  <BarrasHorizontais dados={m.porResponsabilidade}
+                    parte totalRef={m.osImprodutivas} />
                 )}
+              </Painel>
+
+              <Painel titulo="Motivos de improdutividade"
+                dica="O código de baixa que a CLARO devolveu, do mais frequente ao menos."
+                tabela={<TabelaSimples colunas={['Motivo', 'Qtd']}
+                  linhas={m.motivos.map(x => [x.rotulo, x.valor])} />}
+                nota={motivosDeFora > 0 &&
+                  <>Os 10 maiores. Outras <strong className="tabular">{motivosDeFora}</strong>{' '}
+                  O.S. improdutivas estão espalhadas em códigos de menor frequência —
+                  o percentual é sobre as {m.osImprodutivas} do período, não sobre estas dez.</>}>
+                <BarrasHorizontais dados={m.motivos} cor="var(--st-conflito)"
+                  parte totalRef={m.osImprodutivas} rotuloLargo />
               </Painel>
             </div>
 
-            {/* ================= encerramentos por hora ================= */}
-            <Painel titulo="Encerramentos por hora"
-              tabela={<TabelaSimples colunas={['Hora', 'Concluído', 'Improdutivo', 'Impedimento']}
-                linhas={m.horas.filter(h =>
-                  m.hConcluido[h] || m.hImprodutivo[h] || m.hImpedimento[h])
-                  .map(h => [`${String(h).padStart(2, '0')}:00`,
-                    m.hConcluido[h], m.hImprodutivo[h], m.hImpedimento[h]])} />}>
-              <ColunasPorHora horas={m.horas} series={[
-                { rotulo: 'Concluído', cor: 'var(--st-concluida)', valores: m.hConcluido },
-                { rotulo: 'Com improdutiva', cor: 'var(--st-reagendamento)', valores: m.hImprodutivo },
-                { rotulo: 'Com impedimento', cor: 'var(--st-impedimento)', valores: m.hImpedimento },
-              ]} />
-            </Painel>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              {/* ================= motivos ================= */}
-              <Painel titulo="Motivos de improdutividade"
-                tabela={<TabelaSimples colunas={['Motivo', 'Qtd']}
-                  linhas={m.motivos.map(x => [x.rotulo, x.valor])} />}>
-                <BarrasHorizontais dados={m.motivos} cor="var(--st-conflito)" />
+            {/* ===== 6. quando, quão rápido, e por quem ===== */}
+            <div className="sobe sobe-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+              <Painel className="lg:col-span-2" titulo="Encerramentos por hora"
+                dica="Em que horas o dia fecha — e onde a operação empilha."
+                tabela={<TabelaSimples colunas={['Hora', 'Concluído', 'Improdutivo', 'Impedimento']}
+                  linhas={m.horas.filter(h =>
+                    m.hConcluido[h] || m.hImprodutivo[h] || m.hImpedimento[h])
+                    .map(h => [`${String(h).padStart(2, '0')}:00`,
+                      m.hConcluido[h], m.hImprodutivo[h], m.hImpedimento[h]])} />}>
+                <ColunasPorHora horas={m.horas} series={[
+                  { rotulo: 'Concluído', cor: 'var(--st-concluida)', valores: m.hConcluido },
+                  { rotulo: 'Com improdutiva', cor: 'var(--st-reagendamento)', valores: m.hImprodutivo },
+                  { rotulo: 'Com impedimento', cor: 'var(--st-impedimento)', valores: m.hImpedimento },
+                ]} />
               </Painel>
 
-              {/* ================= tempo por etapa ================= */}
               <Painel titulo="Tempo médio por etapa"
-                extra={<span className="text-xs text-graf-500">minutos</span>}
+                dica="Minutos. Só das visitas que têm as duas pontas medidas."
                 tabela={<TabelaSimples colunas={['Etapa', 'Minutos']}
-                  linhas={m.etapas.map(e => [e.rotulo, e.valor])} />}>
-                <BarrasHorizontais dados={m.etapas} sufixo=" min" />
-                <p className="mt-3 border-t border-graf-800 pt-2.5 text-xs text-graf-400">
-                  <strong className="text-graf-200">Atraso sobre a janela</strong> é quanto
-                  tempo depois da abertura do intervalo combinado o técnico começou.
-                  Número negativo significa que chegou adiantado.
+                  linhas={m.etapas.map(e => [e.rotulo, e.valor])} />}
+                nota={<>
+                  <strong className="text-graf-300">Atraso sobre a janela</strong> é quanto
+                  tempo depois da abertura do intervalo combinado o técnico começou;
+                  negativo significa que chegou adiantado.
                   {m.etapas[0].valor > 60 && (
                     <> Acima de 60 min já compromete o horário prometido ao cliente.</>
                   )}
-                </p>
-              </Painel>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              {/* ================= equipes ================= */}
-              <Painel titulo="Equipes por volume concluído"
-                tabela={<TabelaSimples colunas={['Equipe', 'Concluídas']}
-                  linhas={m.equipes.map(e => [e.rotulo, e.valor])} />}>
-                <BarrasHorizontais dados={m.equipes} cor="var(--st-execucao)" />
-              </Painel>
-
-              {/* ================= por tipo ================= */}
-              <Painel titulo={porGrupo ? 'Visitas por grupo de serviço' : 'Visitas por tipo de atividade (TOA)'}
-                extra={<>
-                  <button onClick={() => setPorGrupo(g => !g)}
-                    className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
-                    {porGrupo ? 'ver tipo do TOA' : 'ver grupo de serviço'}
-                  </button>
-                  <button onClick={baixarCSV}
-                    className="text-xs text-graf-400 underline-offset-2 hover:text-af-400 hover:underline">
-                    Exportar CSV
-                  </button>
                 </>}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-graf-700 text-left text-[11px]
-                                     uppercase tracking-wide text-graf-400">
-                        <th className="px-2 py-1.5 font-medium">Tipo</th>
-                        <th className="px-2 py-1.5 text-right font-medium">Total</th>
-                        <th className="px-2 py-1.5 text-right font-medium">Andam.</th>
-                        <th className="px-2 py-1.5 text-right font-medium">Concl.</th>
-                        <th className="px-2 py-1.5 text-right font-medium">Improd.</th>
-                        <th className="px-2 py-1.5 text-right font-medium">% concl.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(porGrupo ? m.porGrupo : m.porTipo).map(t => (
-                        <tr key={t.tipo} className="border-b border-graf-800/60">
-                          <td className="px-2 py-1.5 text-graf-200">{t.tipo}</td>
-                          <td className="tabular px-2 py-1.5 text-right">{t.total}</td>
-                          <td className="tabular px-2 py-1.5 text-right text-graf-400">{t.andamento}</td>
-                          <td className="tabular px-2 py-1.5 text-right text-emerald-400">{t.concluido}</td>
-                          <td className="tabular px-2 py-1.5 text-right text-af-400">{t.improd}</td>
-                          <td className="tabular px-2 py-1.5 text-right font-medium">
-                            {t.pct.toFixed(1).replace('.', ',')}%
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="font-semibold">
-                        <td className="px-2 py-2">Total</td>
-                        <td className="tabular px-2 py-2 text-right">{m.produtivas}</td>
-                        <td className="tabular px-2 py-2 text-right">{m.emAberto}</td>
-                        <td className="tabular px-2 py-2 text-right text-emerald-400">{m.concluidas}</td>
-                        <td className="tabular px-2 py-2 text-right text-af-400">{m.osImprodutivas}</td>
-                        <td className="tabular px-2 py-2 text-right">
-                          {m.taxaConclusao.toFixed(1).replace('.', ',')}%
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <BarrasHorizontais dados={m.etapas} sufixo=" min" />
+              </Painel>
+
+              {/* ===== equipes: o ranking que ainda não dá para fazer ===== */}
+              <Painel titulo="Concluídas por equipe"
+                dica="Só as equipes identificadas entram no ranking."
+                tabela={<TabelaSimples colunas={['Equipe', 'Concluídas']}
+                  linhas={m.equipes.map(e => [e.rotulo, e.valor])} />}
+                nota={m.concluidasSemDono > 0 && <>
+                  <strong className="tabular text-amber-400">{m.concluidasSemDono}</strong>{' '}
+                  concluída(s) do período estão em <strong>Sem login definido</strong> ou
+                  sem equipe nenhuma — ninguém disse ainda de quem é o login do TOA.
+                  Enquanto isso não for cadastrado, este ranking cobre só uma parte.{' '}
+                  <Link to="/controle/equipes"
+                    className="text-af-400 underline underline-offset-2">cadastrar em Equipes →</Link>
+                </>}>
+                {m.equipes.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-graf-500">
+                    Nenhuma conclusão em equipe identificada no período.
+                  </p>
+                ) : (
+                  <BarrasHorizontais dados={m.equipes} cor="var(--st-execucao)" />
+                )}
               </Painel>
             </div>
           </>
