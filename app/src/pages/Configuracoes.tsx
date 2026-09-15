@@ -57,8 +57,31 @@ interface CodigoBaixa {
   situacao_origem: 'ANALISE' | 'CADASTRO' | null
 }
 
+/** Um tipo de O.S. do catalogo e o grupo de servico que ele produz.
+ *
+ *  O grupo da VISITA nao e escolhido: e derivado das O.S. dela, pela de
+ *  maior prioridade de negocio (014). Entao o unico lugar onde da para
+ *  consertar "esta visita nao tem grupo" e aqui, no tipo de O.S.
+ *
+ *  `grupo_origem`: CRUZAMENTO saiu do cruzamento TOA x ngestor de
+ *  04/09; CADASTRO alguem declarou nesta tela. A diferenca fica na tela
+ *  pelo mesmo motivo do codigo de baixa (D-097). */
+interface TipoOS {
+  codigo: number
+  descricao: string
+  grupo: string | null
+  grupo_origem: 'CRUZAMENTO' | 'CADASTRO' | null
+  grupo_em: string | null
+  depende_de_contexto: boolean
+  qtd_os: number
+}
+
 export default function Configuracoes() {
-  const [aba, setAba] = useState<'status' | 'indicadores' | 'pontuacao' | 'baixa'>('status')
+  const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao' | 'baixa'>('status')
+  const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
+  const [grupos, setGrupos] = useState<string[]>([])
+  const [buscaTipo, setBuscaTipo] = useState('')
+  const [soSemGrupo, setSoSemGrupo] = useState(false)
   const [codigos, setCodigos] = useState<CodigoBaixa[]>([])
   const [buscaCodigo, setBuscaCodigo] = useState('')
   const [soSemDestino, setSoSemDestino] = useState(false)
@@ -85,19 +108,24 @@ export default function Configuracoes() {
 
   async function recarregar() {
     setCarregando(true); setErro(null)
-    const [s, i, cb, pa] = await Promise.all([
+    const [s, i, cb, pa, to, gr] = await Promise.all([
       supabase.from('situacao_visita').select('*').order('ordem'),
       supabase.from('indicador_qualidade').select('*').order('ordem'),
       supabase.from('codigo_baixa')
         .select('id, codigo, descricao, natureza, situacao_destino, situacao_origem')
         .order('codigo'),
       supabase.rpc('ler_parametro', { p_chave: 'baixa_automatica' }),
+      supabase.rpc('catalogo_tipo_os'),
+      supabase.from('tipo_servico').select('nome, prioridade')
+        .eq('ativo', true).order('prioridade'),
     ])
     if (s.error) setErro(s.error.message)
     else setSituacoes((s.data ?? []) as Situacao[])
     if (i.data) setIndicadores(i.data as Indicador[])
     setCodigos((cb.data ?? []) as CodigoBaixa[])
     setBaixaAuto(pa.data === true)
+    setTiposOS((to.data ?? []) as TipoOS[])
+    setGrupos(((gr.data ?? []) as { nome: string }[]).map(g => g.nome))
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [])
@@ -137,6 +165,32 @@ export default function Configuracoes() {
     setOcupado(false)
   }
 
+  /** Declarar a que grupo de servico um tipo de O.S. pertence.
+   *
+   *  Vale *daqui pra frente* -- decisao do Emanuel, 14/09. Contrato ja
+   *  importado so troca de grupo quando a planilha do dia dele for
+   *  importada de novo, porque quem refaz o grupo da visita e o gatilho
+   *  da 014, pendurado em `ordem_servico`. A tela DIZ isso embaixo, em
+   *  vez de deixar a pessoa achando que nao funcionou. */
+  async function definirGrupo(t: TipoOS, grupo: string) {
+    setOcupado(true); setErro(null); setOk(null)
+    const { error } = await supabase.rpc('definir_grupo_do_tipo_os', {
+      p_codigo: t.codigo, p_tipo_servico: grupo || null,
+    })
+    if (error) setErro(traduzir(error.message))
+    else {
+      setTiposOS(l => l.map(x => x.codigo === t.codigo
+        ? { ...x, grupo: grupo || null,
+            grupo_origem: grupo ? 'CADASTRO' : null,
+            grupo_em: grupo ? new Date().toISOString() : null }
+        : x))
+      setOk(grupo
+        ? `${t.codigo} · ${t.descricao} → ${grupo}. Vale na próxima importação.`
+        : `${t.codigo} · ${t.descricao} ficou sem grupo.`)
+    }
+    setOcupado(false)
+  }
+
   async function ligarBaixaAuto(ligar: boolean) {
     if (ligar && !confirm(
       'Ligar a baixa automática?\n\n'
@@ -167,6 +221,21 @@ export default function Configuracoes() {
   }, [codigos, buscaCodigo, soSemDestino])
 
   const semDestino = codigos.filter(c => !c.situacao_destino).length
+
+  const tiposFiltrados = useMemo(() => {
+    const t = buscaTipo.trim().toLowerCase()
+    return tiposOS.filter(x => {
+      if (soSemGrupo && x.grupo) return false
+      if (!t) return true
+      return String(x.codigo).includes(t) || x.descricao.toLowerCase().includes(t)
+    })
+  }, [tiposOS, buscaTipo, soSemGrupo])
+
+  const semGrupo = tiposOS.filter(t => !t.grupo)
+  // O.S. ja importadas presas num tipo sem grupo -- e o tamanho real do
+  // buraco, nao "3 tipos de 40". Zero e desconhecido nao sao a mesma
+  // coisa, e aqui o numero existe: da para contar.
+  const osSemGrupo = semGrupo.reduce((n, t) => n + t.qtd_os, 0)
 
   async function salvarRegra(id: string) {
     setOcupado(true); setErro(null); setOk(null)
@@ -254,6 +323,7 @@ export default function Configuracoes() {
 
         <div className="flex rounded-lg bg-graf-900 p-0.5">
           {([['status', 'Status', situacoes.length],
+             ['servico', 'Tipo de serviço', tiposOS.length],
              ['baixa', 'Baixa e situação', codigos.length],
              ['indicadores', 'Indicadores de qualidade', indicadores.length],
              ['pontuacao', 'Pontuação', totalRegras]] as const).map(
@@ -392,6 +462,135 @@ export default function Configuracoes() {
               </table>
             </div>
           </section>
+        ) : aba === 'servico' ? (
+          <section className="card-controle overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-3">
+              <h2 className="text-sm font-semibold">
+                Grupo de serviço de cada tipo de O.S.
+              </h2>
+              {/* ┌─ por que esta tela existe ──────────────────────────┐
+                  │ > "tem serviços que ainda não ganha categoria […]   │
+                  │ >  ele é uma desconexão" — Emanuel, 14/09           │
+                  │                                                     │
+                  │ O grupo pertence à VISITA e é DERIVADO: das O.S.    │
+                  │ dela, vale a de maior prioridade de negócio (014).  │
+                  │ Tipo de O.S. sem grupo ⇒ visita sem grupo ⇒ "—" na  │
+                  │ coluna GRUPO. E o catálogo aprende tipo novo a cada │
+                  │ planilha (070), então o buraco se reabre sozinho:   │
+                  │ tem de ser cadastro, não um UPDATE em migration.    │
+                  └─────────────────────────────────────────────────────┘ */}
+              <p className="mt-1 max-w-3xl text-sm text-graf-400">
+                O grupo do contrato <strong>não é digitado</strong>: ele sai das O.S.,
+                pela de maior prioridade de negócio. Quando o tipo de O.S. não tem
+                grupo, o contrato inteiro aparece com <strong>—</strong> — é isso que
+                se resolve aqui. O que veio do cruzamento TOA × ngestor de 04/09 está
+                marcado como{' '}
+                <span className="mx-0.5 rounded bg-graf-800 px-1 text-[10px]
+                                 font-semibold uppercase text-graf-400">cruzamento</span>;
+                o que você escolher vira{' '}
+                <span className="mx-0.5 rounded bg-emerald-900/40 px-1 text-[10px]
+                                 font-semibold uppercase text-emerald-300">cadastro</span>.
+              </p>
+
+              {semGrupo.length > 0 && (
+                <div className="mt-3">
+                  <Alerta tipo="aviso">
+                    <strong>{semGrupo.length}</strong> tipo(s) de O.S. ainda sem grupo
+                    {osSemGrupo > 0 && <> — e já há <strong>{osSemGrupo}</strong> O.S.
+                      importada(s) presa(s) neles</>}:{' '}
+                    <strong>{semGrupo.map(t => t.codigo).join(', ')}</strong>.
+                  </Alerta>
+                </div>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input value={buscaTipo} onChange={e => setBuscaTipo(e.target.value)}
+                  placeholder="Buscar código ou descrição…"
+                  className={`${campo} min-w-64 flex-1`} />
+                <label className="flex items-center gap-1.5 text-xs text-graf-300">
+                  <input type="checkbox" checked={soSemGrupo}
+                    onChange={e => setSoSemGrupo(e.target.checked)}
+                    className="accent-af-600" />
+                  Só os sem grupo
+                </label>
+              </div>
+            </div>
+
+            <div className="max-h-[32rem] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 border-b border-graf-700 bg-graf-900
+                                  text-left text-[11px] uppercase tracking-wide text-graf-400">
+                  <tr className="[&>th]:border-r [&>th]:border-graf-500/20
+                                 [&>th:last-child]:border-r-0">
+                    <th className="px-3 py-2 font-medium">Tipo de O.S.</th>
+                    <th className="px-3 py-2 font-medium">Descrição</th>
+                    <th className="px-3 py-2 text-right font-medium">O.S.</th>
+                    <th className="px-3 py-2 font-medium">Grupo de serviço</th>
+                    <th className="px-3 py-2 font-medium">Origem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiposFiltrados.map(t => (
+                    <tr key={t.codigo}
+                        className="border-b border-graf-500/25
+                                   [&>td]:border-r [&>td]:border-graf-500/15
+                                   [&>td:last-child]:border-r-0">
+                      <td className="tabular px-3 py-1.5 font-medium">{t.codigo}</td>
+                      <td className="px-3 py-1.5 text-graf-300">
+                        {t.descricao}
+                        {/* 24, 156 e 208 mudam de grupo conforme as outras O.S. da
+                            mesma visita (014). Escolher um grupo fixo aqui é
+                            legítimo, mas a pessoa tem de saber o que está fazendo. */}
+                        {t.depende_de_contexto && (
+                          <span title="No cruzamento de 04/09 o grupo deste tipo variava conforme as outras O.S. da mesma visita — um grupo fixo aqui é uma simplificação"
+                            className="ml-1.5 rounded bg-amber-900/40 px-1 text-[10px]
+                                       font-semibold uppercase text-amber-300">
+                            depende do contexto
+                          </span>
+                        )}
+                      </td>
+                      <td className="tabular px-3 py-1.5 text-right text-xs text-graf-500">
+                        {t.qtd_os || <span className="text-graf-600">—</span>}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <select value={t.grupo ?? ''} disabled={ocupado}
+                          onChange={e => definirGrupo(t, e.target.value)}
+                          className={`${campo} w-52`}>
+                          <option value="">— sem grupo —</option>
+                          {grupos.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        {t.grupo_origem === 'CADASTRO' ? (
+                          <span title="Declarado nesta tela"
+                            className="rounded bg-emerald-900/40 px-1.5 text-[10px]
+                                       font-semibold uppercase text-emerald-300">
+                            cadastro
+                          </span>
+                        ) : t.grupo_origem === 'CRUZAMENTO' ? (
+                          <span title="Derivado do cruzamento TOA × ngestor de 04/09/2026 (240 visitas em comum)"
+                            className="rounded bg-graf-800 px-1.5 text-[10px]
+                                       font-semibold uppercase text-graf-400">
+                            cruzamento
+                          </span>
+                        ) : <span className="text-xs text-graf-600">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="border-t border-graf-800 px-4 py-2.5 text-xs text-graf-500">
+              {tiposFiltrados.length} de {tiposOS.length} tipos ·{' '}
+              <strong className="text-amber-400">vale daqui pra frente</strong>: o
+              contrato que já está importado só muda de grupo quando a planilha do dia
+              dele for importada de novo. O grupo não é escolhido contrato a contrato —
+              é derivado das O.S., e mudar esta linha muda todos os contratos que
+              usarem este tipo.
+            </p>
+          </section>
+
         ) : aba === 'baixa' ? (
           <div className="space-y-4">
             {/* ---- o interruptor ---- */}

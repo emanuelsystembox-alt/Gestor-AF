@@ -3646,3 +3646,233 @@ registrada como Manaus. Enquanto for uma praça só isso não aparece; com
 duas, a produtividade e o faturamento somam operações diferentes no
 mesmo lugar. Não mexi: escolher a operação da importação é regra de
 negócio.
+
+---
+
+### D-142 · Cancelada não é cinza, e o cadastro não chegava a tempo
+
+> *"Cancelado não é cinza, e uma cor mais vermelho claro, tem que
+> corrigir."* — Emanuel, 14/09
+
+O cadastro **já dizia vermelho**: `situacao_visita.cor` = `#d33724`
+desde a 025. Quem pintava de cinza era o padrão compilado do front —
+`--st-cancelada: #6b7280` — e ele ganha porque `carregarSituacoes()` é
+disparada sem `await` no login e só sobrepõe o objeto de módulo **depois**
+que a tela desenhou. Mutar objeto de módulo não provoca render no React,
+então a lista abre cinza e fica cinza.
+
+Ou seja: não era uma cor errada, eram **duas verdades** — e a que
+aparecia era a compilada. As duas passam a dizer `#d9736e` (migration
+072 no cadastro; `styles.css` e `campo/src/lib/dominio.ts` no código),
+justamente para não piscar de um tom para o outro quando a consulta
+chega.
+
+**Por que vermelho apagado e não o vermelho da marca:** `--st-conflito`
+(`#e4262f`) é o ALARME da tela — TEC1 fora do padrão, conflito de
+importação. Um dia com 7 cancelamentos normais pintado no mesmo vermelho
+vivo vira sete alarmes falsos. Cancelado é fato encerrado e ruim:
+vermelho, mas baixo.
+
+**RECUSADO:** consertar a corrida do `carregarSituacoes()` agora. É
+defeito real e continua de pé — a tela usa o padrão compilado no
+primeiro quadro em TODAS as situações, não só nesta. Alinhar os dois
+valores resolve o sintoma hoje sem esconder a causa, que está escrita
+aqui.
+
+---
+
+### D-143 · O de/para do grupo de serviço vira cadastro
+
+> *"tem serviços que ainda não ganha categoria, por exemplo: ctt
+> 1143258, ele não sabe qual grupo de serviço ou tipo de serviço ele é,
+> ele é uma desconexão […] eu preciso que no menu configurações habilite
+> uma função para 'Tipo de Serviço', dá acesso ao usuário para editar e
+> escolher o tipo de serviço para determinado tipo de o.s."* — Emanuel,
+> 14/09
+
+O grupo pertence à VISITA e é **derivado**: `grupo_da_visita()` escolhe,
+entre as O.S. do contrato, a de maior prioridade de negócio (D-045 e
+migration 014). Tipo de O.S. sem grupo ⇒ contrato sem grupo ⇒ `—` na
+coluna. Não há como consertar contrato a contrato: o lugar é o tipo.
+
+Os três sem grupo eram exatamente os três que a **070** aprendeu da
+planilha de Araguaína, e que por isso nunca passaram pelo cruzamento
+TOA × ngestor de 04/09 que produziu o de/para original:
+
+```
+32  DESCONEXAO I C/ RETIRADA DE EQUIPAMENTO      7 O.S.
+79  DESCONEXAO OPCAO C/ RETIRADA DE EQUIPAMENTO  3 O.S.
+87  RETIRAR EMTA                                 3 O.S.
+```
+
+**Por que cadastro e não um UPDATE na migration:** o catálogo continua
+aprendendo tipo novo a cada planilha nova (070). Um UPDATE de três
+linhas fecharia um buraco que se reabre sozinho na próxima praça.
+
+**Por que RPC e não escrita direta:** `tipo_os_admin` exige
+`empresa_id = minha_empresa()`, e **37 dos 40** tipos são do catálogo
+seed, com `empresa_id` nulo. Escrita por RLS acertaria os 3 que a 070
+criou e falharia **calada** nos 37. `definir_grupo_do_tipo_os` é
+`security definer` e confere o papel dentro, como
+`definir_situacao_do_codigo` (046-C).
+
+A tabela passa a dizer de onde veio cada mapeamento — `CRUZAMENTO` ou
+`CADASTRO`, com autor e data —, pela mesma razão que `codigo_baixa` diz
+(D-097): o que a pessoa declarou vale mais do que o que eu deduzi.
+
+**"Só daqui pra frente", e é escolha do Emanuel.** Perguntado se o
+de/para novo deveria recalcular os contratos já importados, ele escolheu
+não. Então nenhuma visita é tocada, e a tela **escreve isso**: o ctt
+1143258 de 14/09 continua com `—` até a planilha daquele dia ser
+importada de novo — aí o gatilho da 014 roda em `ordem_servico` e o
+grupo se refaz.
+
+**Ainda em aberto:** `24`, `156` e `208` são `depende_de_contexto` — no
+cruzamento o grupo deles variava conforme as outras O.S. da mesma
+visita. A tela marca com etiqueta; escolher um grupo fixo para eles é
+uma simplificação consciente, não um conserto.
+
+---
+
+### D-144 · A capacidade do turno pinta a régua de períodos
+
+> *"é a capacidade da janela: o técnico consegue fazer 3 execuções de 08
+> às 12, 1 de 12 às 15 e 2 de 15 às 18. Se tiver manutenção, que fica no
+> horário 08 às 11, 11 às 14 e 14 às 17, tem que considerar como se
+> fosse um contrato da instalação normal"* — Emanuel, 14/09
+
+A régua de períodos pintava a intensidade do bloco pela **maior janela
+da própria equipe**: uma equipe com 1, 1 e 2 contratos pintava o 2 de
+azul sólido como se fosse muito, e uma com 9 pintava o 3 de fantasma.
+Comparação sem referência não responde nada.
+
+Agora a cor compara com a **capacidade do turno**. São dois calendários
+de janela — instalação e manutenção —, e a última frase do Emanuel é a
+que resolve: não são dois orçamentos, é o mesmo turno chamado de dois
+jeitos. Então a faixa não é pelo par início–fim (seriam seis regras que
+divergem), é pelo **início** da janela:
+
+```
+começa antes das 11h  →  turno da manhã  →  cabem 3   (08–12 e 08–11)
+começa 11h–14h        →  turno do meio   →  cabe  1   (12–15 e 11–14)
+começa 14h em diante  →  turno da tarde  →  cabem 2   (15–18 e 14–17)
+```
+
+Até a capacidade a cor é o azul da execução, variando de intensidade.
+Passou, sai do azul: âmbar logo acima, o vermelho de conflito ao dobro —
+mais listra diagonal, porque numa barra de 8 px o tom sozinho não se lê
+e nem todo mundo separa as duas cores. E sai **escrito** embaixo:
+*"11h–14h acima da capacidade (2 para 1)"*.
+
+**`SEM JANELA` não ganha cor de carga.** Sem hora não há turno, logo não
+há capacidade para comparar. Não saber não é estar folgado (D-117).
+
+**É média padrão, não regra da CLARO** — serve para apontar onde olhar,
+não para cobrar ninguém. Está em `TURNOS`, em `telemetria.tsx`, num
+lugar só. Se variar por praça, vira cadastro; hoje é constante porque
+existe **um** conjunto de números, dito uma vez.
+
+---
+
+### D-145 · A equipe diz quando baixou, quanto fez — e a hora que mentia
+
+> *"precisamos encher um pouco mais de informação por exemplo: último
+> horário baixado do último contrato, e preciso saber quantos pontos ele
+> fez concluído hoje"* — Emanuel, 14/09
+
+Ao ir buscar o horário, o defeito apareceu: a coluna ESTADO mostrava
+**20:47 nas três equipes**. A CTE `evt` de `painel_equipes` era
+
+```sql
+select ve.equipe_id, max(ve.criado_em) from visita_evento ve
+ where ve.equipe_id is not null group by 1
+```
+
+— **sem filtro de dia**. Devolvia o evento mais recente da equipe em
+qualquer dia, que na prática é a hora da importação. A tela dizia "a
+equipe parou às 20:47" quando ninguém tinha parado às 20:47. A 074
+restringe `evt` às visitas daquele dia.
+
+**"Último horário baixado" tem duas fontes, e elas divergem.** São duas
+baixas: a da operadora, que vem do TOA e não se edita (D-042), e a
+nossa. Então a coluna vem com a procedência ao lado:
+
+```
+AFLINE   max(ordem_servico.baixa_em)
+TOA      visita.fim, e SÓ com finalizado_toa (D-103: `fim` vem
+         preenchido em atividade apenas INICIADA)
+```
+
+Hoje, nesta base: **83 O.S., zero com `baixa_em`** — tudo veio de
+importação. Então o que aparece é `TOA`, e é a etiqueta que impede
+alguém de ler aquilo como baixa da AFLINE. Vai junto o **contrato**
+daquela baixa: um horário solto não deixa ninguém ir conferir.
+
+**Pontos:** soma de `pontos_claro` das CONCLUÍDAS do dia — o mesmo
+número que `produtividade_periodo` soma (D-046 e 057), para a tela não
+ter dois totais da mesma coisa. Jornada fora (`natureza = PRODUTIVA`),
+só no cálculo de pontos: `visitas` e `ordens` continuam contando tudo.
+
+E vai junto `pontos_sem_regra`. Somar as sem regra como zero é afirmar
+que o serviço não vale nada (D-117); a tela escreve
+`7,53 pts concluídos · +1 sem regra`.
+
+**MEDIDO como `authenticated`, nunca como dono (D-081):** o painel de
+14/09 (3 equipes, 32 visitas, 17 concluídas) custa **167 ms** a quente,
+dos quais **133 ms são a pontuação** — ~7 ms por visita concluída,
+`pontos_da_visita` chamada por linha. `pontos_por_periodo` no mesmo dia
+custou 280 ms para 38 linhas: mesma ordem, não é atalho.
+
+**FICA EM ABERTO, e está escrito de propósito:** num dia cheio (364
+visitas, ~240 concluídas) isso projeta **~1,7 s**. Não estourou nada
+hoje e não foi otimizado hoje — mas é exatamente a forma do defeito que
+matou `produtividade_periodo` (D-081), e quem voltar aqui tem de saber
+disso antes de o painel ficar lento.
+
+---
+
+### D-146 · O mapa do dia sobe para o Google, e o SVG fica de rede
+
+> *"devemos colocar o mapa do google aí com as camadas de visão satélite
+> e visão street view"* — Emanuel, 14/09
+
+"O dia no espaço" era SVG puro: as bolhas numa caixa vazia, posição
+**relativa** entre bairros. Respondia *"está espalhado?"* e não respondia
+*"onde"* — quem não conhece Manaus de cor via um diagrama, não uma
+cidade. Com o mapa embaixo, a mesma bolha diz qual bairro, o satélite
+mostra se é área densa ou ramal, e o Street View põe o COP na esquina
+antes de despachar.
+
+**A codificação não mudou de propósito:** tamanho = visitas, cor e
+número = técnicos, as mesmas da tabela ao lado. Trocar o fundo não é
+motivo para trocar a gramática da tela.
+
+**O SVG não foi apagado — virou a rede.** `MapaBairrosSVG` é o que
+aparece sem chave no `.env`, com o Google fora do ar e em qualquer clone
+novo do repositório. Tela que depende de terceiro para existir é tela
+que some quando o terceiro cai.
+
+**A chave vai para o bundle, e não tem como não ir:** quem chama a API é
+o navegador de quem abre a tela. Isso é previsto pelo Google, mas só é
+seguro com **restrição por referenciador HTTP** no Cloud Console
+(`https://gestor-af.pages.dev/*` e `http://localhost:5173/*`). A chave
+mora em `app/.env`, que está no `.gitignore`; o `.env.example` traz só o
+nome, vazio.
+
+**LGPD:** o que vai para o Google é a área da tela, para desenhar o
+ladrilho. As bolhas são posicionadas no navegador e são **médias por
+bairro** — não o endereço do assinante. Nenhum nome, telefone ou
+endereço sai daqui, e a janela de informação do mapa não mostra nenhum.
+
+**RECUSADO: `AdvancedMarkerElement`.** É o sucessor de
+`google.maps.Marker`, que está marcado como legado — mas exige um
+`mapId` criado no Cloud Console e um estilo hospedado lá. Não vale
+trocar uma tela que funciona por uma dependência de console. Quando o
+`mapId` existir, muda um bloco só.
+
+**A cor do bairro deixou de ser `var(--st-…)`,** porque tinha de deixar:
+o Maps pinta em canvas e `fillColor` com variável CSS não resolve — sai
+preto, calado. As três cores passam a ser hex escritos e iguais aos da
+rampa da casa (conflito, reagendamento, execução); antes eram três tons
+soltos do ngestor (`#d33724`, `#DAA520`, `#3c8dbc`) que não batiam com
+nenhuma outra tela.

@@ -118,6 +118,24 @@ conta a história.
 | 055 | **O campo no celular** — bucket `evidencia` + policies do Storage, `registrar_evidencia`, `registrar_equipamento`, `pode_anexar_na_visita`, `agenda_do_campo`, `hoje_local`, e as travas da baixa (D-112 a D-116) | ✓ |
 | 056 | **`testar_campo()`** — 14 cenários das travas da 055, INVOKER (D-054) | ✓ |
 
+> **A tabela acima para na 056.** As migrations 057 a 074 existem, estão
+> aplicadas e estão no diretório — só não foram listadas aqui na época.
+> **A pasta é o registro; o banco é o estado.** Antes de supor o que
+> existe, consulte o banco (`list_migrations` pelo MCP).
+
+As três últimas, para não repetir o esquecimento:
+
+| # | O que faz | Aplicada |
+|---|---|---|
+| 072 | **Cancelada não é cinza** — alinha `situacao_visita.cor` ao padrão compilado do front (D-142) | ✓ |
+| 073 | **O de/para do grupo vira cadastro** — `definir_grupo_do_tipo_os`, `catalogo_tipo_os`, procedência em `tipo_os` (D-143) | ✓ |
+| 074 | **A equipe diz quando baixou e quanto fez** — última baixa com procedência, pontos do dia, e o filtro de dia que faltava em `evt` (D-145) | ✓ |
+
+> **A 074 derruba e recria `painel_equipes`.** Coluna nova no
+> `returns table` não passa por `create or replace`, e função recriada
+> do zero **nasce com a ACL aberta ao `anon`** — o `revoke`/`grant` no
+> fim dela não é decoração (ver o par 059 → 061).
+
 > **A 055 derruba e recria `baixar_os` e `baixar_visita`.** Assinatura com
 > default não convive com a versão antiga: as duas casariam com uma
 > chamada de argumentos nomeados, e o PostgREST recusa por ambiguidade.

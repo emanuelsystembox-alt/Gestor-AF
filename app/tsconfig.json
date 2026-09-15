@@ -16,7 +16,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] },
-    "types": ["vite/client"]
+    "types": ["vite/client", "google.maps"]
   },
   "include": ["src"]
 }

@@ -108,6 +108,29 @@ negativo. Baixe do ar e compare com o local.
 
 ---
 
+## Google Maps (Rota do dia)
+
+**Chave recusada NÃO cai no `onerror` do `<script>`.** Referenciador
+fora da lista, cota estourada, faturamento desligado: o script carrega
+normalmente, a promessa resolve, o mapa é criado — e só então a API pinta
+**ela mesma** um "Ops! Algo deu errado" dentro do nosso `<div>`. Nenhum
+`catch` dispara, e a tela fica com um retângulo morto sem caminho de
+volta. O único gancho é a global **`window.gm_authFailure`**. Aconteceu
+na primeira abertura da tela: `RefererNotAllowedMapError`, porque a
+chave estava (bem) restrita e `http://localhost:5173/*` não estava
+autorizado.
+
+**`fillColor` não aceita `var(--minha-cor)`.** O Maps pinta em canvas,
+não em CSS: variável CSS não resolve e o marcador sai **preto, calado**.
+Cor para o mapa vai escrita.
+
+**`"types"` no `tsconfig.json` é uma lista FECHADA.** Com
+`"types": ["vite/client"]`, instalar `@types/google.maps` não faz o
+menor efeito — o `tsc` só carrega os pacotes de tipo listados ali. Tem
+de entrar na lista.
+
+---
+
 ## Dados do TOA
 
 **A planilha tem cabeçalhos repetidos.** `Tipo de Atividade` aparece nas

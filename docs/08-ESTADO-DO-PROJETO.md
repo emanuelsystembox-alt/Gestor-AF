@@ -394,4 +394,9 @@ Ficam aqui porque custaram tempo e podem voltar:
 | **Marcador exigido por tipo de serviço** | Não foi combinado quais indicadores são obrigatórios em cada grupo. |
 | **`equipe.skill`** | O sistema atual mostra "SINGLE MASTER"; não modelamos porque não sabemos o domínio. |
 | **7 migrations sem arquivo local** | Dívida conhecida; `supabase/README.md` explica como sincronizar. |
+| **Grupo de serviço de 79 e 87** | A tela existe (Configurações → **Tipo de serviço**, D-143) e o **32** já foi declarado como `DESCONEXAO` — foi o único que o Emanuel disse em voz alta. Faltam `79 DESCONEXAO OPCAO C/ RETIRADA DE EQUIPAMENTO` e `87 RETIRAR EMTA`: parecem desconexão, mas **parecer não é dado**. São 6 O.S. já importadas presas neles. |
+| **Grupo fixo para 24, 156 e 208** | No cruzamento de 04/09 o grupo desses três variava conforme as outras O.S. da mesma visita (`depende_de_contexto`). A tela marca com etiqueta e deixa escolher; escolher é simplificar. Nenhum deles tem O.S. hoje. |
+| **Capacidade do turno é constante, não cadastro** | 3 / 1 / 2 por turno (D-144) saiu de uma frase, para uma operação. Se variar por praça ou por skill, vira tabela — hoje mora em `TURNOS`, em `app/src/components/telemetria.tsx`. |
+| **`painel_equipes` a ~7 ms por visita concluída** | A pontuação é calculada por linha. Hoje o painel custa 167 ms (32 visitas); um dia de 364 projeta ~1,7 s. Não estourou e não foi otimizado — mas é a mesma forma do defeito que matou `produtividade_periodo` (D-081 e D-145). |
+| **A corrida do `carregarSituacoes()`** | O cadastro de cor/rótulo chega **depois** do primeiro render e muta um objeto de módulo, que não provoca re-render. A tela desenha com o padrão compilado e fica com ele. Foi o que fez "cancelada" ficar cinza (D-142); está alinhado nos dois lados, mas a corrida continua de pé para qualquer situação. |
 | Estoque, frota, produtividade, aferição | Fase 2 |

@@ -97,6 +97,38 @@ os dois arquivos vieram byte a byte iguais aos compilados aqui.
   não um segredo nosso. Vale saber: uma busca ingênua por essa palavra
   assusta à toa.)
 
+## A chave do Google Maps
+
+A Rota do Dia usa o mapa do Google (satélite e Street View). A chave vem
+de `VITE_GOOGLE_MAPS_API_KEY`, no `app/.env` — que **não vai para o
+Git**. Como toda `VITE_*`, ela é embutida no bundle em tempo de
+compilação, e **tem de ser**: quem chama a API do Maps é o navegador de
+quem abre a tela. Isso é previsto pelo Google e não é vazamento — desde
+que a chave esteja restrita.
+
+**Restrinja antes de publicar.** No Cloud Console → Credenciais → a
+chave → *Restrições de aplicativo* → **Referenciadores HTTP**, deixe só:
+
+```
+https://gestor-af.pages.dev/*
+http://localhost:5173/*
+```
+
+E em *Restrições de API*, só **Maps JavaScript API**. Sem isso, qualquer
+um que leia o bundle usa a chave e a fatura é nossa.
+
+> Se o endereço não estiver na lista, a tela **não quebra**: ela volta
+> para o mapa em SVG (posição relativa dos bairros) e escreve o que
+> fazer. Foi assim que o erro apareceu aqui —
+> `RefererNotAllowedMapError` em `localhost:5173`.
+>
+> **Publicar em um endereço novo** (a URL de versão que o Wrangler gera,
+> por exemplo) exige a restrição lá também, ou o mapa cai para o SVG
+> naquele endereço.
+
+Sem chave nenhuma no `.env` a tela também funciona — só sem ruas e sem
+satélite. Nada mais depende dela.
+
 ## O que NÃO fazer
 
 - Não colocar a chave `service_role` em variável do front. Ela ignora o

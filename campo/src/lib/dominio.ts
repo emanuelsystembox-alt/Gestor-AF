@@ -26,7 +26,9 @@ export const SITUACAO_INFO: Record<Situacao, { label: string; cor: string }> = {
   EM_DESLOCAMENTO: { label: 'Em deslocamento', cor: '#0ea5e9' },
   EM_EXECUCAO:     { label: 'Em execução',     cor: '#3b82f6' },
   CONCLUIDA:       { label: 'Concluída',       cor: '#16a34a' },
-  CANCELADA:       { label: 'Cancelada',       cor: '#6b7280' },
+  // Cancelada nao e cinza -- cinza e a cor do "nao sei". Espelha
+  // `--st-cancelada` da web (D-011: a rampa e a mesma nos dois).
+  CANCELADA:       { label: 'Cancelada',       cor: '#d9736e' },
   REAGENDAMENTO:   { label: 'Reagendamento',   cor: '#f59e0b' },
   COM_IMPEDIMENTO: { label: 'Com impedimento', cor: '#ea580c' },
 }

@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
+import { useTema } from '../lib/tema'
+import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
+         temChaveDoMapa } from '../lib/mapaGoogle'
 
 /**
  * Rota do Dia — a terceira visão (D-111).
@@ -61,6 +64,25 @@ interface Resumo {
   km_total: number | null; km_medio: number | null; maior_salto: number | null
   com_coordenada: number; retornos: number; bairros_pulverizados: number
 }
+
+/**
+ * Quantos técnicos pisaram o mesmo bairro hoje. Três é o limite em que
+ * ainda dá para chamar de cobertura; de sete em diante é pulverização.
+ *
+ * ┌─ por que HEX e não `var(--st-...)` ──────────────────────────────┐
+ * │ O Google Maps pinta em canvas, não em CSS: `fillColor` com        │
+ * │ `var(--st-conflito)` não resolve — sai preto, calado. Então as    │
+ * │ cores vêm escritas, e escritas IGUAIS às da rampa da casa         │
+ * │ (styles.css): conflito, reagendamento e execução. Antes eram três │
+ * │ tons soltos do ngestor (#d33724, #DAA520, #3c8dbc) que não        │
+ * │ batiam com nenhuma outra tela.                                     │
+ * │                                                                    │
+ * │ Fora do componente de propósito: dentro, ela nascia nova a cada    │
+ * │ render e faria o mapa redesenhar todas as bolhas sem motivo.       │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+const corBairro = (t: number) =>
+  t >= 7 ? '#e4262f' : t >= 4 ? '#f59e0b' : '#3b82f6'
 
 const hhmm = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
@@ -147,9 +169,6 @@ export default function Rota() {
     for (let m = h0; m <= h1; m += passo) l.push(m)
     return l
   }, [h0, h1])
-
-  const corBairro = (t: number) =>
-    t >= 7 ? 'var(--st-conflito, #d33724)' : t >= 4 ? '#DAA520' : '#3c8dbc'
 
   return (
     <Shell acoes={
@@ -352,6 +371,8 @@ export default function Rota() {
               <h2 className="text-sm font-semibold">O dia no espaço</h2>
               <span className="text-xs text-graf-500">
                 bolha = bairro, na coordenada média · tamanho = visitas · cor = técnicos
+                · troque a camada no canto do mapa (mapa, satélite, híbrido) e arraste
+                o boneco para o Street View
               </span>
             </div>
             <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
@@ -402,13 +423,206 @@ export default function Rota() {
 }
 
 /**
- * Mapa de bairros em SVG puro (D-010: gráfico aqui é escrito à mão).
+ * O dia no espaço, sobre o mapa de verdade.
  *
- * Não é mapa de ruas — é a posição relativa dos bairros, pela
- * coordenada média das visitas de cada um. Serve para ver concentração
- * e dispersão, que é a pergunta; não serve para navegar.
+ * ┌─ o que mudou, e por quê ─────────────────────────────────────────┐
+ * │ > "devemos colocar o mapa do google aí com as camadas de visão    │
+ * │ >  satélite e visão street view" — Emanuel, 14/09                 │
+ * │                                                                   │
+ * │ Antes era SVG puro: as bolhas numa caixa vazia, posição RELATIVA  │
+ * │ entre bairros. Respondia "está espalhado?" e não respondia "onde"  │
+ * │ — quem não conhece Manaus de cor via um diagrama, não uma cidade. │
+ * │ Com o mapa embaixo, a mesma bolha passa a dizer QUAL bairro, o    │
+ * │ satélite mostra se é área densa ou ramal, e o Street View põe o   │
+ * │ COP na esquina antes de despachar.                                │
+ * │                                                                   │
+ * │ A CODIFICAÇÃO NÃO MUDOU de propósito: tamanho = visitas, cor e    │
+ * │ número = técnicos, as mesmas da tabela ao lado. Trocar o fundo    │
+ * │ não é motivo para trocar a gramática da tela.                     │
+ * └───────────────────────────────────────────────────────────────────┘
+ *
+ * ┌─ e o SVG continua existindo ─────────────────────────────────────┐
+ * │ `MapaBairrosSVG` não foi apagado: é o que aparece quando não há   │
+ * │ chave no `.env`, quando o script do Google não carrega (rede,     │
+ * │ chave restrita a outro domínio, cota estourada) e em qualquer     │
+ * │ clone novo do repositório. Tela que depende de terceiro para      │
+ * │ existir é tela que some quando o terceiro cai.                    │
+ * └───────────────────────────────────────────────────────────────────┘
+ *
+ * ⚠ Continua NÃO sendo rastreamento: é o dia AGENDADO, e a bolha é a
+ * média das coordenadas das visitas do bairro — não a casa de ninguém.
  */
+/** O recado tem de dizer O QUE FAZER. "Erro no mapa" manda a pessoa
+ *  abrir o console; isto manda ela no lugar certo do Cloud Console. */
+const RECADO_CHAVE =
+  'O Google recusou a chave deste endereço. No Cloud Console, em '
+  + 'Credenciais → a chave → Restrições de aplicativo, inclua '
+  + 'https://gestor-af.pages.dev/* e http://localhost:5173/*.'
+
 function MapaBairros({ bairros, cor }: {
+  bairros: BairroLinha[]; cor: (t: number) => string
+}) {
+  const [tema] = useTema()
+  const div = useRef<HTMLDivElement | null>(null)
+  const mapa = useRef<google.maps.Map | null>(null)
+  const marcas = useRef<google.maps.Marker[]>([])
+  const [erro, setErro] = useState<string | null>(null)
+  const [pronto, setPronto] = useState(false)
+
+  const pontos = useMemo(
+    () => bairros.filter(b => b.lat != null && b.lng != null),
+    [bairros])
+
+  // 1. carregar a API uma vez
+  useEffect(() => {
+    if (!temChaveDoMapa) return
+    let vivo = true
+    // A chave recusada NÃO chega por `catch`: o script carrega, o mapa é
+    // criado, e só então a API pinta o próprio "Ops!" dentro do nosso
+    // div. Sem este ouvinte a tela ficaria com um retângulo morto — foi
+    // exatamente o que aconteceu na primeira vez que esta tela abriu,
+    // com `RefererNotAllowedMapError` em localhost.
+    if (autenticacaoFalhou()) setErro(RECADO_CHAVE)
+    const cancelar = aoFalharAutenticacao(() => { if (vivo) setErro(RECADO_CHAVE) })
+    carregarMapaGoogle()
+      .then(() => { if (vivo) setPronto(true) })
+      .catch(() => { if (vivo) setErro('O mapa do Google não carregou (rede).') })
+    return () => { vivo = false; cancelar() }
+  }, [])
+
+  // 2. criar o mapa quando o div existir
+  useEffect(() => {
+    if (!pronto || !div.current || mapa.current) return
+    mapa.current = new google.maps.Map(div.current, {
+      center: { lat: -3.1, lng: -60.0 },   // Manaus, até o fitBounds mandar
+      zoom: 11,
+      // O controle é escuro por padrão (D-011) — mapa branco no meio de
+      // uma tela grafite é um holofote. Segue a chave de tema da casa.
+      colorScheme: tema === 'claro' ? 'LIGHT' : 'DARK',
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
+      },
+      streetViewControl: true,   // o pedido: "visão street view"
+      fullscreenControl: true,
+      rotateControl: false,
+      // Rolar a PÁGINA não pode virar zoom no mapa sem querer: com Ctrl
+      // (ou dois dedos) o mapa aceita; sem, a página rola.
+      gestureHandling: 'cooperative',
+    })
+  }, [pronto, tema])
+
+  // 3. redesenhar as bolhas quando os dados mudarem
+  useEffect(() => {
+    const m = mapa.current
+    if (!m) return
+
+    for (const x of marcas.current) x.setMap(null)
+    marcas.current = []
+    if (pontos.length === 0) return
+
+    const limites = new google.maps.LatLngBounds()
+    const info = new google.maps.InfoWindow()
+
+    // Do maior para o menor: a bolha pequena fica POR CIMA e continua
+    // clicável. Mesma ordem de desenho do SVG que isto substituiu.
+    for (const b of [...pontos].sort((a, z) => z.visitas - a.visitas)) {
+      const pos = { lat: b.lat as number, lng: b.lng as number }
+      limites.extend(pos)
+      const c = cor(b.tecnicos)
+      // `Marker` está marcado como legado em favor de
+      // `AdvancedMarkerElement` — que exige um `mapId` criado no Cloud
+      // Console e um estilo hospedado lá. Não vale trocar uma tela que
+      // funciona por uma dependência de console; quando o `mapId`
+      // existir, é só este bloco que muda.
+      const marca = new google.maps.Marker({
+        position: pos,
+        map: m,
+        title: `${b.bairro} · ${b.visitas} visita(s) · ${b.tecnicos} técnico(s)`,
+        zIndex: 1000 - b.visitas,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8 + Math.sqrt(b.visitas) * 3.2,   // mesma escala do SVG
+          fillColor: c,
+          fillOpacity: 0.32,
+          strokeColor: c,
+          strokeWeight: 1.6,
+        },
+        label: {
+          text: String(b.tecnicos),
+          color: c,
+          fontSize: '11px',
+          fontWeight: '600',
+        },
+      })
+      marca.addListener('click', () => {
+        // Bairro, contagem e concluídas. Nada de assinante: a bolha é
+        // média de bairro, e a janela não vai inventar um endereço.
+        info.setContent(
+          `<div style="color:#111;font:500 12px/1.45 system-ui;min-width:9rem">
+             <strong style="font-size:13px">${b.bairro}</strong><br>
+             ${b.visitas} visita(s) · ${b.tecnicos} técnico(s)<br>
+             ${b.concluidas} concluída(s) · ${b.em_aberto} em aberto
+           </div>`)
+        info.open({ map: m, anchor: marca })
+      })
+      marcas.current.push(marca)
+    }
+
+    if (pontos.length === 1) { m.setCenter(limites.getCenter()); m.setZoom(14) }
+    else m.fitBounds(limites, 48)
+
+    return () => info.close()
+  }, [pontos, cor, pronto])
+
+  // Sem chave, ou com o Google fora do ar: o desenho antigo, que não
+  // depende de ninguém.
+  if (!temChaveDoMapa || erro) {
+    return (
+      <div>
+        <MapaBairrosSVG bairros={bairros} cor={cor} />
+        <p className="px-3 pb-2 text-[11px] text-graf-500">
+          {erro
+            ? `${erro} Mostrando a posição relativa dos bairros.`
+            : 'Mapa em posição relativa. Para ver ruas e satélite, preencha '}
+          {!erro && <code className="text-graf-400">VITE_GOOGLE_MAPS_API_KEY</code>}
+          {!erro && ' no app/.env.'}
+        </p>
+      </div>
+    )
+  }
+
+  if (pontos.length === 0) {
+    return (
+      <div className="flex min-h-[20rem] items-center justify-center p-6 text-center
+                      text-xs text-graf-500">
+        Sem coordenada neste dia para desenhar o mapa.
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative min-h-[26rem]">
+      <div ref={div} className="absolute inset-0" />
+      {!pronto && (
+        <div className="absolute inset-0 flex items-center justify-center
+                        text-xs text-graf-500">
+          Carregando o mapa…
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * O mapa de bairros em SVG puro (D-010: gráfico aqui é escrito à mão).
+ *
+ * Não é mapa de ruas — é a posição RELATIVA dos bairros, pela coordenada
+ * média das visitas de cada um. Deixou de ser a única visão (o Google
+ * entrou por cima), mas continua sendo a que sempre funciona: sem chave,
+ * sem rede e sem conta de terceiro.
+ */
+function MapaBairrosSVG({ bairros, cor }: {
   bairros: BairroLinha[]; cor: (t: number) => string
 }) {
   const pontos = bairros.filter(b => b.lat != null && b.lng != null)

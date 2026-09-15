@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
-import { dataBR, equipeRotulo, isoLocal } from '../lib/formato'
+import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
@@ -53,6 +53,18 @@ interface EquipePainel {
   situacao_final: Situacao | null
   minutos_parada: number | null
   ocioso: boolean | null
+  /** A ULTIMA BAIXA do dia, e o contrato dela (074). Nao e a mesma
+   *  coisa que `ultima_atividade`: aquela mistura evento de importacao,
+   *  esta e o encerramento de um contrato. `origem` diz QUAL das duas
+   *  baixas -- a nossa ou a da operadora -- porque elas divergem. */
+  ultima_baixa: string | null
+  ultima_baixa_origem: 'AFLINE' | 'TOA' | null
+  ultimo_contrato: string | null
+  /** Pontos das CONCLUIDAS de hoje. NULO = nenhuma concluida achou
+   *  regra; zero seria afirmar que o dia nao valeu nada (D-117). */
+  pontos_concluidos: number | null
+  /** Concluidas que ficaram FORA da soma por nao terem regra. */
+  pontos_sem_regra: number
 }
 
 interface Tec {
@@ -780,6 +792,81 @@ export default function Equipes() {
                                             ) : <span className="text-graf-600">não definido</span>}
                                           </dd>
 
+                                          {/* ┌─ "encher um pouco mais" ────────────┐
+                                              │ > "último horário baixado do último  │
+                                              │ >  contrato, e preciso saber quantos │
+                                              │ >  pontos ele fez concluído hoje"    │
+                                              │ >  — Emanuel, 14/09                  │
+                                              │                                      │
+                                              │ As duas moram no cartão, não na      │
+                                              │ coluna ESTADO, porque são do TÉCNICO: │
+                                              │ quem olha o cartão está perguntando  │
+                                              │ "como foi o dia dele", não "a equipe │
+                                              │ parou?".                              │
+                                              └──────────────────────────────────────┘ */}
+                                          <dt className="text-graf-600">BAIXOU</dt>
+                                          <dd className="min-w-0">
+                                            {e.ultima_baixa ? (
+                                              <span className="tabular text-graf-200">
+                                                {hora(e.ultima_baixa)}
+                                                {e.ultimo_contrato && (
+                                                  <span className="ml-1.5 text-graf-400">
+                                                    ctt {e.ultimo_contrato}
+                                                  </span>
+                                                )}
+                                                {/* São DUAS baixas e elas divergem: a do
+                                                    TOA não se edita, a nossa é a nossa
+                                                    afirmação. Sem esta etiqueta o
+                                                    horário do TOA passaria por baixa
+                                                    da AFLINE. */}
+                                                <span
+                                                  title={e.ultima_baixa_origem === 'AFLINE'
+                                                    ? 'Baixa dada aqui, pela AFLINE'
+                                                    : 'Encerramento vindo do TOA — ninguém baixou este contrato aqui ainda'}
+                                                  className={`ml-1.5 rounded px-1 text-[9px]
+                                                             font-semibold uppercase ${
+                                                    e.ultima_baixa_origem === 'AFLINE'
+                                                      ? 'bg-emerald-900/40 text-emerald-300'
+                                                      : 'bg-graf-800 text-graf-400'}`}>
+                                                  {e.ultima_baixa_origem === 'AFLINE'
+                                                    ? 'afline' : 'toa'}
+                                                </span>
+                                              </span>
+                                            ) : (
+                                              <span className="text-graf-600">
+                                                nenhum contrato baixado no dia
+                                              </span>
+                                            )}
+                                          </dd>
+
+                                          <dt className="text-graf-600">PONTOS</dt>
+                                          <dd className="min-w-0">
+                                            {/* Zero e desconhecido não são a mesma coisa
+                                                (D-117): sem regra a soma é NULA e a tela
+                                                escreve "sem regra", nunca "0,00 pts". */}
+                                            {e.pontos_concluidos != null ? (
+                                              <span className="tabular font-semibold text-graf-200">
+                                                {pts(e.pontos_concluidos)}
+                                                <span className="ml-1 font-normal text-graf-500">
+                                                  concluídos
+                                                </span>
+                                              </span>
+                                            ) : (
+                                              <span className="text-graf-500">
+                                                nada concluído com regra
+                                              </span>
+                                            )}
+                                            {e.pontos_sem_regra > 0 && (
+                                              <span
+                                                title="Concluídas que ficaram de fora da soma porque não há regra de pontuação para a combinação delas — não valem zero, ainda não se sabe quanto valem"
+                                                className="ml-1.5 rounded bg-amber-900/40 px-1
+                                                           text-[9px] font-semibold uppercase
+                                                           text-amber-300">
+                                                +{e.pontos_sem_regra} sem regra
+                                              </span>
+                                            )}
+                                          </dd>
+
                                         </>
                                       )
                                     })()}
@@ -838,20 +925,48 @@ export default function Equipes() {
                                   ) : <span className="text-graf-600">—</span>}
                                 </td>
 
+                                {/* ┌─ ESTADO ────────────────────────────────┐
+                                    │ A hora aqui era `ultima_atividade`, e ela │
+                                    │ mostrava 20:47 nas TRES equipes: a CTE    │
+                                    │ `evt` nao filtrava por dia e pegava o      │
+                                    │ evento mais recente da equipe em qualquer  │
+                                    │ dia -- na pratica, a hora da IMPORTACAO.   │
+                                    │ A 074 corrigiu o filtro e trouxe a baixa   │
+                                    │ de verdade; a hora grande passa a ser ela. │
+                                    │ `ultima_atividade` fica embaixo, dizendo   │
+                                    │ o que e, porque e ela que decide OCIOSO.   │
+                                    └────────────────────────────────────────────┘ */}
                                 <td className="px-3 py-2.5 text-xs">
                                   {e.ocioso ? (
                                     <span className="rounded bg-amber-900/40 px-1.5 py-0.5
                                                      font-semibold text-amber-300">
                                       OCIOSO {e.minutos_parada}min
                                     </span>
-                                  ) : e.ultima_atividade ? (
-                                    <span className="tabular text-graf-400">
-                                      {hora(e.ultima_atividade)}
+                                  ) : e.ultima_baixa ? (
+                                    <div className="leading-tight">
+                                      <span className="tabular font-medium text-graf-200"
+                                        title={e.ultimo_contrato
+                                          ? `Ultima baixa do dia -- contrato ${e.ultimo_contrato}`
+                                          : 'Ultima baixa do dia'}>
+                                        {hora(e.ultima_baixa)}
+                                      </span>
                                       {e.situacao_final && (
                                         <span className="ml-1.5 text-graf-500">
                                           {SITUACAO_INFO[e.situacao_final]?.label}
                                         </span>
                                       )}
+                                      {e.ultima_atividade
+                                       && e.ultima_atividade !== e.ultima_baixa && (
+                                        <div className="tabular text-[10px] text-graf-600"
+                                          title="Mudanca mais recente registrada nestes contratos -- inclui a propria importacao">
+                                          mexido {hora(e.ultima_atividade)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : e.ultima_atividade ? (
+                                    <span className="tabular text-graf-500"
+                                      title="Nenhum contrato encerrado no dia -- esta e a mudanca mais recente registrada">
+                                      mexido {hora(e.ultima_atividade)}
                                     </span>
                                   ) : (
                                     <span className="text-graf-600">sem encerramento</span>

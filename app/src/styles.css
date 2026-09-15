@@ -56,7 +56,14 @@
   --st-deslocamento:   #0ea5e9;
   --st-execucao:       #3b82f6;
   --st-concluida:      #16a34a;
-  --st-cancelada:      #6b7280;
+  /* Cancelada NAO e cinza. Cinza e o que a tela usa para dizer "nao
+     sei"; cancelado e um fato, e um fato ruim. O cadastro do banco
+     (`situacao_visita.cor`) ja dizia vermelho desde a 025 -- quem
+     mostrava cinza era este padrao compilado, que ganha a corrida
+     porque `carregarSituacoes()` chega depois do primeiro render.
+     O vermelho aqui e o APAGADO, de proposito: `--st-conflito` e o
+     alarme, e dois vermelhos iguais na mesma tela nao alarmam nada. */
+  --st-cancelada:      #d9736e;
   --st-reagendamento:  #f59e0b;
   --st-impedimento:    #ea580c;
   --st-conflito:       #e4262f;
@@ -401,7 +408,46 @@ body {
 .faixa-dia > .bloco {
   position: absolute; top: 2px; bottom: 2px;
   border-radius: 2px;
-  background: var(--bloco-cor, var(--color-graf-500));
+  /* O sombreado: o bloco chapado nao se separava do vizinho, e nesta
+     regua os blocos SE SOBREPOEM de verdade -- 08-11, 08-12, 08-22 e
+     10-12 ocupam a mesma manha. O degrade da volume e o anel escuro da
+     borda; sem os dois, quatro janelas viram uma mancha so. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bloco-cor, var(--color-graf-500)), white 16%) 0%,
+    var(--bloco-cor, var(--color-graf-500)) 58%,
+    color-mix(in srgb, var(--bloco-cor, var(--color-graf-500)), black 14%) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-graf-950) 70%, transparent),
+              0 1px 2px -1px rgb(0 0 0 / 0.55);
+}
+
+/* Acima da capacidade do turno a cor ja vai para o vermelho -- o risco
+   listrado e a SEGUNDA leitura, para quem nao distingue as duas cores e
+   para a barra de 3 px onde o tom sozinho nao se le. */
+.faixa-dia > .bloco[data-estouro="1"] {
+  background-image: repeating-linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.28) 0 2px,
+      transparent 2px 5px),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bloco-cor, var(--color-graf-500)), white 16%) 0%,
+      var(--bloco-cor, var(--color-graf-500)) 58%,
+      color-mix(in srgb, var(--bloco-cor, var(--color-graf-500)), black 14%) 100%);
+}
+
+/* A moldura do turno, por TRAS dos blocos: 08-12, 12-15 e 15-18 sao as
+   tres capacidades, e sem elas a regua nao mostra CONTRA O QUE a cor
+   esta comparando. Decorativa; o numero continua escrito embaixo. */
+.faixa-dia > .turno {
+  position: absolute; top: 0; bottom: 0;
+  pointer-events: none;
+  /* A divisa e o que se le: o fundo claro demais some no grafite e o
+     escuro demais compete com o bloco. Quem marca o corte e o tracejado.
+     Sem `:first-of-type` -- os dois cortes desenhados sao 11h e 14h, e
+     apagar o primeiro apagava justamente a divisa da manha. */
+  border-left: 1px dashed color-mix(in srgb, var(--color-graf-400) 70%, transparent);
+  background: color-mix(in srgb, var(--color-graf-100) 6%, transparent);
 }
 /* O encerramento é um risco vertical, não um bloco: é um INSTANTE. */
 .faixa-dia > .risco {
