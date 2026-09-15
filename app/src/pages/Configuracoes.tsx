@@ -76,8 +76,33 @@ interface TipoOS {
   qtd_os: number
 }
 
+/**
+ * Um tipo de atividade do TOA, e a NATUREZA dele.
+ *
+ * ┌─ por que `conferir` existe ──────────────────────────────────────┐
+ * │ A 078 faz o catálogo aprender com a planilha: tipo que o TOA      │
+ * │ manda e o catálogo não conhece entra sozinho, em vez de a         │
+ * │ atividade perder o tipo (eram 9 de 29 num dia). Mas a NATUREZA    │
+ * │ não dá para aprender do nome — ela é adivinhada como PRODUTIVA.   │
+ * │                                                                   │
+ * │ E adivinhar aqui custa dinheiro: "Almoxarifado" e "Reuniao"       │
+ * │ entraram contando como produção, e não são. Por isso o que foi    │
+ * │ adivinhado fica MARCADO até alguém dizer — em vez de virar um     │
+ * │ fato calado. Ver D-149.                                           │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+interface TipoAtividade {
+  id: string
+  nome: string
+  natureza: string | null
+  ativo: boolean
+  conferir: boolean
+}
+
 export default function Configuracoes() {
-  const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao' | 'baixa'>('status')
+  const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao'
+                                | 'baixa' | 'atividade'>('status')
+  const [atividades, setAtividades] = useState<TipoAtividade[]>([])
   const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
   const [grupos, setGrupos] = useState<string[]>([])
   const [buscaTipo, setBuscaTipo] = useState('')
@@ -108,7 +133,7 @@ export default function Configuracoes() {
 
   async function recarregar() {
     setCarregando(true); setErro(null)
-    const [s, i, cb, pa, to, gr] = await Promise.all([
+    const [s, i, cb, pa, to, gr, ta] = await Promise.all([
       supabase.from('situacao_visita').select('*').order('ordem'),
       supabase.from('indicador_qualidade').select('*').order('ordem'),
       supabase.from('codigo_baixa')
@@ -118,6 +143,9 @@ export default function Configuracoes() {
       supabase.rpc('catalogo_tipo_os'),
       supabase.from('tipo_servico').select('nome, prioridade')
         .eq('ativo', true).order('prioridade'),
+      supabase.from('tipo_atividade')
+        .select('id, nome, natureza, ativo, conferir')
+        .order('conferir', { ascending: false }).order('nome'),
     ])
     if (s.error) setErro(s.error.message)
     else setSituacoes((s.data ?? []) as Situacao[])
@@ -126,6 +154,7 @@ export default function Configuracoes() {
     setBaixaAuto(pa.data === true)
     setTiposOS((to.data ?? []) as TipoOS[])
     setGrupos(((gr.data ?? []) as { nome: string }[]).map(g => g.nome))
+    setAtividades((ta.data ?? []) as TipoAtividade[])
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [])
@@ -259,6 +288,24 @@ export default function Configuracoes() {
     setOcupado(false)
   }
 
+  /** Diz a natureza e tira a marca de adivinhado, num movimento so:
+   *  confirmar sem limpar a marca deixaria a tela pedindo confirmacao
+   *  de algo que ja foi confirmado. */
+  async function classificarAtividade(id: string, natureza: 'PRODUTIVA' | 'JORNADA') {
+    setOcupado(true); setErro(null); setOk(null)
+    const { error } = await supabase.from('tipo_atividade')
+      .update({ natureza, conferir: false }).eq('id', id)
+    if (error) setErro(traduzir(error.message))
+    else {
+      setOk(natureza === 'JORNADA'
+        ? 'Classificado como JORNADA: sai da produtividade e passa a aparecer '
+          + 'como "fora de contrato" em Equipes e na Rota.'
+        : 'Classificado como PRODUTIVA: conta como contrato.')
+      await recarregar()
+    }
+    setOcupado(false)
+  }
+
   async function salvarIndicador(id: string) {
     setOcupado(true); setErro(null); setOk(null)
     const { error } = await supabase.from('indicador_qualidade')
@@ -326,6 +373,7 @@ export default function Configuracoes() {
              ['servico', 'Tipo de serviço', tiposOS.length],
              ['baixa', 'Baixa e situação', codigos.length],
              ['indicadores', 'Indicadores de qualidade', indicadores.length],
+             ['atividade', 'Tipo de atividade', atividades.length],
              ['pontuacao', 'Pontuação', totalRegras]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
@@ -724,6 +772,103 @@ export default function Configuracoes() {
             </section>
           </div>
 
+        ) : aba === 'atividade' ? (
+          <section className="card-controle overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-3">
+              <h2 className="text-sm font-semibold">Tipo de atividade</h2>
+              <p className="mt-1 max-w-3xl text-xs text-graf-400">
+                O que o TOA chama a atividade, e se ela é <strong>trabalho</strong> ou{' '}
+                <strong>jornada</strong>. Jornada (Refeição, Na Base) entra no sistema
+                para o controlador saber o que o técnico faz fora do contrato — mas
+                nunca conta como contrato, nem em produtividade, nem na taxa de
+                conclusão.
+              </p>
+            </div>
+
+            {/* O que a importação adivinhou fica em cima, e diz que
+                adivinhou. Um "Almoxarifado" contando como produção some
+                no meio de 28 linhas se não gritar aqui. */}
+            {atividades.some(a => a.conferir) && (
+              <div className="px-4 py-3">
+                <Alerta tipo="aviso">
+                  <strong>
+                    {atividades.filter(a => a.conferir).length} tipo(s) entraram pela
+                    planilha e foram marcados como PRODUTIVA sem ninguém dizer.
+                  </strong>
+                  <span className="mt-1 block text-xs opacity-90">
+                    Enquanto estiverem assim, contam como contrato na produtividade.
+                    Confirme abaixo — o que for pausa do técnico deve virar JORNADA.
+                  </span>
+                </Alerta>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-graf-800 bg-graf-900 text-left
+                                  text-[11px] uppercase tracking-wide text-graf-400">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Tipo</th>
+                    <th className="px-3 py-2 font-medium">Natureza</th>
+                    <th className="px-3 py-2 text-right font-medium">Classificar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {atividades.map(a => (
+                    <tr key={a.id} className="border-b border-graf-800/60">
+                      <td className="px-4 py-2">
+                        <span className={a.ativo ? '' : 'text-graf-500 line-through'}>
+                          {a.nome}
+                        </span>
+                        {a.conferir && (
+                          <span className="ml-2 rounded bg-amber-900/40 px-1.5 py-0.5
+                                           text-[10px] font-semibold text-amber-300"
+                            title="A importação criou este tipo e chutou PRODUTIVA. Ninguém confirmou.">
+                            ADIVINHADO
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {a.natureza === 'JORNADA' ? (
+                          <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[11px]
+                                           font-semibold text-graf-300">
+                            JORNADA · fora da conta
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-900/40 px-1.5 py-0.5
+                                           text-[11px] font-semibold text-emerald-300">
+                            PRODUTIVA · conta
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="inline-flex gap-1.5">
+                          {(['PRODUTIVA', 'JORNADA'] as const).map(n => (
+                            <button key={n} disabled={ocupado || a.natureza === n && !a.conferir}
+                              onClick={() => classificarAtividade(a.id, n)}
+                              className="rounded border border-graf-700 px-2 py-1 text-[11px]
+                                         text-graf-300 hover:border-af-600 hover:text-graf-100
+                                         disabled:opacity-30">
+                              {n === 'PRODUTIVA' ? 'É trabalho' : 'É jornada'}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="border-t border-graf-800 px-4 py-2.5 text-[11px] leading-snug
+                          text-graf-400">
+              Mudar a natureza vale para <strong>todo o histórico</strong>, não só daqui
+              para a frente: as contagens leem a natureza na hora de responder. Marcar
+              um tipo como JORNADA tira as atividades dele da produtividade
+              retroativamente — que é o certo, e é o que você vai querer em
+              «Almoxarifado» e «Reuniao».
+            </p>
+          </section>
         ) : aba === 'indicadores' ? (
           <section className="space-y-4">
             <div className="card-controle p-4">

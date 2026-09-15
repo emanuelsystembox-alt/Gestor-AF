@@ -212,7 +212,7 @@ export default function Produtividade() {
     <Shell>
       <div className="pagina-entra mx-auto max-w-7xl space-y-4 p-4">
         <div>
-          <h1 className="text-xl font-semibold">Produtividade e comissão</h1>
+          <h1 className="text-xl font-semibold">Meta técnica</h1>
           <p className="mt-1 max-w-3xl text-sm text-graf-400">
             Uma tela, três dimensões — por técnico, por equipe e por supervisor. Só
             entra <strong>contrato concluído</strong>: contrato em execução ainda não

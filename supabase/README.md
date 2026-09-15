@@ -132,6 +132,13 @@ As três últimas, para não repetir o esquecimento:
 | 074 | **A equipe diz quando baixou e quanto fez** — última baixa com procedência, pontos do dia, e o filtro de dia que faltava em `evt` (D-145) | ✓ |
 | 075 | **A rota entrega o que o controlador precisa** — `rota_do_dia` ganha `equipe_id` (para transferir), `tec1` (aderência do servidor) e `finalizado_toa` (D-147) | ✓ |
 | 076 | **O cartão da rota mostra a baixa** — códigos das O.S. com procedência AFLINE/TOA e o detalhe das duas (D-147) | ✓ |
+| 077 | **Cada situação diz quantos pontos carrega** — `painel_equipes.situacoes` ganha `pontos`, `sem_regra` e `produtivas` (D-148) | ✓ |
+| 078 | **A jornada acha o dono** — `toa_recurso` (o de/para que o TOA emite), `login_do_recurso`, `reconciliar_importacao`, e o catálogo aprende tipo novo com `conferir` (D-149) | ✓ |
+| 079 | **A jornada aparece sem contar como contrato** — sai de `visitas`/`ordens`/`situacoes`/`periodos`/baixa e ganha `jornada jsonb`; entra na `rota_do_dia` com `ordem` nula (D-149) | ✓ |
+| 080 | **O TEC1 é por O.S.** — `ordem_servico.tec1`, `tec1_da_os`, carência em `tipo_servico.tec1_carencia_min`; revoga a regra herdada do concorrente (D-150) | ✓ |
+| 081 | **A equipe mostra a nota TEC1** — `painel_equipes.tec1`, sobre O.S. (D-150) | ✓ |
+| 082 | **O TEC1 do painel sai do cache** — defeito meu: filtro por `visita.importacao_id` refrescava 1 de 30, e o painel lia cache enquanto a linha lia a regra (D-150) | ✓ |
+| 083 | **A régua sabe o tipo, e a equipe mostra os tempos** — `periodos[].vt`, `min_deslocamento`, `min_execucao` (D-151) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY
 > DEFINER`.** Coluna nova no `returns table` não passa por `create or
@@ -139,10 +146,17 @@ As três últimas, para não repetir o esquecimento:
 > Nas duas, o `revoke ... from public, anon` no fim é a diferença entre
 > um painel de despacho e um vazamento. Conferido: `anon` não executa.
 
-> **A 074 derruba e recria `painel_equipes`.** Coluna nova no
+> **A 074, a 079, a 081, a 082 e a 083 derrubam e recriam
+> `painel_equipes`; a 079 derruba também `rota_do_dia`.** Coluna nova no
 > `returns table` não passa por `create or replace`, e função recriada
 > do zero **nasce com a ACL aberta ao `anon`** — o `revoke`/`grant` no
-> fim dela não é decoração (ver o par 059 → 061).
+> fim delas não é decoração (ver o par 059 → 061). Conferido depois de
+> cada uma: `anon` não executa.
+
+> **A 078 cria `toa_recurso`, e toda tabela nova precisa de RLS.** Ela
+> nasce com `enable row level security` e duas policies (leitura pela
+> empresa, escrita só ADMIN), no formato `(select minha_empresa())` —
+> função de escopo solta é chamada por linha (D-118).
 
 > **A 055 derruba e recria `baixar_os` e `baixar_visita`.** Assinatura com
 > default não convive com a versão antiga: as duas casariam com uma

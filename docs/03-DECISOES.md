@@ -4049,3 +4049,511 @@ tamanho**, não de mais tons de cinza.
 com `match(/\d+/g)` lê `oklch(0.879 0.169 91.605)` como se fosse RGB e
 acusa 1,04:1 numa etiqueta que tem 9,6:1. O Tailwind 4 emite cor em
 `oklch`/`oklab`.
+
+### D-148 · Cada situação diz quanto vale, e o "Estado" vira hora
+
+> "é bom colocar a soma da quantidade de pontos concluidos, reagendados,
+> em entrada [...] quantos pontos tem cada segmento de status seria muito
+> bom" · "o estado na entrada eu não sei o que é? deveria ser, horário
+> ultimo status, apenas isso" · "nem sempre vai dar status pelo TOA, pode
+> ser que ele coloque o status manual" — Emanuel, 15/09
+
+**1. O ponto ao lado da contagem (migration 077).** A barra de situação
+dizia onde estão os CONTRATOS e calava sobre onde está o DINHEIRO. Seis
+contratos na entrada podem ser 5,51 pontos ou 0,90 — mesma barra, mesmo
+"6", faturamento seis vezes diferente. `painel_equipes.situacoes` passa a
+trazer `pontos`, `sem_regra` e `produtivas` por situação.
+
+**Zero e desconhecido continuam sem se misturar** (D-117). Medido no dia
+15/09: a CANCELADA da equipe 001 tem 1 contrato e **nenhuma** regra de
+pontuação — a tela escreve "sem regra", não `0,00`. O asterisco marca a
+situação em que só PARTE achou regra, e o total do dia some se nada achou
+("sem regra de pontuação" em vez de zero).
+
+O total da coluna e o segmento CONCLUÍDA passam a sair da **mesma** CTE:
+dois caminhos para o mesmo número são dois números para divergir.
+Conferido — 3,1603 na 001, exatamente o que a tela já mostrava.
+
+**O que custou, e é preciso dizer.** Medido como `authenticated` (nunca
+como dono — D-081), no dia 15/09 com 29 visitas:
+
+| | ms |
+|---|---|
+| `painel_equipes` depois da 077 | 318 |
+| só o lateral de pontos, todas as situações | 237 |
+| só o lateral de pontos, só concluídas (era assim até a 074) | 124 |
+
+Derivando das duas amostras: **~5,9 ms por visita**, mais ~65 ms fixos.
+Projetado para as 1.300 visitas/dia que a operação real tem, isso é
+**~8 s — estouraria o timeout do PostgREST**. E antes da 077 já projetava
+~3 s: o gargalo não nasceu aqui, é `pontos_da_visita` ser chamada por
+linha (ela chama `assinatura_da_visita` e `edificacao_da_visita`, esta
+última duas vezes). A 077 amplia o problema em ~2,5×.
+
+**Não consertei isso aqui**, e o motivo é escopo: a saída é uma versão em
+conjunto (`pontos_das_visitas(uuid[])`) substituindo o lateral por linha,
+em `pontos_da_visita`, `pontos_por_periodo` e `painel_equipes` de uma vez
+— é trabalho próprio, não um apêndice de "somar pontos na barra". Fica
+declarado como limite conhecido. A base hoje tem 29–40 visitas/dia porque
+foi reiniciada; **quando o volume real voltar, Equipes vai ficar lenta.**
+
+`left join lateral`, não `cross`: o cross DERRUBA a visita se a função não
+devolver linha, e aí `qtd` passaria a contar menos contratos do que a
+equipe tem, em silêncio, dentro de uma mudança que era "só somar pontos".
+Conferido: hoje são 29 de 29 com exatamente uma linha — o cross daria o
+mesmo. Mas a contagem de situação não pode depender da função de
+pontuação continuar se comportando.
+
+**2. "Estado" virou "Último status".** A coluna mostrava
+`12:26 · Na entrada · mexido 17:40`. "Na entrada" era a situação do
+último contrato ENCERRADO — informação verdadeira e ilegível, e o Emanuel
+disse que não sabia o que era. Agora é uma hora só.
+
+**Não caí em `ultima_atividade` quando não há baixa**, e é decisão: ela
+inclui o evento da IMPORTAÇÃO. Escrever aquele horário sob o título
+"último status" diria "o último status foi às 17:40" quando ninguém mudou
+status nenhum às 17:40 — foi a hora em que a planilha entrou. Sem
+encerramento, a célula diz **"sem encerramento"**. Hora errada é pior que
+hora nenhuma. `ultima_atividade` continua viva no `title` e continua
+sendo quem decide OCIOSO.
+
+**3. A baixa do ngestor aparece (anexo 4).** A coluna JANELA escreve
+"encerrou HH:MM" e aquilo é SEMPRE o TOA (`visita.fim`). Quando alguém
+baixa aqui dentro, esse horário não existe no TOA — e a tela não mostrava
+a hora de jeito nenhum. A coluna Data virou **"Data · baixa"**: a nossa
+baixa (`max(ordem_servico.baixa_em)`) tem precedência, marcada **AQUI**;
+sem ela, repete-se a do TOA marcada **TOA**, "só para registro", como o
+Emanuel pediu. A etiqueta é o que impede de ler uma como a outra — são
+duas baixas e elas divergem (D-042).
+
+O ramo do TOA exige `finalizado_toa`: `fim` vem preenchido em atividade
+apenas INICIADA (D-103). Conferido no rascunho — contrato EM EXECUÇÃO com
+`fim` preenchido e `finalizado_toa` falso não mostra hora em nenhuma das
+duas colunas.
+
+**4. "Produtividade" virou "Meta técnica"** — só o rótulo. Rota
+(`/controle/produtividade`), arquivo e componente ficam como estão:
+renomear rota quebra link que alguém salvou.
+
+**Contraste, medido de verdade.** O `traps.md` avisa que regex de dígitos
+mente com as cores `oklch` do Tailwind 4, então medi pintando a cor num
+canvas e lendo o pixel (o medidor foi conferido: preto sobre branco = 21).
+`text-graf-600` no tema claro dá **2,04:1** — e "sem regra" e "sem
+encerramento" não são enfeite, são a afirmação de que não sabemos.
+Passaram para `graf-400`: **5,88** no claro e **4,76** no escuro. As
+etiquetas AQUI/TOA ficaram em 4,74–6,51, e as horas em 5,06–9,45.
+
+NÃO consertei, e é anterior a esta mudança: a etiqueta **TOA** dentro da
+coluna Ordens de Serviço (`bg-black/25`) dá **3,83:1** no tema claro.
+
+VERIFICADO ATE ONDE DEU: `tsc --noEmit` e `npm run build` limpos;
+`testar_policies()` 16/16 e `testar_campo()` 14/14 depois da 077;
+`has_function_privilege` confirma anon=false, authenticated=true; as
+pecas novas foram montadas numa pagina de rascunho (apagada depois) e
+conferidas nos DOIS temas, com os numeros reais lidos do banco.
+NAO verificado: a tela logada de verdade -- nao tenho credencial e nao
+entro com senha; e o comportamento em volume real, pelo motivo acima.
+
+### D-149 · A jornada acha o dono — e continua não sendo contrato
+
+> "refeição, na base, é bom entrar no banco, pra gente saber de fato por
+> que o técnico está parado [...] porém não pode contar como um contrato
+> que soma na produtividade ou na quebra, reagendamento ou algo do tipo
+> [...] e os status devem subir tanto na visão da equipe como na rota do
+> dia" — Emanuel, 15/09
+
+**O que já estava certo.** Jornada sempre entrou: `Na Base` e `Refeicao`
+estão no catálogo com `natureza = 'JORNADA'`, e toda conta de
+produtividade já as excluía. Suspensa já não entrava (051). O que faltava
+era **atribuição**.
+
+**O TOA não manda o login na jornada.** Conferido na planilha de 15/09 e
+no banco: as 6 linhas de jornada vêm com `Login do Técnico` VAZIO — e a
+`Refeicao` vem sem `Concluiu Atividade` também. Sem login,
+`equipe_do_contrato` devolve nulo, e está certo devolver: o D-070 conta o
+estrago de `norm_txt(NULL)` rotear jornada para uma equipe qualquer.
+Resultado: **6 de 29 atividades sem equipe e sem técnico**, invisíveis em
+Equipes e na Rota.
+
+Mas o TOA manda o **`ID do Recurso`** em todas as linhas — 29 de 29 — e
+as linhas produtivas do mesmo técnico trazem login e recurso juntos:
+
+```
+35996 → Z384041      50399 → Z515564      32950 → Z359048
+```
+
+Cada recurso casa com **exatamente um** login. Não é dedução nossa: é um
+de/para que a própria fonte emite, no mesmo arquivo.
+
+**Por que isto não fere o D-088.** Aquela decisão proíbe deduzir a
+EQUIPE a partir da matrícula — "a matrícula diz de quem é o login; não
+diz de qual equipe ele é". Aqui a corrente é outra, e para em cadastro:
+
+```
+ID do Recurso ──(o TOA diz)──▶ login ──(o CADASTRO diz)──▶ equipe
+```
+
+O segundo elo continua sendo `equipe_do_contrato`, intocada: login não
+cadastrado cai no abrigo "Sem login definido", igual a contrato. A linha
+do D-088 que dizia *"Sem login (jornada) → não vai para lugar nenhum"*
+passa a ser **"sem login E sem recurso conhecido"**.
+
+**Dar visibilidade e dar PESO são coisas diferentes** — e a 078 quase
+confundiu as duas. Assim que a jornada ganhou equipe, o painel passou a
+contá-la como contrato: a equipe 001 saltou de **11 para 13** "Contratos"
+e nasceu uma situação fantasma `EM_EXECUCAO` com `qtd: 2, produtivas: 0`,
+que era a Refeição posando de serviço em andamento. A 079 tira jornada de
+`visitas`, `ordens`, `situacoes`, `periodos`, `ultima_baixa`,
+`situacao_final` e do cálculo de OCIOSO — e dá a ela um campo só,
+`jornada jsonb`. Conferido depois: 11 / 4 / 8 contratos, como antes.
+
+Ela fica **abaixo** da régua de períodos, não dentro: a régua mede
+capacidade de turno, e uma Refeição ocupando vaga de instalação diria que
+o turno está cheio quando não está. Na Rota entra na sequência pelo
+relógio, com `ordem` nula e sem km — numerá-la faria "a 7ª parada do dia"
+ser o almoço, e medir deslocamento até um ponto sem coordenada
+inventaria distância.
+
+**O catálogo perdia tipo, e isso era 31% do arquivo.** 9 das 29 linhas
+entraram com `tipo_atividade_id` NULO porque seis tipos não estavam no
+catálogo. Sem tipo não há natureza, e todo lugar que lê
+`coalesce(ta.natureza,'PRODUTIVA')` estava assumindo produtiva **no
+escuro**. Mesmo remédio da 070 para a área: o catálogo aprende com a
+planilha, que é a fonte.
+
+Escolha do Emanuel entre três: tipo novo entra como PRODUTIVA e fica
+**marcado** (`tipo_atividade.conferir`) até alguém confirmar. E a marca
+provou o próprio valor na hora: o backfill criou **`Almoxarifado` e
+`Reuniao`** como produtiva — dois tipos que quase certamente são jornada.
+Estão contando como produção **agora**, e a aba nova em Configurações →
+Tipo de atividade existe para o Emanuel decidir. Mudar a natureza vale
+para todo o histórico, porque as contagens leem a natureza na hora.
+
+**Por que uma passada DEPOIS, e não mexer no importador.**
+`importar_toa_interno` tem 17.870 caracteres; reescrevê-la para enfiar
+duas regras no meio é arriscar o que funciona por causa do que falta.
+`reconciliar_importacao` é função própria, chamada pela `importar_toa`
+logo depois — mesma transação, então ou entra tudo ou não entra nada. E
+roda depois da inserção de propósito: numa importação a linha de Refeição
+pode vir ANTES da linha produtiva que ensina o login daquele recurso.
+
+CONFERIDO DEPOIS DE APLICAR: de/para aprendido com 27–33 ocorrências por
+recurso; 0 visitas sem tipo; 0 jornada sem equipe; as 6 ligadas ao
+tecnico certo; contratos de volta a 11/4/8; `produtividade_periodo` em
+8/10/4 sem jornada; a Rota do Z384041 com a Refeicao entre o contrato 5
+(12:26) e o 6 (14:38), contratos numerados 1-10 e km preservado.
+
+VERIFICADO ATE ONDE DEU: `tsc --noEmit` e `npm run build` limpos;
+`testar_policies()` 16/16 e `testar_campo()` 14/14; nenhuma tabela sem
+RLS; nenhuma SECURITY DEFINER alcancavel pelo anon; contraste das pecas
+novas medido com o motor do navegador nos DOIS temas (rotulo e total
+subiram de 3,66/2,75 para 5,88/4,76; o horario de 4,35 para 6,25).
+NAO verificado: a tela logada de verdade -- nao tenho credencial e nao
+entro com senha. NAO consertado, e e anterior: o eixo `06h/14h/22h` da
+regua de periodos da 1,70:1 no tema escuro.
+
+EM ABERTO: a jornada fica em `EM_EXECUCAO` para sempre, porque quem
+decide situacao e o codigo de baixa (050) e jornada nunca tem um. Nao
+mexi -- e regra de negocio, e a pergunta e do Emanuel.
+
+**Ajuste no mesmo dia, depois de ver na tela.**
+
+> "o na base e fora de contrato vamos tirar esses nomes, vamos deixar o
+> refeição, hora e total de hora, e nas cores azul vamos colocar um
+> amarelo suave para refeição quando ele iniciar e finalizar"
+> — Emanuel, 15/09
+
+Em Equipes sobrou só a refeição: `Refeição 12:26–14:26 2h`. Caiu o rótulo
+"FORA DE CONTRATO" e caiu o chip de `Na Base` — que dura 1, 7 e 11
+minutos nos três técnicos do dia e é registro, não explicação. As duas
+continuam no BANCO; só a que informa ocupa a tela. O total só aparece com
+**mais de uma** refeição: com uma só ele repetiria a duração que está dois
+centímetros à esquerda.
+
+E a refeição passou a ser desenhada na régua do dia. **Duas tentativas
+até acertar**, e a primeira está registrada porque o erro é instrutivo:
+comecei com uma lavagem amarela ATRÁS dos blocos, para o alarme de
+capacidade não perder espaço. Na tela ela **sumiu** — uma equipe com
+janela `08h–22h` tem bloco cobrindo a régua inteira, e a refeição ficava
+invisível exatamente onde mais importa. Virou faixa PRÓPRIA, de 3px, no
+rodapé da régua, na frente.
+
+Posição diferente também resolve a ambiguidade que a cor criaria sozinha:
+esta régua **já** usa âmbar e vermelho, e ali eles significam "acima da
+capacidade do turno". Âmbar em BLOCO é alarme; âmbar na FAIXA DE BAIXO é
+refeição. Duas pistas — lugar e cor — em vez de só cor. Conferido com as
+duas juntas na mesma régua: o bloco estourado continua sólido e listrado
+por cima, e a faixa aparece inteira embaixo.
+
+Sem hora de fim, a faixa marca só o começo, com 4px: refeição aberta não
+ganha largura inventada, e o texto escreve `12:00–? ?`.
+
+MEDIDO no navegador: no tema claro o preenchimento amarelo dá **2,15:1**
+contra o branco — abaixo do 3:1 que a WCAG 1.4.11 pede para elemento
+gráfico com significado. O amarelo continua suave, como pedido; quem
+carrega o contraste é o **contorno** (`#b45309`, 5,02:1). No escuro o
+preenchimento sozinho já dá 11,32:1.
+
+NA ROTA não mexi, e é decisão: lá a jornada é uma linha do tempo, onde
+cada bloco explica um buraco específico entre dois contratos. `Na Base`
+continua aparecendo por isso. Em Equipes é resumo; na Rota é sequência.
+Se for para alinhar as duas, é uma linha.
+
+### D-150 · O TEC1 vira regra da AFLINE: por O.S., com carência em cadastro
+
+> "Esses serviços precisam ser iniciados antes do fim da janela, ou antes
+> de iniciar a janela e baixado até 1h:59 minutos depois do fim da janela
+> para ser padrão [...] se for não executado, depois do fim da janela, o
+> caso é considerado como sem padrão [...] agora se ele baixar não
+> executado dentro da janela de atendimento ou antes? aí sim é dentro do
+> padrão na certa." · "status executado e não executado, ela que mostrará
+> o TEC1, ele também é por o.s" — Emanuel, 15/09
+
+**Isto REVOGA a regra herdada do concorrente.** A D-099 transcreveu o
+TEC1 do `painel_produtividade.html` (`classifyTEC1Row`) porque era o que
+existia. Agora o Emanuel **definiu** a regra da AFLINE, e ela difere em
+três pontos — está escrito para ninguém "consertar" de volta:
+
+| | antes (painel) | agora |
+|---|---|---|
+| RETORNO DE CREDENCIADA | 119 min | **59 min** |
+| DESCONEXAO | 119 min (caía em "o resto") | **59 min** |
+| hora de início | não olhava | **tem de começar até o fim da janela** |
+
+A inversão do RETORNO eu perguntei antes de aplicar, porque o painel
+antigo tinha uma exceção escrita de propósito — `RETORNO(?! DE
+CREDENCIADA)` — para tirá-lo do balde de 59. Ele confirmou.
+
+**A regra, inteira.** Carência por grupo: 119 min para ADESAO, SERVICO,
+REINSTALACAO, MUDANCA DE ENDERECO e MIGRACAO GPON; 59 min para VISITA
+TECNICA, RETORNO DE CREDENCIADA e DESCONEXAO.
+
+```
+não executado   fim ≤ fim da janela ............ PADRÃO
+                fim > fim da janela ............ SEM PADRÃO   (sem carência)
+executado       início ≤ fim da janela
+                  E fim ≤ fim da janela + carência ... PADRÃO
+                senão ......................... SEM PADRÃO
+```
+
+A assimetria é dele e faz sentido: quem **não** fez o serviço devia ao
+menos ter avisado dentro da janela, então improdutiva não ganha carência.
+
+**A carência saiu do código e virou cadastro.** Estava num regex dentro
+da função. Regex escondido em função é onde regra de negócio vai morrer:
+para mudar 59 → 45 alguém precisa de migration, e por isso ninguém muda.
+Agora é `tipo_servico.tec1_carencia_min`, ao lado do grupo que ela
+governa. Grupo sem carência assume **59** — escolha dele, "o mais
+rígido": falta de cadastro nunca afrouxa a cobrança.
+
+**O TEC1 nasce na O.S., não na visita.** Uma visita tem de 1 a 10 O.S., e
+é a O.S. que a CLARO fatura; o `Status da O.S.` é por O.S. (a planilha
+traz `Status da O.S 1` a `Status da O.S 10`). `visita.tec1` passa a ser o
+**consolidado**, e é severo: uma O.S. fora do padrão põe o contrato fora
+do padrão — mesma lógica da 035, e pela mesma razão.
+
+`inicio` e `fim` continuam sendo da VISITA: o TOA não manda hora por O.S.
+As O.S. de um contrato compartilham as duas pontas e só se separam pelo
+status.
+
+**Qual hora conta.** Perguntei, porque são duas baixas e elas divergem
+(D-042). Ele escolheu **só a do TOA** (`visita.fim`). O TEC1 passa a
+medir o que a CLARO enxerga — que é quem cobra. Contrato baixado só aqui
+dentro fica sem TEC1: consequência declarada, não esquecimento.
+
+**Comparação por timestamp, não por minuto-do-dia.** A função antiga
+fazia `extract(hour)*60 + extract(minute)` nos dois lados. Janela que
+fecha 22:00 mais 119 min dá 24:59, que não existe nesse esquema, e o
+encerramento depois da meia-noite voltava para o começo do dia. Somar
+`data_agendada + janela_fim` resolve.
+
+CONFERIDO ramo a ramo depois de aplicar, nas 107 visitas do banco:
+
+| ramo | visitas | TEC1 |
+|---|---|---|
+| jornada (sem O.S.) | 22 | nulo |
+| não encerrado no TOA | 22 | nulo |
+| sem janela | 3 | nulo |
+| **começou depois do fim da janela** | 1 | **SEM PADRÃO** |
+| encerrou dentro da janela | 48 | PADRÃO (1 expurgada) |
+| encerrou dentro da carência | 11 | PADRÃO |
+| estourou a carência | 0 | — |
+
+Antes: PADRÃO 60, SEM PADRÃO 2, expurgada 1, nulo 44. Depois: 58 / 1 / 1
+/ 47. Os 3 nulos a mais são jornada, que agora não tem O.S. e portanto
+não tem TEC1 — antes a função olhava a visita direto e classificava
+almoço. A única SEM PADRÃO é o contrato 1149280: ADESÃO, janela
+12:00–15:00, **não executada**, encerrada 16:11 — 71 min depois do fim.
+
+**A nota da equipe (081).** Sobre O.S., com denominador = padrão + sem
+padrão. Expurgo e "sem regra" ficam **fora**: somá-los como acerto
+inflaria a nota, como erro puniria quem não errou. Os dois vão no JSON
+assim mesmo, para a tela dizer quanto ficou de fora. `pct` NULO quando o
+denominador é zero — equipe sem O.S. avaliável não tem nota 0%, tem nota
+desconhecida (D-117), e a tela escreve "sem O.S. avaliável". A meta de
+**95%** não é palpite: está na 047, lida do painel que ele já usava.
+
+VERIFICADO ATE ONDE DEU: `tsc --noEmit` e `npm run build` limpos;
+`testar_policies()` 16/16 e `testar_campo()` 14/14; nenhuma tabela sem
+RLS; nenhuma SECURITY DEFINER alcancavel pelo anon; `recalcular_tec1` ja
+era SECURITY DEFINER com checagem de papel ANTES desta migration --
+conferi para nao rebaixar seguranca sem perceber. Os sete estados da nota
+conferidos no navegador nos dois temas; o pior contraste do cartao ficou
+em 4,76:1 (escuro) e 5,48:1 (claro), depois de trocar tres `text-graf-500`
+-- e o TERCEIRO lugar nesta sessao onde esse token reprova.
+NAO verificado: a tela logada de verdade -- nao tenho credencial.
+
+EM ABERTO: `recalcular_tec1` nao filtra por empresa (`empresa_id`). E
+anterior a esta migration e nao mexi, mas num segundo cliente ela
+recalcularia o banco inteiro.
+
+**Defeito meu, no mesmo dia, e o Emanuel achou primeiro.**
+
+> "por que mostra 4 os? se tem mais que isso? tem 6 o.s so nessa tela,
+> tem que ver essa contagem" — Emanuel, 15/09
+
+A equipe 002 mostrava `TEC1 100% · 4/4 O.S.` com **8 O.S.** na coluna ao
+lado. E, na mesma tela, o contrato 1010746 estava escrito **TEC1 SEM
+PADRÃO** — o cabeçalho e a linha se contradiziam.
+
+**Causa 1: filtrei pelo campo errado.** A 080 refrescava
+`ordem_servico.tec1` com `where visita.importacao_id = p_importacao_id`.
+Mas o importador só carimba `importacao_id` no **INSERT** — visita que já
+existia e foi ATUALIZADA guarda o id da importação que a criou. Medido: a
+importação das 18:31 trouxe 30 linhas e carimbou **uma** visita. O
+refresh pegou 1 de 30; as outras ficaram com a coluna nula, e 4 O.S. da
+002 sumiram do denominador — inclusive a única SEM PADRÃO. Daí o
+"4/4 · 100%". O conjunto certo é `importacao_linha.visita_id`, que é
+exatamente o que a importação tocou e vem cheio (30 de 30).
+
+**Causa 2, mais grave: eu criei duas fontes para o mesmo fato.** O painel
+lia a coluna guardada; a linha do contrato lia `visita.tec1`, que o
+importador refaz linha a linha. Basta uma das duas atrasar para a tela
+mentir contra si mesma.
+
+E era pior do que um descuido: a 080 tirou a carência do código e pôs em
+**cadastro** justamente para poder mudar — e aí eu cacheei o resultado.
+No dia em que alguém trocar 119 por 90, todo valor guardado fica errado
+sem aviso.
+
+**Medido antes de escolher o conserto**, como `authenticated`:
+
+| | ms |
+|---|---|
+| `painel_equipes` inteiro | 340 |
+| `tec1_da_os` ao vivo, TODAS as O.S. do dia | **4,8** |
+
+O cache não estava comprando nada. O painel passou a calcular na hora
+(082), então o cabeçalho e a linha leem a mesma regra no mesmo instante e
+não podem divergir. `ordem_servico.tec1` continua existindo para
+relatório e filtro não chamarem função por linha — mas deixou de ser o
+que o painel lê.
+
+CONFERIDO depois: equipe 002 passou a mostrar **87,5% · 7/8 O.S.**, com a
+SEM PADRÃO na conta. Em todo o banco, **0 de 119 O.S.** e **0 de 108
+visitas** com valor guardado diferente da regra ao vivo, e **0** contratos
+SEM PADRÃO dentro de equipe marcando 100%.
+
+A LIÇÃO, que vale além deste caso: cache de regra que é cadastro precisa
+de quem o invalide, ou não deve existir. Aqui não devia existir — e o
+número que provou isso (4,8 ms) levou trinta segundos para ser medido,
+contra as duas horas que a regra passou mentindo na tela.
+
+CORRIGIDO TAMBEM: o cabecalho da 080 afirmava que a carencia era
+"editavel em Configuracoes". Nao e -- essa tela nao existe, so muda por
+SQL, e quem mudar precisa rodar `recalcular_tec1()` depois. A afirmacao
+estava errada e foi reescrita.
+
+### D-151 · A régua sabe o tipo, a refeição vira bloco, e a equipe mostra os tempos
+
+> "a linha laranja precisa entrar toda na caixa de separação como se
+> fosse uma atividade, não sobrepondo a caixa azul" · "janela de 08 as 22
+> horas não devem entrar nessa caixinha azul, é um serviço que não é tão
+> importante" · "se for uma rota inteira de Visita técnica a capacidade
+> é: 08 as 11 - 3, 11 as 14 - 2, 14 as 17 - 3" · "use mais esse espaço
+> para não ficar tudo imprensado, vamos colocar mais informações da
+> equipe, como tempo médio de deslocamento, tempo médio de execução"
+> — Emanuel, 15/09
+
+**A refeição virou bloco — na quarta tentativa.** Vale registrar as
+quatro, porque cada uma falhou por um motivo diferente e o motivo é a
+lição:
+
+| tentativa | o que era | por que falhou |
+|---|---|---|
+| 1 | lavagem atrás dos blocos | sumia: janela `08h–22h` cobre a régua |
+| 2 | faixa própria no rodapé | virava uma segunda régua colada |
+| 3 | barra fina dentro do bloco | lia-se como enfeite do bloco azul |
+| 4 | **mesma altura e forma dos outros** | é o que ele pediu desde o começo |
+
+Agora `.refeicao` só troca `--bloco-cor`: posição, degradê e anel vêm de
+`.bloco`. Ela é uma atividade na régua, do tamanho das outras, ocupando o
+seu pedaço do dia. Não se confunde com o bloco **estourado** porque
+aquele é listrado na diagonal — a "segunda leitura" que já existia. Forma,
+não só cor.
+
+Vem por último no DOM de propósito: o almoço **aconteceu**, ele não
+divide a hora com a instalação, ele a tomou.
+
+**A janela larga sai do desenho.** As janelas de verdade têm 3h (08–11,
+11–14, 14–17) ou 4h (08–12, 12–15, 15–18). A `08h–22h` tem **quatorze** —
+não é janela, é a ausência de uma: o TOA marca assim o serviço que pode
+ser feito a qualquer hora. Desenhá-la ocupa a régua inteira e faz todo
+turno parecer cheio. O corte ficou em **4h**, que é a maior janela real.
+No dia 15/09 isso tira duas: `08h–22h` (14h) e **`12h–18h` (6h)** — esta
+eu encontrei nos dados, ele tinha citado só a primeira.
+
+A contagem continua **escrita** embaixo, com a etiqueta "livre". Some do
+desenho, nunca do dado — sem a etiqueta, o número sem bloco em cima
+pareceria defeito.
+
+**Duas tabelas de capacidade.** VT é mais rápida que instalação:
+
+```
+instalação    manhã 3   meio 1   tarde 2
+visita técn.  manhã 3   meio 2   tarde 3
+```
+
+Os cortes de turno são os mesmos (11h e 14h); muda só o vetor de
+capacidade. Sem isso a régua comparava uma rota inteira de VT contra a
+tabela de instalação e pintava de vermelho um dia que cabia.
+
+⚠ **Leitura minha, e está marcada no código:** ele disse "rota inteira de
+visita técnica"; apliquei **por janela** — quando toda a janela é VT,
+vale a tabela da VT. É mais fino (a capacidade é do TURNO, e um turno
+pode ser todo de VT num dia misto) e degrada para o lado seguro: janela
+misturada usa a tabela de instalação, que é a mais restritiva. Errar para
+o lado do alarme é melhor que errar para o lado do silêncio. Se ele
+quiser pelo dia inteiro, é trocar um argumento.
+
+**Os dois tempos médios (083).** Deslocamento é a coluna que o TOA manda;
+execução é fim menos início. Guarda de sanidade nas duas: negativo ou
+acima de 24h fica **fora** da média — um contrato com hora invertida
+envenena a média inteira, e média envenenada é pior que média nenhuma
+porque parece um número. NULO vira travessão, nunca "0 min": não medimos
+não é não gastou (D-117). Medido em 15/09: deslocamento 10–11 min,
+execução 29–50 min.
+
+São os dois números que dizem COMO o dia foi gasto, e a tela não tinha
+nenhum. Deslocamento alto é rota mal montada; execução alta é serviço
+difícil ou técnico parado no cliente — perguntas diferentes, e nenhuma
+delas o volume responde.
+
+VERIFICADO ATE ONDE DEU: `tsc --noEmit` e `npm run build` limpos;
+`testar_policies()` 16/16, `testar_campo()` 14/14, nenhuma tabela sem RLS,
+nenhuma SECURITY DEFINER alcancavel pelo anon. Quatro casos da regua
+conferidos no navegador nos DOIS temas: (a) o dia real 15/09, com as
+janelas larga e de 6h fora do desenho e escritas com "livre"; (b) rota so
+de VT com 2 no turno do meio -- SEM alarme; (c) a MESMA carga em rota
+mista -- COM alarme; (d) equipe so com janela larga -- regua vazia e o
+numero escrito.
+NAO verificado: o cartao de tempos medios na tela. O rascunho nao monta
+ao importar a pagina inteira, e nao gastei mais tempo nisso; o componente
+sao duas `span` e passou no `tsc`. O `text-graf-500` dos rotulos eu
+troquei por `graf-400` SEM medir de novo -- e o mesmo token no mesmo
+fundo que ja reprovou tres vezes hoje (3,66 claro / 2,75 escuro).
+
+EM ABERTO, e e pergunta para o Emanuel: o corte de 4h para "janela
+larga". Ele citou a 08h-22h; eu generalizei para "maior que a maior
+janela real". Uma janela de 5h ou 6h futura tambem sairia do desenho --
+que e o que acontece hoje com a 12h-18h.

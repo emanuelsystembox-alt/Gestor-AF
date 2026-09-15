@@ -7,7 +7,7 @@ import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
-import { BarraComposicao, FaixaPeriodos } from '../components/telemetria'
+import { FaixaJornada, FaixaPeriodos, SituacaoComPontos } from '../components/telemetria'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
 // linha só, um componente só (D-095).
 import {
@@ -31,7 +31,22 @@ import {
  */
 
 interface Periodo { janela: string; qtd: number }
-interface SitQtd { situacao: Situacao; qtd: number }
+/**
+ * Uma situação da equipe no dia: quantos contratos, e quanto isso VALE.
+ *
+ * `pontos` NULO significa que nenhum contrato daquela situação achou
+ * regra de pontuação — não que ele valha zero (D-117). `sem_regra` diz
+ * quantos produtivos ficaram de fora da soma, e `produtivas` diz sobre
+ * quantos a soma podia falar: `qtd` conta jornada junto, porque é assim
+ * que a coluna Contratos sempre contou. Vêm da 077.
+ */
+interface SitQtd {
+  situacao: Situacao
+  qtd: number
+  produtivas?: number
+  pontos?: number | string | null
+  sem_regra?: number
+}
 
 interface EquipePainel {
   equipe_id: string
@@ -65,6 +80,43 @@ interface EquipePainel {
   pontos_concluidos: number | null
   /** Concluidas que ficaram FORA da soma por nao terem regra. */
   pontos_sem_regra: number
+  /** O que o técnico fez FORA de contrato: Refeição, Na Base (079).
+   *
+   *  Está aqui para o controlador saber por que a equipe ficou parada —
+   *  e NÃO entra em `visitas`, `ordens`, `situacoes` nem `periodos`.
+   *  Jornada não é contrato e nunca conta em produtividade. */
+  jornada: ItemJornada[] | null
+  /** A nota TEC1 da equipe no dia, sobre O.S. (081). */
+  tec1: TEC1Equipe | null
+  /** Minutos medios de deslocamento e de execucao no dia (083).
+   *
+   *  NULO quando nenhuma visita tinha as duas pontas medidas -- zero
+   *  afirmaria que a equipe nao gastou tempo (D-117). O servidor ja
+   *  descarta o que e negativo ou passa de 24h: media envenenada por um
+   *  outlier e pior que media nenhuma, porque parece um numero. */
+  min_deslocamento: number | null
+  min_execucao: number | null
+}
+
+/** A contagem de TEC1 da equipe. `pct` é NULO quando nenhuma O.S. entrou
+ *  na régua — sem denominador não há nota, e nota desconhecida não é
+ *  zero (D-117). Expurgo e "sem regra" ficam fora do denominador. */
+interface TEC1Equipe {
+  padrao: number
+  sem_padrao: number
+  expurgada: number
+  sem_regra: number
+  pct: number | string | null
+}
+
+/** Uma atividade de jornada: o que era, quando, e por quanto tempo. */
+interface ItemJornada {
+  tipo: string | null
+  situacao: string
+  inicio: string | null
+  fim: string | null
+  /** Nulo quando falta uma das pontas — duração desconhecida não é zero. */
+  minutos: number | null
 }
 
 interface Tec {
@@ -112,6 +164,115 @@ const COLUNAS = ['LOGIN', 'NOME DO TÉCNICO', 'EQUIPE', 'SUPERVISOR', 'ÁREA']
 
 const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
+
+/**
+ * A meta de TEC1.
+ *
+ * NÃO é palpite: está escrita na 047, lida do painel que o Emanuel já
+ * usava — "Meta do painel: ≥ 95%". Fica como constante nomeada para a
+ * cor e o texto falarem o mesmo número; se a CLARO mudar, muda aqui.
+ */
+const META_TEC1 = 95
+
+/** `95` -> `1h35`. Minuto cru acima de uma hora nao se le. */
+function minutos(n: number | null): string {
+  if (n == null) return '—'
+  if (n < 60) return `${n} min`
+  const h = Math.floor(n / 60), m = n % 60
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
+
+/**
+ * Os dois tempos medios do dia da equipe.
+ *
+ * ┌─ por que aqui ──────────────────────────────────────────────────┐
+ * │ > "use mais esse espaco para nao ficar tudo imprensado, vamos    │
+ * │ >  colocar mais informacoes da equipe, como tempo medio de       │
+ * │ >  deslocamento, tempo medio de execucao" -- Emanuel, 15/09      │
+ * │                                                                  │
+ * │ Sao os dois numeros que dizem COMO o dia foi gasto, e a tela nao │
+ * │ tinha nenhum dos dois. Deslocamento alto e rota mal montada;     │
+ * │ execucao alta e servico dificil ou tecnico parado no cliente --  │
+ * │ perguntas diferentes, e nenhuma delas o volume responde.         │
+ * └──────────────────────────────────────────────────────────────────┘
+ *
+ * Nulo escreve travessao, nunca "0 min": nao medimos nao e nao gastou.
+ */
+function TemposDaEquipe({ desloc, exec }: {
+  desloc: number | null; exec: number | null
+}) {
+  if (desloc == null && exec == null) return null
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+      <span title="Média do 'Tempo de Deslocamento' que o TOA manda, nos contratos do dia">
+        {/* graf-500 ja reprovou tres vezes nesta sessao no mesmo fundo
+            (3,66 claro / 2,75 escuro). Rotulo e informacao, nao moldura. */}
+        <span className="text-graf-400">desloc.</span>{' '}
+        <span className="tabular font-semibold text-graf-200">{minutos(desloc)}</span>
+      </span>
+      <span title="Média de fim menos início, nos contratos do dia que têm as duas pontas">
+        <span className="text-graf-400">execução</span>{' '}
+        <span className="tabular font-semibold text-graf-200">{minutos(exec)}</span>
+      </span>
+    </div>
+  )
+}
+
+/**
+ * A nota TEC1 da equipe no dia.
+ *
+ * Três leituras diferentes, e a tela não pode confundi-las:
+ *   · tem denominador  → a porcentagem, colorida pela meta
+ *   · denominador zero → "sem O.S. avaliável". NÃO é 0% (D-117): a
+ *     equipe não errou, é que nada dela entrou na régua ainda.
+ *   · nada carregado   → travessão.
+ */
+function TEC1DaEquipe({ tec1 }: { tec1: TEC1Equipe | null }) {
+  // graf-500 da 2,75:1 no escuro e 3,66:1 no claro -- medido com o motor
+  // do navegador (traps.md). E o TERCEIRO lugar nesta sessao onde esse
+  // token reprova; ele so serve para moldura, nunca para informacao.
+  if (!tec1) return <span className="text-graf-400">—</span>
+
+  const avaliadas = tec1.padrao + tec1.sem_padrao
+  const dica = [
+    `${tec1.padrao} O.S. no padrão`,
+    `${tec1.sem_padrao} fora do padrão`,
+    tec1.expurgada ? `${tec1.expurgada} expurgada(s), fora da conta` : null,
+    tec1.sem_regra ? `${tec1.sem_regra} sem regra aplicável (não encerrada no TOA, sem janela ou sem hora)` : null,
+    `meta ${META_TEC1}%`,
+  ].filter(Boolean).join(' · ')
+
+  if (tec1.pct == null) {
+    return (
+      <span className="text-graf-400" title={dica}>
+        sem O.S. avaliável
+        {tec1.sem_regra > 0 && (
+          <span className="tabular ml-1 text-graf-400">({tec1.sem_regra} sem regra)</span>
+        )}
+      </span>
+    )
+  }
+
+  const noAlvo = Number(tec1.pct) >= META_TEC1
+  return (
+    <span title={dica}>
+      <span className={`tabular font-semibold ${
+        noAlvo ? 'text-emerald-400' : 'text-af-400'}`}>
+        {String(tec1.pct).replace('.', ',')}%
+      </span>
+      <span className="tabular ml-1 text-graf-400">
+        {tec1.padrao}/{avaliadas} O.S.
+      </span>
+      {!noAlvo && (
+        <span title={`Abaixo da meta de ${META_TEC1}%`}
+          className="ml-1.5 rounded bg-af-900/40 px-1 text-[9px] font-semibold
+                     uppercase text-af-300">
+          abaixo da meta
+        </span>
+      )}
+    </span>
+  )
+}
 
 export default function Equipes() {
 
@@ -654,9 +815,7 @@ export default function Equipes() {
                           <th className="px-3 py-2 text-right font-medium">O.S.</th>
                           <th className="px-3 py-2 font-medium">Períodos</th>
                           <th className="px-3 py-2 font-medium">Situação</th>
-                          <th className="px-3 py-2 font-medium">
-                            {ehHoje ? 'Estado' : 'Última atividade'}
-                          </th>
+                          <th className="px-3 py-2 font-medium">Último status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -867,6 +1026,28 @@ export default function Equipes() {
                                             )}
                                           </dd>
 
+                                          {/* ┌─ a nota TEC1 (D-150) ──────────────────┐
+                                              │ Sobre O.S., não sobre contrato: o TEC1  │
+                                              │ nasce na O.S. e é a O.S. que a CLARO    │
+                                              │ fatura. Denominador = padrão + sem      │
+                                              │ padrão; expurgo e sem-regra ficam fora, │
+                                              │ porque somá-los como acerto inflaria a  │
+                                              │ nota e como erro puniria quem não errou.│
+                                              └─────────────────────────────────────────┘ */}
+                                          <dt className="text-graf-600">TEC1</dt>
+                                          <dd className="min-w-0">
+                                            <TEC1DaEquipe tec1={e.tec1} />
+                                          </dd>
+
+                                          {(e.min_deslocamento != null
+                                            || e.min_execucao != null) && <>
+                                            <dt className="text-graf-600">TEMPOS</dt>
+                                            <dd className="min-w-0">
+                                              <TemposDaEquipe desloc={e.min_deslocamento}
+                                                              exec={e.min_execucao} />
+                                            </dd>
+                                          </>}
+
                                         </>
                                       )
                                     })()}
@@ -888,8 +1069,13 @@ export default function Equipes() {
                                     numeros continuam escritos embaixo. */}
                                 <td className="px-3 py-2.5">
                                   {e.periodos?.length
-                                    ? <FaixaPeriodos periodos={e.periodos} />
+                                    ? <FaixaPeriodos periodos={e.periodos} jornada={e.jornada} />
                                     : <span className="text-graf-600">—</span>}
+                                  {/* A jornada mora ABAIXO da regua, nao dentro:
+                                      a regua mede capacidade de turno, e uma
+                                      Refeicao ocupando vaga de instalacao diria
+                                      que o turno esta cheio quando nao esta. */}
+                                  <FaixaJornada itens={e.jornada} />
                                 </td>
 
                                 {/* Seis etiquetas do mesmo tamanho para 163 e 17
@@ -897,32 +1083,7 @@ export default function Equipes() {
                                     poe cada um no seu tamanho; a contagem embaixo
                                     continua exata, na ordem do maior para o menor. */}
                                 <td className="px-3 py-2.5">
-                                  {e.situacoes?.length ? (
-                                    <div className="min-w-44 max-w-64 space-y-1.5">
-                                      <BarraComposicao fatias={[...e.situacoes]
-                                        .sort((a, b) => b.qtd - a.qtd)
-                                        .map(s => ({
-                                          chave: s.situacao,
-                                          rotulo: SITUACAO_INFO[s.situacao]?.label ?? s.situacao,
-                                          cor: SITUACAO_INFO[s.situacao]?.cor ?? '#64748b',
-                                          qtd: s.qtd,
-                                        }))} />
-                                      <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[10px]">
-                                        {[...e.situacoes].sort((a, b) => b.qtd - a.qtd).map(s => (
-                                          <span key={s.situacao}
-                                            className="inline-flex items-center gap-1 text-graf-400">
-                                            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full"
-                                              style={{ background:
-                                                SITUACAO_INFO[s.situacao]?.cor ?? '#64748b' }} />
-                                            <span className="tabular font-semibold text-graf-200">
-                                              {s.qtd}
-                                            </span>
-                                            {(SITUACAO_INFO[s.situacao]?.label ?? s.situacao).toLowerCase()}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : <span className="text-graf-600">—</span>}
+                                  <SituacaoComPontos sits={e.situacoes} info={SITUACAO_INFO} />
                                 </td>
 
                                 {/* ┌─ ESTADO ────────────────────────────────┐
@@ -939,37 +1100,45 @@ export default function Equipes() {
                                 <td className="px-3 py-2.5 text-xs">
                                   {e.ocioso ? (
                                     <span className="rounded bg-amber-900/40 px-1.5 py-0.5
-                                                     font-semibold text-amber-300">
+                                                     font-semibold text-amber-300"
+                                      title={'Sem encerramento há ' + e.minutos_parada
+                                             + ' min. Último status às ' + hora(e.ultima_baixa)}>
                                       OCIOSO {e.minutos_parada}min
                                     </span>
                                   ) : e.ultima_baixa ? (
-                                    <div className="leading-tight">
-                                      <span className="tabular font-medium text-graf-200"
-                                        title={e.ultimo_contrato
-                                          ? `Ultima baixa do dia -- contrato ${e.ultimo_contrato}`
-                                          : 'Ultima baixa do dia'}>
-                                        {hora(e.ultima_baixa)}
-                                      </span>
-                                      {e.situacao_final && (
-                                        <span className="ml-1.5 text-graf-500">
-                                          {SITUACAO_INFO[e.situacao_final]?.label}
-                                        </span>
-                                      )}
-                                      {e.ultima_atividade
-                                       && e.ultima_atividade !== e.ultima_baixa && (
-                                        <div className="tabular text-[10px] text-graf-600"
-                                          title="Mudanca mais recente registrada nestes contratos -- inclui a propria importacao">
-                                          mexido {hora(e.ultima_atividade)}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : e.ultima_atividade ? (
-                                    <span className="tabular text-graf-500"
-                                      title="Nenhum contrato encerrado no dia -- esta e a mudanca mais recente registrada">
-                                      mexido {hora(e.ultima_atividade)}
+                                    <span className="tabular font-medium text-graf-200"
+                                      title={[
+                                        'Hora do último contrato encerrado nesta equipe.',
+                                        e.ultimo_contrato ? 'Contrato ' + e.ultimo_contrato : null,
+                                        e.ultima_baixa_origem === 'AFLINE'
+                                          ? 'Baixado aqui, no Gestor AF.'
+                                          : 'Encerrado no TOA.',
+                                        e.ultima_atividade && e.ultima_atividade !== e.ultima_baixa
+                                          ? 'Mudança mais recente registrada nestes contratos (inclui a própria importação): '
+                                            + hora(e.ultima_atividade)
+                                          : null,
+                                      ].filter(Boolean).join(' ')}>
+                                      {hora(e.ultima_baixa)}
                                     </span>
                                   ) : (
-                                    <span className="text-graf-600">sem encerramento</span>
+                                    /* ┌─ por que NÃO cair em `ultima_atividade` ────┐
+                                       │ Ela inclui o evento da IMPORTAÇÃO, então    │
+                                       │ escrever aquele horário aqui diria "o       │
+                                       │ último status foi às 17:40" quando ninguém  │
+                                       │ mudou status nenhum às 17:40 — foi a hora   │
+                                       │ em que a planilha entrou. Zero e            │
+                                       │ desconhecido não são a mesma coisa, e hora  │
+                                       │ errada é pior que hora nenhuma. Ela         │
+                                       │ continua viva no `title` acima e é ela que  │
+                                       │ decide OCIOSO.                              │
+                                       └─────────────────────────────────────────────┘ */
+                                    <span className="text-graf-400"
+                                      title={e.ultima_atividade
+                                        ? 'Nenhum contrato encerrado no dia. A mudança mais recente registrada foi às '
+                                          + hora(e.ultima_atividade) + ' — mas isso inclui a importação, então não é um status.'
+                                        : 'Nenhum contrato encerrado no dia.'}>
+                                      sem encerramento
+                                    </span>
                                   )}
                                 </td>
                               </tr>

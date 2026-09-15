@@ -32,7 +32,7 @@ const OPERACAO: Item[] = [
   { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos' },
   { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes' },
   { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota' },
-  { para: '/controle/produtividade', rotulo: 'Produtividade', icone: 'produtividade' },
+  { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade' },
   { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
 ]
 const ENTRADA: Item[] = [

@@ -100,6 +100,40 @@ export const hora = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
 /**
+ * QUANDO este contrato foi encerrado, e POR QUEM.
+ *
+ * ┌─ sao duas baixas, e elas divergem (D-042) ──────────────────────┐
+ * │ > "nem sempre vai dar status pelo TOA, pode ser que ele coloque  │
+ * │ >  o status manual, entao e bom termos esse horario" -- Emanuel  │
+ * │                                                                  │
+ * │ A coluna JANELA ja escreve "encerrou HH:MM", e aquilo e SEMPRE o │
+ * │ TOA (`visita.fim`). Quando alguem baixa aqui dentro, esse        │
+ * │ horario nao existe no TOA -- e a tela nao mostrava a hora de     │
+ * │ jeito nenhum.                                                    │
+ * │                                                                  │
+ * │ A nossa tem precedencia: se alguem DESTA casa declarou, e isso   │
+ * │ que vale. Sem a nossa, repete-se a do TOA "so para registro" --  │
+ * │ a etiqueta ao lado e o que impede de ler uma como a outra.       │
+ * │ Mesma regra que a 074 aplicou em Equipes.                        │
+ * └──────────────────────────────────────────────────────────────────┘
+ *
+ * `finalizado_toa` e obrigatorio no ramo do TOA: `fim` vem preenchido
+ * mesmo em atividade apenas INICIADA, e sem ele a tela diz que fechou
+ * quem nao fechou (D-103).
+ */
+export function encerramento(v: ContratoLinha):
+  { em: string; origem: 'AFLINE' | 'TOA' } | null {
+  let af: string | null = null
+  for (const o of v.ordem_servico) {
+    if (!o.baixa_em) continue
+    if (!af || new Date(o.baixa_em).getTime() > new Date(af).getTime()) af = o.baixa_em
+  }
+  if (af) return { em: af, origem: 'AFLINE' }
+  if (v.finalizado_toa && v.fim) return { em: v.fim, origem: 'TOA' }
+  return null
+}
+
+/**
  * Agrupa os pendentes repetidos: um contrato com 3 pontos traz
  * "NETFLIX INCLUSO" tres vezes, e 72 etiquetas iguais nao se leem.
  * Vira "NETFLIX INCLUSO x3", na ordem em que o TOA mandou.
@@ -198,7 +232,9 @@ export function TabelaContratos({
           <th className={`px-3 py-2 font-medium ${detalhada ? '' : 'text-center'}`}>
             {detalhada ? 'Ordens de serviço' : 'O.S.'}
           </th>
-          {mostra.data && <th className="px-3 py-2 font-medium">Data</th>}
+          {/* "Data e baixa": a celula tem duas coisas -- a data agendada
+              e a hora em que o contrato foi encerrado, com a procedencia. */}
+          {mostra.data && <th className="px-3 py-2 font-medium">Data · baixa</th>}
           {renderAcoes && <th className="px-3 py-2 font-medium"></th>}
         </tr>
       </thead>
@@ -498,6 +534,27 @@ export function TabelaContratos({
                 <td className="tabular whitespace-nowrap px-3 py-2 align-top text-xs text-graf-400">
                   {dataBR(v.data_agendada)}
                   <div className="text-[10px] text-graf-600">{diaSemana(v.data_agendada)}</div>
+                  {(() => {
+                    const e = encerramento(v)
+                    if (!e) return null
+                    const nossa = e.origem === 'AFLINE'
+                    return (
+                      <div className="mt-1 flex items-center gap-1"
+                        title={nossa
+                          ? 'Baixado AQUI, no Gestor AF -- este horario nao existe no TOA'
+                          : 'Encerrado no TOA. Ninguem baixou aqui dentro; repetido so para registro'}>
+                        <span className={`tabular text-[11px] font-semibold ${
+                          nossa ? 'text-emerald-400' : 'text-graf-300'}`}>
+                          {hora(e.em)}
+                        </span>
+                        <span className={`rounded px-1 py-px text-[9px] font-bold tracking-wide ${
+                          nossa ? 'bg-emerald-900/40 text-emerald-300'
+                                : 'bg-graf-800 text-graf-400'}`}>
+                          {nossa ? 'AQUI' : 'TOA'}
+                        </span>
+                      </div>
+                    )
+                  })()}
                 </td>
               )}
 

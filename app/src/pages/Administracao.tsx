@@ -580,7 +580,7 @@ export default function Administracao() {
               recado += ` Skill ${novo.skill}.`
               if (!r2.faixas) {
                 recado += ` ATENÇÃO: ${novo.skill} ainda não tem faixa de comissão`
-                  + ' — a receber ficará R$ 0 até cadastrar a tabela em Produtividade.'
+                  + ' — a receber ficará R$ 0 até cadastrar a tabela em Meta técnica.'
               }
             }
           }
@@ -1101,7 +1101,7 @@ export default function Administracao() {
                       <strong>{novo.skill}</strong> ainda não tem meta nem faixa de
                       comissão. O técnico é cadastrado do mesmo jeito, mas o
                       "a receber" dele fica R$ 0 até a tabela existir — cadastre em
-                      Produtividade.
+                      Meta técnica.
                     </p>
                   )}
                   <button onClick={criarUsuario}

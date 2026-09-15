@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
@@ -77,6 +77,11 @@ interface Parada {
   baixa_codigos: string | null
   baixa_origem: 'AFLINE' | 'TOA' | null
   baixa_detalhe: string | null
+  /** PRODUTIVA ou JORNADA (079). A jornada entra na sequencia do dia
+   *  para explicar o buraco entre um contrato e o seguinte -- mas com
+   *  `ordem` NULA, sem km e fora de toda contagem. */
+  natureza: 'PRODUTIVA' | 'JORNADA' | string
+  tipo_atividade: string | null
 }
 interface BairroLinha {
   bairro: string; visitas: number; tecnicos: number; equipes: number
@@ -161,6 +166,8 @@ export default function Rota() {
   // de hoje é a pior das confusões numa tela de despacho (lib/dia.ts).
   const [data, setData] = useState(isoLocal())
   const [paradas, setParadas] = useState<Parada[]>([])
+  /** Refeicao, Na Base: o que explica o buraco na sequencia do dia. */
+  const [jornadas, setJornadas] = useState<Parada[]>([])
   const [bairros, setBairros] = useState<BairroLinha[]>([])
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -189,7 +196,15 @@ export default function Rota() {
     ]).then(([p, b, r]) => {
       if (!vivo) return
       if (p.error) setErro(p.error.message)
-      setParadas((p.data ?? []) as Parada[])
+      // ┌─ jornada nao entra em conta nenhuma ─────────────────────┐
+      // │ A separacao acontece AQUI, na porta: `paradas` alimenta  │
+      // │ km, bairros, "a fazer", o mapa e o resumo das equipes.   │
+      // │ Deixar a Refeicao entrar ali seria exatamente o que o    │
+      // │ Emanuel pediu para nao acontecer -- e sairia calado.     │
+      // └──────────────────────────────────────────────────────────┘
+      const todas = (p.data ?? []) as Parada[]
+      setParadas(todas.filter(x => x.natureza !== 'JORNADA'))
+      setJornadas(todas.filter(x => x.natureza === 'JORNADA'))
       setBairros((b.data ?? []) as BairroLinha[])
       setResumo((r.data ?? null) as Resumo | null)
       setCarregando(false)
@@ -212,6 +227,8 @@ export default function Rota() {
         const ordenadas = [...ps].sort((a, b) => a.ordem - b.ordem)
         return {
           login, paradas: ordenadas,
+          jornada: jornadas.filter(j => j.login === login)
+            .sort((a, b) => (a.inicio ?? '').localeCompare(b.inicio ?? '')),
           nome: ps.find(p => p.tecnico)?.tecnico ?? null,
           equipe: ps.find(p => p.equipe)?.equipe ?? null,
           equipeId: ps.find(p => p.equipe_id)?.equipe_id ?? null,
@@ -224,7 +241,7 @@ export default function Rota() {
         }
       })
       .sort((a, b) => b.km - a.km)
-  }, [paradas])
+  }, [paradas, jornadas])
 
   /** A cor de cada equipe, fixa no dia — a mesma no mapa e na faixa. */
   const corEquipe = useMemo(() => {
@@ -445,17 +462,48 @@ export default function Rota() {
                         │ de baixo, como texto — a rota inteira fica   │
                         │ visivel de uma vez, sem barra horizontal.    │
                         └──────────────────────────────────────────────┘ */}
+                    {/* ┌─ a jornada entra na sequência, pelo relógio ────┐
+                        │ Sem ela o controlador vê o contrato das 12:06   │
+                        │ e o das 14:38 colados, e não sabe se o técnico  │
+                        │ almoçou ou sumiu. Com ela, a Refeição de duas   │
+                        │ horas está escrita ali.                         │
+                        │                                                 │
+                        │ Mas ela NÃO é um Trecho: não tem número de      │
+                        │ ordem, não tem km, não abre contrato e não      │
+                        │ arrasta. É um separador que fala. Ver D-149.    │
+                        └─────────────────────────────────────────────────┘ */}
                     <ol className="trilho flex flex-wrap items-stretch gap-y-1.5">
-                      {t.paradas.map((p, i) => (
-                        <Trecho key={p.visita_id}
-                          parada={p} anterior={i > 0 ? t.paradas[i - 1] : null}
-                          primeiro={i === 0}
-                          arrastando={arrastando === p.visita_id}
-                          onArrastar={setArrastando}
-                          onAbrir={() => navegar(`/controle/visita/${p.visita_id}`)}
-                          onMover={() => { setMover({ parada: p, destinoLogin: null })
-                                           setMotivo('') }} />
-                      ))}
+                      {t.paradas.map((p, i) => {
+                        // A jornada que começou DEPOIS da parada anterior e
+                        // ANTES desta: é o buraco que ela explica.
+                        const antes = t.jornada.filter(j => {
+                          if (!j.inicio) return false
+                          const ant = i > 0 ? t.paradas[i - 1].inicio : null
+                          return (!ant || j.inicio > ant) && (!p.inicio || j.inicio <= p.inicio)
+                        })
+                        return (
+                          <Fragment key={p.visita_id}>
+                            {antes.map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                            <Trecho
+                              parada={p} anterior={i > 0 ? t.paradas[i - 1] : null}
+                              primeiro={i === 0}
+                              arrastando={arrastando === p.visita_id}
+                              onArrastar={setArrastando}
+                              onAbrir={() => navegar(`/controle/visita/${p.visita_id}`)}
+                              onMover={() => { setMover({ parada: p, destinoLogin: null })
+                                               setMotivo('') }} />
+                          </Fragment>
+                        )
+                      })}
+                      {/* o que ficou depois do último contrato do dia */}
+                      {t.jornada
+                        .filter(j => j.inicio && t.paradas.length > 0
+                          && j.inicio > (t.paradas[t.paradas.length - 1].inicio ?? ''))
+                        .map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                      {/* técnico que só tem jornada no dia: a faixa existe
+                          e precisa dizer o que ele fez */}
+                      {t.paradas.length === 0 &&
+                        t.jornada.map(j => <ChipJornada key={j.visita_id} j={j} />)}
                     </ol>
                   </div>
                 )
@@ -561,6 +609,54 @@ export default function Rota() {
 }
 
 /* ================================================================== */
+
+/**
+ * A jornada na sequência do dia: Refeição, Na Base.
+ *
+ * ┌─ o que ela é, e o que ela NÃO é ─────────────────────────────────┐
+ * │ > "ele vai tá ali pra gente saber mais ou menos o que ele tá      │
+ * │ >  fazendo quando não está no contrato [...] mais não serve para  │
+ * │ >  considerar como um contrato" — Emanuel, 15/09                  │
+ * │                                                                   │
+ * │ Sem isto, o contrato que fecha 12:26 e o seguinte que começa      │
+ * │ 14:38 aparecem colados, e o despachante não sabe se foram duas    │
+ * │ horas de almoço ou duas horas de sumiço.                          │
+ * │                                                                   │
+ * │ De propósito NÃO é um `Trecho`: não tem número de ordem (a 7ª     │
+ * │ parada do dia não pode ser o almoço), não carrega km (jornada     │
+ * │ não tem coordenada, e medir até um ponto sem coordenada           │
+ * │ inventaria distância), não abre contrato e não arrasta. É         │
+ * │ separador que fala — mais estreito e mais apagado que um cartão,  │
+ * │ para o olho não confundir as duas coisas. Ver D-149.              │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+function ChipJornada({ j }: { j: Parada }) {
+  const min = j.inicio && j.fim
+    ? Math.round((new Date(j.fim).getTime() - new Date(j.inicio).getTime()) / 60000)
+    : null
+  const rotulo = j.tipo_atividade ?? 'jornada'
+  return (
+    <li className="flex items-center" aria-label={`Fora de contrato: ${rotulo}`}>
+      <div className="mx-1 flex items-center gap-1.5 rounded-sm border border-dashed
+                      border-graf-600 bg-graf-900/60 px-2 py-1 text-[10px]"
+        title={[
+          `${rotulo} — fora de contrato`,
+          j.inicio ? `das ${hhmm(j.inicio)}` : null,
+          j.fim ? `às ${hhmm(j.fim)}` : null,
+          'Não conta como contrato nem em produtividade.',
+        ].filter(Boolean).join(' ')}>
+        <span aria-hidden className="text-graf-500">⏸</span>
+        <span className="font-medium text-graf-300">{rotulo}</span>
+        <span className="tabular text-graf-500">
+          {hhmm(j.inicio) ?? '?'}–{hhmm(j.fim) ?? '?'}
+        </span>
+        {min != null && min >= 0 && (
+          <span className="tabular font-semibold text-graf-400">{duracao(min)}</span>
+        )}
+      </div>
+    </li>
+  )
+}
 
 /**
  * Um trecho da rota: o DESLOCAMENTO que chegou até aqui, e a parada.

@@ -58,6 +58,24 @@ normaliza para a mesma string vazia, então as duas casam.
 e roteava jornada para uma equipe qualquer, em silêncio. Ver D-070.
 E **`unaccent_simples` não existe aqui**: quem normaliza é `norm_txt`.
 
+**`visita.importacao_id` só é carimbado no INSERT.** Visita que já
+existia e foi ATUALIZADA por uma importação nova **mantém o id da
+importação que a criou**. Quem filtrar "o que esta importação tocou" por
+esse campo pega quase nada: medido, a importação de 30 linhas carimbou
+**uma** visita, e um refresh de TEC1 rodou em 1 de 30 — em silêncio, com
+o resto da tela mostrando número velho. O conjunto certo é
+`importacao_linha.visita_id`, que vem preenchido para todas. Ver D-150.
+
+**Cache de regra que virou cadastro fica errado calado.** A 080 tirou a
+carência do TEC1 de dentro de um regex e pôs em `tipo_servico`
+justamente para a operação poder mudar — e então materializou o
+resultado em `ordem_servico.tec1`. No dia em que alguém trocar 119 por
+90, todo valor guardado passa a mentir sem aviso. Pior: o painel lia o
+cache e a linha do contrato lia outra coluna, então a **mesma tela se
+contradizia**. Antes de cachear, meça: `tec1_da_os` ao vivo sobre o dia
+inteiro custou **4,8 ms** contra 340 ms do painel. O cache não comprava
+nada. Ver D-150.
+
 **Data-modifying CTE não enxerga o próprio efeito.** `with x as (delete
 … returning) select count(*) from tabela` devolve a contagem **antes**
 do delete. Conferir num segundo comando.
@@ -101,6 +119,14 @@ teto de conexões **simultâneas**, não de mensagens. Sempre
 **No React Native o Blob não carrega os bytes.** `fetch(uri).blob()`
 sobe o arquivo **vazio**, sem erro. O caminho que funciona é base64 →
 `decode()` → ArrayBuffer.
+
+**`text-graf-500` reprova contraste em texto que informa.** Medido com o
+motor do navegador, sobre o cartão: **3,66:1** no tema claro e **2,75:1**
+no escuro — abaixo do 4,5 da AA. Reprovou três vezes numa sessão só
+("sem regra", "sem encerramento", "fora de contrato", "x/y O.S."). Ele
+serve para MOLDURA (rótulo de eixo, travessão decorativo); texto que
+carrega informação usa `graf-400` (5,88 / 4,76). E meça sempre com
+conversão de espaço de cor — regex de dígitos mente com `oklch`.
 
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso

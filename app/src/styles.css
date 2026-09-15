@@ -397,11 +397,21 @@ body {
    equipe. Dez linhas de texto ("08:00 - 11:00 (20)") viram uma régua
    onde a manhã cheia e a tarde vazia se veem sem ler. */
 .faixa-dia {
-  position: relative; height: 0.875rem; border-radius: 0.25rem;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-graf-800) 0 1px,
-    transparent 1px 25%);
+  position: relative; height: 1rem; border-radius: 0.25rem;
+  /* ---------- a grade de horas ----------
+     Era UMA linha a cada 25% -- ou seja, de 4 em 4 horas: 06, 10, 14, 18.
+     Quatro riscos em 16 horas nao localizam nada; para saber se um bloco
+     comeca 09h ou 10h a pessoa media com o olho contra a borda.
+     Agora sao duas grades sobrepostas: fina de 1 em 1 hora (6,25%) para
+     dar a escala, e forte de 2 em 2 (12,5%) para o olho ter onde pousar.
+     A primeira camada declarada fica POR CIMA -- por isso a forte vem
+     antes. Os cortes de turno (11h e 14h) continuam sendo `.turno`, que
+     e outra leitura e nao se confunde com a grade. */
+  background:
+    repeating-linear-gradient(90deg,
+      var(--color-graf-700) 0 1px, transparent 1px 12.5%),
+    repeating-linear-gradient(90deg,
+      var(--color-graf-800) 0 1px, transparent 1px 6.25%);
   outline: 1px solid var(--color-graf-800);
   outline-offset: 0;
 }
@@ -419,6 +429,51 @@ body {
     color-mix(in srgb, var(--bloco-cor, var(--color-graf-500)), black 14%) 100%);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-graf-950) 70%, transparent),
               0 1px 2px -1px rgb(0 0 0 / 0.55);
+}
+
+/* ---------- A refeicao na regua ----------
+   > "nas cores azul vamos colocar um amarelo suave para refeicao quando
+   >  ele iniciar e finalizar" -- Emanuel, 15/09
+
+   ┌─ o cuidado que esta cor exige ──────────────────────────────────┐
+   │ Esta regua JA usa ambar e vermelho, e ali eles significam "acima │
+   │ da capacidade do turno" -- alarme. Um amarelo solido para        │
+   │ refeicao ficaria a um tom de distancia de "esta equipe           │
+   │ estourou", e a mesma regua passaria a dizer duas coisas com a    │
+   │ mesma cor.                                                       │
+   │                                                                  │
+   │ Entao a refeicao NAO e um bloco: e uma LAVAGEM de fundo, palida, │
+   │ sem borda e sem degrade, desenhada ATRAS dos blocos. O bloco     │
+   │ estourado continua solido e listrado na frente. Duas camadas,    │
+   │ duas leituras -- e a do alarme continua por cima.                │
+   │                                                                  │
+   │ As bordas verticais marcam o INICIO e o FIM, que e o que o       │
+   │ Emanuel pediu ver: sem elas a lavagem tem comeco difuso.         │
+   └──────────────────────────────────────────────────────────────────┘ */
+.faixa-dia > .refeicao {
+  /* ┌─ a refeicao e um BLOCO, nao um risco por cima ─────────────────┐
+     │ > "a linha laranja precisa entrar toda na caixa de separacao    │
+     │ >  como se fosse uma atividade, nao sobrepondo a caixa azul"    │
+     │ >                                            -- Emanuel, 15/09  │
+     │                                                                 │
+     │ Quarta posicao, e as tres anteriores ensinaram:                 │
+     │   1. ATRAS dos blocos ....... sumia sob a janela de 08h-22h     │
+     │   2. faixa propria no rodape  virava uma segunda regua colada   │
+     │   3. barra fina DENTRO ...... lia-se como enfeite do bloco azul │
+     │   4. agora: MESMA altura e MESMA forma dos outros blocos.       │
+     │                                                                 │
+     │ Por isso aqui so troca a COR: `.bloco` ja da posicao, degrade e │
+     │ anel. A refeicao passa a ser uma atividade na regua, do mesmo   │
+     │ tamanho que as outras, ocupando o seu pedaco do dia.            │
+     │                                                                 │
+     │ Nao se confunde com o bloco ESTOURADO -- aquele e listrado na   │
+     │ diagonal (a "segunda leitura" logo abaixo), e este e chapado.   │
+     │ Forma, nao so cor.                                              │
+     └─────────────────────────────────────────────────────────────────┘ */
+  --bloco-cor: #fbbf24;
+}
+[data-tema="claro"] .sup-controle .faixa-dia > .refeicao {
+  --bloco-cor: #f59e0b;
 }
 
 /* Acima da capacidade do turno a cor ja vai para o vermelho -- o risco
