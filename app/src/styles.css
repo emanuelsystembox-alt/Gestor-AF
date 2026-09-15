@@ -529,6 +529,88 @@ body {
 .sobe-2 { animation-delay: 80ms; }
 .sobe-3 { animation-delay: 120ms; }
 
+/* ============================================================
+   A MESA DE DESPACHO — Rota do dia
+   ------------------------------------------------------------
+   Gramatica: canto POUCO arredondado (2px), borda esquerda na cor da
+   situacao, tipografia tabular. E mesa de operacao, nao cartao de
+   produto -- o raio grande engorda a linha e cabe menos parada na
+   tela, que e o oposto do que o despachante quer.
+
+   A cor da situacao entra so na BORDA ESQUERDA, nao no fundo: com dez
+   cartoes lado a lado, dez fundos saturados viram um arco-iris onde
+   nada se destaca. A borda da a leitura de relance e o texto continua
+   legivel.
+   ============================================================ */
+
+.faixa-rota { transition: background-color 120ms ease-out, box-shadow 120ms ease-out; }
+
+/* Enquanto um contrato esta no ar, toda faixa que PODE receber se
+   anuncia -- e a unica forma de o controlador saber onde pode soltar. */
+.faixa-alvo {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-af-500) 35%, transparent);
+  background: color-mix(in srgb, var(--color-af-500) 4%, transparent);
+}
+.faixa-sobre {
+  box-shadow: inset 0 0 0 2px var(--color-af-500);
+  background: color-mix(in srgb, var(--color-af-500) 10%, transparent);
+}
+
+/* O trilho QUEBRA linha, nao rola.
+   > "o ideal e olhar a rota inteira sem o scroll" -- Emanuel
+   13 paradas num cartao legivel dao ~2.400 px: nao ha fonte pequena o
+   bastante para caber numa tela de 950 px sem virar borrao. Quebrar
+   continua a leitura na linha de baixo, como texto, e a rota inteira
+   fica visivel de uma vez. */
+.trilho { scrollbar-width: thin; }
+
+.parada-cartao {
+  position: relative;
+  /* 7,5rem: o menor em que "LOT SAO FRANCISCO" ainda da para reconhecer
+     truncado e as duas horas cabem lado a lado. Abaixo disso a economia
+     de pixel sai do entendimento. */
+  width: 7.5rem; min-width: 7.5rem;
+  border: 1px solid var(--color-graf-700);
+  border-left: 3px solid var(--parada-cor, var(--color-graf-500));
+  border-radius: 2px;
+  background: var(--color-graf-850);
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+.parada-cartao:hover { background: var(--color-graf-800); }
+/* O foco do teclado tem de aparecer no CARTAO, nao so no botao de
+   dentro: e o cartao que o olho procura na fila. */
+.parada-cartao:focus-within {
+  border-color: var(--color-af-500);
+  outline: 2px solid var(--color-af-500);
+  outline-offset: 1px;
+}
+.parada-arrastando { opacity: 0.4; }
+
+/* O botao de transferir pelo TECLADO. Visivel sempre (fraco), porque em
+   tela de toque nao existe hover -- esconder atras do mouse tiraria a
+   acao do celular e do teclado ao mesmo tempo. */
+.parada-mover {
+  position: absolute; top: 2px; right: 2px;
+  width: 1.5rem; height: 1.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 2px;
+  font-size: 0.75rem; line-height: 1;
+  /* Medido: `graf-500` a 0,55 de opacidade dava 3,31:1 -- passa como
+     componente de interface e falha como simbolo que se le. Sobe. */
+  color: var(--color-graf-400);
+  background: color-mix(in srgb, var(--color-graf-900) 70%, transparent);
+  opacity: 0.8;
+  transition: opacity 120ms ease-out, color 120ms ease-out;
+}
+.parada-cartao:hover .parada-mover,
+.parada-mover:focus-visible { opacity: 1; color: var(--color-af-400); }
+
+@media (hover: none) {
+  /* Sem mouse nao ha arrasto confiavel: o botao vira o caminho
+     principal, entao ele para de ser discreto. */
+  .parada-mover { opacity: 1; color: var(--color-af-400); }
+}
+
 /* ---------- Respeita quem pediu menos movimento ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

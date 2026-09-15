@@ -3876,3 +3876,176 @@ preto, calado. As três cores passam a ser hex escritos e iguais aos da
 rampa da casa (conflito, reagendamento, execução); antes eram três tons
 soltos do ngestor (`#d33724`, `#DAA520`, `#3c8dbc`) que não batiam com
 nenhuma outra tela.
+
+---
+
+### D-147 · A Rota deixa de ser painel e vira mesa de despacho
+
+> *"precisamos melhorar essa visão dos quadrados, nele é bom mostrar
+> bairro, se é uma adesão, VT, hora início e fim, e mostrar talvez o km
+> de um para o outro […] pense que tem um controlador de rota olhando
+> isso, ele deve ser avisado de alguma divergência de rota […] o que
+> está pendente para trás ele possa mexer e arrastar para outra linha,
+> aí o contrato automaticamente seria transferido […] quero uma visão de
+> rota muito lisa e fluida"* — Emanuel, 14/09
+
+**A direção: mesa de despacho, não painel de indicador.** A tela era de
+leitura; passa a ser de ação.
+
+#### 1. O Gantt não cabia o que ele pedia
+
+Cada visita era um retângulo posicionado pela hora. Num dia real a visita
+de 20 minutos vira um bloco de **14 px** — e 14 px não cabem "SETOR
+CENTRAL", muito menos o tipo de serviço e as duas horas. O desenho
+respondia **quando** e escondia **o quê**.
+
+Agora a faixa é uma **sequência de paradas**, e o espaço vai para o
+**trecho entre elas**, que é a unidade do despachante: o km e o tempo
+parado moram na linha que liga dois cartões, porque é exatamente isso que
+eles são — o deslocamento. A hora continua escrita, com precisão de
+minuto, que é melhor do que deduzir de um pixel.
+
+O cartão carrega, de cima para baixo:
+
+```
+LOT SAO FRANCIS…      bairro
+08:00–11:00           a janela COMBINADA
+09:14 → 09:22         a execução REAL
+SEM GRUPO   312   ↩   grupo · código de baixa · divergências
+```
+
+**A janela e a execução juntas, distintas pelo peso.** O controlador
+compara as duas o tempo todo; separá-las em telas diferentes era obrigá-lo
+a decorar uma delas.
+
+**O que se perdeu, e é honesto dizer:** a leitura proporcional do dia —
+"a manhã está cheia, a tarde vazia" — some. Ela continua em **Equipes**,
+na régua de períodos (D-144). Aqui a pergunta é outra: a rota está
+ajustada?
+
+#### 1b. A sequência QUEBRA, não rola
+
+> *"diminua mais a fonte para não ter que usar muito o scroll […] o ideal
+> é olhar a rota inteira sem o scroll"* — Emanuel
+
+A primeira versão rolava na horizontal, uma barra por técnico. Diminuir a
+fonte não resolve: **13 paradas num cartão legível dão ~2.400 px**, e não
+existe corpo pequeno o bastante para caber em 950 px sem virar borrão.
+
+Então a sequência **quebra linha**, como texto: continua na linha de
+baixo e a rota inteira fica visível de uma vez. Medido: **zero barras
+horizontais** — nem nas faixas, nem na página, nem a 375 px de largura.
+
+O cartão encolheu de 9,5 para **7,5 rem** — o menor em que "LOT SAO
+FRANCISCO" ainda se reconhece truncado e as duas horas cabem lado a lado.
+Abaixo disso a economia de pixel sai do entendimento.
+
+#### 1c. Os códigos de baixa no cartão (076)
+
+> *"adicione os códigos de baixa também dentro da caixa"* — Emanuel
+
+**São duas baixas, e elas divergem** (D-042). O cartão mostra a **nossa**
+quando existe — em verde, como em toda a casa — e a da **operadora**
+quando não. A dica do cartão traz as duas por extenso, com descrição: é
+lá que a divergência aparece inteira.
+
+E é uma **lista**, não um código: a visita tem de 1 a 10 O.S., o caso mais
+comum é 2, e cada uma tem o seu. "O código do contrato" não existe;
+existe o conjunto. Duas O.S. com 409 e 430 viram `409 · 430`, não a
+primeira que o banco devolver.
+
+#### 2. A divergência sai da tabela e entra no trecho
+
+A seção *"O que precisa de olho"* foi **removida a pedido**. Os três
+avisos que ela dava passam a aparecer onde a pessoa está olhando:
+
+| aviso | onde aparece | de onde vem |
+|---|---|---|
+| voltou ao bairro | `↩` no cartão | `voltou_ao_bairro`, da 054 |
+| salto de 10 km+ | o trecho fica vermelho, com `⚑ salto` | mesmo corte de `rota_alertas` |
+| fora da janela | `⧗` no cartão | **`visita.tec1`**, calculado pelo servidor |
+
+**`tec1` e não uma conta nova.** Comparar `inicio` com `janela_inicio` no
+front seria escrever uma segunda aderência, que diverge da primeira no dia
+em que a regra mudar. A regra é do servidor desde a 047 (D-047), lida do
+painel do próprio Emanuel. A 075 só passou a devolvê-la.
+
+**O tempo parado entre duas paradas é escrito, e NÃO é julgado.** Não
+existe regra combinada de quanto é "parado demais"; pintar de vermelho
+seria inventar meta. Ele aparece em cinza, ao lado do km.
+
+`rota_alertas` continua no banco, intacta. Nada a chama hoje.
+
+#### 3. Arrastar transfere — e a armadilha está dita na tela
+
+Arrastar um cartão para outra faixa abre a confirmação e chama
+`transferir_visita`, a mesma RPC do modal de contrato. Fica no histórico
+com autor e motivo, e **fixa a rota** (066): a próxima importação do TOA
+não desfaz.
+
+> ⚠ **A faixa é o LOGIN do TOA; a transferência é por EQUIPE.** Dois
+> logins da mesma equipe são duas faixas e um dono só — arrastar entre
+> elas devolve `mudou: false`. A tela avisa **antes** de tentar, com o
+> nome da equipe, em vez de deixar o banco recusar em silêncio.
+
+Só arrasta o que **não encerrou** — escolha do Emanuel entre três opções.
+Concluída, cancelada e reagendamento ficam travadas: já acabaram, e mover
+produção de um técnico para outro é outra conversa.
+
+**Arrastar sozinho seria inacessível.** Todo cartão móvel tem um botão
+`⇄` que abre a MESMA confirmação pelo teclado — e em tela de toque ele
+deixa de ser discreto, porque ali não existe *hover* e o arrasto não é
+confiável. Um caminho, duas portas.
+
+#### 4. O mapa mostra quem está onde
+
+Era bolha por bairro (agregado). Agora é **um pino por contrato, na cor da
+equipe** — pendente sólido, encerrado vazado, para o que falta não
+disputar atenção com o que já acabou. Ao lado, *Equipes em campo*: quantos
+cada uma ainda tem **a executar**.
+
+A cor da equipe é **categórica e fica fora da rampa `--st-*`**: aquela
+significa situação. Verde de "concluída" para a equipe 001 faria o mapa
+mentir duas vezes.
+
+**LGPD:** o pino fica no endereço do assinante, então a janela mostra
+contrato, bairro, janela e situação — e nada mais. Nome e telefone não vêm
+de `rota_do_dia` e não vão entrar.
+
+A tabela de bairros saiu da lateral: com pinos por contrato, um agregado
+por bairro ao lado respondia outra pergunta. O número de bairros continua
+no resumo do topo.
+
+#### 5. Dois defeitos achados medindo, não olhando
+
+**O mapa não trocava de tema.** `colorScheme` é opção de **construção** —
+não existe `setOptions({colorScheme})`. O mapa nascia com o tema do
+primeiro desenho e ficava branco de holofote numa tela grafite depois de
+alternar. Agora ele se refaz quando o tema muda. Passou na primeira
+conferência porque o defeito só aparece **depois** de alternar.
+
+**Contraste medido no navegador, não no olho:**
+
+```
+"5 min" (tempo parado)   1,70:1   graf-600  -> graf-400   4,76:1
+botão ⇄                  3,31:1   graf-500  -> graf-400   5,73:1
+"30 km · 8 bairros"      2,75:1   graf-500  -> graf-400
+código de baixa "312"    4,35:1   graf-400  -> graf-300   6,26:1
+```
+
+Conferência final: **256 textos da tela medidos, nenhum abaixo de
+4,5:1**.
+
+`graf-600` sobre o fundo escuro dá **1,7:1**: serve para filete, não para
+palavra. Onde havia palavra, subiu. A hierarquia passa a vir de **peso e
+tamanho**, não de mais tons de cinza.
+
+> **FICA REGISTRADO, e é maior que esta tela:** `text-graf-500` e
+> `text-graf-600` são usados como texto no aplicativo inteiro, e reprovam
+> em contraste do mesmo jeito. Só a Rota foi corrigida — arrumar a rampa
+> mexeria em todas as telas e não era o pedido.
+
+**Um falso positivo, para ninguém repetir:** medidor de contraste escrito
+com `match(/\d+/g)` lê `oklch(0.879 0.169 91.605)` como se fosse RGB e
+acusa 1,04:1 numa etiqueta que tem 9,6:1. O Tailwind 4 emite cor em
+`oklch`/`oklab`.

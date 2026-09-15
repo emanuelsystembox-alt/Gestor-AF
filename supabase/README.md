@@ -130,6 +130,14 @@ As três últimas, para não repetir o esquecimento:
 | 072 | **Cancelada não é cinza** — alinha `situacao_visita.cor` ao padrão compilado do front (D-142) | ✓ |
 | 073 | **O de/para do grupo vira cadastro** — `definir_grupo_do_tipo_os`, `catalogo_tipo_os`, procedência em `tipo_os` (D-143) | ✓ |
 | 074 | **A equipe diz quando baixou e quanto fez** — última baixa com procedência, pontos do dia, e o filtro de dia que faltava em `evt` (D-145) | ✓ |
+| 075 | **A rota entrega o que o controlador precisa** — `rota_do_dia` ganha `equipe_id` (para transferir), `tec1` (aderência do servidor) e `finalizado_toa` (D-147) | ✓ |
+| 076 | **O cartão da rota mostra a baixa** — códigos das O.S. com procedência AFLINE/TOA e o detalhe das duas (D-147) | ✓ |
+
+> **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY
+> DEFINER`.** Coluna nova no `returns table` não passa por `create or
+> replace`, e função recriada do zero nasce com a ACL aberta ao `anon`.
+> Nas duas, o `revoke ... from public, anon` no fim é a diferença entre
+> um painel de despacho e um vazamento. Conferido: `anon` não executa.
 
 > **A 074 derruba e recria `painel_equipes`.** Coluna nova no
 > `returns table` não passa por `create or replace`, e função recriada

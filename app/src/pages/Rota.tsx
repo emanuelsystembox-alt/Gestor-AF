@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
@@ -10,22 +10,34 @@ import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
          temChaveDoMapa } from '../lib/mapaGoogle'
 
 /**
- * Rota do Dia — a terceira visão (D-111).
+ * Rota do Dia — a mesa de despacho (D-111, redesenhada).
  *
- * ┌─ A PERGUNTA QUE FALTAVA ────────────────────────────────────────┐
- * │ Serviços responde "o que aconteceu neste contrato".              │
- * │ Equipes responde "o que a 014 tem hoje".                         │
- * │ Nenhuma responde "A ROTA ESTÁ AJUSTADA?" — e o Console de        │
- * │ Alocação do TOA também não: ele mostra se o técnico está         │
- * │ ocupado, não se faz sentido onde ele está.                        │
- * └──────────────────────────────────────────────────────────────────┘
+ * ┌─ DIREÇÃO: painel de despacho, não painel de indicador ───────────┐
+ * │ > "pense que tem um controlador de rota olhando isso […] quero    │
+ * │ >  uma visão de rota muito lisa e fluida" — Emanuel, 14/09        │
+ * │                                                                   │
+ * │ A versão anterior era um Gantt: cada visita virava um retângulo   │
+ * │ posicionado pela hora, com o bairro espremido dentro. Num dia     │
+ * │ real a visita de 20 minutos vira um bloco de 14 px, e 14 px não   │
+ * │ cabem "SETOR CENTRAL", muito menos o tipo de serviço e a hora.    │
+ * │ O desenho respondia QUANDO e escondia O QUÊ.                      │
+ * │                                                                   │
+ * │ Agora a faixa é uma SEQUÊNCIA de paradas, e o que ganha espaço é  │
+ * │ o **trecho entre elas** — que é a unidade do despachante. O km e  │
+ * │ o tempo parado moram na linha que liga duas paradas, que é        │
+ * │ exatamente o que eles são: o deslocamento. A hora continua        │
+ * │ escrita em cada cartão, com precisão de minuto — melhor do que    │
+ * │ deduzir de um pixel.                                              │
+ * │                                                                   │
+ * │ Gramática: tipografia tabular para hora e km (a coluna não        │
+ * │ dança), caixa alta pequena para etiqueta, canto pouco arredondado │
+ * │ — mesa de operação, não cartão de marketing. Tudo dentro da rampa │
+ * │ `graf` e das cores de situação que a casa inteira já usa; nenhum  │
+ * │ botão, input ou card novo foi inventado (D-011).                  │
+ * └───────────────────────────────────────────────────────────────────┘
  *
- * Três painéis, na ordem em que o COP pensa: onde olhar (alertas), o
- * dia no tempo (linha do tempo com o BAIRRO no bloco, não o tipo de
- * serviço) e o dia no espaço (bairros pela coordenada média).
- *
- * ⚠ O que esta tela NÃO sabe, e diz na cara: o trajeto percorrido (o
- * TOA manda pontos, não caminho), onde o técnico está agora (sem GPS
+ * ⚠ O que esta tela continua NÃO sabendo, e diz: o trajeto percorrido
+ * (o TOA manda pontos, não caminho), onde o técnico está agora (sem GPS
  * ao vivo) e a distância de rua — o km aqui é linha reta.
  */
 
@@ -35,29 +47,40 @@ interface Parada {
   login: string
   tecnico: string | null
   equipe: string | null
+  /** A CHAVE para agir. `equipe` é o código, rótulo; quem `transferir_visita`
+   *  aceita é o id (075). */
+  equipe_id: string | null
   bairro: string | null
   area: string | null
   lat: number | null
   lng: number | null
   inicio: string | null
   fim: string | null
+  /** Quem diz que encerrou. `fim` vem preenchido em atividade só
+   *  INICIADA — sem isto o cartão daria hora de fim a quem não fechou
+   *  (D-103). */
+  finalizado_toa: boolean | null
   janela_inicio: string | null
   janela_fim: string | null
   situacao: Situacao
   tipo_servico: string | null
+  /** Aderência à janela, calculada pelo SERVIDOR (D-047). A tela não
+   *  recalcula: uma segunda regra divergiria da primeira. */
+  tec1: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
   ordem: number
   km_desde_anterior: number | null
   voltou_ao_bairro: boolean
+  /** Os códigos de baixa das O.S. desta visita — a NOSSA quando existe,
+   *  senão a da operadora. São duas baixas e elas divergem (D-042), por
+   *  isso `baixa_origem` vem junto e `baixa_detalhe` traz as duas
+   *  inteiras para a dica do cartão (076). */
+  baixa_codigos: string | null
+  baixa_origem: 'AFLINE' | 'TOA' | null
+  baixa_detalhe: string | null
 }
 interface BairroLinha {
   bairro: string; visitas: number; tecnicos: number; equipes: number
   concluidas: number; em_aberto: number; lat: number | null; lng: number | null
-}
-interface AlertaLinha {
-  tipo: 'RETORNO' | 'SALTO' | 'PULVERIZADO'
-  gravidade: 'ALTA' | 'MEDIA'
-  login: string | null; tecnico: string | null; bairro: string | null
-  titulo: string; detalhe: string; valor: number | null
 }
 interface Resumo {
   visitas: number; tecnicos: number; bairros: number
@@ -66,35 +89,71 @@ interface Resumo {
 }
 
 /**
- * Quantos técnicos pisaram o mesmo bairro hoje. Três é o limite em que
- * ainda dá para chamar de cobertura; de sete em diante é pulverização.
+ * O salto que vale aviso, em km de linha reta.
  *
- * ┌─ por que HEX e não `var(--st-...)` ──────────────────────────────┐
- * │ O Google Maps pinta em canvas, não em CSS: `fillColor` com        │
- * │ `var(--st-conflito)` não resolve — sai preto, calado. Então as    │
- * │ cores vêm escritas, e escritas IGUAIS às da rampa da casa         │
- * │ (styles.css): conflito, reagendamento e execução. Antes eram três │
- * │ tons soltos do ngestor (#d33724, #DAA520, #3c8dbc) que não        │
- * │ batiam com nenhuma outra tela.                                     │
- * │                                                                    │
- * │ Fora do componente de propósito: dentro, ela nascia nova a cada    │
- * │ render e faria o mapa redesenhar todas as bolhas sem motivo.       │
- * └────────────────────────────────────────────────────────────────────┘
+ * NÃO é meta da CLARO e não é palpite: é o mesmo corte que
+ * `rota_alertas` (054) usa, tirado do que o próprio dia mostrou como
+ * fora da curva. Está aqui como constante nomeada para a régua e o
+ * servidor falarem o mesmo número — se um dia mudar, muda nos dois.
  */
+const LIMITE_SALTO_KM = 10
+
+/**
+ * Encerrado: não se arrasta. Espelha `situacoes_terminais()` (035) — o
+ * banco é quem recusa; a tela só evita oferecer o que vai falhar.
+ */
+const TERMINAIS: string[] = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
+
+/**
+ * A cor da EQUIPE no mapa — categórica, não semântica.
+ *
+ * Deliberadamente fora da rampa `--st-*`: aquela significa SITUAÇÃO, e
+ * no mapa a cor significa DE QUEM É. Usar verde de "concluída" para a
+ * equipe 001 faria o mapa mentir duas vezes. Vermelho fica no fim da
+ * fila de propósito — equipe nenhuma deve nascer parecendo alarme.
+ */
+const CORES_EQUIPE = [
+  '#3b82f6', '#f59e0b', '#06b6d4', '#a855f7',
+  '#10b981', '#ec4899', '#f97316', '#6366f1',
+]
+
+/** Hex concreto: o Maps pinta em canvas e `var(--x)` não resolve ali. */
 const corBairro = (t: number) =>
   t >= 7 ? '#e4262f' : t >= 4 ? '#f59e0b' : '#3b82f6'
 
 const hhmm = (ts: string | null) =>
   ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
-/** Minutos desde a meia-noite, no fuso de Manaus. */
-const minutos = (ts: string | null) => {
-  if (!ts) return null
-  const d = new Date(ts)
-  return d.getHours() * 60 + d.getMinutes()
-}
+
 const num = (n: number | null | undefined, casas = 1) =>
   n == null ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: casas,
                                                 maximumFractionDigits: casas })
+
+/** "1h20" / "45 min" — o tempo parado entre duas paradas. */
+function duracao(min: number): string {
+  if (min < 60) return `${Math.round(min)} min`
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
+}
+
+/**
+ * A etiqueta curta do tipo de serviço.
+ *
+ * "VISITA TECNICA" não cabe num cartão de 9 rem, e o controlador chama
+ * de VT. As abreviações são as da operação — não invenção nossa. O que
+ * não estiver no de/para aparece inteiro, truncado pelo CSS: melhor uma
+ * palavra cortada do que um rótulo errado.
+ */
+const APELIDO_SERVICO: Record<string, string> = {
+  'VISITA TECNICA': 'VT',
+  'MUDANCA DE ENDERECO': 'MUD. END.',
+  'RETORNO DE CREDENCIADA': 'RETORNO CRED.',
+  'MIGRACAO GPON': 'GPON',
+  'REINSTALACAO': 'REINST.',
+  'DESCONEXAO': 'DESCONEXÃO',
+  'ADESAO': 'ADESÃO',
+  'SERVICO': 'SERVIÇO',
+}
 
 export default function Rota() {
   const navegar = useNavigate()
@@ -103,89 +162,147 @@ export default function Rota() {
   const [data, setData] = useState(isoLocal())
   const [paradas, setParadas] = useState<Parada[]>([])
   const [bairros, setBairros] = useState<BairroLinha[]>([])
-  const [alertas, setAlertas] = useState<AlertaLinha[]>([])
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [ok, setOk] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)   // login em foco
-  /** Atalho do estado vazio: o último dia com movimento, quando não é
-   *  o dia na tela. A rota abre em HOJE (ver lib/dia.ts). */
   const outroDia = useDiaAnteriorComMovimento(data)
 
-  useEffect(() => {
-    if (!data) return
+  /** A transferência em curso: o que está sendo movido e para onde.
+   *  Nasce do arrasto OU do botão do cartão — os dois caem aqui, para
+   *  não existirem dois caminhos com regras diferentes. */
+  const [mover, setMover] = useState<
+    { parada: Parada; destinoLogin: string | null } | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [arrastando, setArrastando] = useState<string | null>(null)
+  const [sobre, setSobre] = useState<string | null>(null)
+
+  const recarregar = useCallback(() => {
     let vivo = true
-    setCarregando(true); setErro(null); setFoco(null)
+    setCarregando(true); setErro(null)
     Promise.all([
       supabase.rpc('rota_do_dia', { p_data: data }),
       supabase.rpc('rota_bairros', { p_data: data }),
-      supabase.rpc('rota_alertas', { p_data: data }),
       supabase.rpc('rota_resumo', { p_data: data }),
-    ]).then(([p, b, a, r]) => {
+    ]).then(([p, b, r]) => {
       if (!vivo) return
       if (p.error) setErro(p.error.message)
       setParadas((p.data ?? []) as Parada[])
       setBairros((b.data ?? []) as BairroLinha[])
-      setAlertas((a.data ?? []) as AlertaLinha[])
       setResumo((r.data ?? null) as Resumo | null)
       setCarregando(false)
     })
     return () => { vivo = false }
   }, [data])
 
-  /** Um técnico por faixa, na ordem de quem mais rodou. */
-  const porTecnico = useMemo(() => {
+  useEffect(() => {
+    if (!data) return
+    setFoco(null)
+    return recarregar()
+  }, [data, recarregar])
+
+  /** Uma faixa por LOGIN do TOA, na ordem de quem mais rodou. */
+  const faixas = useMemo(() => {
     const m = new Map<string, Parada[]>()
     for (const p of paradas) m.set(p.login, [...(m.get(p.login) ?? []), p])
     return [...m.entries()]
-      .map(([login, ps]) => ({
-        login, paradas: ps,
-        nome: ps.find(p => p.tecnico)?.tecnico ?? null,
-        equipe: ps.find(p => p.equipe)?.equipe ?? null,
-        km: ps.reduce((s, p) => s + (p.km_desde_anterior ?? 0), 0),
-        bairros: new Set(ps.map(p => p.bairro).filter(Boolean)).size,
-        retornos: ps.filter(p => p.voltou_ao_bairro).length,
-      }))
+      .map(([login, ps]) => {
+        const ordenadas = [...ps].sort((a, b) => a.ordem - b.ordem)
+        return {
+          login, paradas: ordenadas,
+          nome: ps.find(p => p.tecnico)?.tecnico ?? null,
+          equipe: ps.find(p => p.equipe)?.equipe ?? null,
+          equipeId: ps.find(p => p.equipe_id)?.equipe_id ?? null,
+          km: ps.reduce((s, p) => s + (p.km_desde_anterior ?? 0), 0),
+          bairros: new Set(ps.map(p => p.bairro).filter(Boolean)).size,
+          retornos: ps.filter(p => p.voltou_ao_bairro).length,
+          saltos: ps.filter(p => (p.km_desde_anterior ?? 0) >= LIMITE_SALTO_KM).length,
+          foraJanela: ps.filter(p => p.tec1 === 'SEM_PADRAO').length,
+          aFazer: ps.filter(p => !TERMINAIS.includes(p.situacao)).length,
+        }
+      })
       .sort((a, b) => b.km - a.km)
   }, [paradas])
 
-  const visiveis = foco ? porTecnico.filter(t => t.login === foco) : porTecnico
-
-  // Escala da linha do tempo: do primeiro início ao último fim do dia,
-  // arredondado para a hora cheia. Fixar 8h–18h cortaria o técnico que
-  // encerrou 23:30 — e é justamente ele que interessa.
-  const [h0, h1] = useMemo(() => {
-    const ms = paradas.flatMap(p => [minutos(p.inicio), minutos(p.fim)])
-      .filter((n): n is number => n != null)
-    if (!ms.length) return [8 * 60, 18 * 60]
-    return [Math.floor(Math.min(...ms) / 60) * 60, Math.ceil(Math.max(...ms) / 60) * 60]
+  /** A cor de cada equipe, fixa no dia — a mesma no mapa e na faixa. */
+  const corEquipe = useMemo(() => {
+    const codigos = [...new Set(paradas.map(p => p.equipe).filter(Boolean))].sort()
+    const m = new Map<string, string>()
+    codigos.forEach((c, i) => m.set(c as string, CORES_EQUIPE[i % CORES_EQUIPE.length]))
+    return (c: string | null) => (c && m.get(c)) || '#64748b'
   }, [paradas])
 
-  const cor = (s: Situacao) => SITUACAO_INFO[s]?.cor ?? '#64748b'
-  const pct = (m: number) => ((m - h0) / (h1 - h0)) * 100
-  const horas = useMemo(() => {
-    const passo = (h1 - h0) / 60 > 10 ? 120 : 60
-    const l: number[] = []
-    for (let m = h0; m <= h1; m += passo) l.push(m)
-    return l
-  }, [h0, h1])
+  /** As equipes em campo, com o que ainda têm para executar. */
+  const equipes = useMemo(() => {
+    const m = new Map<string, {
+      codigo: string; visitas: number; aFazer: number; concluidas: number
+      logins: Set<string>; km: number
+    }>()
+    for (const p of paradas) {
+      const c = p.equipe ?? '—'
+      const e = m.get(c) ?? { codigo: c, visitas: 0, aFazer: 0, concluidas: 0,
+                              logins: new Set<string>(), km: 0 }
+      e.visitas++
+      if (!TERMINAIS.includes(p.situacao)) e.aFazer++
+      if (p.situacao === 'CONCLUIDA') e.concluidas++
+      e.logins.add(p.login)
+      e.km += p.km_desde_anterior ?? 0
+      m.set(c, e)
+    }
+    return [...m.values()].sort((a, b) => b.aFazer - a.aFazer || b.visitas - a.visitas)
+  }, [paradas])
+
+  const visiveis = foco ? faixas.filter(t => t.login === foco) : faixas
+  const faixaDestino = mover?.destinoLogin
+    ? faixas.find(f => f.login === mover.destinoLogin) ?? null : null
+  /** Duas faixas podem ser a MESMA equipe: dois logins, um dono. Aí o
+   *  banco responde "não mudou" — e a tela avisa antes de tentar. */
+  const mesmaEquipe = Boolean(
+    mover && faixaDestino && faixaDestino.equipeId === mover.parada.equipe_id)
+
+  async function confirmarTransferencia() {
+    if (!mover || !faixaDestino?.equipeId || mesmaEquipe) return
+    setOcupado(true); setErro(null); setOk(null)
+    const { data: r, error } = await supabase.rpc('transferir_visita', {
+      p_visita: mover.parada.visita_id,
+      p_equipe: faixaDestino.equipeId,
+      p_motivo: motivo.trim() || null,
+    })
+    if (error) {
+      setErro(/permiss/i.test(error.message)
+        ? 'Só COP, Controlador ou ADMIN transferem contrato. A barreira é do banco.'
+        : error.message)
+    } else if ((r as { mudou?: boolean } | null)?.mudou === false) {
+      setErro('As duas faixas são da mesma equipe — nada mudou.')
+    } else {
+      setOk(`Contrato ${mover.parada.contrato ?? ''} → equipe ${faixaDestino.equipe}. `
+            + 'A rota ficou FIXADA: a próxima importação do TOA não desfaz.')
+      recarregar()
+    }
+    setOcupado(false); setMover(null); setMotivo('')
+  }
 
   return (
     <Shell acoes={
       <input type="date" value={data} onChange={e => setData(e.target.value)}
+        aria-label="Dia da rota"
         className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
     }>
       <div className="space-y-4 p-4">
         <div>
           <h1 className="text-xl font-semibold">Rota do dia</h1>
           <p className="mt-1 max-w-3xl text-sm text-graf-400">
-            O dia inteiro no tempo e no espaço. <strong>Serviços</strong> responde o que
-            houve num contrato, <strong>Equipes</strong> o que a equipe tem hoje — aqui a
-            pergunta é se a rota está ajustada.
+            A mesa de despacho. Cada faixa é um técnico, cada cartão é uma parada, e a
+            linha entre dois cartões é o <strong>deslocamento</strong> — é nela que o km
+            e o tempo parado aparecem. <strong>Arraste</strong> um contrato em aberto
+            para outra faixa para transferi-lo de equipe.
           </p>
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
+        {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
         {/* ====== resumo ====== */}
         {resumo && (
@@ -206,14 +323,14 @@ export default function Rota() {
                 <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
                   {rot}
                 </div>
-                {nota && <div className="mt-0.5 text-[10px] text-graf-600">{nota}</div>}
+                {nota && <div className="mt-0.5 text-[10px] text-graf-400">{nota}</div>}
               </div>
             ))}
           </div>
         )}
 
         {carregando ? (
-          <p className="py-16 text-center text-graf-400">Carregando o dia…</p>
+          <p className="py-16 text-center text-graf-400" role="status">Carregando o dia…</p>
         ) : paradas.length === 0 ? (
           <Vazio titulo="Sem rota para este dia"
             descricao="Nenhuma visita produtiva com login de técnico nesta data."
@@ -227,307 +344,577 @@ export default function Rota() {
             ) : undefined} />
         ) : (<>
 
-          {/* ====== 1. onde olhar ====== */}
-          {alertas.length > 0 && (
-            <section className="card-controle overflow-hidden">
-              <div className="border-b border-graf-800 px-4 py-2.5">
-                <h2 className="text-sm font-semibold">
-                  O que precisa de olho
-                  <span className="tabular ml-2 text-xs font-normal text-graf-500">
-                    {alertas.length}
-                  </span>
-                </h2>
-                <p className="mt-0.5 text-xs text-graf-500">
-                  Os limites — 10 km de salto, 5 técnicos por bairro — saíram do que o
-                  próprio dia mostrou como fora da curva. Não são meta da CLARO.
-                </p>
-              </div>
-              <div className="max-h-72 overflow-auto">
-                {alertas.map((a, i) => (
-                  <button key={i}
-                    onClick={() => a.login && setFoco(foco === a.login ? null : a.login)}
-                    className="flex w-full items-start gap-3 border-b border-graf-800 px-4 py-2
-                               text-left last:border-0 hover:bg-graf-850">
-                    <span className={`mt-0.5 w-1 self-stretch rounded ${
-                      a.gravidade === 'ALTA' ? 'bg-af-500' : 'bg-amber-500'}`} />
-                    <span className="min-w-0 flex-1">
-                      <span className="text-xs font-medium text-graf-200">{a.titulo}</span>
-                      <span className="mt-0.5 block text-[11px] text-graf-400">
-                        {a.login && (
-                          <span className="tabular mr-1.5 text-graf-300">{a.login}</span>
-                        )}
-                        {a.tecnico && <span className="mr-1.5">{a.tecnico}</span>}
-                        {a.detalhe}
-                      </span>
-                    </span>
-                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase
-                                      tracking-wide ${a.gravidade === 'ALTA'
-                        ? 'bg-af-900/40 text-af-300' : 'bg-amber-900/40 text-amber-300'}`}>
-                      {a.tipo.toLowerCase()}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ====== 2. o dia no tempo ====== */}
+          {/* ====== 1. a mesa ====== */}
           <section className="card-controle overflow-hidden">
-            <div className="flex flex-wrap items-baseline gap-2 border-b border-graf-800 px-4 py-2.5">
-              <h2 className="text-sm font-semibold">O dia no tempo</h2>
-              <span className="text-xs text-graf-500">
-                cada bloco é uma visita, com o bairro escrito
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1
+                            border-b border-graf-800 px-4 py-2.5">
+              <h2 className="text-sm font-semibold">A rota, parada a parada</h2>
+              <span className="text-xs text-graf-400">
+                janela combinada em cima, execução embaixo · o km e o tempo ficam no
+                trecho entre dois cartões
               </span>
               {foco && (
                 <button onClick={() => setFoco(null)}
                   className="ml-auto text-xs text-af-400 underline underline-offset-2">
-                  ver todos os {porTecnico.length} técnicos
+                  ver os {faixas.length} técnicos
                 </button>
               )}
             </div>
 
-            <div className="overflow-x-auto">
-              <div className="min-w-[52rem] px-4 py-3">
-                {/* régua */}
-                <div className="relative mb-1.5 ml-40 h-4">
-                  {horas.map(m => (
-                    <span key={m} style={{ left: `${pct(m)}%` }}
-                      className="tabular absolute -translate-x-1/2 text-[10px] text-graf-500">
-                      {String(Math.floor(m / 60)).padStart(2, '0')}h
-                    </span>
-                  ))}
-                </div>
+            <div className="divide-y divide-graf-800">
+              {visiveis.map(t => {
+                const alvo = Boolean(arrastando)
+                  && arrastando !== null
+                  && !t.paradas.some(p => p.visita_id === arrastando)
+                return (
+                  <div key={t.login}
+                    onDragOver={e => { if (alvo) { e.preventDefault(); setSobre(t.login) } }}
+                    onDragLeave={() => setSobre(s => (s === t.login ? null : s))}
+                    onDrop={e => {
+                      e.preventDefault(); setSobre(null)
+                      const p = paradas.find(x => x.visita_id === arrastando)
+                      setArrastando(null)
+                      if (p) { setMover({ parada: p, destinoLogin: t.login }); setMotivo('') }
+                    }}
+                    className={`faixa-rota px-4 py-3 ${alvo ? 'faixa-alvo' : ''} ${
+                      sobre === t.login ? 'faixa-sobre' : ''}`}>
 
-                {visiveis.map(t => (
-                  <div key={t.login} className="mb-1.5 flex items-stretch gap-2">
-                    <button onClick={() => setFoco(foco === t.login ? null : t.login)}
-                      className="w-38 shrink-0 pr-2 text-left" style={{ width: '9.5rem' }}>
-                      <span className="tabular block truncate text-[11px] font-medium text-graf-200">
-                        {t.login}
-                      </span>
-                      <span className="block truncate text-[10px] text-graf-500">
-                        {t.nome ?? (t.equipe ? equipeRotulo(t.equipe) : 'sem nome no TOA')}
-                      </span>
-                      <span className="tabular block text-[10px] text-graf-600">
-                        {num(t.km, 0)} km · {t.bairros} bairros
+                    {/* ---- cabeçalho da faixa ---- */}
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <button onClick={() => setFoco(foco === t.login ? null : t.login)}
+                        aria-pressed={foco === t.login}
+                        className="group flex min-w-0 items-center gap-2 text-left">
+                        <span aria-hidden className="h-7 w-1 shrink-0 rounded-full"
+                          style={{ background: corEquipe(t.equipe) }} />
+                        <span className="min-w-0">
+                          <span className="tabular block truncate text-xs font-semibold
+                                           text-graf-100 group-hover:text-af-400">
+                            {t.login}
+                          </span>
+                          <span className="block truncate text-[11px] text-graf-400">
+                            {t.nome ?? 'sem nome no TOA'}
+                            {t.equipe && (
+                              <span className="ml-1.5 text-graf-400">
+                                · {equipeRotulo(t.equipe)}
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                      </button>
+
+                      <span className="tabular ml-auto flex flex-wrap items-center gap-x-3
+                                       gap-y-0.5 text-[11px] text-graf-400">
+                        <span>{num(t.km, 0)} km</span>
+                        <span>{t.bairros} bairro{t.bairros === 1 ? '' : 's'}</span>
+                        <span>{t.paradas.length} parada{t.paradas.length === 1 ? '' : 's'}</span>
+                        {t.aFazer > 0 && (
+                          <span className="text-graf-300">{t.aFazer} a fazer</span>
+                        )}
+                        {/* Divergência com PALAVRA, não só cor. */}
                         {t.retornos > 0 && (
-                          <span className="ml-1 text-af-400">· {t.retornos} ↩</span>
+                          <span className="rounded bg-af-900/40 px-1.5 py-0.5 font-semibold
+                                           text-af-300">
+                            {t.retornos} retorno{t.retornos === 1 ? '' : 's'}
+                          </span>
+                        )}
+                        {t.saltos > 0 && (
+                          <span className="rounded bg-af-900/40 px-1.5 py-0.5 font-semibold
+                                           text-af-300">
+                            {t.saltos} salto{t.saltos === 1 ? '' : 's'}
+                          </span>
+                        )}
+                        {t.foraJanela > 0 && (
+                          <span title="Fora do padrão TEC1 — a aderência é calculada pelo servidor"
+                            className="rounded bg-amber-900/40 px-1.5 py-0.5 font-semibold
+                                       text-amber-300">
+                            {t.foraJanela} fora da janela
+                          </span>
                         )}
                       </span>
-                    </button>
-
-                    <div className="relative min-h-[2.1rem] flex-1 rounded bg-graf-900">
-                      {horas.map(m => (
-                        <span key={m} style={{ left: `${pct(m)}%` }}
-                          className="absolute inset-y-0 w-px bg-graf-800" />
-                      ))}
-                      {t.paradas.map(p => {
-                        const i = minutos(p.inicio), f = minutos(p.fim)
-                        if (i == null) return null
-                        const largura = Math.max(pct(f ?? i + 20) - pct(i), 1.4)
-                        return (
-                          <button key={p.visita_id}
-                            onClick={() => navegar(`/controle/visita/${p.visita_id}`)}
-                            title={`${p.contrato ?? 'sem contrato'} · ${p.bairro ?? 'sem bairro'}`
-                              + ` · ${hhmm(p.inicio)}–${hhmm(p.fim) ?? '?'}`
-                              + ` · ${SITUACAO_INFO[p.situacao]?.label ?? p.situacao}`
-                              + (p.km_desde_anterior != null
-                                  ? ` · ${num(p.km_desde_anterior)} km desde a anterior` : '')}
-                            style={{
-                              left: `${pct(i)}%`, width: `${largura}%`,
-                              background: cor(p.situacao),
-                              opacity: p.situacao === 'ENTRADA' ? 0.45 : 0.9,
-                            }}
-                            className="absolute inset-y-1 overflow-hidden rounded-sm px-1
-                                       text-left text-[9px] font-semibold text-white
-                                       hover:ring-2 hover:ring-white/40">
-                            {p.voltou_ao_bairro && '↩ '}
-                            {p.bairro ?? ''}
-                          </button>
-                        )
-                      })}
                     </div>
+
+                    {/* ---- a sequência ---- */}
+                    {/* ┌─ QUEBRA, nao rola ──────────────────────────┐
+                        │ > "o ideal é olhar a rota inteira sem o      │
+                        │ >  scroll" — Emanuel                         │
+                        │                                              │
+                        │ 13 paradas num cartao legivel dao ~2.400 px: │
+                        │ nao existe fonte pequena o bastante para     │
+                        │ caber numa tela de 950 px sem virar borrao.  │
+                        │ Entao a sequencia QUEBRA e continua na linha │
+                        │ de baixo, como texto — a rota inteira fica   │
+                        │ visivel de uma vez, sem barra horizontal.    │
+                        └──────────────────────────────────────────────┘ */}
+                    <ol className="trilho flex flex-wrap items-stretch gap-y-1.5">
+                      {t.paradas.map((p, i) => (
+                        <Trecho key={p.visita_id}
+                          parada={p} anterior={i > 0 ? t.paradas[i - 1] : null}
+                          primeiro={i === 0}
+                          arrastando={arrastando === p.visita_id}
+                          onArrastar={setArrastando}
+                          onAbrir={() => navegar(`/controle/visita/${p.visita_id}`)}
+                          onMover={() => { setMover({ parada: p, destinoLogin: null })
+                                           setMotivo('') }} />
+                      ))}
+                    </ol>
                   </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-graf-800 px-4 py-2
-                            text-[10px] text-graf-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t
+                            border-graf-800 px-4 py-2 text-[10px] text-graf-400">
               {(['CONCLUIDA', 'EM_EXECUCAO', 'EM_DESLOCAMENTO', 'REAGENDAMENTO',
                  'CANCELADA', 'ENTRADA'] as Situacao[]).map(s => (
                 <span key={s} className="inline-flex items-center gap-1.5">
-                  <i className="h-2.5 w-2.5 rounded-sm" style={{ background: cor(s) }} />
+                  <i aria-hidden className="h-2.5 w-2.5 rounded-sm"
+                    style={{ background: SITUACAO_INFO[s]?.cor ?? '#64748b' }} />
                   {SITUACAO_INFO[s]?.label ?? s}
                 </span>
               ))}
-              <span className="ml-auto">↩ voltou a um bairro onde já esteve hoje</span>
-            </div>
-          </section>
-
-          {/* ====== 3. o dia no espaço ====== */}
-          <section className="card-controle overflow-hidden">
-            <div className="flex flex-wrap items-baseline gap-2 border-b border-graf-800 px-4 py-2.5">
-              <h2 className="text-sm font-semibold">O dia no espaço</h2>
-              <span className="text-xs text-graf-500">
-                bolha = bairro, na coordenada média · tamanho = visitas · cor = técnicos
-                · troque a camada no canto do mapa (mapa, satélite, híbrido) e arraste
-                o boneco para o Street View
+              <span className="ml-auto">
+                ↩ voltou ao bairro · ⚑ salto de {LIMITE_SALTO_KM} km ou mais ·
+                ⧗ fora da janela (TEC1)
               </span>
             </div>
-            <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
-              <MapaBairros bairros={bairros} cor={corBairro} />
-              <div className="max-h-[26rem] overflow-auto border-t border-graf-800 lg:border-l lg:border-t-0">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 border-b border-graf-700 bg-graf-900 text-left
-                                    text-[10px] uppercase tracking-wide text-graf-400">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">Bairro</th>
-                      <th className="px-3 py-2 text-right font-medium">Visitas</th>
-                      <th className="px-3 py-2 text-right font-medium">Téc.</th>
-                      <th className="px-3 py-2 text-right font-medium">Concl.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bairros.map(b => (
-                      <tr key={b.bairro} className="border-b border-graf-800">
-                        <td className="px-3 py-1.5 text-xs text-graf-200">{b.bairro}</td>
-                        <td className="tabular px-3 py-1.5 text-right text-xs">{b.visitas}</td>
-                        <td className="px-3 py-1.5 text-right">
-                          <span className="tabular rounded px-1.5 py-0.5 text-xs font-semibold"
-                            style={{ color: corBairro(b.tecnicos),
-                                     background: `color-mix(in srgb, ${corBairro(b.tecnicos)} 16%, transparent)` }}>
-                            {b.tecnicos}
-                          </span>
-                        </td>
-                        <td className="tabular px-3 py-1.5 text-right text-xs text-graf-400">
-                          {b.concluidas}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </section>
 
-          <p className="pb-6 text-center text-xs text-graf-600">
-            {resumo?.com_coordenada ?? 0} de {resumo?.visitas ?? 0} visitas com coordenada ·
-            distância em linha reta, não trajeto de rua · esta tela é do dia agendado,
-            não é rastreamento ao vivo
-          </p>
+          {/* ====== 2. o dia no espaço ====== */}
+          <section className="card-controle overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-2.5">
+              <h2 className="text-sm font-semibold">O dia no espaço</h2>
+              <p className="mt-0.5 text-xs text-graf-400">
+                um pino por contrato, na cor da equipe · troque a camada no canto do
+                mapa e arraste o boneco para o Street View
+              </p>
+            </div>
+            <div className="grid gap-0 lg:grid-cols-[1.5fr_1fr]">
+              <MapaDoDia paradas={paradas} bairros={bairros}
+                corEquipe={corEquipe} corBairro={corBairro} foco={foco} />
+
+              {/* Painel das equipes: substitui a tabela de bairros porque a
+                  pergunta mudou — "o que eles têm pra executar", não "onde
+                  há concentração". O agregado por bairro segue no resumo. */}
+              <div className="max-h-[26rem] overflow-auto border-t border-graf-800
+                              lg:border-l lg:border-t-0">
+                <h3 className="sticky top-0 z-10 border-b border-graf-700 bg-graf-900
+                               px-3 py-2 text-[10px] font-medium uppercase
+                               tracking-wide text-graf-400">
+                  Equipes em campo
+                </h3>
+                <ul>
+                  {equipes.map(e => (
+                    <li key={e.codigo}
+                      className="flex items-center gap-2.5 border-b border-graf-800 px-3 py-2">
+                      <span aria-hidden className="h-6 w-1 shrink-0 rounded-full"
+                        style={{ background: corEquipe(e.codigo) }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-medium text-graf-200">
+                          {equipeRotulo(e.codigo)}
+                        </span>
+                        <span className="tabular block text-[10px] text-graf-400">
+                          {e.logins.size} login{e.logins.size === 1 ? '' : 's'} ·{' '}
+                          {num(e.km, 0)} km
+                        </span>
+                      </span>
+                      <span className="text-right">
+                        <span className={`tabular block text-sm font-semibold ${
+                          e.aFazer > 0 ? 'text-graf-100' : 'text-graf-400'}`}>
+                          {e.aFazer}
+                        </span>
+                        <span className="block text-[9px] uppercase tracking-wide
+                                         text-graf-400">a executar</span>
+                      </span>
+                      <span className="tabular w-10 text-right text-xs text-graf-400">
+                        {e.concluidas}
+                        <span className="block text-[9px] uppercase tracking-wide
+                                         text-graf-400">ok</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <p className="border-t border-graf-800 px-4 py-2 text-center text-[11px]
+                          text-graf-400">
+              {resumo?.com_coordenada ?? 0} de {resumo?.visitas ?? 0} visitas com
+              coordenada · distância em linha reta, não trajeto de rua · esta tela é do
+              dia agendado, não é rastreamento ao vivo
+            </p>
+          </section>
         </>)}
+
+        {/* ====== a transferência ====== */}
+        {mover && (
+          <PainelMover parada={mover.parada} faixas={faixas}
+            destinoLogin={mover.destinoLogin} mesmaEquipe={mesmaEquipe}
+            motivo={motivo} ocupado={ocupado}
+            onDestino={l => setMover(m => (m ? { ...m, destinoLogin: l } : m))}
+            onMotivo={setMotivo}
+            onConfirmar={confirmarTransferencia}
+            onFechar={() => { setMover(null); setMotivo('') }} />
+        )}
       </div>
     </Shell>
   )
 }
 
+/* ================================================================== */
+
 /**
- * O dia no espaço, sobre o mapa de verdade.
+ * Um trecho da rota: o DESLOCAMENTO que chegou até aqui, e a parada.
  *
- * ┌─ o que mudou, e por quê ─────────────────────────────────────────┐
- * │ > "devemos colocar o mapa do google aí com as camadas de visão    │
- * │ >  satélite e visão street view" — Emanuel, 14/09                 │
- * │                                                                   │
- * │ Antes era SVG puro: as bolhas numa caixa vazia, posição RELATIVA  │
- * │ entre bairros. Respondia "está espalhado?" e não respondia "onde"  │
- * │ — quem não conhece Manaus de cor via um diagrama, não uma cidade. │
- * │ Com o mapa embaixo, a mesma bolha passa a dizer QUAL bairro, o    │
- * │ satélite mostra se é área densa ou ramal, e o Street View põe o   │
- * │ COP na esquina antes de despachar.                                │
- * │                                                                   │
- * │ A CODIFICAÇÃO NÃO MUDOU de propósito: tamanho = visitas, cor e    │
- * │ número = técnicos, as mesmas da tabela ao lado. Trocar o fundo    │
- * │ não é motivo para trocar a gramática da tela.                     │
- * └───────────────────────────────────────────────────────────────────┘
- *
- * ┌─ e o SVG continua existindo ─────────────────────────────────────┐
- * │ `MapaBairrosSVG` não foi apagado: é o que aparece quando não há   │
- * │ chave no `.env`, quando o script do Google não carrega (rede,     │
- * │ chave restrita a outro domínio, cota estourada) e em qualquer     │
- * │ clone novo do repositório. Tela que depende de terceiro para      │
- * │ existir é tela que some quando o terceiro cai.                    │
- * └───────────────────────────────────────────────────────────────────┘
- *
- * ⚠ Continua NÃO sendo rastreamento: é o dia AGENDADO, e a bolha é a
- * média das coordenadas das visitas do bairro — não a casa de ninguém.
+ * O deslocamento vem primeiro porque é o que o despachante julga — e é
+ * ele que carrega o km e o tempo. A primeira parada do dia não tem
+ * trecho: ninguém sabe de onde o técnico saiu (o TOA não manda a base).
  */
+function Trecho({ parada: p, anterior, primeiro, arrastando,
+                  onArrastar, onAbrir, onMover }: {
+  parada: Parada
+  anterior: Parada | null
+  primeiro: boolean
+  arrastando: boolean
+  onArrastar: (id: string | null) => void
+  onAbrir: () => void
+  onMover: () => void
+}) {
+  const encerrou = p.finalizado_toa ? hhmm(p.fim) : null
+  const km = p.km_desde_anterior
+  const salto = km != null && km >= LIMITE_SALTO_KM
+  const movel = !TERMINAIS.includes(p.situacao)
+  const cor = SITUACAO_INFO[p.situacao]?.cor ?? '#64748b'
+  const servico = p.tipo_servico
+    ? APELIDO_SERVICO[p.tipo_servico] ?? p.tipo_servico
+    : null
+
+  // Tempo entre o fim da anterior e o início desta. Só descreve; não
+  // julga — não existe regra de quanto é "parado demais", e inventar uma
+  // seria escrever meta que ninguém combinou.
+  const parado = useMemo(() => {
+    if (!anterior?.fim || !p.inicio) return null
+    const d = (new Date(p.inicio).getTime() - new Date(anterior.fim).getTime()) / 60000
+    return d > 0 && d < 60 * 14 ? d : null
+  }, [anterior?.fim, p.inicio])
+
+  /** "08:00–12:00" — o combinado com o assinante. */
+  const janela = p.janela_inicio
+    ? `${p.janela_inicio.slice(0, 5)}–${(p.janela_fim ?? '').slice(0, 5) || '?'}`
+    : null
+
+  const rotulo = [
+    p.contrato ? `contrato ${p.contrato}` : 'sem contrato',
+    p.bairro ?? 'sem bairro',
+    servico ?? 'sem grupo de serviço',
+    janela ? `janela ${janela}` : 'sem janela',
+    `${hhmm(p.inicio) ?? 'sem início'}${encerrou ? ` até ${encerrou}` : ', em curso'}`,
+    SITUACAO_INFO[p.situacao]?.label ?? p.situacao,
+    p.baixa_codigos
+      ? `baixa ${p.baixa_origem === 'AFLINE' ? 'da AFLINE' : 'da operadora'}`
+        + ` ${p.baixa_codigos}`
+      : '',
+    km != null ? `${num(km)} km desde a parada anterior` : '',
+    p.voltou_ao_bairro ? 'voltou a um bairro onde já esteve hoje' : '',
+    p.tec1 === 'SEM_PADRAO' ? 'fora da janela combinada' : '',
+  ].filter(Boolean).join(' · ')
+
+  return (
+    <li className="flex shrink-0 items-stretch">
+      {/* ---- o trecho ---- */}
+      {!primeiro && (
+        <span className="flex w-11 shrink-0 flex-col items-center justify-center px-0.5
+                         text-center"
+          aria-hidden>
+          <span className={`tabular text-[9px] font-semibold leading-tight ${
+            salto ? 'text-af-400' : 'text-graf-400'}`}>
+            {km != null ? num(km) : '—'}
+          </span>
+          <span className={`my-0.5 h-px w-full ${
+            salto ? 'bg-af-500' : 'bg-graf-700'}`} />
+          <span className="text-[8px] leading-tight text-graf-400">
+            {salto ? '⚑' : parado != null ? duracao(parado) : 'km'}
+          </span>
+        </span>
+      )}
+      {primeiro && <span className="w-1 shrink-0" aria-hidden />}
+
+      {/* ---- a parada ---- */}
+      <div
+        draggable={movel}
+        onDragStart={e => {
+          if (!movel) return
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', p.visita_id)
+          onArrastar(p.visita_id)
+        }}
+        onDragEnd={() => onArrastar(null)}
+        className={`parada-cartao ${arrastando ? 'parada-arrastando' : ''} ${
+          movel ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ ['--parada-cor' as string]: cor }}>
+
+        <button onClick={onAbrir} title={rotulo} aria-label={rotulo}
+          className="block w-full px-1.5 py-1 text-left">
+          <span className="block truncate text-[11px] font-semibold leading-tight
+                           text-graf-100">
+            {p.bairro ?? <span className="font-normal text-graf-400">sem bairro</span>}
+          </span>
+
+          {/* A janela é o COMBINADO; a execução é o que houve. As duas
+              juntas, e distintas pelo peso — o controlador compara as
+              duas o tempo todo, e separá-las em telas diferentes era
+              obrigá-lo a decorar uma. */}
+          <span className="tabular mt-0.5 block text-[9px] leading-tight text-graf-400">
+            {janela ?? 'sem janela'}
+          </span>
+          <span className="tabular block text-[10px] font-semibold leading-tight
+                           text-graf-200">
+            {hhmm(p.inicio) ?? '--:--'}
+            <span className="text-graf-400"> → </span>
+            {encerrou ?? <span className="font-normal text-graf-400">em curso</span>}
+          </span>
+
+          <span className="mt-1 flex items-center gap-1">
+            <span className="min-w-0 truncate rounded-sm bg-graf-800 px-1 text-[8px]
+                             font-semibold uppercase tracking-wide text-graf-300">
+              {servico ?? 'sem grupo'}
+            </span>
+            {/* O código é a prova do que aconteceu — e a etiqueta diz de
+                QUEM é a baixa, porque a da operadora e a nossa divergem. */}
+            {p.baixa_codigos && (
+              <span title={p.baixa_detalhe ?? undefined}
+                className={`tabular shrink-0 rounded-sm px-1 text-[8px] font-semibold ${
+                  p.baixa_origem === 'AFLINE'
+                    ? 'bg-emerald-900/40 text-emerald-300'
+                    // graf-400 sobre graf-800 media 4,35:1 -- passa raspando
+                    // por baixo do minimo. graf-300 da 6,26:1.
+                    : 'bg-graf-800 text-graf-300'}`}>
+                {p.baixa_codigos}
+              </span>
+            )}
+            {/* Divergência com SÍMBOLO + título, nunca só cor. */}
+            {p.voltou_ao_bairro && (
+              <span title="Voltou a um bairro onde já esteve hoje"
+                className="shrink-0 text-[10px] font-semibold text-af-400">↩</span>
+            )}
+            {p.tec1 === 'SEM_PADRAO' && (
+              <span title="Fora da janela combinada (TEC1, calculado pelo servidor)"
+                className="shrink-0 text-[10px] font-semibold text-amber-400">⧗</span>
+            )}
+          </span>
+        </button>
+
+        {/* O mesmo caminho do arrasto, pelo teclado. Arrastar sozinho
+            deixaria a transferência inacessível a quem não usa mouse. */}
+        {movel && (
+          <button onClick={onMover}
+            title={`Transferir o contrato ${p.contrato ?? ''} para outra faixa`}
+            aria-label={`Transferir o contrato ${p.contrato ?? 'sem número'} para outra faixa`}
+            className="parada-mover">
+            ⇄
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+/* ================================================================== */
+
+/** O painel que confirma a transferência — do arrasto ou do teclado. */
+function PainelMover({ parada: p, faixas, destinoLogin, mesmaEquipe, motivo,
+                       ocupado, onDestino, onMotivo, onConfirmar, onFechar }: {
+  parada: Parada
+  faixas: { login: string; nome: string | null; equipe: string | null
+            equipeId: string | null }[]
+  destinoLogin: string | null
+  mesmaEquipe: boolean
+  motivo: string
+  ocupado: boolean
+  onDestino: (login: string) => void
+  onMotivo: (m: string) => void
+  onConfirmar: () => void
+  onFechar: () => void
+}) {
+  const caixa = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    caixa.current?.querySelector<HTMLElement>('select, input')?.focus()
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onFechar])
+
+  const destino = faixas.find(f => f.login === destinoLogin) ?? null
+  const podeIr = Boolean(destino?.equipeId) && !mesmaEquipe && !ocupado
+  const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs ' +
+                'outline-none focus:border-af-500'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4
+                    sm:items-center"
+      role="dialog" aria-modal="true" aria-labelledby="mover-titulo"
+      onClick={e => { if (e.target === e.currentTarget) onFechar() }}>
+      <div ref={caixa} className="card-controle w-full max-w-lg p-4">
+        <h2 id="mover-titulo" className="text-sm font-semibold">
+          Transferir contrato {p.contrato ?? 'sem número'}
+        </h2>
+        <p className="mt-1 text-xs text-graf-400">
+          {p.bairro ?? 'sem bairro'} · {p.tipo_servico ?? 'sem grupo'} · sai da equipe{' '}
+          <strong>{p.equipe ? equipeRotulo(p.equipe) : 'sem equipe'}</strong>.
+        </p>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="text-[11px] text-graf-400">
+            <span className="mb-1 block">Faixa de destino</span>
+            <select value={destinoLogin ?? ''} className={`${campo} w-full`}
+              onChange={e => onDestino(e.target.value)}>
+              <option value="">— escolha —</option>
+              {faixas.filter(f => f.login !== p.login).map(f => (
+                <option key={f.login} value={f.login}>
+                  {f.login} · {f.nome ?? 'sem nome'}
+                  {f.equipe ? ` · ${equipeRotulo(f.equipe)}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[11px] text-graf-400">
+            <span className="mb-1 block">Motivo</span>
+            <input value={motivo} onChange={e => onMotivo(e.target.value)}
+              placeholder="Por que está transferindo?" className={`${campo} w-full`} />
+          </label>
+        </div>
+
+        {/* A armadilha do modelo, dita antes de falhar: a faixa é o LOGIN,
+            a transferência é por EQUIPE. */}
+        {mesmaEquipe && (
+          <p className="mt-3 rounded-md border border-amber-900/50 bg-amber-950/30 px-3
+                        py-2 text-[11px] text-amber-300">
+            Essa faixa é da <strong>mesma equipe</strong> ({destino?.equipe}). O que o
+            sistema transfere é a equipe dona do contrato, não o login do TOA — mover
+            entre dois logins da mesma equipe não muda nada.
+          </p>
+        )}
+
+        <p className="mt-3 text-[11px] text-graf-400">
+          A transferência fica no histórico, com autor e motivo, e <strong>fixa a
+          rota</strong>: a próxima importação do TOA não desfaz o que você decidiu aqui.
+        </p>
+
+        <div className="mt-3 flex justify-end gap-2">
+          <button onClick={onFechar}
+            className="rounded-md border border-graf-700 px-3 py-1.5 text-xs text-graf-300
+                       hover:border-graf-600 hover:text-graf-100">
+            Cancelar
+          </button>
+          <button onClick={onConfirmar} disabled={!podeIr}
+            className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                       hover:bg-af-500 disabled:opacity-40">
+            {ocupado ? 'Transferindo…' : 'Transferir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ================================================================== */
+
+const RECADO_CHAVE = 'recusou'
+
 /**
  * O endereço que o Google quer ver autorizado — calculado AQUI, na hora.
- *
- * ┌─ por que não é um texto fixo ────────────────────────────────────┐
- * │ O recado escrito à mão mandava incluir                            │
- * │ `http://localhost:5173/*`. Mas quem abre a tela pode estar em     │
- * │ `localhost:5174` (porta ocupada), no endereço de versão que o     │
- * │ Wrangler gera a cada envio, ou em outra máquina da rede. Recado   │
- * │ que manda autorizar o endereço ERRADO é pior que recado nenhum:   │
- * │ a pessoa mexe na segurança da chave e o mapa continua recusado.   │
- * │                                                                   │
- * │ `origin` já traz protocolo, host E PORTA — e a porta é a          │
- * │ pegadinha: no Google, `localhost/*` NÃO casa com                  │
- * │ `localhost:5173`. Tem de estar escrita.                           │
- * └───────────────────────────────────────────────────────────────────┘
+ * Texto fixo mandaria autorizar o endereço errado quando a porta muda.
  */
 const ORIGEM_A_AUTORIZAR = `${window.location.origin}/*`
 
-function MapaBairros({ bairros, cor }: {
-  bairros: BairroLinha[]; cor: (t: number) => string
+/**
+ * O dia no espaço: um pino por contrato, na cor da equipe.
+ *
+ * > "a visão do mapa deverá mostrar as equipes em campo e o que eles
+ * >  têm pra executar" — Emanuel, 14/09
+ *
+ * Era bolha por bairro (agregado). Agora é o contrato onde ele está, e
+ * a cor responde DE QUEM É — que é a pergunta do despacho. O pino
+ * pendente é sólido; o encerrado é vazado: o que já acabou não disputa
+ * a atenção com o que falta.
+ *
+ * ┌─ LGPD ───────────────────────────────────────────────────────────┐
+ * │ O pino fica no endereço do assinante, então a janela de           │
+ * │ informação mostra CONTRATO, bairro, janela e situação — e mais    │
+ * │ nada. Nome e telefone não vêm de `rota_do_dia` e não vão entrar:  │
+ * │ quem precisa do cadastro abre o contrato, onde o acesso é         │
+ * │ registrado. Para o Google vai só a área da tela, para o ladrilho. │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
+  paradas: Parada[]
+  bairros: BairroLinha[]
+  corEquipe: (c: string | null) => string
+  corBairro: (t: number) => string
+  foco: string | null
 }) {
   const [tema] = useTema()
   const div = useRef<HTMLDivElement | null>(null)
   const mapa = useRef<google.maps.Map | null>(null)
   const marcas = useRef<google.maps.Marker[]>([])
+  /** Com que tema o mapa que está na tela foi construído. */
+  const temaDoMapa = useRef<string | null>(null)
+  /** Sobe a cada mapa novo, para os pinos serem redesenhados nele. */
+  const [versao, setVersao] = useState(0)
   const [erro, setErro] = useState<string | null>(null)
   const [pronto, setPronto] = useState(false)
 
   const pontos = useMemo(
-    () => bairros.filter(b => b.lat != null && b.lng != null),
-    [bairros])
+    () => paradas.filter(p => p.lat != null && p.lng != null
+                              && (!foco || p.login === foco)),
+    [paradas, foco])
 
-  // 1. carregar a API uma vez
   useEffect(() => {
     if (!temChaveDoMapa) return
     let vivo = true
-    // A chave recusada NÃO chega por `catch`: o script carrega, o mapa é
-    // criado, e só então a API pinta o próprio "Ops!" dentro do nosso
-    // div. Sem este ouvinte a tela ficaria com um retângulo morto — foi
-    // exatamente o que aconteceu na primeira vez que esta tela abriu,
-    // com `RefererNotAllowedMapError` em localhost.
-    if (autenticacaoFalhou()) setErro('recusou')
-    const cancelar = aoFalharAutenticacao(() => { if (vivo) setErro('recusou') })
+    if (autenticacaoFalhou()) setErro(RECADO_CHAVE)
+    const cancelar = aoFalharAutenticacao(() => { if (vivo) setErro(RECADO_CHAVE) })
     carregarMapaGoogle()
       .then(() => { if (vivo) setPronto(true) })
       .catch(() => { if (vivo) setErro('O mapa do Google não carregou (rede).') })
     return () => { vivo = false; cancelar() }
   }, [])
 
-  // 2. criar o mapa quando o div existir
+  // ┌─ o mapa se REFAZ quando o tema muda ─────────────────────────┐
+  // │ `colorScheme` é opção de CONSTRUÇÃO: não existe               │
+  // │ `setOptions({colorScheme})`. Sem isto, trocar para o tema      │
+  // │ escuro deixava um mapa branco de holofote no meio de uma tela  │
+  // │ grafite — e o defeito só aparecia DEPOIS de alternar, que é    │
+  // │ por que ele passou na primeira conferência.                    │
+  // └────────────────────────────────────────────────────────────────┘
   useEffect(() => {
-    if (!pronto || !div.current || mapa.current) return
+    if (!pronto || !div.current) return
+    if (mapa.current && temaDoMapa.current === tema) return
+    if (mapa.current) {
+      for (const x of marcas.current) x.setMap(null)
+      marcas.current = []
+      div.current.innerHTML = ''
+    }
+    temaDoMapa.current = tema
     mapa.current = new google.maps.Map(div.current, {
-      center: { lat: -3.1, lng: -60.0 },   // Manaus, até o fitBounds mandar
+      center: { lat: -3.1, lng: -60.0 },
       zoom: 11,
-      // O controle é escuro por padrão (D-011) — mapa branco no meio de
-      // uma tela grafite é um holofote. Segue a chave de tema da casa.
       colorScheme: tema === 'claro' ? 'LIGHT' : 'DARK',
       mapTypeControl: true,
       mapTypeControlOptions: {
         mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
       },
-      streetViewControl: true,   // o pedido: "visão street view"
+      streetViewControl: true,
       fullscreenControl: true,
       rotateControl: false,
-      // Rolar a PÁGINA não pode virar zoom no mapa sem querer: com Ctrl
-      // (ou dois dedos) o mapa aceita; sem, a página rola.
+      // Rolar a PÁGINA não pode virar zoom sem querer.
       gestureHandling: 'cooperative',
     })
+    setVersao(v => v + 1)
   }, [pronto, tema])
 
-  // 3. redesenhar as bolhas quando os dados mudarem
   useEffect(() => {
     const m = mapa.current
     if (!m) return
-
     for (const x of marcas.current) x.setMap(null)
     marcas.current = []
     if (pontos.length === 0) return
@@ -535,96 +922,86 @@ function MapaBairros({ bairros, cor }: {
     const limites = new google.maps.LatLngBounds()
     const info = new google.maps.InfoWindow()
 
-    // Do maior para o menor: a bolha pequena fica POR CIMA e continua
-    // clicável. Mesma ordem de desenho do SVG que isto substituiu.
-    for (const b of [...pontos].sort((a, z) => z.visitas - a.visitas)) {
-      const pos = { lat: b.lat as number, lng: b.lng as number }
+    // Encerrados primeiro: o pendente fica por cima e continua clicável.
+    const ordenados = [...pontos].sort(
+      (a, b) => Number(TERMINAIS.includes(a.situacao))
+                - Number(TERMINAIS.includes(b.situacao)))
+
+    for (const p of ordenados) {
+      const pos = { lat: p.lat as number, lng: p.lng as number }
       limites.extend(pos)
-      const c = cor(b.tecnicos)
-      // `Marker` está marcado como legado em favor de
-      // `AdvancedMarkerElement` — que exige um `mapId` criado no Cloud
-      // Console e um estilo hospedado lá. Não vale trocar uma tela que
-      // funciona por uma dependência de console; quando o `mapId`
-      // existir, é só este bloco que muda.
+      const c = corEquipe(p.equipe)
+      const feito = TERMINAIS.includes(p.situacao)
+      // `Marker` é legado em favor de `AdvancedMarkerElement`, que exige
+      // um `mapId` criado no Cloud Console. Quando o mapId existir, é só
+      // este bloco que muda.
       const marca = new google.maps.Marker({
         position: pos,
         map: m,
-        title: `${b.bairro} · ${b.visitas} visita(s) · ${b.tecnicos} técnico(s)`,
-        zIndex: 1000 - b.visitas,
+        title: `${p.contrato ?? 'sem contrato'} · ${p.bairro ?? 'sem bairro'}`
+             + ` · ${SITUACAO_INFO[p.situacao]?.label ?? p.situacao}`,
+        zIndex: feito ? 1 : 10,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 8 + Math.sqrt(b.visitas) * 3.2,   // mesma escala do SVG
+          scale: feito ? 6 : 8.5,
           fillColor: c,
-          fillOpacity: 0.32,
+          fillOpacity: feito ? 0.15 : 0.9,
           strokeColor: c,
-          strokeWeight: 1.6,
-        },
-        label: {
-          text: String(b.tecnicos),
-          color: c,
-          fontSize: '11px',
-          fontWeight: '600',
+          strokeWeight: feito ? 1.2 : 2.2,
         },
       })
       marca.addListener('click', () => {
-        // Bairro, contagem e concluídas. Nada de assinante: a bolha é
-        // média de bairro, e a janela não vai inventar um endereço.
+        const janela = p.janela_inicio
+          ? `${p.janela_inicio.slice(0, 5)}–${(p.janela_fim ?? '').slice(0, 5) || '?'}`
+          : 'sem janela'
         info.setContent(
-          `<div style="color:#111;font:500 12px/1.45 system-ui;min-width:9rem">
-             <strong style="font-size:13px">${b.bairro}</strong><br>
-             ${b.visitas} visita(s) · ${b.tecnicos} técnico(s)<br>
-             ${b.concluidas} concluída(s) · ${b.em_aberto} em aberto
+          `<div style="color:#111;font:500 12px/1.5 system-ui;min-width:11rem">
+             <strong style="font-size:13px">${p.contrato ?? 'sem contrato'}</strong><br>
+             ${p.bairro ?? 'sem bairro'} · ${p.tipo_servico ?? 'sem grupo'}<br>
+             janela ${janela} · ${SITUACAO_INFO[p.situacao]?.label ?? p.situacao}<br>
+             <span style="color:#555">equipe ${p.equipe ?? '—'} · ${p.login}</span>
            </div>`)
         info.open({ map: m, anchor: marca })
       })
       marcas.current.push(marca)
     }
 
-    if (pontos.length === 1) { m.setCenter(limites.getCenter()); m.setZoom(14) }
+    if (pontos.length === 1) { m.setCenter(limites.getCenter()); m.setZoom(15) }
     else m.fitBounds(limites, 48)
 
     return () => info.close()
-  }, [pontos, cor, pronto])
+  }, [pontos, corEquipe, pronto, versao])
 
-  // Sem chave, ou com o Google fora do ar: o desenho antigo, que não
-  // depende de ninguém.
   if (!temChaveDoMapa || erro) {
     return (
       <div>
-        <MapaBairrosSVG bairros={bairros} cor={cor} />
-        <div className="px-3 pb-2.5 text-[11px] leading-relaxed text-graf-500">
-          {erro === 'recusou' ? (
+        <MapaBairrosSVG bairros={bairros} cor={corBairro} />
+        <div className="px-3 pb-2.5 text-[11px] leading-relaxed text-graf-400">
+          {erro === RECADO_CHAVE ? (
             <>
               <strong className="text-amber-400">
                 O Google recusou a chave nesta tela.
               </strong>{' '}
               Mostrando a posição relativa dos bairros. São <strong>duas</strong>{' '}
-              listas na mesma página do Cloud Console (Credenciais → a chave), e
-              o mapa só desenha se passar nas duas — o console do navegador diz
-              em qual parou:
+              listas na mesma página do Cloud Console (Credenciais → a chave), e o mapa
+              só desenha se passar nas duas — o console do navegador diz em qual parou:
               <span className="mt-1 block">
                 <strong>1.</strong> <em>Restrições de aplicativo</em> →{' '}
                 <em>Referenciadores HTTP</em> tem de conter este endereço
                 (<code>RefererNotAllowedMapError</code>):
               </span>
-              <code className="mt-1 block w-fit select-all rounded bg-graf-900 px-2
-                               py-1 text-[11px] text-graf-200">
+              <code className="mt-1 block w-fit select-all rounded bg-graf-900 px-2 py-1
+                               text-[11px] text-graf-200">
                 {ORIGEM_A_AUTORIZAR}
               </code>
               <span className="mt-1 block">
-                A <strong>porta</strong> faz parte: <code>localhost/*</code> não
-                libera <code>localhost:5173</code>.
+                A <strong>porta</strong> faz parte: <code>localhost/*</code> não libera{' '}
+                <code>localhost:5173</code>.
               </span>
               <span className="mt-1 block">
                 <strong>2.</strong> <em>Restrições de API</em> tem de incluir a{' '}
                 <strong>Maps JavaScript API</strong>
-                (<code>ApiTargetBlockedMapError</code>). Passar na primeira e
-                esquecer esta é o engano mais fácil — o erro muda e parece que
-                nada mudou.
-              </span>
-              <span className="mt-1 block">
-                Cada alteração leva até 5 minutos para valer; depois é só
-                recarregar.
+                (<code>ApiTargetBlockedMapError</code>).
               </span>
             </>
           ) : erro ? (
@@ -632,8 +1009,8 @@ function MapaBairros({ bairros, cor }: {
           ) : (
             <>
               Mapa em posição relativa. Para ver ruas e satélite, preencha{' '}
-              <code className="text-graf-400">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
-              no <code className="text-graf-400">app/.env</code>.
+              <code className="text-graf-400">VITE_GOOGLE_MAPS_API_KEY</code> no{' '}
+              <code className="text-graf-400">app/.env</code>.
             </>
           )}
         </div>
@@ -644,8 +1021,10 @@ function MapaBairros({ bairros, cor }: {
   if (pontos.length === 0) {
     return (
       <div className="flex min-h-[20rem] items-center justify-center p-6 text-center
-                      text-xs text-graf-500">
-        Sem coordenada neste dia para desenhar o mapa.
+                      text-xs text-graf-400">
+        {foco
+          ? 'Este técnico não tem contrato com coordenada neste dia.'
+          : 'Sem coordenada neste dia para desenhar o mapa.'}
       </div>
     )
   }
@@ -654,8 +1033,9 @@ function MapaBairros({ bairros, cor }: {
     <div className="relative min-h-[26rem]">
       <div ref={div} className="absolute inset-0" />
       {!pronto && (
-        <div className="absolute inset-0 flex items-center justify-center
-                        text-xs text-graf-500">
+        <div role="status"
+          className="absolute inset-0 flex items-center justify-center text-xs
+                     text-graf-400">
           Carregando o mapa…
         </div>
       )}
@@ -664,12 +1044,9 @@ function MapaBairros({ bairros, cor }: {
 }
 
 /**
- * O mapa de bairros em SVG puro (D-010: gráfico aqui é escrito à mão).
- *
- * Não é mapa de ruas — é a posição RELATIVA dos bairros, pela coordenada
- * média das visitas de cada um. Deixou de ser a única visão (o Google
- * entrou por cima), mas continua sendo a que sempre funciona: sem chave,
- * sem rede e sem conta de terceiro.
+ * A rede: posição RELATIVA dos bairros em SVG (D-010, gráfico à mão).
+ * Aparece sem chave, sem rede e em clone novo do repositório — tela que
+ * depende de terceiro para existir some quando o terceiro cai.
  */
 function MapaBairrosSVG({ bairros, cor }: {
   bairros: BairroLinha[]; cor: (t: number) => string
@@ -678,7 +1055,7 @@ function MapaBairrosSVG({ bairros, cor }: {
   if (pontos.length < 2) {
     return (
       <div className="flex min-h-[20rem] items-center justify-center p-6 text-center
-                      text-xs text-graf-500">
+                      text-xs text-graf-400">
         Sem coordenada suficiente neste dia para desenhar o mapa.
       </div>
     )
@@ -693,7 +1070,8 @@ function MapaBairrosSVG({ bairros, cor }: {
 
   return (
     <div className="overflow-x-auto p-3">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[36rem]">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[36rem]" role="img"
+        aria-label={`Posição relativa de ${pontos.length} bairros do dia`}>
         {[...pontos].sort((a, b) => b.visitas - a.visitas).map(b => {
           const cx = px(b.lng as number), cy = py(b.lat as number), rr = r(b.visitas)
           const c = cor(b.tecnicos)

@@ -120,6 +120,19 @@ na primeira abertura da tela: `RefererNotAllowedMapError`, porque a
 chave estava (bem) restrita e `http://localhost:5173/*` não estava
 autorizado.
 
+**`colorScheme` do mapa é opção de CONSTRUÇÃO.** Não existe
+`map.setOptions({colorScheme})`: o mapa nasce com o tema que recebeu e
+fica com ele. Num app com chave de tema, isso deixa um mapa branco de
+holofote numa tela grafite — e o defeito só aparece **depois** de
+alternar, então passa na primeira conferência. Para trocar, é destruir e
+recriar o mapa (ver `MapaDoDia` em `pages/Rota.tsx`).
+
+**Medidor de contraste escrito com `match(/\d+/g)` mente no Tailwind 4.**
+O Tailwind 4 emite cor em `oklch`/`oklab`, e uma regex de dígitos lê
+`oklch(0.879 0.169 91.605)` como se fosse RGB. Acusou **1,04:1** numa
+etiqueta que tem 9,6:1. Medição de contraste tem de converter o espaço de
+cor, ou pelo menos recusar o que não souber ler.
+
 **`fillColor` não aceita `var(--minha-cor)`.** O Maps pinta em canvas,
 não em CSS: variável CSS não resolve e o marcador sai **preto, calado**.
 Cor para o mapa vai escrita.
