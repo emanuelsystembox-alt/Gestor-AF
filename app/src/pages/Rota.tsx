@@ -596,20 +596,35 @@ function MapaBairros({ bairros, cor }: {
           {erro === 'recusou' ? (
             <>
               <strong className="text-amber-400">
-                O Google recusou a chave neste endereço.
+                O Google recusou a chave nesta tela.
               </strong>{' '}
-              Mostrando a posição relativa dos bairros. Para liberar: Cloud
-              Console → <em>Credenciais</em> → a chave → <em>Restrições de
-              aplicativo</em> → <em>Referenciadores HTTP</em>, e acrescente
-              exatamente:
+              Mostrando a posição relativa dos bairros. São <strong>duas</strong>{' '}
+              listas na mesma página do Cloud Console (Credenciais → a chave), e
+              o mapa só desenha se passar nas duas — o console do navegador diz
+              em qual parou:
+              <span className="mt-1 block">
+                <strong>1.</strong> <em>Restrições de aplicativo</em> →{' '}
+                <em>Referenciadores HTTP</em> tem de conter este endereço
+                (<code>RefererNotAllowedMapError</code>):
+              </span>
               <code className="mt-1 block w-fit select-all rounded bg-graf-900 px-2
                                py-1 text-[11px] text-graf-200">
                 {ORIGEM_A_AUTORIZAR}
               </code>
               <span className="mt-1 block">
                 A <strong>porta</strong> faz parte: <code>localhost/*</code> não
-                libera <code>localhost:5173</code>. A liberação leva até 5
-                minutos para valer — depois é só recarregar.
+                libera <code>localhost:5173</code>.
+              </span>
+              <span className="mt-1 block">
+                <strong>2.</strong> <em>Restrições de API</em> tem de incluir a{' '}
+                <strong>Maps JavaScript API</strong>
+                (<code>ApiTargetBlockedMapError</code>). Passar na primeira e
+                esquecer esta é o engano mais fácil — o erro muda e parece que
+                nada mudou.
+              </span>
+              <span className="mt-1 block">
+                Cada alteração leva até 5 minutos para valer; depois é só
+                recarregar.
               </span>
             </>
           ) : erro ? (
