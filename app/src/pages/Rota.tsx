@@ -452,12 +452,23 @@ export default function Rota() {
  * ⚠ Continua NÃO sendo rastreamento: é o dia AGENDADO, e a bolha é a
  * média das coordenadas das visitas do bairro — não a casa de ninguém.
  */
-/** O recado tem de dizer O QUE FAZER. "Erro no mapa" manda a pessoa
- *  abrir o console; isto manda ela no lugar certo do Cloud Console. */
-const RECADO_CHAVE =
-  'O Google recusou a chave deste endereço. No Cloud Console, em '
-  + 'Credenciais → a chave → Restrições de aplicativo, inclua '
-  + 'https://gestor-af.pages.dev/* e http://localhost:5173/*.'
+/**
+ * O endereço que o Google quer ver autorizado — calculado AQUI, na hora.
+ *
+ * ┌─ por que não é um texto fixo ────────────────────────────────────┐
+ * │ O recado escrito à mão mandava incluir                            │
+ * │ `http://localhost:5173/*`. Mas quem abre a tela pode estar em     │
+ * │ `localhost:5174` (porta ocupada), no endereço de versão que o     │
+ * │ Wrangler gera a cada envio, ou em outra máquina da rede. Recado   │
+ * │ que manda autorizar o endereço ERRADO é pior que recado nenhum:   │
+ * │ a pessoa mexe na segurança da chave e o mapa continua recusado.   │
+ * │                                                                   │
+ * │ `origin` já traz protocolo, host E PORTA — e a porta é a          │
+ * │ pegadinha: no Google, `localhost/*` NÃO casa com                  │
+ * │ `localhost:5173`. Tem de estar escrita.                           │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+const ORIGEM_A_AUTORIZAR = `${window.location.origin}/*`
 
 function MapaBairros({ bairros, cor }: {
   bairros: BairroLinha[]; cor: (t: number) => string
@@ -482,8 +493,8 @@ function MapaBairros({ bairros, cor }: {
     // div. Sem este ouvinte a tela ficaria com um retângulo morto — foi
     // exatamente o que aconteceu na primeira vez que esta tela abriu,
     // com `RefererNotAllowedMapError` em localhost.
-    if (autenticacaoFalhou()) setErro(RECADO_CHAVE)
-    const cancelar = aoFalharAutenticacao(() => { if (vivo) setErro(RECADO_CHAVE) })
+    if (autenticacaoFalhou()) setErro('recusou')
+    const cancelar = aoFalharAutenticacao(() => { if (vivo) setErro('recusou') })
     carregarMapaGoogle()
       .then(() => { if (vivo) setPronto(true) })
       .catch(() => { if (vivo) setErro('O mapa do Google não carregou (rede).') })
@@ -581,13 +592,36 @@ function MapaBairros({ bairros, cor }: {
     return (
       <div>
         <MapaBairrosSVG bairros={bairros} cor={cor} />
-        <p className="px-3 pb-2 text-[11px] text-graf-500">
-          {erro
-            ? `${erro} Mostrando a posição relativa dos bairros.`
-            : 'Mapa em posição relativa. Para ver ruas e satélite, preencha '}
-          {!erro && <code className="text-graf-400">VITE_GOOGLE_MAPS_API_KEY</code>}
-          {!erro && ' no app/.env.'}
-        </p>
+        <div className="px-3 pb-2.5 text-[11px] leading-relaxed text-graf-500">
+          {erro === 'recusou' ? (
+            <>
+              <strong className="text-amber-400">
+                O Google recusou a chave neste endereço.
+              </strong>{' '}
+              Mostrando a posição relativa dos bairros. Para liberar: Cloud
+              Console → <em>Credenciais</em> → a chave → <em>Restrições de
+              aplicativo</em> → <em>Referenciadores HTTP</em>, e acrescente
+              exatamente:
+              <code className="mt-1 block w-fit select-all rounded bg-graf-900 px-2
+                               py-1 text-[11px] text-graf-200">
+                {ORIGEM_A_AUTORIZAR}
+              </code>
+              <span className="mt-1 block">
+                A <strong>porta</strong> faz parte: <code>localhost/*</code> não
+                libera <code>localhost:5173</code>. A liberação leva até 5
+                minutos para valer — depois é só recarregar.
+              </span>
+            </>
+          ) : erro ? (
+            <>{erro} Mostrando a posição relativa dos bairros.</>
+          ) : (
+            <>
+              Mapa em posição relativa. Para ver ruas e satélite, preencha{' '}
+              <code className="text-graf-400">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
+              no <code className="text-graf-400">app/.env</code>.
+            </>
+          )}
+        </div>
       </div>
     )
   }
