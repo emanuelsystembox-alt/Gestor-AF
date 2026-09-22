@@ -15,6 +15,7 @@ const Produtividade = lazy(() => import('./pages/Produtividade'))
 const Administracao = lazy(() => import('./pages/Administracao'))
 const Campo = lazy(() => import('./pages/Campo'))
 const Visita = lazy(() => import('./pages/Visita'))
+const Almoxarifado = lazy(() => import('./pages/Almoxarifado'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -24,7 +25,7 @@ function Protegida({
   exige,
 }: {
   children: React.ReactNode
-  exige?: 'GESTAO' | 'CAMPO'
+  exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO'
 }) {
   const { session, carregando, ehGestor, ehTecnico, temPapel } = useAuth()
   const local = useLocation()
@@ -36,6 +37,11 @@ function Protegida({
     return <Navigate to="/campo" replace />
   if (exige === 'CAMPO' && !ehTecnico && !ehGestor)
     return <Navigate to="/controle" replace />
+  // O almoxarife nao e gestao nem campo: e o terceiro modulo (077). Sem
+  // esta porta ele entraria no sistema e seria expulso para /campo, onde
+  // nao tem nada -- e o RLS ja o barra em tudo o mais.
+  if (exige === 'ALMOXARIFADO' && !(ehGestor || temPapel('ALMOXARIFE')))
+    return <Navigate to="/" replace />
 
   return <>{children}</>
 }
@@ -48,6 +54,8 @@ function Raiz() {
   if (ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR'))
     return <Navigate to="/controle" replace />
   if (ehTecnico) return <Navigate to="/campo" replace />
+  // Almoxarife cai na casa dele, nao num /campo que ele nao usa.
+  if (temPapel('ALMOXARIFE')) return <Navigate to="/almoxarifado" replace />
   return <Navigate to="/campo" replace />
 }
 
@@ -81,6 +89,9 @@ export default function App() {
           <Protegida exige="GESTAO"><Configuracoes /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
+
+        <Route path="/almoxarifado" element={
+          <Protegida exige="ALMOXARIFADO"><Almoxarifado /></Protegida>} />
 
         <Route path="/campo" element={
           <Protegida exige="CAMPO"><Campo /></Protegida>} />

@@ -27,6 +27,26 @@ function lerRecolhido(): boolean {
   try { return localStorage.getItem(CHAVE_MENU) === '1' } catch { return false }
 }
 
+/**
+ * O menu passa a ser por MÓDULO, não por função.
+ *
+ * ┌─ por que mudou ──────────────────────────────────────────────────┐
+ * │ > "se preferir mudar até o menu lateral para não confundir as     │
+ * │ >  coisas sem problemas, até por que depois vai entrar            │
+ * │ >  financeiro, frota, RH entre outros" — Emanuel, 22/09           │
+ * │                                                                   │
+ * │ "Operação / Entrada de dados / Ajustes" agrupava por VERBO, e     │
+ * │ funcionava enquanto havia um produto só. Com almoxarifado,        │
+ * │ financeiro, frota e RH chegando, "Importar TOA" e "Importar a     │
+ * │ carga do Atlas" cairiam no mesmo grupo sendo de mundos            │
+ * │ diferentes — e a pessoa que só mexe em estoque teria de aprender  │
+ * │ o mapa inteiro para achar a tela dela.                            │
+ * │                                                                   │
+ * │ Agora cada módulo é um grupo e leva as telas dele junto,          │
+ * │ inclusive a importação. AJUSTES fica de fora porque é             │
+ * │ transversal: configura todos.                                     │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
 const OPERACAO: Item[] = [
   { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard' },
   { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos' },
@@ -34,18 +54,20 @@ const OPERACAO: Item[] = [
   { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota' },
   { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade' },
   { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
-]
-const ENTRADA: Item[] = [
   { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar' },
   { para: '/controle/sub-falhas', rotulo: 'Sub-falhas', icone: 'subfalhas' },
+]
+const ALMOXARIFADO: Item[] = [
+  { para: '/almoxarifado', rotulo: 'Estoque', icone: 'estoque' },
 ]
 const AJUSTES: Item[] = [
   { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes' },
   { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao' },
 ]
 const FUTURO: Item[] = [
-  { para: '/estoque', rotulo: 'Estoque', icone: 'estoque', futuro: true },
   { para: '/frota', rotulo: 'Frota', icone: 'frota', futuro: true },
+  { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
+  { para: '/rh', rotulo: 'RH', icone: 'equipes', futuro: true },
 ]
 
 function Grupo({ titulo, itens, recolhido }: {
@@ -103,7 +125,7 @@ function Grupo({ titulo, itens, recolhido }: {
 }
 
 export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactNode }) {
-  const { perfil, papeis, sair } = useAuth()
+  const { perfil, papeis, sair, pode, ehGestor, temPapel } = useAuth()
   const [tema, setTema] = useTema()
   const [recolhido, setRecolhido] = useState(lerRecolhido)
   /** Recolhido, mas com o mouse em cima: abre só enquanto o cursor
@@ -139,9 +161,20 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
               <Marca compacto={!aberto} />
             </div>
             <div className="px-2">
-              <Grupo titulo="Operação" itens={OPERACAO} recolhido={!aberto} />
-              <Grupo titulo="Entrada de dados" itens={ENTRADA} recolhido={!aberto} />
-              <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={!aberto} />
+              {/* Cada modulo so aparece para quem tem a chave dele: o
+                  almoxarife nao precisa ver Serviços, e o controlador
+                  nao precisa ver Estoque se ninguem lhe deu a permissao.
+                  A barreira real continua sendo o RLS -- isto e para a
+                  tela nao oferecer o que vai dar em porta fechada. */}
+              {(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && (
+                <Grupo titulo="Operação" itens={OPERACAO} recolhido={!aberto} />
+              )}
+              {pode('almoxarifado.ver') && (
+                <Grupo titulo="Almoxarifado" itens={ALMOXARIFADO} recolhido={!aberto} />
+              )}
+              {(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && (
+                <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={!aberto} />
+              )}
               <Grupo titulo="Próximas fases" itens={FUTURO} recolhido={!aberto} />
             </div>
           </div>
@@ -193,7 +226,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
 
           {/* navegação móvel */}
           <nav className="flex gap-1 overflow-x-auto border-t border-graf-800 px-4 py-1.5 lg:hidden">
-            {[...OPERACAO, ...ENTRADA, ...AJUSTES].filter(i => !i.futuro).map(i => (
+            {[...OPERACAO, ...ALMOXARIFADO, ...AJUSTES].filter(i => !i.futuro).map(i => (
               <NavLink key={i.para} to={i.para}
                 className={({ isActive }) =>
                   `whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${

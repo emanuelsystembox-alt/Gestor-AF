@@ -4557,3 +4557,168 @@ EM ABERTO, e e pergunta para o Emanuel: o corte de 4h para "janela
 larga". Ele citou a 08h-22h; eu generalizei para "maior que a maior
 janela real". Uma janela de 5h ou 6h futura tambem sairia do desenho --
 que e o que acontece hoje com a 12h-18h.
+
+---
+
+### D-151 · A lista de contratos pagina de 50 em 50, e a caixa "marcar todos" muda de sentido
+
+> *"vamos deixar essa página dos contratos paginada, ex: 1/30 […] de 50
+> em 50, quando a operação tiver acima de 50 contratos"* — Emanuel, 22/09
+
+**A página é do lado de cá, e é decisão.** Paginar no banco (`range()`)
+traria 50 linhas e quebraria tudo o que a tela de Serviços faz sobre o
+CONJUNTO: os nove filtros, a soma "X pts CLARO no filtro", o exportar e o
+marcar em lote passariam a enxergar só o pedaço carregado — e continuariam
+escrevendo o total inteiro. Mentira calada, a pior delas.
+
+A consulta continua trazendo o período inteiro; a página é o **recorte da
+tela**. Medido com 143 contratos: o rodapé segue dizendo
+`143 de 143 visitas · 110,27 pts CLARO no filtro` com 50 na tela.
+
+**A caixa do cabeçalho passa a marcar A PÁGINA.** Antes marcava o filtro
+inteiro. Com 1.400 linhas invisíveis, "marcar todos" seguido de "Apagar do
+banco" é exclusão em lote apontada para o escuro. Para marcar o filtro
+todo existe um botão explícito na barra, **com o número escrito**:
+*"marcar os 143 do filtro, não só esta página"*.
+
+O `1/30` que ele pediu é também o campo de pulo — com 30 páginas, clicar
+14 vezes em "próxima" é trabalho. A barra só existe acima de 50; abaixo
+disso seria uma página de uma.
+
+> **EM ABERTO:** a tela sempre carregou o período inteiro de uma vez, e a
+> paginação não mudou isso. Se ela pesar num período longo, é a consulta
+> que tem de mudar — não o recorte.
+
+---
+
+### D-152 · O almoxarifado nasce como módulo, e a importação não inventa posse
+
+> *"imagina você ser o chefe do almoxarifado e precisa controlar
+> miscelâneas e equipamentos, todo isso precisa estar registrado em nosso
+> sistema […] pense no almoxarifado como um módulo, se preferir mudar até
+> o menu lateral para não confundir as coisas […] até por que depois vai
+> entrar financeiro, frota, RH entre outros"* — Emanuel, 22/09
+
+**Fase 1 de três, escolhida por ele:** importar a carga e mostrar a
+posição. Entrega/devolutiva ao técnico por romaneio e miscelânea por
+saldo ficam para depois — as duas respostas dele já estão registradas
+abaixo para quem construir.
+
+#### O que o dado real disse
+
+`CARGA AFLINE.xlsx` — **15.603 equipamentos**, todos no local
+`ADUARTE ALBUQUERQUE ME`, operação MANAUS, classificação COMODATO.
+**Número de série único em 15.603 de 15.603**: é a chave natural, e é por
+ela que a importação reconhece o que já existe.
+
+```
+PERDA                 7.629   48,9%     EMTA                 5.403  34,6%
+INICIALIZADO          5.070   32,5%     SMART CARD           5.077  32,5%
+SUSPEITO              1.033    6,6%     DECODER DIGITAL      3.303  21,2%
+TRANSITO REVERSA        742    4,8%     TELEFONICO           1.225   7,9%
+SUCATA                  676    4,3%     ROTEADOR WI-FI         354   2,3%
+ANALISE DE INVENTARIO   415    2,7%     CABLE MODEM            164   1,1%
+GARE/COM DEFEITO/INUTILIZADO  38  0,2%  DAC / HARD DISK         77   0,5%
+```
+
+**Quase metade da carga está como PERDA.** É o número que nomeia o
+módulo.
+
+#### Dois eixos, e é o produto da tela
+
+Mesma gramática das **duas baixas** (D-042):
+
+| | quem afirma | pode editar aqui? |
+|---|---|---|
+| `estado_atlas` | a CLARO, pela planilha | **não** |
+| `posse` | o almoxarife da AFLINE | sim (fase 2) |
+
+O Atlas sabe que a peça é responsabilidade da AFLINE. Ele **não** sabe se
+ela está na prateleira ou na van do técnico.
+
+**Então a importação deixa `posse` NULA.** Carimbar "no almoxarifado" em
+15.603 peças seria inventar o inventário inteiro num `update`. Zero e
+desconhecido não são a mesma coisa (D-117) — e a tela escreve
+`33 sem posse declarada`, em âmbar, porque esse número **é o trabalho que
+falta**.
+
+A única posse que a planilha AFIRMA é a do assinante: quando o Atlas diz
+`Tipo Local = ASSINANTE`, a peça está com o cliente. Isso é dado, não
+dedução, e entra.
+
+#### Dois formatos de planilha, de novo (D-091)
+
+`CARGA AFLINE` e `CONSULTA ATLAS` têm cabeçalhos diferentes; o segundo
+cola série e endereçável num campo só (`"722255161458 / B4F2673499C1"`).
+O formato é descoberto pelo **cabeçalho**, não perguntado: a planilha sabe
+o que é.
+
+As colunas vêm com os erros de digitação da fonte — `Responsavél`,
+`Classificacação Material`, `Endereçavel Principal`. Lê-se pelo nome
+**errado**, que é o que está no arquivo; ler pelo certo perderia a coluna
+em silêncio.
+
+**A data ambígua é recusada.** `18/06/2021 14:50:27` entra. `9/12/26
+17:19` — 9 de dezembro ou 12 de setembro? — **não entra**: fica nula, o
+texto original continua guardado em `dados_origem`, e a tela avisa quantas
+ficaram assim antes de você confirmar. "Provavelmente mês/dia" erra em 11
+dos 12 meses e ninguém percebe.
+
+#### A fundação já existia, e foi usada
+
+Não criei papel nem perfil: o papel **`ALMOXARIFE`** já estava no enum, o
+perfil de acesso **"Almoxarife"** já existia (com **zero** permissões) e a
+chave `almoxarifado.ver` já estava lá marcada `disponivel = false`,
+descrição *"Modulo ainda nao construido"*. A 077 acende essas três e
+acrescenta `almoxarifado.importar` e `almoxarifado.editar`.
+
+**Escrita só por RPC:** `equipamento` não tem policy de INSERT, UPDATE nem
+DELETE. Quem grava é `importar_estoque`, `security definer`, que confere
+papel e permissão dentro. A policy de SELECT exige
+`(select tem_permissao('almoxarifado.ver'))` — com `(select)`, porque
+função solta na policy é chamada por linha e aqui são 15.603 (D-118).
+
+#### O menu passa a ser por módulo
+
+"Operação / Entrada de dados / Ajustes" agrupava por **verbo**, e
+funcionava com um produto só. Com almoxarifado, financeiro, frota e RH
+chegando, "Importar TOA" e "Importar a carga do Atlas" cairiam no mesmo
+grupo sendo de mundos diferentes.
+
+Agora cada módulo é um grupo e **leva as telas dele junto, inclusive a
+importação**. Ajustes fica fora porque é transversal. E cada grupo só
+aparece para quem tem a chave: o almoxarife não vê Serviços.
+
+#### A tela: barra, não donut
+
+O painel do concorrente é uma parede de 12 cartões e um donut de 12
+fatias — com 68% numa e sete abaixo de 1%. Um donut de doze fatias não é
+gráfico, é legenda redonda: para saber qualquer número você lê a legenda.
+
+Aqui a proporção é **barra horizontal ordenada**, com o rótulo na barra e
+o número ao lado. A cor entra só onde significa: verde é o que a CLARO
+considera utilizável, vermelho é baixa de patrimônio — classificação
+**dela**, não escala minha.
+
+A lista pagina **no banco** (`range()`), ao contrário da tela de Serviços
+(D-151). A diferença é o volume: lá são centenas e os filtros precisam do
+conjunto; aqui são dezenas de milhares e ninguém soma 15.603 seriais.
+
+E a importação sobe **em lotes de 500**: 15.603 linhas num `jsonb` só é
+~8 MB de corpo e um timeout esperando acontecer. Como é idempotente pelo
+serial, falha no meio não perde o que já entrou.
+
+#### O que ficou decidido para a fase 2, e está aqui para não se perder
+
+- **Miscelânea:** saldo por item **e por técnico** — entrega baixa de um e
+  sobe no outro. Responde "quanto de conector o Jeferson gastou".
+- **Entrega:** **romaneio** — o almoxarife monta uma carga com várias
+  peças, fecha o documento, o técnico confirma. A devolutiva é outro
+  documento. Histórico assinado dos dois lados.
+
+#### Achado na planilha, para alguém olhar
+
+O campo `Código Item JDE` vem com o texto
+`$equipamento.getCodigoItemJDE()` em parte das linhas — um *placeholder de
+template* que o Atlas não renderizou. Não é dado; é defeito da exportação
+da CLARO. Entra cru em `dados_origem` e não vira código de item.
