@@ -19,6 +19,27 @@ import {
 const SELECT = SELECT_CONTRATO
 
 /**
+ * Quantos contratos por página.
+ *
+ * > "vamos deixar essa página dos contratos paginada, ex: 1/30 […] de 50
+ * >  em 50, quando a operação tiver acima de 50 contratos" — Emanuel
+ *
+ * ┌─ por que a página é do LADO DE CÁ ───────────────────────────────┐
+ * │ Paginar no banco (`range()`) traria 50 linhas e quebraria tudo o  │
+ * │ que esta tela faz em cima do conjunto: os nove filtros, a soma de │
+ * │ pontos "no filtro", o exportar e o marcar em lote passariam a ver │
+ * │ só o pedaço carregado — e continuariam dizendo o total inteiro.   │
+ * │ Mentira silenciosa, que é a pior.                                 │
+ * │                                                                   │
+ * │ Então a consulta continua trazendo o período inteiro e a página é │
+ * │ só o RECORTE DA TELA. O custo disso é a consulta: um período      │
+ * │ longo carrega muita linha de uma vez. Está medido? Não. Fica      │
+ * │ escrito como o próximo lugar a olhar se a tela pesar.             │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+const POR_PAGINA = 50
+
+/**
  * Quem responde por este contrato.
  *
  * O DECLARADO do técnico primeiro (068); só cai no nome que veio da
@@ -331,6 +352,24 @@ export default function Servicos() {
       ].some(x => x?.toLowerCase().includes(t))
     })
   }, [base, situacao, busca, area, supervisor, equipe, grupo, origem, resultado, culpa])
+
+  // ---- paginação ----
+  const [pagina, setPagina] = useState(1)
+  const paginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA))
+  // Filtro que muda joga de volta para a primeira: continuar na página 7
+  // de um filtro que agora tem 2 páginas é cair num vazio sem explicação.
+  useEffect(() => { setPagina(1) },
+    [situacao, busca, area, supervisor, equipe, grupo, origem, resultado,
+     culpa, soProdutivas, de, ate])
+  // A lista pode encolher por baixo (chegou baixa ao vivo, filtro do
+  // Realtime): a página nunca passa do fim.
+  const paginaAtual = Math.min(pagina, paginas)
+  const inicio = (paginaAtual - 1) * POR_PAGINA
+  const naPagina = useMemo(
+    () => (visiveis.length > POR_PAGINA
+      ? visiveis.slice(inicio, inicio + POR_PAGINA)
+      : visiveis),
+    [visiveis, inicio])
 
   const totalPontos = useMemo(
     () => visiveis.reduce((soma, v) => soma + Number(pontos.get(v.id)?.pontos_claro ?? 0), 0),
@@ -652,12 +691,17 @@ export default function Servicos() {
               tela de 265 linhas, a coluna do meio sem cabecalho e um
               numero sem nome. */}
           <div className="quadro">
+            {/* A caixa do cabeçalho marca O QUE SE VÊ — a página. Antes
+                ela marcava o filtro inteiro, e com 1.400 linhas invisíveis
+                isso é um botão de apagar em lote apontado para o escuro.
+                Para marcar o filtro todo existe o botão explícito na barra
+                de páginas, com o número escrito nele. */}
             <TabelaContratos
-              linhas={visiveis}
+              linhas={naPagina}
               selecionados={selecionados}
               aoSelecionar={alternarSelecao}
               aoSelecionarTodos={marcado => setSelecionados(
-                marcado ? new Set(visiveis.map(v => v.id)) : new Set())}
+                marcado ? new Set(naPagina.map(v => v.id)) : new Set())}
               detalhada={detalhada}
               pontos={pontos}
               porIndicador={porIndicador}
@@ -767,9 +811,86 @@ export default function Servicos() {
               </>)}
             />
           </div>
+
+          {/* Só existe quando há o que paginar (D-151). Abaixo de 50
+              contratos a barra seria ruído: uma página de uma. */}
+          {visiveis.length > POR_PAGINA && (
+            <nav aria-label="Páginas de contratos"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t
+                         border-graf-800 px-4 py-2.5 text-xs">
+              <span className="tabular text-graf-400">
+                {inicio + 1}–{Math.min(inicio + POR_PAGINA, visiveis.length)}
+                {' de '}{visiveis.length}
+              </span>
+
+              <span className="ml-auto flex items-center gap-1.5">
+                <button onClick={() => setPagina(1)} disabled={paginaAtual === 1}
+                  aria-label="Primeira página"
+                  className="rounded-md border border-graf-700 px-2 py-1 text-graf-300
+                             hover:border-af-600 hover:text-af-400 disabled:opacity-35
+                             disabled:hover:border-graf-700 disabled:hover:text-graf-300">
+                  «
+                </button>
+                <button onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={paginaAtual === 1} aria-label="Página anterior"
+                  className="rounded-md border border-graf-700 px-2.5 py-1 text-graf-300
+                             hover:border-af-600 hover:text-af-400 disabled:opacity-35
+                             disabled:hover:border-graf-700 disabled:hover:text-graf-300">
+                  ‹ anterior
+                </button>
+
+                {/* O "1/30" que ele pediu, e que também é o campo de pulo:
+                    com 30 páginas, clicar 14 vezes em "próxima" é trabalho. */}
+                <span className="tabular flex items-center gap-1 px-1 text-graf-200"
+                  aria-current="page">
+                  <label className="sr-only" htmlFor="pagina-atual">Ir para a página</label>
+                  <input id="pagina-atual" type="number" min={1} max={paginas}
+                    value={paginaAtual}
+                    onChange={e => {
+                      const n = Number(e.target.value)
+                      if (Number.isFinite(n)) setPagina(Math.min(paginas, Math.max(1, n)))
+                    }}
+                    className="tabular w-12 rounded-md border border-graf-700 bg-graf-900
+                               px-1.5 py-1 text-center outline-none focus:border-af-500" />
+                  <span className="text-graf-400">/ {paginas}</span>
+                </span>
+
+                <button onClick={() => setPagina(p => Math.min(paginas, p + 1))}
+                  disabled={paginaAtual === paginas} aria-label="Próxima página"
+                  className="rounded-md border border-graf-700 px-2.5 py-1 text-graf-300
+                             hover:border-af-600 hover:text-af-400 disabled:opacity-35
+                             disabled:hover:border-graf-700 disabled:hover:text-graf-300">
+                  próxima ›
+                </button>
+                <button onClick={() => setPagina(paginas)} disabled={paginaAtual === paginas}
+                  aria-label="Última página"
+                  className="rounded-md border border-graf-700 px-2 py-1 text-graf-300
+                             hover:border-af-600 hover:text-af-400 disabled:opacity-35
+                             disabled:hover:border-graf-700 disabled:hover:text-graf-300">
+                  »
+                </button>
+              </span>
+
+              {/* Marcar além do que se vê só acontece dizendo o número. */}
+              <button
+                onClick={() => setSelecionados(
+                  selecionados.size === visiveis.length
+                    ? new Set()
+                    : new Set(visiveis.map(v => v.id)))}
+                className="w-full text-left text-[11px] text-af-400 underline
+                           underline-offset-2 sm:w-auto">
+                {selecionados.size === visiveis.length
+                  ? 'desmarcar tudo'
+                  : `marcar os ${visiveis.length} do filtro, não só esta página`}
+              </button>
+            </nav>
+          )}
         </section>
 
         <p className="pb-6 text-center text-xs text-graf-600">
+          {visiveis.length > POR_PAGINA && (
+            <>página {paginaAtual} de {paginas} · </>
+          )}
           {visiveis.length} de {base.length} visitas
           {totalPontos > 0 && (
             <> · <strong className="tabular text-emerald-400">
