@@ -9,6 +9,9 @@
 export type Pilha = {
   Agenda: undefined
   Visita: { id: string }
+  /** O recibo do que o almoxarifado entregou (079). Fica fora da agenda
+   *  de proposito: nao e trabalho do dia, e conferencia de material. */
+  Romaneios: undefined
   /** A câmera volta para a visita pelo parâmetro de retorno, e não por
    *  estado global: assim a foto nunca "cai" na visita errada quando o
    *  Android reconstrói a pilha depois de matar o processo. */

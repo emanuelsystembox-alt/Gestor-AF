@@ -154,35 +154,56 @@ export function ColunasPorHora({ horas, series, altura = 'h-40' }: {
         <span className="tabular">pico {max}</span>
         <span className="tabular">{hh(de)}h–{hh(ate)}h</span>
       </div>
-      <div className={`flex ${altura} items-stretch gap-[2px] border-b border-graf-800`}>
+      {/* ┌─ o volume e a hora ficam ESCRITOS ─────────────────────────┐
+          │ > "preciso saber esse volume por hora, e a hora precisa     │
+          │ >  aparecer no gráfico pra ficar mais evidente"             │
+          │ >  — Emanuel, 23/09                                         │
+          │                                                             │
+          │ O total por hora só aparecia no `hover` (`opacity-0         │
+          │ group-hover`), e a hora só nas pares. Num gráfico de 10     │
+          │ colunas isso é esconder o dado por economia de espaço que   │
+          │ não faltava — e no celular, onde não existe hover, o número │
+          │ não existia. Agora os dois estão na tela.                   │
+          │                                                             │
+          │ Espaço para o número: o `pt-4` no alto da área de barras.   │
+          │ Sem ele a coluna mais alta cobre o próprio rótulo.          │
+          └─────────────────────────────────────────────────────────────┘ */}
+      <div className={`flex ${altura} items-stretch gap-[3px] border-b border-graf-800 pt-4`}>
         {faixa.map(h => {
           const i = horas.indexOf(h)
+          const detalhe = series
+            .filter(sr => (sr.valores[i] ?? 0) > 0)
+            .map(sr => `${sr.rotulo}: ${sr.valores[i]}`)
+            .join('\n')
           return (
-            <div key={h} className="group relative flex h-full flex-1 flex-col justify-end"
-                 title={`${hh(h)}:00 — ${totais[i]}`}>
+            <div key={h} className="relative flex h-full flex-1 flex-col justify-end"
+                 title={`${hh(h)}:00 — ${totais[i]} encerramento(s)`
+                        + (detalhe ? `\n${detalhe}` : '')}>
+              {totais[i] > 0 && (
+                <span className="tabular absolute -top-4 left-1/2 -translate-x-1/2
+                                 text-[10px] font-semibold text-graf-200">
+                  {totais[i]}
+                </span>
+              )}
               {series.map(sr => {
                 const v = sr.valores[i] ?? 0
                 if (!v) return null
                 return (
                   <div key={sr.rotulo} className="first:rounded-t-[2px]" style={{
-                    height: `${(v / max) * 100}%`, background: sr.cor, minHeight: 2,
+                    height: `${(v / max) * 100}%`, background: sr.cor, minHeight: 3,
                   }} />
                 )
               })}
-              {totais[i] > 0 && (
-                <span className="tabular absolute -top-4 left-1/2 -translate-x-1/2 text-[10px]
-                                 text-graf-300 opacity-0 group-hover:opacity-100">
-                  {totais[i]}
-                </span>
-              )}
             </div>
           )
         })}
       </div>
-      <div className="mt-1 flex gap-[2px]">
+      {/* A hora embaixo de CADA coluna enquanto couber. Acima de 14
+          colunas ela alterna — 24 rótulos de 9 px viram borrão. */}
+      <div className="mt-1 flex gap-[3px]">
         {faixa.map(h => (
-          <span key={h} className="tabular flex-1 text-center text-[9px] text-graf-600">
-            {h % 2 === 0 ? hh(h) : ''}
+          <span key={h} className="tabular flex-1 text-center text-[10px] text-graf-400">
+            {faixa.length <= 14 || h % 2 === 0 ? `${hh(h)}h` : ''}
           </span>
         ))}
       </div>

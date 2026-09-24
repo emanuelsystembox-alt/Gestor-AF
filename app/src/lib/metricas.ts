@@ -142,16 +142,34 @@ export function calcular(visitas: Visita[]) {
     .slice(0, 10)
 
   // ---------- encerramentos por hora ----------
+  //
+  // ┌─ a cor passa a ser a SITUAÇÃO ───────────────────────────────────┐
+  // │ > "quero colocar as cores por hora: cancelado vermelho, verde    │
+  // │ >  executado, e amarelo reagendado" — Emanuel, 23/09             │
+  // │                                                                  │
+  // │ Antes as três séries eram "concluído / com improdutiva / com     │
+  // │ impedimento": a primeira cor era situação e as outras duas eram  │
+  // │ OUTRO eixo (que tipo de baixa a O.S. teve). Misturar os dois no  │
+  // │ mesmo empilhado fazia o gráfico responder meia pergunta — e      │
+  // │ CANCELADA, que é 8 de 24 hoje, não aparecia em lugar nenhum.     │
+  // │                                                                  │
+  // │ Agora é um eixo só: as três situações TERMINAIS, nas mesmas      │
+  // │ cores que a tela inteira usa (`SITUACAO_INFO`). A leitura de     │
+  // │ improdutiva continua inteira no painel de responsabilidade.      │
+  // └──────────────────────────────────────────────────────────────────┘
+  //
+  // Encerramento é `fim`. Conferido no dia 23/09: as três situações
+  // terminais têm `fim` em 100% das linhas (14 / 8 / 1), então nenhuma
+  // barra nasce vazia por falta de dado.
   const horas = Array.from({ length: 24 }, (_, i) => i)
   const zeros = () => Array(24).fill(0) as number[]
-  const hConcluido = zeros(), hImprodutivo = zeros(), hImpedimento = zeros()
+  const hConcluida = zeros(), hCancelada = zeros(), hReagendamento = zeros()
   for (const v of produtivas) {
     if (!v.fim) continue
     const h = new Date(v.fim).getHours()
-    if (v.situacao === 'CONCLUIDA') {
-      const temImprod = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
-      if (temImprod) hImprodutivo[h]++ ; else hConcluido[h]++
-    } else if (v.situacao === 'COM_IMPEDIMENTO') hImpedimento[h]++
+    if (v.situacao === 'CONCLUIDA') hConcluida[h]++
+    else if (v.situacao === 'CANCELADA') hCancelada[h]++
+    else if (v.situacao === 'REAGENDAMENTO') hReagendamento[h]++
   }
 
   // ---------- tempo médio por etapa ----------
@@ -276,7 +294,7 @@ export function calcular(visitas: Visita[]) {
     porSituacao,
     porResponsabilidade,
     motivos,
-    horas, hConcluido, hImprodutivo, hImpedimento,
+    horas, hConcluida, hCancelada, hReagendamento,
     porGrupo,
     etapas, gargalo, pctNaJanela, dentroDaJanela, comJanela,
     equipes, concluidasSemDono,

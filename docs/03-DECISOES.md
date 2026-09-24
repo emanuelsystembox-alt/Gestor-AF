@@ -4836,3 +4836,109 @@ caractere — e o foco volta num `requestAnimationFrame`, depois do render.
 > amarração com `equipamento_movimento` — quando o técnico lança o serial
 > na baixa (055-F), a peça deveria sair da posse dele para
 > `COM_ASSINANTE` sozinha. É regra nova e é do Emanuel.
+
+---
+
+### D-155 · O gráfico de encerramentos passa a ser por SITUAÇÃO
+
+> *"quero colocar as cores por hora: cancelado vermelho, verde
+> executado, e amarelo reagendado, preciso saber esse volume por hora, e
+> a hora precisa aparecer no gráfico"* — Emanuel, 23/09
+
+As três séries eram **"concluído / com improdutiva / com impedimento"**.
+A primeira é situação; as outras duas são **outro eixo** — que tipo de
+baixa a O.S. teve. Misturadas no mesmo empilhado, o gráfico respondia
+meia pergunta. E **CANCELADA, que era 8 de 24 no dia**, não aparecia em
+lugar nenhum.
+
+Agora é um eixo só: as três situações **terminais**, nas cores de
+`SITUACAO_INFO` — as mesmas da tabela, da Rota e do aplicativo. Gráfico
+com paleta própria obriga a ler a legenda duas vezes.
+
+**Conferido antes de trocar:** as três situações terminais têm `fim` em
+100% das linhas do dia (14 / 8 / 1). Nenhuma barra nasce vazia por falta
+de dado.
+
+**O volume e a hora saíram do `hover`.** O total por hora só aparecia com
+o mouse em cima (`opacity-0 group-hover`) e a hora só nas pares. Num
+gráfico de dez colunas isso é esconder o dado por economia de espaço que
+não faltava — e **no celular, onde não existe hover, o número não
+existia**. Agora os dois estão escritos.
+
+---
+
+### D-156 · "Atraso sobre a janela" estava enganando, e o texto ajudava
+
+> *"o atraso sobre a janela é quanto tempo médio a operação demorou a
+> iniciar o outro contrato após baixado? não entendi direito"* — Emanuel
+
+Não é. É `visita.inicio − janela_inicio`: **quanto tempo depois da
+abertura do intervalo combinado com o cliente o técnico começou**.
+
+Ele leu a nota que já existia e ainda assim entendeu outra coisa — o que
+é sinal sobre a nota, não sobre ele. Dois defeitos no texto:
+
+1. Não dizia o que o indicador **não** é.
+2. Afirmava que *"acima de 60 min já compromete o horário prometido ao
+   cliente"*. **Isso é falso** para a janela de 08h–22h, que domina esta
+   operação: ela tem 840 minutos de folga. Era a frase que criava a
+   contradição aparente com o cartão "chegou dentro da janela: 100%".
+
+A nota passa a explicar a convivência dos dois números, e a dizer que
+**as três barras não se somam**: as duas de baixo são etapas do
+atendimento, esta é a distância até o combinado.
+
+---
+
+### D-157 · O campo fecha o ciclo do estoque — fase 3
+
+Duas pendências de D-154, liberadas em 23/09.
+
+#### 1 · O técnico confirma, pelo celular dele
+
+Na fase 2 quem confirmava era o almoxarife no balcão, porque o aplicativo
+não tinha a tela. **Confirmar no lugar de alguém é assinar por ele** —
+funciona enquanto os dois estão frente a frente e deixa de funcionar no
+dia da divergência, que é justamente o dia em que o documento importa.
+
+`confirmar_romaneio` passa a aceitar duas mãos: o almoxarife/gestor, ou o
+**técnico dono daquele documento** — e só o dele. Medido: romaneio de
+outro técnico devolve **42501**, e `meus_romaneios()` não o lista.
+
+A tela do aplicativo é de **leitura e um botão**. O técnico não monta
+carga, não tira item, não corrige quantidade — se algo está errado ele
+fala com o almoxarife, que tem o documento aberto do outro lado. Dar
+edição ali transformaria o recibo em negociação.
+
+A porta fica no **cabeçalho**, não na agenda: não é trabalho do dia, é
+conferência de material, e a agenda continua sendo a primeira coisa que
+ele vê (D-112).
+
+#### 2 · O que o campo declara move a posse
+
+`registrar_equipamento` (055-F) já registrava o serial instalado ou
+retirado. Faltava a outra ponta: essa peça é a **mesma** que saiu do
+almoxarifado.
+
+```
+INSTALADO  → COM_ASSINANTE     (ficou na casa do cliente)
+RETIRADO   → COM_TECNICO       (voltou para a mão dele)
+```
+
+O gatilho mora em `equipamento_movimento`, que é o **funil** — mesma
+razão do gatilho de avisos em `visita_evento` (059): pendurar em cada RPC
+é escrever a regra cinco vezes e esquecer na sexta.
+
+> ⚠ **Ele nunca levanta exceção.** O técnico está na casa do cliente com
+> o celular na mão; travar a baixa porque o estoque discorda seria parar
+> o serviço por causa de uma planilha. Serial fora da nossa carga
+> (equipamento do assinante, de outra empreiteira, digitado errado) não
+> move nada — medido: o movimento é gravado e nada quebra.
+
+**A divergência é registrada, não corrigida em silêncio.** Se a peça
+instalada estava, para nós, "no almoxarifado" — ninguém entregou ao
+técnico —, a posse muda do mesmo jeito (o fato é que ela está na casa do
+cliente) e `posse_motivo` guarda de onde ela veio:
+`campo: instalado no contrato 1149124 (antes: COM_TECNICO)`. Quem
+conferir o inventário vê que houve peça saindo sem romaneio, em vez de
+ver um estoque redondo e falso.

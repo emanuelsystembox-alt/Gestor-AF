@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, SITUACAO_INFO } from '../lib/supabase'
 import { calcular, csvPorTipo, type Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
 import { ReguaDoDia, MatrizGrupos } from '../components/PainelDoDia'
@@ -327,16 +327,24 @@ export default function Controle() {
             {/* ===== 6. quando, quão rápido, e por quem ===== */}
             <div className="sobe sobe-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
               <Painel className="lg:col-span-2" titulo="Encerramentos por hora"
-                dica="Em que horas o dia fecha — e onde a operação empilha."
-                tabela={<TabelaSimples colunas={['Hora', 'Concluído', 'Improdutivo', 'Impedimento']}
+                dica="Em que horas o dia fecha, e como fecha."
+                tabela={<TabelaSimples colunas={['Hora', 'Concluída', 'Cancelada', 'Reagendamento', 'Total']}
                   linhas={m.horas.filter(h =>
-                    m.hConcluido[h] || m.hImprodutivo[h] || m.hImpedimento[h])
+                    m.hConcluida[h] || m.hCancelada[h] || m.hReagendamento[h])
                     .map(h => [`${String(h).padStart(2, '0')}:00`,
-                      m.hConcluido[h], m.hImprodutivo[h], m.hImpedimento[h]])} />}>
+                      m.hConcluida[h], m.hCancelada[h], m.hReagendamento[h],
+                      m.hConcluida[h] + m.hCancelada[h] + m.hReagendamento[h]])} />}>
+                {/* As cores são as de `SITUACAO_INFO`, não escolhidas aqui:
+                    a mesma verde/vermelha/âmbar da tabela, da Rota e do
+                    aplicativo. Gráfico com paleta própria obriga a ler a
+                    legenda duas vezes. */}
                 <ColunasPorHora horas={m.horas} series={[
-                  { rotulo: 'Concluído', cor: 'var(--st-concluida)', valores: m.hConcluido },
-                  { rotulo: 'Com improdutiva', cor: 'var(--st-reagendamento)', valores: m.hImprodutivo },
-                  { rotulo: 'Com impedimento', cor: 'var(--st-impedimento)', valores: m.hImpedimento },
+                  { rotulo: 'Concluída', cor: SITUACAO_INFO.CONCLUIDA.cor,
+                    valores: m.hConcluida },
+                  { rotulo: 'Cancelada', cor: SITUACAO_INFO.CANCELADA.cor,
+                    valores: m.hCancelada },
+                  { rotulo: 'Reagendamento', cor: SITUACAO_INFO.REAGENDAMENTO.cor,
+                    valores: m.hReagendamento },
                 ]} />
               </Painel>
 
@@ -345,12 +353,29 @@ export default function Controle() {
                 tabela={<TabelaSimples colunas={['Etapa', 'Minutos']}
                   linhas={m.etapas.map(e => [e.rotulo, e.valor])} />}
                 nota={<>
-                  <strong className="text-graf-300">Atraso sobre a janela</strong> é quanto
-                  tempo depois da abertura do intervalo combinado o técnico começou;
-                  negativo significa que chegou adiantado.
-                  {m.etapas[0].valor > 60 && (
-                    <> Acima de 60 min já compromete o horário prometido ao cliente.</>
-                  )}
+                  {/* ┌─ o rotulo enganava, e ele perguntou ─────────────┐
+                      │ > "o atraso sobre a janela é quanto tempo médio a │
+                      │ >  operação demorou a iniciar o outro contrato    │
+                      │ >  após baixado? não entendi" — Emanuel, 23/09    │
+                      │                                                   │
+                      │ Nao e. E `inicio - janela_inicio`. E o texto      │
+                      │ anterior ainda afirmava que "acima de 60 min      │
+                      │ compromete o horario prometido" -- o que e FALSO  │
+                      │ numa janela de 08 as 22, que tem 840 min de       │
+                      │ folga e domina esta operacao. A nota passa a      │
+                      │ explicar a aparente contradicao com o cartao      │
+                      │ "chegou dentro da janela", em vez de criar uma.   │
+                      └───────────────────────────────────────────────────┘ */}
+                  <strong className="text-graf-300">Atraso sobre a janela</strong> é
+                  quanto tempo <em>depois da abertura</em> do intervalo combinado o
+                  técnico começou — não é o tempo entre um contrato e o seguinte.
+                  Negativo significa que chegou adiantado.
+                  {' '}Por isso ele convive com “chegou dentro da janela”: numa janela
+                  de 08h–22h dá para começar 100 min depois da abertura e ainda estar
+                  folgadamente no prazo.
+                  {' '}As três barras <strong className="text-graf-300">não se somam</strong>:
+                  as duas de baixo são etapas do atendimento, esta é a distância até o
+                  combinado.
                 </>}>
                 <BarrasHorizontais dados={m.etapas} sufixo=" min" />
               </Painel>

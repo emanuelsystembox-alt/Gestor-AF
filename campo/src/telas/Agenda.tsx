@@ -177,6 +177,14 @@ export default function Agenda({ navigation }: Props) {
               etapa que o técnico registrar. */}
           <Text style={e.email} numberOfLines={1}>{perfil?.email ?? ''}</Text>
         </View>
+        {/* A porta do romaneio fica no cabecalho, nao na agenda: nao e
+            trabalho do dia, e conferencia de material -- e a agenda
+            continua sendo a primeira coisa que ele ve (D-112). */}
+        <Pressable onPress={() => navigation.navigate('Romaneios')}
+          style={e.material} hitSlop={8}
+          accessibilityRole="button" accessibilityLabel="Meus romaneios de material">
+          <Text style={e.materialTexto}>Material</Text>
+        </Pressable>
         <Pressable onPress={sair} style={e.sair} hitSlop={8}>
           <Text style={e.sairTexto}>Sair</Text>
         </Pressable>
@@ -399,6 +407,11 @@ const e = StyleSheet.create({
   email: { fontSize: 11, color: cor.graf400 },
   sair: { paddingHorizontal: 10, paddingVertical: 8 },
   sairTexto: { color: cor.graf500, fontSize: 14, fontWeight: '600' },
+  material: {
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: cor.graf200, borderRadius: 8,
+  },
+  materialTexto: { color: cor.tinta, fontSize: 14, fontWeight: '600' },
 
   barraDia: {
     flexDirection: 'row', alignItems: 'center',
