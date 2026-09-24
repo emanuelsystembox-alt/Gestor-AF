@@ -133,6 +133,7 @@ As três últimas, para não repetir o esquecimento:
 | 075 | **A rota entrega o que o controlador precisa** — `rota_do_dia` ganha `equipe_id` (para transferir), `tec1` (aderência do servidor) e `finalizado_toa` (D-147) | ✓ |
 | 076 | **O cartão da rota mostra a baixa** — códigos das O.S. com procedência AFLINE/TOA e o detalhe das duas (D-147) | ✓ |
 | 077 | **O almoxarifado nasce** — `equipamento` serializado, `estoque_posse`, `importar_estoque`, `estoque_posicao`, e as permissões do módulo (D-152) | ✓ |
+| 078 | **O romaneio e a miscelânea** — `romaneio`/`romaneio_item`, `item_miscelanea`, o razão `miscelanea_movimento` e `confirmar_romaneio` (D-154) | ✓ |
 | 077 | **Cada situação diz quantos pontos carrega** — `painel_equipes.situacoes` ganha `pontos`, `sem_regra` e `produtivas` (D-148) | ✓ |
 | 078 | **A jornada acha o dono** — `toa_recurso` (o de/para que o TOA emite), `login_do_recurso`, `reconciliar_importacao`, e o catálogo aprende tipo novo com `conferir` (D-149) | ✓ |
 | 079 | **A jornada aparece sem contar como contrato** — sai de `visitas`/`ordens`/`situacoes`/`periodos`/baixa e ganha `jornada jsonb`; entra na `rota_do_dia` com `ordem` nula (D-149) | ✓ |

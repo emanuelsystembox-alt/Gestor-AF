@@ -4,6 +4,8 @@ import { useAuth } from '../lib/auth'
 import { lerCargaEstoque, type LeituraEstoque } from '../lib/estoque'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
+import { Romaneios } from '../components/Romaneios'
+import { Miscelanea } from '../components/Miscelanea'
 
 /**
  * Almoxarifado — a posição da carga (fase 1 do módulo).
@@ -106,6 +108,10 @@ function Barra({ rotulo, qtd, total, cor, nota }: {
 
 export default function Almoxarifado() {
   const { pode } = useAuth()
+  /** As tres metades do almoxarifado (a terceira e o documento que
+   *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
+   *  atravessa as tres no mesmo atendimento de balcao. */
+  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'miscelanea'>('posicao')
   const [posicao, setPosicao] = useState<Posicao | null>(null)
   const [posses, setPosses] = useState<Posse[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -243,6 +249,23 @@ export default function Almoxarifado() {
             justamente onde eles divergem que mora o trabalho.
           </p>
         </div>
+
+        <div className="flex rounded-lg bg-graf-900 p-0.5">
+          {([['posicao', 'Posição'],
+             ['romaneios', 'Romaneios'],
+             ['miscelanea', 'Miscelânea']] as const).map(([a, rot]) => (
+            <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
+              {rot}
+            </button>
+          ))}
+        </div>
+
+        {aba === 'romaneios' && <Romaneios podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'miscelanea' && <Miscelanea podeMexer={pode('almoxarifado.editar')} />}
+
+        {aba === 'posicao' && (<>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
@@ -571,6 +594,8 @@ export default function Almoxarifado() {
               {n(posicao.ultima_importacao.atualizados)} atualizada(s)
             </p>
           )}
+        </>)}
+
         </>)}
       </div>
     </Shell>

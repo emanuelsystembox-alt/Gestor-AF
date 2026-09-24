@@ -235,25 +235,14 @@ export default function Controle() {
 
         {erro && <Alerta tipo="erro">Não consegui carregar: {erro}</Alerta>}
 
-        {/* ================= alerta de janela =================
-            Fica ACIMA da régua porque é a única coisa da tela com
-            hora marcada: os números embaixo continuam verdadeiros
-            daqui a uma hora, este não. */}
-        {m.emRisco > 0 && (
-          <div role="status" className="flex items-start gap-2.5 rounded-lg border
-                          border-amber-700/60 bg-amber-900/20 px-3.5 py-2.5 text-sm text-amber-200">
-            <span aria-hidden className="mt-0.5">⚠</span>
-            <p>
-              <strong>{m.emRisco} visita(s) com a janela estourando</strong> — menos de 60 min
-              para o fim do intervalo combinado com o cliente
-              {m.vencidas > 0 && <>, e <strong>{m.vencidas} já passou do horário</strong></>}.
-              {' '}
-              <Link to="/controle/servicos?filtro=abertas"
-                    className="underline underline-offset-2">ver quais</Link>
-            </p>
-          </div>
-        )}
-
+        {/* O alerta de "janela estourando" ficava aqui e SAIU a pedido
+            (D-153): "não acho viável ou interessante por enquanto nesse
+            cenário" — Emanuel, 23/09. Ele acendia com 60 min para o fim
+            da janela, e num dia em que quase tudo tem janela 08–22 isso
+            acende no fim da tarde para a operação inteira: alarme que
+            toca sempre é alarme que ninguém olha. A regra e a conta
+            saíram junto, para não ficar cálculo morto rodando a cada
+            render. O git guarda as duas se um dia voltar. */}
         {carregando && (
           <div className="card-controle grid place-items-center gap-3 py-20">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-graf-700 border-t-af-500" />

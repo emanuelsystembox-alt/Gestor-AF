@@ -4722,3 +4722,117 @@ O campo `Código Item JDE` vem com o texto
 `$equipamento.getCodigoItemJDE()` em parte das linhas — um *placeholder de
 template* que o Atlas não renderizou. Não é dado; é defeito da exportação
 da CLARO. Entra cru em `dados_origem` e não vira código de item.
+
+---
+
+### D-153 · O alerta de "janela estourando" saiu
+
+> *"tire o aviso […] não acho viável ou interessante por enquanto nesse
+> cenário"* — Emanuel, 23/09
+
+Ele acendia quando faltavam menos de 60 min para o fim da janela do
+cliente. O problema é o cenário: num dia em que boa parte dos contratos
+tem janela **08:00–22:00**, o aviso acende no fim da tarde para a
+operação inteira, todo dia. **Alarme que toca sempre é alarme que
+ninguém olha** — e ele ficava no topo do Dashboard, ocupando o lugar de
+quem tem algo a dizer.
+
+Saiu o aviso **e a conta**: `emRisco` e `vencidas` não eram lidos em mais
+lugar nenhum, e cálculo morto rodando a cada render é dívida silenciosa.
+O parâmetro `agora` de `calcular()` foi junto — existia só por causa
+dele, e nenhum chamador passava.
+
+O git guarda as duas se um dia voltar. Se voltar, a regra precisa de um
+corte que não seja "60 minutos para qualquer janela" — a de 14 horas e a
+de 3 horas não são o mesmo risco.
+
+---
+
+### D-154 · O romaneio move a posse, e o saldo nunca é guardado
+
+> *"o almoxarife monta uma carga para o técnico (vários equipamentos +
+> miscelânea), fecha o documento e o técnico confirma. A devolutiva
+> também é um documento"* · *"cada item tem um saldo no almoxarifado e um
+> saldo COM CADA TÉCNICO"* — escolhas do Emanuel
+
+Fase 2 do almoxarifado. A fase 1 (D-152) mostrou 15.603 peças e disse que
+**não se sabe onde nenhuma está**. Esta fase dá o instrumento de
+declarar — e de declarar com documento, não com um clique solto.
+
+#### As duas metades, e o que as une
+
+| | chave | o que muda |
+|---|---|---|
+| **Serializado** | número de série | a **posse** (077) |
+| **Miscelânea** | código do item | a **quantidade**, por lugar |
+
+Um decoder não tem "saldo 3". Um conector não tem número de série. São
+mecânicas diferentes, e por isso tabelas diferentes. O que as une é o
+**romaneio**: um documento carrega os dois.
+
+#### O saldo é soma, nunca coluna
+
+`miscelanea_movimento` é um **razão**: cada linha é um lançamento com
+sinal, e o saldo é a soma. Não existe campo `saldo` mantido por gatilho.
+
+O motivo está em `traps.md`: cache de número que a operação mexe diverge
+**calado**. Num almoxarifado ele diverge no dia em que alguém mexer num
+lançamento antigo — e aí a prateleira e a tela discordam sem ninguém
+saber qual está certa. Hoje são dezenas de linhas; se um dia a soma
+pesar, mede-se primeiro.
+
+Toda entrega lança **duas pernas**: sai de um lugar, entra no outro. O
+razão fecha em zero, e é isso que torna o total auditável.
+
+#### Nada se move até a confirmação
+
+Enquanto **ABERTO**, o romaneio é uma lista. A posse e o saldo só mexem
+em `confirmar_romaneio` — e lá a miscelânea é processada **primeiro**,
+porque ela pode recusar por saldo: recusar depois de já ter mexido na
+posse deixaria meia verdade gravada.
+
+**Documento confirmado não se cancela.** A correção é um romaneio no
+sentido contrário, que deixa rastro dos dois lados — mesma lógica da
+baixa que não se apaga (D-030). `cancelar_romaneio` só aceita ABERTO, e
+exige motivo.
+
+#### O que o banco recusa e o que ele deixa passar
+
+Recusa, porque é **conta errada**: entregar 10 de um saldo de 3;
+devolver o que o técnico não tem; entregar peça que não está no
+almoxarifado; a mesma peça em dois romaneios abertos; confirmar
+documento vazio ou já confirmado.
+
+**Deixa passar, com aviso na tela:** peça em `PERDA`, `SUCATA`,
+`INUTILIZADO` ou `COM DEFEITO` no Atlas. Bloquear seria inventar política
+de patrimônio que ninguém combinou — e com **48,9% da carga em PERDA**,
+travaria metade do estoque. O banco aceita; a tela grita em vermelho.
+
+#### Quem confirma, nesta fase
+
+Ele disse "o técnico confirma". O técnico confirma pelo **celular**, e o
+`campo/` ainda não tem essa tela. Então nesta fase quem confirma é o
+**almoxarife, no balcão**, que é como a carga acontece de manhã. O
+documento já nasce com `confirmado_por` para receber a mão do técnico sem
+migration nova.
+
+Isto é **escopo, não regra inventada**: o fato "fulano confirmou" é
+gravado com quem de fato clicou.
+
+#### O defeito que só o dedo achou
+
+O campo de série tinha `disabled={ocupado}`. O navegador **tira o foco de
+um campo que desabilita**, e `.focus()` num elemento desabilitado não faz
+nada — então depois de cada Enter o foco ia para o `BODY`, e bipar trinta
+peças viraria trinta cliques. Exatamente o contrário do que a tela existe
+para fazer.
+
+Medido na tela, digitando de verdade: `focoDepoisDoEnter: "BODY"`. A
+trava de reentrada virou um `ref`, o campo ficou sempre vivo — leitor de
+código de barras digita rápido, e desabilitar no meio de uma leitura come
+caractere — e o foco volta num `requestAnimationFrame`, depois do render.
+
+> **FICA PARA A FASE 3:** a confirmação pelo celular do técnico, e a
+> amarração com `equipamento_movimento` — quando o técnico lança o serial
+> na baixa (055-F), a peça deveria sair da posse dele para
+> `COM_ASSINANTE` sozinha. É regra nova e é do Emanuel.

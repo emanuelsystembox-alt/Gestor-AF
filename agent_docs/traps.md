@@ -128,6 +128,14 @@ serve para MOLDURA (rótulo de eixo, travessão decorativo); texto que
 carrega informação usa `graf-400` (5,88 / 4,76). E meça sempre com
 conversão de espaço de cor — regex de dígitos mente com `oklch`.
 
+**`disabled` num campo TIRA O FOCO, e `.focus()` num campo desabilitado
+nao faz nada.** O padrao "desabilita enquanto salva" mata o fluxo de
+teclado: depois do Enter o foco vai para o `BODY` e a proxima leitura nao
+entra. No balcao do almoxarifado isso vira trinta cliques para bipar
+trinta pecas. E leitor de codigo de barras digita rapido: desabilitar no
+meio de uma leitura **come caractere**. Trave a reentrada num `ref` e
+devolva o foco num `requestAnimationFrame`, depois do render. Ver D-154.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

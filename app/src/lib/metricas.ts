@@ -1,5 +1,5 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
-import { isoLocal, equipeRotulo } from './formato'
+import { equipeRotulo } from './formato'
 
 /** A equipe abrigo: onde o contrato para quando ninguém disse de quem é
  *  o login do TOA (ver `agent_docs/business-rules.md`). Mesmo código que
@@ -78,7 +78,11 @@ function media(v: number[]): number {
   return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : 0
 }
 
-export function calcular(visitas: Visita[], agora = new Date()) {
+// `agora` era parametro so por causa da janela em risco, que saiu
+// (D-153). Nenhum chamador passava: `Controle.tsx` sempre chamou
+// `calcular(filtradas)`. Parametro que ninguem usa e assinatura que
+// mente sobre o que a funcao depende.
+export function calcular(visitas: Visita[]) {
   // D-011/D-001: jornada NUNCA entra no denominador de produtividade.
   // "Na Base" e "Refeição" somaram 94 dos 349 apontamentos do dia 04/09 —
   // deixá-los dentro derruba a taxa de conclusão artificialmente.
@@ -97,26 +101,9 @@ export function calcular(visitas: Visita[], agora = new Date()) {
   const taxaConclusao = produtivas.length
     ? (concluidas.length / produtivas.length) * 100 : 0
 
-  // Janela em risco: ainda aberta e faltando menos de 60 min para o fim.
-  // Data local, não UTC: em Manaus (UTC−4) o dia virava às 20h.
-  const hojeStr = isoLocal(agora)
-  const emRisco = emAberto.filter(v => {
-    if (!v.janela_fim) return false
-    // Janela "estourando" so tem sentido para HOJE. Num periodo historico
-    // toda visita aberta apareceria como vencida, virando ruido.
-    if (v.data_agendada !== hojeStr) return false
-    const [h, m] = v.janela_fim.split(':').map(Number)
-    const limite = new Date(v.data_agendada + 'T00:00:00')
-    limite.setHours(h, m, 0, 0)
-    const faltam = (limite.getTime() - agora.getTime()) / 60000
-    return faltam <= 60
-  })
-  const vencidas = emRisco.filter(v => {
-    const [h, m] = v.janela_fim!.split(':').map(Number)
-    const limite = new Date(v.data_agendada + 'T00:00:00')
-    limite.setHours(h, m, 0, 0)
-    return limite.getTime() < agora.getTime()
-  })
+  // "Janela em risco" (menos de 60 min para o fim) foi retirada a pedido
+  // em 23/09 — ver D-153. A conta saiu junto com o aviso: metrica que
+  // ninguem le e calculo rodando a cada render por nada.
 
   // ---------- distribuição por situação ----------
   const porSituacao = (Object.keys(SITUACAO_INFO) as Situacao[]).map(s => ({
@@ -286,8 +273,6 @@ export function calcular(visitas: Visita[], agora = new Date()) {
     osImprodutivas: osImprodutivas.length,
     nossas,
     taxaConclusao,
-    emRisco: emRisco.length,
-    vencidas: vencidas.length,
     porSituacao,
     porResponsabilidade,
     motivos,
