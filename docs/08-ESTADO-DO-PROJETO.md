@@ -201,7 +201,7 @@ aparelho e sobe sozinha depois.
 
 ---
 
-## As 120 decisões
+## As 157 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -373,7 +373,98 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
-## O que falta, e por quê
+## Pendente em 23/09/2026 — o que ficou desta leva
+
+Registrado no fim da sessão que entregou: paginação de contratos, a Rota
+como mesa de despacho, o mapa do Google, o almoxarifado (fases 1, 2 e 3)
+e os ajustes do Dashboard. Ordenado por urgência, não por tamanho.
+
+### 1. A WEB NÃO ESTÁ PUBLICADA — e o banco está à frente
+
+**É a pendência que morde primeiro.** As migrations **072 a 079** estão
+aplicadas em produção; o site em `gestor-af.pages.dev` é de **antes** da
+Rota nova. Conferido baixando o bundle do ar: o `index.js` publicado não
+referencia o pedaço `Almoxarifado-*.js`, e não contém "parada a parada".
+
+Isso viola a regra do `CLAUDE.md` — *migration que muda o que a tela faz
+→ republique a tela no mesmo dia* — e é exatamente a forma do incidente
+de 09/09 (a 055 passou a recusar o que o site continuava oferecendo).
+
+**Hoje o risco é o contrário e é menor:** o banco tem mais do que o site
+usa, então nada quebra — só não aparece. Mas o Almoxarifado inteiro, a
+Rota nova e a paginação estão invisíveis para quem abre o endereço.
+
+```powershell
+cd app
+npm run build
+npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
+```
+
+> O `dist` já está compilado com tudo. A publicação foi tentada e
+> **recusada pelo controle de permissão da sessão** — não é erro do
+> Wrangler nem da conta.
+
+### 2. Dado de conferência que ficou em produção
+
+Criado por mim para provar o módulo funcionando, com dado real do
+Emanuel. Nada é fictício, mas nem tudo é declaração de gente:
+
+| O quê | Situação |
+|---|---|
+| **33 equipamentos** da `CARGA AFLINE.xlsx` | Reais, amostra que cobre os 9 estados e os 8 tipos. Reimportar o arquivo completo atualiza estas e cria as outras 15.570. |
+| Item de miscelânea **`CON-RG6`**, saldo 100 | Cadastro de teste. Desative em Almoxarifado → Miscelânea se não for usar. |
+| Romaneios **1 e 2** (confirmados) e **3** (cancelado) | 1 entregou, 2 devolveu tudo, 3 foi cancelado com motivo. Ficam no histórico — documento confirmado não se apaga, por desenho (D-154). |
+| Peças `215535341115` e `*163247013549` com posse **"No almoxarifado"** | ⚠ **Esta declaração veio da minha conferência, não de alguém olhando a prateleira.** Antes elas diziam "não sabemos". São 2 de 33; quando o inventário de verdade começar, refaça as duas. |
+
+### 3. Almoxarifado
+
+| O quê | Por que está parado |
+|---|---|
+| **Importar as 15.603 pela tela** | O caminho está provado pela RPC com dado real e a importação sobe em lotes de 500, mas o arquivo inteiro nunca passou pelo navegador. Não consigo anexar arquivo no navegador daqui — é um clique do Emanuel em Almoxarifado → Importar. |
+| **A tela do técnico no celular** | `tsc` e `expo export` passam; ninguém abriu no Expo Go. Falta o dedo na tela. |
+| **A lista real de miscelânea** | Não veio em planilha nenhuma. Conector, cabo, fita: alguém tem de cadastrar o que a operação usa de verdade, com a unidade certa. |
+| **Contestar a PERDA** | 48,9% da carga (7.629 peças) está como PERDA no Atlas. O módulo agora mostra; **atacar** é outra fase — exige saber quem foi o último responsável e o que a CLARO aceita como contestação. Regra de negócio, não código. |
+| **Inventário cíclico** | Não existe. Contar a prateleira e bater com a posse declarada é o que transforma `sem posse` em número confiável. |
+| **`Código Item JDE` com lixo** | Parte das linhas vem com `$equipamento.getCodigoItemJDE()` — *placeholder* de template que o Atlas não renderizou. Entra cru em `dados_origem` e não vira código de item. **Vale reclamar com a CLARO.** |
+
+### 4. Rota do dia e mapa
+
+| O quê | Por que está parado |
+|---|---|
+| **Dia com muitos técnicos** | Hoje são 3 faixas. Com 20 a página fica longa e a leitura pode pedir agrupamento ou filtro. Não medi. |
+| **`painel_equipes` a ~7 ms por concluída** | Medido como `authenticated`: 167 ms no dia de 32 visitas, dos quais 133 ms são a pontuação, calculada por linha. Um dia de 364 projeta **~1,7 s**. Não estourou e não foi otimizado — mas é a forma do defeito que matou `produtividade_periodo` (D-081). |
+| **Chave do Google em endereço novo** | A restrição por referenciador cobre `gestor-af.pages.dev` e `localhost:5173`. A **URL de versão** que o Wrangler gera a cada envio (`https://<hash>.gestor-af.pages.dev`) **não está na lista** — nela o mapa cai para o SVG. É esperado; só não se assuste. |
+| **`AdvancedMarkerElement`** | `google.maps.Marker` é legado. O sucessor exige um `mapId` criado no Cloud Console. Quando existir, muda um bloco só (D-146). |
+
+### 5. Dívida que atravessa telas
+
+| O quê | Por que está parado |
+|---|---|
+| **`text-graf-500` e `-600` como texto** | Medido com o motor do navegador: **3,66:1** no tema claro e **2,75:1** no escuro — abaixo do 4,5 da WCAG AA. Corrigidos só na **Rota** e no **Almoxarifado**; o resto do app segue usando. Arrumar a rampa mexe em todas as telas e nunca foi o pedido. |
+| **A corrida do `carregarSituacoes()`** | O cadastro de cor e rótulo chega **depois** do primeiro render e muta um objeto de módulo, o que não provoca re-render. A tela desenha com o padrão compilado e fica com ele. Foi o que fez "cancelada" ficar cinza (D-142); os valores estão alinhados, mas a corrida continua de pé para qualquer situação. |
+| **Serviços carrega o período inteiro** | A paginação (D-151) é recorte de tela, não de consulta — de propósito, para os filtros e a soma de pontos continuarem valendo sobre o conjunto. Se um período longo pesar, é a **consulta** que muda, não o recorte. |
+| **Tipos de O.S. 79 e 87 sem grupo** | O `32` foi declarado como `DESCONEXAO` porque o Emanuel disse. `79 DESCONEXAO OPCAO C/ RETIRADA DE EQUIPAMENTO` e `87 RETIRAR EMTA` **parecem** desconexão — e parecer não é dado. São 6 O.S. presas. Configurações → Tipo de serviço, um clique cada. |
+| **`24`, `156` e `208` dependem do contexto** | No cruzamento de 04/09 o grupo desses três variava conforme as outras O.S. da mesma visita. A tela marca com etiqueta e deixa escolher; escolher é **simplificar**, e tem de ser decisão de gente. |
+| **A importação grava sempre na base MAN** | `.eq('codigo','MAN')` em `Importacao.tsx`. A planilha de 10/09 é de **Araguaína** e foi registrada como Manaus — o mapa da Rota mostra isso desenhado. Com duas praças no ar, produtividade e faturamento somam operações diferentes no mesmo lugar. **Escolher a praça da importação é regra de negócio** (D-141). |
+
+### 6. Decidido, mas não construído
+
+Respostas que o Emanuel já deu e que estão esperando código:
+
+- **Confirmação do romaneio com assinatura** — hoje o técnico confirma
+  com um toque; `confirmado_por` guarda quem foi. Assinatura desenhada,
+  foto do canhoto ou geolocalização da entrega são fase seguinte.
+- **Alerta de "janela estourando"** — retirado a pedido (D-153). Se
+  voltar, precisa de um corte que **não** seja "60 minutos para qualquer
+  janela": a de 14 horas e a de 3 horas não são o mesmo risco.
+- **Financeiro, Frota e RH** — já existem no menu como *Próximas fases*,
+  e as permissões `financeiro.ver` e `frota.ver` já estão no catálogo
+  marcadas `disponivel = false`, como o almoxarifado estava antes da 077.
+
+
+---
+
+## O que falta, e por quê (levas anteriores)
 
 | O quê | Por que está parado |
 |---|---|

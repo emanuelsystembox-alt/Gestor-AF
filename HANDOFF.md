@@ -223,6 +223,24 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
+> ### ⚠ Comece por aqui: a web está ATRÁS do banco
+>
+> As migrations **072 a 079** estão aplicadas em produção e o site em
+> `gestor-af.pages.dev` é de **antes** da Rota nova — o Almoxarifado
+> inteiro, a mesa de despacho e a paginação não estão no ar. Conferido
+> baixando o bundle e comparando.
+>
+> ```powershell
+> cd app
+> npm run build
+> npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
+> ```
+>
+> **A lista completa e atualizada do que ficou pendente está em
+> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 23/09/2026"** — ela
+> tem o que é urgente, o dado de conferência que ficou em produção e as
+> dívidas que atravessam telas. A tabela abaixo é das levas anteriores.
+
 | O quê | Por quê |
 |---|---|
 | ~~**O critério 3 conta como cadastro?**~~ | **RESOLVIDO em 07/09: NÃO vale** — D-088 revoga o D-082. Só o login cadastrado leva contrato para equipe; o resto fica em "Sem login definido". |
