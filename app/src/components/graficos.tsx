@@ -66,7 +66,10 @@ export function BarrasHorizontais({
   dados, cor = 'var(--color-af-600)', sufixo = '', parte = false,
   rotuloLargo = false, totalRef,
 }: {
-  dados: { rotulo: string; valor: number; cor?: string; nota?: string }[]
+  /** `texto` troca só o que se LÊ ao lado da barra (ex.: `1h46`); o
+   *  comprimento continua em `valor`, na mesma escala das outras. Barra
+   *  em horas ao lado de barra em minutos mentiria no tamanho. */
+  dados: { rotulo: string; valor: number; cor?: string; nota?: string; texto?: string }[]
   cor?: string
   sufixo?: string
   parte?: boolean
@@ -94,8 +97,9 @@ export function BarrasHorizontais({
             <div className="h-full rounded-sm transition-all"
                  style={{ width: `${Math.max((d.valor / max) * 100, 1.5)}%`, background: d.cor ?? cor }} />
           </div>
-          <span className="tabular w-12 shrink-0 text-right text-xs font-semibold">
-            {d.valor}{sufixo}
+          <span className={`tabular ${dados.some(x => x.texto) ? 'w-16' : 'w-12'}
+                            shrink-0 text-right text-xs font-semibold`}>
+            {d.texto ?? `${d.valor}${sufixo}`}
           </span>
           {parte && (
             <span className="tabular w-10 shrink-0 text-right text-[11px] text-graf-500">

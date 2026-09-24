@@ -24,13 +24,22 @@ import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
  */
 
 /** O que a tabela precisa ler. Quem consulta usa este SELECT para não
- *  descobrir na tela que faltou um campo. */
+ *  descobrir na tela que faltou um campo.
+ *
+ *  `status_toa` e `motivo_fechamento_toa` saem do JSON cru da
+ *  importação pela CHAVE, no próprio PostgREST (`->>`). Trazer
+ *  `dados_origem` inteiro mandaria nome, telefone e endereço do
+ *  assinante para cada linha da lista — que a tabela não usa. As aspas
+ *  preservam o espaço da chave: o supabase-js só apaga espaço FORA
+ *  delas. */
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
   finalizado_toa, produtos_pendentes,
+  status_toa:dados_origem->>"Status da Atividade",
+  motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo, apelido ),
@@ -73,6 +82,12 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
    *  quem nao encerrou (D-103). */
   finalizado_toa?: boolean
+  /** "Status da Atividade" da planilha do TOA, como veio (concluído,
+   *  não concluído, iniciado…). Nulo em contrato que não veio do TOA. */
+  status_toa?: string | null
+  /** "Motivo de Fechamento Externo" do TOA — ex.: "Liberado no Sistema
+   *  NETSMS". Vazio na maioria das linhas. */
+  motivo_fechamento_toa?: string | null
   node: string | null
   complemento: string | null
   /** Rota decidida por gente: a importação não remaneja este (066). */
@@ -342,6 +357,30 @@ export function TabelaContratos({
                           className="text-[10px] text-sky-400">⚲</span>
                   )}
                 </div>
+                {/* ┌─ a palavra do TOA, ao lado da nossa ────────────────┐
+                    │ A etiqueta acima é a situação DESTA casa. O TOA tem │
+                    │ o próprio "Status da Atividade" e, às vezes, um     │
+                    │ "Motivo de Fechamento Externo" — e os dois podem    │
+                    │ divergir da etiqueta (em 23/09: EM EXECUÇÃO aqui,   │
+                    │ "não concluído · Liberado no Sistema NETSMS" lá).   │
+                    │ Escritos como vieram, sem traduzir: é a leitura da  │
+                    │ operadora, e a diferença tem de aparecer (D-042).   │
+                    └─────────────────────────────────────────────────────┘ */}
+                {(v.status_toa || v.motivo_fechamento_toa) && (
+                  <div className="mt-1 max-w-48 text-[10px] leading-snug text-graf-400"
+                       title="Como está no TOA: Status da Atividade e Motivo de Fechamento Externo">
+                    {v.status_toa && (
+                      <div>
+                        <span className="mr-1 rounded-sm bg-graf-800 px-1 text-[9px]
+                                         font-bold uppercase tracking-wider">TOA</span>
+                        {v.status_toa}
+                      </div>
+                    )}
+                    {v.motivo_fechamento_toa && (
+                      <div className="mt-0.5 italic">{v.motivo_fechamento_toa}</div>
+                    )}
+                  </div>
+                )}
                 {/* TEC1: sobe junto com a baixa do TOA. Sem etiqueta = a
                     regra não se aplica àquela atividade (D-099). */}
                 {v.tec1 === 'PADRAO' && (

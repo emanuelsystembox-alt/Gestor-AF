@@ -349,9 +349,9 @@ export default function Controle() {
               </Painel>
 
               <Painel titulo="Tempo médio por etapa"
-                dica="Minutos. Só das visitas que têm as duas pontas medidas."
-                tabela={<TabelaSimples colunas={['Etapa', 'Minutos']}
-                  linhas={m.etapas.map(e => [e.rotulo, e.valor])} />}
+                dica="Atraso em horas; as etapas em minutos. Só das visitas que têm as duas pontas medidas."
+                tabela={<TabelaSimples colunas={['Etapa', 'Tempo', 'Minutos']}
+                  linhas={m.etapas.map(e => [e.rotulo, e.texto, e.valor])} />}
                 nota={<>
                   {/* ┌─ o rotulo enganava, e ele perguntou ─────────────┐
                       │ > "o atraso sobre a janela é quanto tempo médio a │
@@ -371,13 +371,13 @@ export default function Controle() {
                   técnico começou — não é o tempo entre um contrato e o seguinte.
                   Negativo significa que chegou adiantado.
                   {' '}Por isso ele convive com “chegou dentro da janela”: numa janela
-                  de 08h–22h dá para começar 100 min depois da abertura e ainda estar
+                  de 08h–22h dá para começar 1h40 depois da abertura e ainda estar
                   folgadamente no prazo.
                   {' '}As três barras <strong className="text-graf-300">não se somam</strong>:
                   as duas de baixo são etapas do atendimento, esta é a distância até o
                   combinado.
                 </>}>
-                <BarrasHorizontais dados={m.etapas} sufixo=" min" />
+                <BarrasHorizontais dados={m.etapas} />
               </Painel>
 
               {/* ===== equipes: o ranking que ainda não dá para fazer ===== */}

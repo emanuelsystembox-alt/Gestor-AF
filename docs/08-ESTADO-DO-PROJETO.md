@@ -201,7 +201,7 @@ aparelho e sobe sozinha depois.
 
 ---
 
-## As 157 decisões
+## As 158 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 

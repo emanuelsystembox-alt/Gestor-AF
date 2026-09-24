@@ -83,7 +83,7 @@ app/                  web do controle (13 telas)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Visita · Captura
-docs/                 mapeamento, domínio, 157 decisões, mapa do concorrente
+docs/                 mapeamento, domínio, 158 decisões, mapa do concorrente
 supabase/migrations/  schema, em ordem (61)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -119,7 +119,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 157 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 158 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |

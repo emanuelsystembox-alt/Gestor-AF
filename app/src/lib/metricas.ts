@@ -1,5 +1,5 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
-import { equipeRotulo } from './formato'
+import { equipeRotulo, horasMin } from './formato'
 
 /** A equipe abrigo: onde o contrato para quando ninguém disse de quem é
  *  o login do TOA (ver `agent_docs/business-rules.md`). Mesmo código que
@@ -205,10 +205,15 @@ export function calcular(visitas: Visita[]) {
 
   const desloc = produtivas.map(v => intervParaMin(v.tempo_deslocamento)).filter((x): x is number => x !== null)
   const exec = produtivas.map(v => minEntre(v.inicio, v.fim)).filter((x): x is number => x !== null)
-  const etapas = [
-    { rotulo: 'Atraso sobre a janela', valor: media(atraso), cor: '#f59e0b' },
-    { rotulo: 'Deslocamento', valor: media(desloc), cor: '#0ea5e9' },
-    { rotulo: 'Execução', valor: media(exec), cor: '#16a34a' },
+  // O atraso é escrito em HORAS -- "eu quero em horas o atraso sobre a
+  // janela, é melhor" (Emanuel, 23/09): 106 min não se lê de relance,
+  // 1h46 sim. O `valor` segue em minutos para a barra ficar na mesma
+  // escala das outras duas, que são curtas e continuam em minutos.
+  const mAtraso = media(atraso)
+  const etapas: { rotulo: string; valor: number; cor: string; texto: string }[] = [
+    { rotulo: 'Atraso sobre a janela', valor: mAtraso, cor: '#f59e0b', texto: horasMin(mAtraso) },
+    { rotulo: 'Deslocamento', valor: media(desloc), cor: '#0ea5e9', texto: `${media(desloc)} min` },
+    { rotulo: 'Execução', valor: media(exec), cor: '#16a34a', texto: `${media(exec)} min` },
   ]
   const gargalo = etapas.reduce((a, b) => (b.valor > a.valor ? b : a), etapas[0])
 

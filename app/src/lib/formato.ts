@@ -20,6 +20,17 @@ export const num2 = (n: number | string | null | undefined) =>
 export const pts = (n: number | string | null | undefined) =>
   n == null ? '' : `${num2(n)} pts`
 
+/**
+ * `1h46` — minutos escritos em horas. Negativo sai com sinal (`−0h20`):
+ * no atraso sobre a janela, negativo é quem chegou ADIANTADO, e isso
+ * não pode sumir no arredondamento.
+ */
+export const horasMin = (min: number | null | undefined) => {
+  if (min == null) return ''
+  const t = Math.round(Math.abs(min))
+  return `${min < 0 && t > 0 ? '−' : ''}${Math.floor(t / 60)}h${String(t % 60).padStart(2, '0')}`
+}
+
 /** `R$ 1.157,10` */
 export const reais = (n: number | string | null | undefined) =>
   n == null ? '' : Number(n).toLocaleString('pt-BR',

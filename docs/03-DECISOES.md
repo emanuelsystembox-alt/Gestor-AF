@@ -4942,3 +4942,46 @@ cliente) e `posse_motivo` guarda de onde ela veio:
 `campo: instalado no contrato 1149124 (antes: COM_TECNICO)`. Quem
 conferir o inventário vê que houve peça saindo sem romaneio, em vez de
 ver um estoque redondo e falso.
+
+---
+
+### D-158 · A situação mostra também a palavra do TOA, e o atraso vira horas
+
+> *"na situação quero também incluir o status da atividade e Motivo de
+> Fechamento Externo dentro do campo situação, isso também tem que
+> refletir tanto no campo dos serviços como no campo das equipes"* e
+> *"eu quero em horas o atraso sobre a janela, é melhor"* — Emanuel, 23/09
+
+#### 1 · Status da Atividade e Motivo de Fechamento Externo
+
+A etiqueta da coluna Situação é a situação **desta casa**. O TOA tem a
+dele, e as duas divergem — no dia 23/09 o contrato 1150092 estava
+**EM EXECUÇÃO** aqui e **"não concluído · Liberado no Sistema NETSMS"**
+no TOA. Mesma lógica das duas baixas (D-042): as duas lado a lado, para
+a diferença aparecer. Os textos saem **como vieram**, sem traduzir.
+
+Aparece embaixo da etiqueta, em `TabelaContratos` — o componente único
+de Serviços e Equipes (D-095), então as duas telas mudam juntas.
+
+**Sem migration.** Os dois campos já moravam em `visita.dados_origem`.
+O `SELECT_CONTRATO` extrai só as duas chaves no PostgREST
+(`dados_origem->>"Status da Atividade"`).
+
+**Recusado: trazer `dados_origem` inteiro.** O JSON cru carrega nome,
+telefone e endereço do assinante; a lista não usa isso e não tem por que
+mandá-lo pela rede a cada linha.
+
+> ⚠ Chave com espaço funciona porque vai **entre aspas**: o supabase-js
+> apaga todo espaço do `select`, **menos** o que está dentro de aspas.
+> Conferido no código da `postgrest-js` e com `curl` no PostgREST
+> (coluna inexistente dá 400; a extração, 200).
+
+#### 2 · Atraso sobre a janela em horas
+
+106 min vira **1h46** (`horasMin` em `lib/formato.ts`). Negativo sai com
+sinal — é quem chegou adiantado.
+
+**Só o texto muda; o comprimento da barra continua em minutos.** As
+outras duas etapas (deslocamento, execução) são curtas e ficam em
+minutos; desenhar uma barra em horas ao lado de outra em minutos faria o
+tamanho mentir. O "Ver tabela" traz as duas leituras.
