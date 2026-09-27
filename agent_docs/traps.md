@@ -76,6 +76,22 @@ contradizia**. Antes de cachear, meça: `tec1_da_os` ao vivo sobre o dia
 inteiro custou **4,8 ms** contra 340 ms do painel. O cache não comprava
 nada. Ver D-150.
 
+**Lista fechada em CHECK pega tipo novo.** `aviso.tipo` aceita só os
+tipos que existiam na 059; a 091 inseriu `MATERIAL` e estourou 23514 no
+primeiro teste. Antes de gravar valor novo numa coluna de "tipo", olhe o
+CHECK dela (`pg_get_constraintdef`) — e amplie na mesma migration. Ver
+D-167.
+
+**`ativo = false` não é "vigência encerrada".** `definir_meta_comissao`
+fechava a meta antiga com `ativo = false`, e toda leitura filtra
+`ativo`: trocar a meta em outubro deixaria setembro sem meta. Período
+se fecha com a data (`vigencia_fim`); `ativo` é para desligar o que
+estava errado. Ver D-167.
+
+**Crase dentro de aspas duplas no bash é comando.** `node -e "…\`x\`…"`
+executa `x` como command substitution antes do node ver o texto. Script
+com crase (Markdown, template string) vai num arquivo, não em `-e`.
+
 **NOT NULL de coluna não aparece em `pg_constraint`.** Conferir
 restrição com `select … from pg_constraint` mostra CHECK, FK e UNIQUE —
 e esconde o NOT NULL, que mora em `information_schema.columns.is_nullable`.

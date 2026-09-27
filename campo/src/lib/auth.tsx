@@ -25,6 +25,9 @@ interface Ctx {
    *  (059) — canal por equipe, não um canal para todo mundo. Nulo para
    *  quem não é técnico. */
   equipeId: string | null
+  /** O técnico deste login (`tecnico.usuario_id`). É a chave da conversa
+   *  com o controle (091): o canal do chat filtra por ele. */
+  tecnicoId: string | null
   papeis: Papel[]
   permissoes: string[]
   pode: (chave: string) => boolean
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [papeis, setPapeis] = useState<Papel[]>([])
   const [permissoes, setPermissoes] = useState<string[]>([])
   const [equipeId, setEquipeId] = useState<string | null>(null)
+  const [tecnicoId, setTecnicoId] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
 
   /**
@@ -70,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s)
       if (!s) {
         setPerfil(null); setPapeis([]); setPermissoes([])
-        setEquipeId(null); setCarregando(false)
+        setEquipeId(null); setTecnicoId(null); setCarregando(false)
       }
     })
     return () => { vivo = false; sub.subscription.unsubscribe() }
@@ -91,14 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Vem de `tecnico`, não de `perfil`: quem manda no escopo é
         // `tecnico.usuario_id` — `perfil.tecnico_id` é conveniência de
         // tela e pode estar vazio.
-        supabase.from('tecnico').select('equipe_id')
+        supabase.from('tecnico').select('id, equipe_id')
           .eq('usuario_id', usuarioId).maybeSingle(),
       ])
       if (!vivo) return
       setPerfil((p.data as Perfil | null) ?? null)
       setPapeis(((r.data ?? []) as { papel: Papel }[]).map(x => x.papel))
       setPermissoes(((q.data ?? []) as { chave: string }[]).map(x => x.chave))
-      setEquipeId((t.data as { equipe_id: string | null } | null)?.equipe_id ?? null)
+      const tec = t.data as { id: string; equipe_id: string | null } | null
+      setEquipeId(tec?.equipe_id ?? null)
+      setTecnicoId(tec?.id ?? null)
       setCarregando(false)
     })()
     return () => { vivo = false }
@@ -108,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const ehGestor = temPapel('ADMIN', 'COP')
 
   const valor: Ctx = {
-    session, perfil, papeis, permissoes, equipeId, carregando, temPapel, ehGestor,
+    session, perfil, papeis, permissoes, equipeId, tecnicoId, carregando, temPapel, ehGestor,
     pode: (chave: string) => permissoes.includes(chave),
     // "Campo" é quem SÓ tem o papel do campo — a mesma conta que o
     // banco faz em `baixar_os` (055-G). Um controlador que também está

@@ -151,6 +151,9 @@ As três últimas, para não repetir o esquecimento:
 | 089a | `item_miscelanea.codigo` deixa de ser NOT NULL (a carga do catálogo morreu no primeiro item sem código SAP) | ✓ |
 | 089b | **O catálogo do concorrente vira o nosso** — 418 itens ativos do Alfa Gestor, de `supabase/dados/catalogo_miscelanea_alfa_2026-09-26.txt`; 2 fora por código SAP repetido | ✓ |
 | 089c | O Kardex ganha `seq`: lançamentos no mesmo instante saíam fora de ordem | ✓ |
+| 091 | **O campo conversa com o controle** — produção única, ranking, ritmo, central, chat (`mensagem`), sinalização de material, abastecimento pelo campo; **091b** amplia `aviso.tipo` (MATERIAL); **091c** o painel calcula a produção uma vez (D-167) | ✓ |
+| 092 | **A meta na Administração** — `metas_das_skills()`; trocar a meta não apaga mais o mês anterior; `hoje_local()` (D-167) | ✓ |
+| 093 | **Os pontos em conjunto** — `pontos_das_visitas(uuid[])`, `edificacao_de`/`edificacao_origem`; `pontos_por_periodo`, painel, ranking e ritmo passam a somar em conjunto (388 → 35 ms, 0 diferenças) (D-167) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

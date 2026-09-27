@@ -410,7 +410,7 @@ export default function Produtividade() {
                 ) : (<>
                   Meta de{' '}
                   <strong className="tabular">{meta == null ? '—' : num2(Number(meta))}</strong>
-                  {' '}pontos no mês. Abaixo dela não há fator.
+                  {' '}pontos no mês. O fator não depende da meta: sai da faixa que a pontuação alcançou, e pode começar antes dela.
                 </>)}
               </p>
             </div>
@@ -452,7 +452,7 @@ export default function Produtividade() {
                   className={`tabular ${sel} w-32`} />
               </label>
               <p className="mt-1.5 text-[11px] text-graf-500">
-                A meta não se sobrescreve: a antiga fecha hoje e a nova começa amanhã, para
+                A meta não se sobrescreve: a antiga vale até ontem e a nova a partir de hoje, para
                 não reescrever a comissão de um mês já fechado.
               </p>
             </div>

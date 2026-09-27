@@ -82,9 +82,10 @@ app/                  web do controle (15 telas, com Almoxarifado e Frota)
   scripts/            criar-usuarios-teste.mjs (exige service_role)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · midia · avisos · dominio · formato · auth
-  src/telas/          Entrar · Agenda · Visita · Captura
-docs/                 mapeamento, domínio, 166 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (87 arquivos, até a 090)
+  src/telas/          Entrar · Agenda · Painel · Conversa · Material
+                      Abastecer · Visita · Captura · Romaneios · Transferir
+docs/                 mapeamento, domínio, 167 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (90 arquivos, até a 093)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -120,7 +121,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 166 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 167 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |

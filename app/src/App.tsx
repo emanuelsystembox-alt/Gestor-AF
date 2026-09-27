@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
+import { CentralProvider } from './lib/central'
 import Login from './pages/Login'
 const Controle = lazy(() => import('./pages/Controle'))
 const Servicos = lazy(() => import('./pages/Servicos'))
@@ -67,6 +68,9 @@ function Raiz() {
 export default function App() {
   return (
     <AuthProvider>
+      {/* A central fica ACIMA das rotas: um canal de Realtime a sessão
+          inteira, e não um por página (091). */}
+      <CentralProvider>
       <Suspense fallback={<Carregando />}>
       <Routes>
         <Route path="/" element={<Raiz />} />
@@ -108,6 +112,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      </CentralProvider>
     </AuthProvider>
   )
 }

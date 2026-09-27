@@ -6,6 +6,9 @@ import { supabase, EM_ABERTO } from '../lib/supabase'
 import { isoLocal } from '../lib/formato'
 import { Avatar, Logo, Marca } from './ui'
 import { Icone, type NomeIcone } from './icones'
+import { useCentral } from '../lib/central'
+import { PainelCentral } from './PainelCentral'
+import { ChatControle } from './ChatControle'
 
 interface Item {
   para: string; rotulo: string; icone: NomeIcone
@@ -146,9 +149,12 @@ function useAbertosHoje(ligado: boolean): number | null {
   return n
 }
 
+/** O número ao lado de um item do menu, e o que ele conta. */
+interface Contagem { n: number | null; titulo: string }
+
 function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
   modulo: Modulo; recolhido: boolean; fechado: boolean; alternar: () => void
-  contagens: Record<string, number | null>; aoNavegar?: () => void
+  contagens: Record<string, Contagem>; aoNavegar?: () => void
 }) {
   const local = useLocation()
   const temAtivo = modulo.itens.some(i => ativo(local.pathname, i.para))
@@ -177,7 +183,8 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
         <nav className="space-y-0.5">
           {modulo.itens.map(i => {
             const eh = ativo(local.pathname, i.para)
-            const n = contagens[i.para]
+            const c = contagens[i.para]
+            const n = c?.n ?? null
             if (i.futuro) return (
               <span key={i.para}
                 className={`flex cursor-not-allowed items-center gap-2.5 rounded-md py-1.5
@@ -193,7 +200,7 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
             )
             return (
               <NavLink key={i.para} to={i.para} onClick={aoNavegar}
-                title={recolhido ? (n != null ? `${i.rotulo} · ${n} em aberto hoje` : i.rotulo) : undefined}
+                title={recolhido ? (n != null ? `${i.rotulo} · ${n} ${c!.titulo}` : i.rotulo) : undefined}
                 aria-current={eh ? 'page' : undefined}
                 className={`relative flex items-center gap-2.5 rounded-md py-1.5 text-sm transition ${
                   recolhido ? 'justify-center px-0' : 'px-3'} ${
@@ -207,7 +214,7 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                 {!recolhido && <>
                   <span className="truncate">{i.rotulo}</span>
                   {n != null && (
-                    <span title="Em aberto hoje (sem jornada)"
+                    <span title={c!.titulo}
                       className={`tabular ml-auto rounded px-1.5 text-[11px] font-medium ${
                         eh ? 'bg-af-600/25 text-af-200' : 'bg-graf-800 text-graf-300'}`}>
                       {n}
@@ -309,8 +316,21 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   const [busca, setBusca] = useState(false)
   const aberto = !recolhido || espiando
 
-  const abertos = useAbertosHoje(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR'))
-  const contagens = { '/controle/servicos': abertos }
+  const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
+  const abertos = useAbertosHoje(gestao)
+  const central = useCentral()
+  const [sinoAberto, setSinoAberto] = useState(false)
+  const naoLidas = central.dados?.mensagens?.reduce((s, m) => s + Number(m.nao_lidas), 0) ?? null
+  // 091: o selo do módulo mostra o que o CAMPO pediu e ainda espera
+  // resposta — sinalização de material, pedido de abastecimento. Sem a
+  // central carregada, nulo: nada de "0" que ninguém mediu.
+  const contagens: Record<string, Contagem> = {
+    '/controle/servicos': { n: abertos, titulo: 'em aberto hoje (sem jornada)' },
+    // Selo de pedido só aparece quando há pedido: é chamada de atenção,
+    // não inventário.
+    '/almoxarifado': { n: central.dados?.material?.length || null, titulo: 'sinalização(ões) do campo aguardando' },
+    '/frota': { n: central.dados?.abastecimento?.length || null, titulo: 'abastecimento(s) aguardando aprovação' },
+  }
 
   useEffect(() => {
     try { localStorage.setItem(CHAVE_MENU, recolhido ? '1' : '0') } catch { /* sem storage */ }
@@ -457,6 +477,47 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
 
             <div className="ml-auto flex items-center gap-3">
               {acoes}
+              {/* 091: a conversa com o campo e a central. O balão conta
+                  mensagem; o sino conta o que pede AÇÃO. */}
+              {gestao && (
+                <button onClick={() => central.abrirChat(null)}
+                  aria-label={naoLidas ? `Conversas, ${naoLidas} não lida(s)` : 'Conversas com o campo'}
+                  title="Conversas com o campo"
+                  className="relative rounded-md border border-graf-700 px-2 py-1 text-graf-300
+                             hover:border-af-600 hover:text-af-400">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
+                    <path d="M4 5.5h16v10H9l-4.5 3.5V15.5H4z" />
+                  </svg>
+                  {!!naoLidas && (
+                    <span className="tabular absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-af-600 px-1
+                                     text-center text-[10px] font-semibold leading-4 text-white">
+                      {naoLidas > 99 ? '99+' : naoLidas}
+                    </span>
+                  )}
+                </button>
+              )}
+              {central.dados && (
+                <div className="relative">
+                  <button onClick={() => setSinoAberto(a => !a)} aria-expanded={sinoAberto}
+                    aria-label={central.total ? `Central: ${central.total} item(ns) pedindo atenção` : 'Central do controle'}
+                    title="O que pede atenção"
+                    className="relative rounded-md border border-graf-700 px-2 py-1 text-graf-300
+                               hover:border-af-600 hover:text-af-400">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" />
+                    </svg>
+                    {central.total > 0 && (
+                      <span className="tabular absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-orange-500 px-1
+                                       text-center text-[10px] font-semibold leading-4 text-white">
+                        {central.total > 99 ? '99+' : central.total}
+                      </span>
+                    )}
+                  </button>
+                  {sinoAberto && <PainelCentral fechar={() => setSinoAberto(false)} />}
+                </div>
+              )}
               <button
                 onClick={() => setTema(tema === 'escuro' ? 'claro' : 'escuro')}
                 title={tema === 'escuro' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
@@ -475,6 +536,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
         </header>
 
         <main className="min-w-0 flex-1">{children}</main>
+        <ChatControle />
       </div>
     </div>
   )

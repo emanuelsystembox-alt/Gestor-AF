@@ -17,6 +17,7 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
+import { BarraInferior } from '../ui/BarraInferior'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -272,13 +273,17 @@ export default function Agenda({ navigation }: Props) {
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 6 }}>
                 <Text style={e.numeraoGrande}>{num2(p)}</Text>
-                <Text style={[e.miudo, { paddingBottom: 4 }]}>de {num2(alvo)} pts</Text>
+                <Text style={[e.miudo, { paddingBottom: 4 }]}>
+                  {producao.meta == null ? 'pts · sem meta cadastrada' : `de ${num2(alvo)} pts`}
+                </Text>
               </View>
               <View style={e.trilho}>
                 <View style={[e.progresso, { width: `${pct}%` }]} />
               </View>
               <Text style={e.miudoEscuro}>
-                {producao.fator == null
+                {producao.meta == null
+                  ? 'A meta da sua skill ainda não foi cadastrada. Veja o Painel.'
+                  : producao.fator == null
                   ? `Faltam ${pts(falta)} para entrar na primeira faixa.`
                   : `Fator ${num2(Number(producao.fator))} · a receber ${reais(producao.valor)}`}
               </Text>
@@ -387,6 +392,7 @@ export default function Agenda({ navigation }: Props) {
           </Text>
         )}
       </ScrollView>
+      <BarraInferior ativa="Agenda" />
     </SafeAreaView>
   )
 }

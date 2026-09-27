@@ -1,9 +1,32 @@
 import type { ReactNode } from 'react'
 import {
-  ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle,
+  ActivityIndicator, Image, Pressable, StyleSheet, Text, View, type ViewStyle,
 } from 'react-native'
 import { corSituacao, rotuloSituacao } from '../lib/dominio'
 import { cor, raio, sombraCard, TOQUE, TOQUE_GRANDE } from './tema'
+
+/**
+ * A marca da AFLINE, a arte oficial (091). No web ela foi redesenhada em
+ * SVG (D-166); aqui não há SVG sem instalar biblioteca, então vai a arte
+ * como está — o fundo grafite dela vira o selo, como ícone de aplicativo.
+ */
+export function Marca({ tamanho = 38 }: { tamanho?: number }) {
+  return (
+    <Image source={require('../../assets/marca-afline.png')}
+      style={{ width: tamanho, height: tamanho, borderRadius: tamanho * 0.24 }}
+      accessibilityLabel="AFLINE" />
+  )
+}
+
+/** Cabeçalho de seção: título forte e, à direita, o complemento miúdo. */
+export function TituloSecao({ titulo, extra }: { titulo: string; extra?: string }) {
+  return (
+    <View style={e.secao}>
+      <Text style={e.secaoTitulo} accessibilityRole="header">{titulo}</Text>
+      {extra ? <Text style={e.secaoExtra}>{extra}</Text> : null}
+    </View>
+  )
+}
 
 export function Cartao({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return <View style={[e.cartao, style]}>{children}</View>
@@ -106,6 +129,15 @@ export function Carregando({ texto = 'Carregando…' }: { texto?: string }) {
 }
 
 const e = StyleSheet.create({
+  secao: {
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
+    paddingHorizontal: 2, marginTop: 6,
+  },
+  secaoTitulo: {
+    fontSize: 12, fontWeight: '800', color: cor.graf600,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+  },
+  secaoExtra: { fontSize: 12, color: cor.graf500 },
   cartao: {
     backgroundColor: cor.branco,
     borderWidth: 1,

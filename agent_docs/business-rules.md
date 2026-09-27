@@ -179,6 +179,35 @@ Quem estava sem sinal lê o que perdeu ao voltar.
 
 ---
 
+## O campo e o controle (091 e 092, D-167)
+
+Definições do Emanuel (27/09). **Uma conta só** (`producao_por_tecnico`)
+alimenta o painel do técnico, o ranking e a central; não some de outro jeito.
+
+- **Pedido de ajuda = o Impedimento feito pelo campo.** Contrato de hoje
+  em `COM_IMPEDIMENTO` cujo último evento veio de `origem = MOBILE`.
+- **Quebrado = visita com O.S. de baixa IMPRODUTIVA** (código da
+  operadora, o mesmo do Dashboard). **Pontos perdidos** = o que a quebrada
+  **não concluída** valeria; sem regra de pontos, conta à parte (D-117).
+- **O técnico vê o ranking inteiro**, com nome e pontos.
+- **Menos produtivo = abaixo do ritmo da meta**: pontos concluídos até o
+  corte (12h, 15h, 18h) < meta do dia × fração da jornada. Meta do dia =
+  meta do mês ÷ 26; jornada 08:00–18:00 em linha reta (parâmetros
+  `ritmo_*`, aprovados). Sem meta para a skill: **sem meta**, não "abaixo".
+- **A meta é da skill** e se configura em Administração › Metas.
+  Trocar a meta **não reescreve o passado**: a antiga vale até ontem
+  (vigência), a nova a partir de hoje. ADESÃO = **120 pts/mês**, com faixas a partir
+  de **110** (a escada da SINGLE MASTER 10 pts abaixo) — o fator começa
+  antes da meta, por decisão do Emanuel (27/09).
+- **O chat é uma conversa por técnico**, compartilhada pelos
+  controladores que enxergam a equipe dele. Autor carimbado pelo servidor.
+- **Sinalizar material não move nada** (nem saldo, nem posse): é pedido.
+  Recusar exige motivo; a resposta volta como aviso ao técnico.
+- **O técnico pede abastecimento** do carro que está no nome dele; nasce
+  em aberto e a frota aprova. Odômetro não bloqueia.
+
+---
+
 ## Almoxarifado (077 a 087, D-152 a D-163)
 
 **Três eixos por peça, três donos.** `estado_atlas` é da CLARO e só a
@@ -262,7 +291,7 @@ muito baixo) são para conferir, **nunca bloqueiam** lançamento.
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)
-- meta e faixas de ADESÃO, MANUTENÇÃO e DESCONEXÃO (D-094)
+- meta e faixas de MANUTENÇÃO e DESCONEXÃO (D-094, D-167)
 - `ITEM` / `CONSOLID` / `VALOR` por O.S. — a LPU, não modelada
 - 34 regras de pontuação marcadas `CONFERIR`; 448 regras coringa
 - retenção de evidência: por quanto tempo a CLARO audita?

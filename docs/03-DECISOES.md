@@ -5706,3 +5706,171 @@ O que ele não tem e entrou:
 **Não explorado ao vivo:** o Chrome com a sessão do ngestor não estava
 conectado nesta sessão, e o navegador embutido não tem login lá. O
 desenho partiu do mapa já levantado em `docs/05`.
+
+---
+
+### D-167 · O campo conversa com o controle: painel, ranking, chat, material, combustível e a central
+
+> *"visão de produtividade do técnico […] quantos pontos ele já fez, e
+> quantos ainda falta para a meta, visão de rank […] módulo combustível
+> […] módulo estoque […] sinalizar que está faltando algum ferramental ou
+> está com defeito […] módulo chat […] popup ou selo no canto superior
+> direito, informando técnicos que perderam tec1, técnicos menos
+> produtivos até 12 horas, até 15 horas, até 18 horas, técnico que mais
+> quebrou […] quando o técnico jogar o contrato no pendente, que é ajuda
+> ao controlador, o sistema vai enviar uma notificação"* — Emanuel, 27/09
+
+#### As definições, perguntadas antes de escrever (27/09)
+
+| pergunta | resposta do Emanuel |
+|---|---|
+| "jogar no pendente" é o quê? | **é o Impedimento** do app |
+| o que é contrato "quebrado"? | **O.S. com baixa IMPRODUTIVA**; pontos perdidos = o que ela valeria |
+| o que o técnico vê do ranking? | **a lista inteira**, com nome e pontos |
+| "menos produtivo até 12/15/18h"? | **abaixo do ritmo da meta** |
+| os números do ritmo (proposta minha) | **aprovados**: meta do dia = mês ÷ 26; jornada 08:00–18:00, em linha reta |
+| meta da ADESÃO | **120 pts/mês**, configurável na Administração |
+
+#### Uma conta, três telas (091)
+
+`producao_por_tecnico` é a conta única — pontos (só concluída, jornada
+fora), quebradas, pontos perdidos, TEC1 perdido — e alimenta o painel do
+técnico, o ranking e a central. Se cada tela somasse do seu jeito, o
+técnico e o COP leriam números diferentes para o mesmo dia. Conferido:
+os **32,10 pts** do técnico de teste batem com o que o app já mostrava.
+
+- **Quebrada** usa o código da **operadora** (`codigo_baixa_id`), o
+  mesmo que Dashboard e Serviços contam.
+- **Pontos perdidos** só contam quebrada **não concluída** (uma visita com
+  uma O.S. improdutiva e outra de sucesso, concluída, recebeu os pontos).
+  Quebrada **sem regra** de pontuação vai à parte (`perdidos_sem_regra`),
+  nunca como zero perdido (D-117).
+- **Ritmo**: em cada corte já passado, técnico com visita produtiva hoje
+  e pontos concluídos até o corte < meta do dia × fração. "Concluída até
+  o corte" = `fim` do TOA **se** `finalizado_toa` (D-103), senão
+  `situacao_em`. Técnico **sem meta** para a skill não é "abaixo" nem
+  "acima": entra em `sem_meta`, e a central diz quantos são.
+- **Pedido de ajuda** = contrato de hoje em `COM_IMPEDIMENTO` cujo último
+  evento para essa situação veio do **campo** (`origem = MOBILE`).
+
+#### O chat: uma conversa por técnico
+
+Individual do lado do campo (nenhum outro técnico lê); **compartilhada**
+entre os controladores que enxergam a equipe dele — a troca de turno não
+deixa a pergunta numa caixa que ninguém abre. Autor e conversa
+carimbados pelo servidor (D-061). `mensagem` entra no Realtime (é magra,
+sem dado de assinante); o app assina filtrando por `tecnico_id`, a web
+por RLS. **Recusado:** conversa por par controlador×técnico.
+
+#### Material e combustível pelo campo
+
+- **Sinalização** (faltando / com defeito) é um PEDIDO: não mexe em
+  saldo nem posse (D-154). O almoxarifado responde (recusar exige motivo)
+  e a resposta volta como **aviso** na agenda (`aviso.tipo = MATERIAL`).
+- **Abastecimento**: responde a pendência 3 da D-164 — sim, o técnico
+  pede pelo celular. Nasce `EM_ABERTO`, a frota aprova no fluxo que já
+  existia. O carro é o do **condutor atual**; o cliente não escolhe
+  veículo. Odômetro opcional, com aviso se voltou — nunca bloqueia.
+
+#### A central (o sino) e o chat na web
+
+Um `CentralProvider` **acima das rotas**: um canal de Realtime a sessão
+inteira (se morasse no Shell, cada troca de página fecharia e reabriria a
+assinatura). A central é relida a cada minuto; o Realtime só antecipa
+dois gatilhos com aviso na hora — pedido de ajuda e mensagem do campo. O
+sino conta o que pede **ação**; mensagem tem selo próprio no balão.
+Estoque e Frota ganham selo no menu com o que o campo pediu e espera.
+
+#### O aplicativo: barra de baixo
+
+A agenda continua a tela inicial (D-112). As outras portas — Painel,
+Conversa, Material, Abastecer — numa **barra de baixo**, ao alcance do
+polegar, sem ícone (sem biblioteca, e "Abastecer" escrito não precisa de
+legenda). Trocar de aba substitui a tela: a pilha fica rasa. A marca é a
+arte oficial (sem SVG no app sem instalar biblioteca).
+
+#### A meta na Administração (092)
+
+A meta **já** era configurável, escondida em Meta técnica › Editar
+tabela. Ganhou aba própria em **Administração › Metas**, com as skills
+lado a lado — o buraco que interessa é a skill **sem** meta. A de
+ADESÃO (120) foi gravada pela função, **autenticada como o Emanuel**:
+autor dele, declaração dele (a mensagem de 27/09).
+
+Dois defeitos achados em `definir_meta_comissao` (037) ao abrir a porta:
+1. a meta antiga era fechada com `ativo = false`, e toda leitura filtra
+   `ativo` — **mudar a meta em outubro deixaria setembro sem meta**, o
+   contrário do que o comentário prometia. Agora fecha só pela vigência;
+2. `current_date` (UTC) → `hoje_local()`.
+
+Limite conhecido: meta trocada **no meio** do mês deixa duas vigências no
+mês; `meta_da_skill` fica com a mais nova, `produtividade_periodo` pega
+uma sem ordem.
+
+#### Defeitos que o teste pegou
+
+- **091b:** `aviso.tipo` é uma lista fechada (CHECK) e a resposta do
+  almoxarifado estourou 23514. A conferência de restrições olhava NOT
+  NULL e esqueceu CHECK.
+- **091c:** o painel levava **528 ms** com 240 visitas — calculava a
+  produção do mês quatro vezes. Uma vez: **178 ms**, números idênticos.
+- O leitor de valor do app lia "6.49" como 649 (tirava o ponto como
+  milhar). Com vírgula, ponto é milhar; sem vírgula, ponto é decimal.
+
+#### Testado como `authenticated` (transação desfeita)
+
+técnico: painel, ranking (2º de 3), manda mensagem (lê 1), **não** escreve
+na conversa de outro (42501), sinaliza, **não** responde sinalização
+(42501), sinalização vazia recusada (23514), abastecer sem carro (P0002),
+**não** abre a central (42501), lê o catálogo (419) · gestão: lê a
+conversa, responde, marca lida, central completa, recusa com motivo →
+aviso MATERIAL, responder duas vezes recusado (23514). Baterias 16/16 e
+14/14; nenhuma tabela sem RLS; nada alcançável pelo `anon`;
+`producao_por_tecnico` fechada até para `authenticated`.
+
+#### Não verificado
+
+O app num celular (compila e empacota; não foi aberto). A web clicando
+com dados reais de hoje (27/09 ainda sem visita): sino, chat e abas
+abriram, mas nenhuma mensagem nem sinalização foi gravada em produção
+pela tela. O Realtime ponta a ponta (celular → web) não foi exercitado.
+
+#### Depois, no mesmo dia (093)
+
+**A escala foi resolvida.** > *"pode rodar"* — Emanuel.
+`pontos_das_visitas(uuid[])` faz a mesma conta de `pontos_da_visita`
+para o conjunto: assinatura numa agregação, regra por junção. A regra da
+edificação (e a da origem dela) saiu de dentro da função por visita para
+`edificacao_de()` / `edificacao_origem()`, puras, que as duas versões
+chamam — copiar a regex seria ter duas para divergir.
+
+Provado antes de trocar: **0 diferenças** nas 240 visitas (pontos,
+edificação, origem, achou). Tudo como `authenticated`:
+
+| função | antes | depois |
+|---|---|---|
+| `pontos_por_periodo` (Serviços, Equipes, Relatórios, Painel do dia) | 388 ms | **35 ms** |
+| `painel_do_tecnico` | 178 ms | **54 ms** |
+| `ranking_tecnicos` | 111 ms | **17 ms** |
+| `produtividade_periodo` | — | 23 ms |
+
+Diferença deliberada: sem tabela de preço ativa, a versão antiga SUMIA
+com a visita (`cross join`); a nova a devolve com `achou = false` —
+"sem regra", não fora da conta (D-117). `pontos_da_visita` continua: a
+tela do contrato mostra a regra que casou, e isso é por visita.
+
+**Faixas da ADESÃO** — > *"coloque 110 na faixa de comissão, depois posso
+trocar"*; perguntado, o Emanuel escolheu: começa em 110 e segue a escada
+da SINGLE MASTER deslocada 10 pts para baixo (110→119 fator 2,00 …
+290→390 fator 12,00). Gravadas por `definir_faixas_comissao`
+autenticada como ele. **Consequência que ele precisa saber:** a faixa
+começa ANTES da meta (120) — a ADESÃO recebe fator a partir de 110. O
+texto de Meta técnica que dizia "abaixo da meta não há fator" foi
+corrigido.
+
+#### Pendências
+
+- Metas e faixas de MANUTENÇÃO e DESCONEXÃO.
+- `agenda_do_campo` e `painel_equipes` ainda chamam `pontos_da_visita`
+  por linha — são de UM dia (dezenas de visitas por equipe), não do mês;
+  trocar se medirem lentas.

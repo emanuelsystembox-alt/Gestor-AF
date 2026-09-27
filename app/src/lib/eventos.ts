@@ -27,6 +27,8 @@ export const EVENTO_ROTULO: Record<string, string> = {
   CHECKIN:         'Chegou e iniciou',
   IMPEDIMENTO:     'Registrou impedimento',
   CONCLUSAO:       'Finalizou a visita',
+  // 090: reimportada com outro dia de atuacao (D-166).
+  DIA_DE_ATUACAO:  'Dia de atuação alterado',
 }
 
 export const rotuloEvento = (tipo: string) =>

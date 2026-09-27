@@ -19,6 +19,8 @@ export interface Aviso {
   id: number
   visita_id: string | null
   tipo: 'NOVO' | 'SITUACAO' | 'REABERTO' | 'CANCELADO_OPERADORA' | 'CHEGOU' | 'SAIU'
+    /** Resposta do almoxarifado a uma sinalização de material (091). */
+    | 'MATERIAL'
   titulo: string
   /** A observação que o controlador escreveu ao mudar o status. */
   detalhe: string | null
@@ -40,6 +42,7 @@ export const PESO_AVISO: Record<Aviso['tipo'], 'urgente' | 'atencao' | 'informa'
   SITUACAO: 'atencao',
   CHEGOU: 'informa',
   NOVO: 'informa',
+  MATERIAL: 'informa',
 }
 
 export async function carregarAvisos(limite = 50): Promise<Aviso[]> {

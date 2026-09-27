@@ -10,6 +10,8 @@ import { Miscelanea } from '../components/Miscelanea'
 import { Cargas } from '../components/Cargas'
 import { BaixaContrato } from '../components/BaixaContrato'
 import { Movimentacoes } from '../components/Movimentacoes'
+import { Sinalizacoes } from '../components/Sinalizacoes'
+import { useCentral } from '../lib/central'
 
 /**
  * Almoxarifado — a posição da carga (fase 1 do módulo).
@@ -122,7 +124,10 @@ export default function Almoxarifado() {
   /** As tres metades do almoxarifado (a terceira e o documento que
    *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
    *  atravessa as tres no mesmo atendimento de balcao. */
-  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes'>('posicao')
+  // A central leva direto à aba pelo endereço (?aba=sinalizacoes, 091).
+  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes' | 'sinalizacoes'>(
+    () => new URLSearchParams(window.location.search).get('aba') === 'sinalizacoes' ? 'sinalizacoes' : 'posicao')
+  const { dados: central } = useCentral()
   const [posicao, setPosicao] = useState<Posicao | null>(null)
   const [posses, setPosses] = useState<Posse[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -275,11 +280,17 @@ export default function Almoxarifado() {
              ['cargas', 'Cargas por técnico'],
              ['miscelanea', 'Material e ferramenta'],
              ['baixa', 'Baixa por contrato'],
-             ['movimentacoes', 'Movimentações e pesquisa']] as const).map(([a, rot]) => (
+             ['movimentacoes', 'Movimentações e pesquisa'],
+             ['sinalizacoes', 'Sinalizações do campo']] as const).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
               {rot}
+              {a === 'sinalizacoes' && !!central?.material?.length && (
+                <span className="tabular ml-1.5 rounded-full bg-af-500 px-1.5 text-[10px] text-white">
+                  {central.material.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -289,6 +300,7 @@ export default function Almoxarifado() {
         {aba === 'cargas' && <Cargas />}
         {aba === 'baixa' && <BaixaContrato podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'movimentacoes' && <Movimentacoes />}
+        {aba === 'sinalizacoes' && <Sinalizacoes podeMexer={pode('almoxarifado.editar')} />}
 
         {aba === 'posicao' && (<>
 

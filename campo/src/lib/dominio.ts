@@ -85,6 +85,10 @@ export const ROTULO_EVENTO: Record<string, string> = {
   TRANSFERIDA: 'Transferida',
   CADASTRO: 'Cadastro manual',
   REVERSAO: 'Situação revertida',
+  CONFLITO_TOA: 'O TOA discordou do campo',
+  // 090: o contrato foi reimportado para outro dia (D-166). Sem o
+  // rótulo, o celular mostrava o código cru "DIA_DE_ATUACAO".
+  DIA_DE_ATUACAO: 'Dia de atuação alterado',
 }
 
 export const rotuloEvento = (t: string) => ROTULO_EVENTO[t] ?? t

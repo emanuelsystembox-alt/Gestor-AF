@@ -225,7 +225,7 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 > ### Comece por aqui (atualizado em 26/09)
 >
-> **A web está no ar e em dia com o banco** (migrations até a 090),
+> **A web está no ar e em dia com o banco** (migrations até a 093),
 > conferido baixando o bundle publicado. A leva de 26/09 fechou o
 > **almoxarifado** em relação ao concorrente (cargas por técnico, baixa
 > por contrato, Kardex, auditoria, movimentações, catálogo de 418 itens,
@@ -235,6 +235,10 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 > atuação** escolhido (hoje, por padrão), não na Data da planilha; a
 > Importação voltou para dentro do menu; a marca AFLINE em vetor; menu
 > com contador, grupos que recolhem, Ctrl+K e gaveta no celular.
+> D-167 (27/09): o app ganhou barra de baixo com Painel (pontos, meta,
+> quebrados, ranking inteiro), Conversa, Material (sinalizar falta ou
+> defeito) e Abastecer; a web ganhou o sino da central, o chat com o
+> campo, a aba Sinalizações e a aba Metas na Administração (ADESÃO = 120).
 >
 > Para publicar, **de dentro de `app`** — rodar na raiz dá
 > `ENOENT … \dist`, porque o `dist` mora em `app/dist`:
