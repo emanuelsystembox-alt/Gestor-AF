@@ -219,6 +219,9 @@ export function ContratoModal({
       const novo: Record<string, { id: string; nome: string }[]> = {}
       for (const c of faltam) {
         let q = supabase.from('sub_falha').select('id, nome').eq('codigo', Number(c))
+          // Excluída em Configurações = `ativo` falso: some da escolha, mas
+          // continua no histórico de quem já usou (D-161).
+          .eq('ativo', true)
         if (conjunto) q = q.eq('conjunto', conjunto)
         const { data } = await q.order('ordem')
         novo[c] = (data ?? []) as { id: string; nome: string }[]

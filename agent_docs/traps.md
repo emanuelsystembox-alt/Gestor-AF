@@ -76,9 +76,38 @@ contradizia**. Antes de cachear, meça: `tec1_da_os` ao vivo sobre o dia
 inteiro custou **4,8 ms** contra 340 ms do painel. O cache não comprava
 nada. Ver D-150.
 
+**NOT NULL de coluna não aparece em `pg_constraint`.** Conferir
+restrição com `select … from pg_constraint` mostra CHECK, FK e UNIQUE —
+e esconde o NOT NULL, que mora em `information_schema.columns.is_nullable`.
+Na 089b a carga do catálogo morreu no primeiro item sem código SAP porque
+`item_miscelanea.codigo` era NOT NULL e a conferência "não achou" nada.
+Olhe as duas coisas, e os índices únicos (`pg_indexes`) também. Ver D-165.
+
+**Ordenar por `id` uuid não é ordem de gravação.** Dois lançamentos com o
+mesmo `criado_em` (mesma transação, mesmo segundo) desempatados por uuid
+saem em ordem aleatória. Num razão isso não muda o saldo final, mas
+embaralha o "saldo anterior" de cada linha do Kardex. Quem precisa de
+ordem tem de ter uma coluna de ordem (`seq … generated always as
+identity`, 089c).
+
+**Carga grande pelo MCP custa o texto inteiro a cada tentativa.** O
+`apply_migration` recebe o SQL na chamada; se a carga falhar, a transação
+volta e o texto todo vai de novo. Antes de mandar dado em volume, confira
+TODAS as restrições da tabela-alvo e as duplicatas do arquivo — na 089b
+foram três envios de 25 KB.
+
 **Data-modifying CTE não enxerga o próprio efeito.** `with x as (delete
 … returning) select count(*) from tabela` devolve a contagem **antes**
 do delete. Conferir num segundo comando.
+
+**O arquivo da migration pode estar atrasado em relação à função viva.**
+Antes de um `create or replace`, leia a versão que está NO BANCO
+(`pg_get_functiondef`), não a do arquivo. Aconteceu na 085:
+`estoque_posicao` no banco tinha `base as materialized`, que o arquivo
+077 não tem — recriar a partir do arquivo teria desfeito uma otimização
+calado. E `romaneio_por_serial` tinha sido reaplicada sem os comentários.
+Para conferir se são iguais, compare o `md5` do `prosrc` sem comentários
+e sem espaços com o mesmo cálculo sobre o arquivo. Ver D-160.
 
 ---
 

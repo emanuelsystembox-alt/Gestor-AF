@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase, SITUACOES } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
+import { EditorSubFalhas } from '../components/EditorSubFalhas'
 
 /**
  * Configurações da operação.
@@ -101,7 +102,7 @@ interface TipoAtividade {
 
 export default function Configuracoes() {
   const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao'
-                                | 'baixa' | 'atividade'>('status')
+                                | 'baixa' | 'atividade' | 'subfalhas' | 'almox'>('status')
   const [atividades, setAtividades] = useState<TipoAtividade[]>([])
   const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
   const [grupos, setGrupos] = useState<string[]>([])
@@ -111,6 +112,9 @@ export default function Configuracoes() {
   const [buscaCodigo, setBuscaCodigo] = useState('')
   const [soSemDestino, setSoSemDestino] = useState(false)
   const [baixaAuto, setBaixaAuto] = useState<boolean | null>(null)
+  /** Prazo da carga do técnico, em dias (087-A). 0 = desligado. */
+  const [prazoCarga, setPrazoCarga] = useState<number | null>(null)
+  const [rascunhoPrazo, setRascunhoPrazo] = useState('')
   const [regras, setRegras] = useState<Regra[]>([])
   const [totalRegras, setTotalRegras] = useState(0)
   const [buscaRegra, setBuscaRegra] = useState('')
@@ -133,7 +137,7 @@ export default function Configuracoes() {
 
   async function recarregar() {
     setCarregando(true); setErro(null)
-    const [s, i, cb, pa, to, gr, ta] = await Promise.all([
+    const [s, i, cb, pa, to, gr, ta, pc] = await Promise.all([
       supabase.from('situacao_visita').select('*').order('ordem'),
       supabase.from('indicador_qualidade').select('*').order('ordem'),
       supabase.from('codigo_baixa')
@@ -146,12 +150,15 @@ export default function Configuracoes() {
       supabase.from('tipo_atividade')
         .select('id, nome, natureza, ativo, conferir')
         .order('conferir', { ascending: false }).order('nome'),
+      supabase.rpc('ler_parametro', { p_chave: 'carga_dias_limite' }),
     ])
     if (s.error) setErro(s.error.message)
     else setSituacoes((s.data ?? []) as Situacao[])
     if (i.data) setIndicadores(i.data as Indicador[])
     setCodigos((cb.data ?? []) as CodigoBaixa[])
     setBaixaAuto(pa.data === true)
+    const prazo = pc.data == null ? null : Number(pc.data)
+    setPrazoCarga(prazo); setRascunhoPrazo(prazo == null ? '' : String(prazo))
     setTiposOS((to.data ?? []) as TipoOS[])
     setGrupos(((gr.data ?? []) as { nome: string }[]).map(g => g.nome))
     setAtividades((ta.data ?? []) as TipoAtividade[])
@@ -236,6 +243,26 @@ export default function Configuracoes() {
       setOk(ligar
         ? 'Baixa automática ligada. Vale a partir da próxima importação.'
         : 'Baixa automática desligada. Quem baixa é o técnico, na tela de campo.')
+    }
+    setOcupado(false)
+  }
+
+  async function salvarPrazoCarga() {
+    const n = Number(rascunhoPrazo)
+    if (!Number.isInteger(n) || n < 0 || n > 365) {
+      setErro('O prazo é um número inteiro de dias, de 0 a 365. Zero desliga.')
+      return
+    }
+    setOcupado(true); setErro(null); setOk(null)
+    const { error } = await supabase.rpc('definir_parametro', {
+      p_chave: 'carga_dias_limite', p_valor: n,
+    })
+    if (error) setErro(traduzir(error.message))
+    else {
+      setPrazoCarga(n)
+      setOk(n === 0
+        ? 'Prazo da carga desligado: nenhum técnico é impedido de receber.'
+        : `Prazo da carga: ${n} dias. Quem tiver peça parada há mais que isso não recebe peça nova.`)
     }
     setOcupado(false)
   }
@@ -372,19 +399,70 @@ export default function Configuracoes() {
           {([['status', 'Status', situacoes.length],
              ['servico', 'Tipo de serviço', tiposOS.length],
              ['baixa', 'Baixa e situação', codigos.length],
+             // D-161: saiu do menu lateral e mora aqui, junto do código
+             // de baixa a que ela pertence. A contagem é da própria aba.
+             ['subfalhas', 'Sub-falhas', null],
              ['indicadores', 'Indicadores de qualidade', indicadores.length],
              ['atividade', 'Tipo de atividade', atividades.length],
-             ['pontuacao', 'Pontuação', totalRegras]] as const).map(
+             ['pontuacao', 'Pontuação', totalRegras],
+             ['almox', 'Almoxarifado', null]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                   aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
-                {rot}<span className="tabular ml-1.5 opacity-60">{n}</span>
+                {rot}{n != null && <span className="tabular ml-1.5 opacity-60">{n}</span>}
               </button>
             ))}
         </div>
 
-        {carregando ? (
+        {aba === 'subfalhas' ? (
+          <EditorSubFalhas />
+        ) : aba === 'almox' ? (
+          /* ┌─ o prazo da carga, como no concorrente ─────────────────────┐
+             │ Lá: "<equipe> não pode receber equipamentos, pois existem N │
+             │ equipamento(s) em sua carga que ainda não foram utilizados  │
+             │ ou devolvidos com mais de D dias". D = 0 desliga, e é o     │
+             │ valor configurado lá para a AFLINE em 26/09 — conferido em  │
+             │ 10 de 10 equipes, uma delas com peça de 233 dias (D-163).   │
+             └──────────────────────────────────────────────────────────────┘ */
+          <section className="card-controle p-4">
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="min-w-64 flex-1">
+                <h2 className="font-medium">Prazo da carga do técnico</h2>
+                <p className="mt-1 text-sm text-graf-400">
+                  Quantos dias uma peça pode ficar na mão do técnico sem ser instalada
+                  nem devolvida. Passou do prazo, ele <strong>não recebe peça nova</strong>{' '}
+                  — nem por entrega, nem por transferência — até acertar a carga.
+                </p>
+                <p className="mt-1.5 text-xs text-graf-400">
+                  <strong>0 desliga.</strong> É o valor que a AFLINE usa hoje no sistema
+                  anterior. A confirmação de romaneio já montado não é travada: a peça
+                  pode já estar na mão dele.
+                </p>
+              </div>
+              <div className="flex items-end gap-2">
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Dias</span>
+                  <input value={rascunhoPrazo} inputMode="numeric"
+                    onChange={e => setRascunhoPrazo(e.target.value.replace(/\D/g, ''))}
+                    className="w-20 rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5
+                               text-right text-sm outline-none focus:border-af-500" />
+                </label>
+                <button onClick={salvarPrazoCarga}
+                  disabled={ocupado || rascunhoPrazo === '' || Number(rascunhoPrazo) === prazoCarga}
+                  className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold text-white
+                             hover:bg-af-500 disabled:opacity-40">
+                  Salvar
+                </button>
+              </div>
+            </div>
+            <p className="mt-3 border-t border-graf-800 pt-2.5 text-xs text-graf-400">
+              Hoje: <strong className="text-graf-200">
+                {prazoCarga == null ? 'não lido' : prazoCarga === 0 ? 'desligado' : `${prazoCarga} dias`}
+              </strong>. Só ADMIN altera — quem barra é o banco.
+            </p>
+          </section>
+        ) : carregando ? (
           <p className="py-12 text-center text-graf-400">Carregando…</p>
         ) : aba === 'status' ? (
           <section className="card-controle overflow-hidden">

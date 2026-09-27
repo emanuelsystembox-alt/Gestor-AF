@@ -174,6 +174,9 @@ export default function Visita() {
     setSubSel('')
     if (!codEscolhido) { setSubFalhas([]); return }
     let q = supabase.from('sub_falha').select('id, nome').eq('codigo', codEscolhido.codigo)
+      // Excluída em Configurações = `ativo` falso: some da escolha, mas
+      // continua no histórico de quem já usou (D-161).
+      .eq('ativo', true)
     if (conjunto) q = q.eq('conjunto', conjunto)
     q.order('ordem').then(({ data }) => setSubFalhas((data ?? []) as SubFalha[]))
   }, [codEscolhido, conjunto])

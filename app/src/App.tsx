@@ -16,6 +16,7 @@ const Administracao = lazy(() => import('./pages/Administracao'))
 const Campo = lazy(() => import('./pages/Campo'))
 const Visita = lazy(() => import('./pages/Visita'))
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'))
+const Frota = lazy(() => import('./pages/Frota'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -25,7 +26,7 @@ function Protegida({
   exige,
 }: {
   children: React.ReactNode
-  exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO'
+  exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO' | 'FROTA'
 }) {
   const { session, carregando, ehGestor, ehTecnico, temPapel } = useAuth()
   const local = useLocation()
@@ -42,6 +43,9 @@ function Protegida({
   // nao tem nada -- e o RLS ja o barra em tudo o mais.
   if (exige === 'ALMOXARIFADO' && !(ehGestor || temPapel('ALMOXARIFE')))
     return <Navigate to="/" replace />
+  // Frota é o quarto módulo (088), com o papel que já existia no enum.
+  if (exige === 'FROTA' && !(ehGestor || temPapel('FROTA')))
+    return <Navigate to="/" replace />
 
   return <>{children}</>
 }
@@ -56,6 +60,7 @@ function Raiz() {
   if (ehTecnico) return <Navigate to="/campo" replace />
   // Almoxarife cai na casa dele, nao num /campo que ele nao usa.
   if (temPapel('ALMOXARIFE')) return <Navigate to="/almoxarifado" replace />
+  if (temPapel('FROTA')) return <Navigate to="/frota" replace />
   return <Navigate to="/campo" replace />
 }
 
@@ -92,6 +97,8 @@ export default function App() {
 
         <Route path="/almoxarifado" element={
           <Protegida exige="ALMOXARIFADO"><Almoxarifado /></Protegida>} />
+        <Route path="/frota" element={
+          <Protegida exige="FROTA"><Frota /></Protegida>} />
 
         <Route path="/campo" element={
           <Protegida exige="CAMPO"><Campo /></Protegida>} />

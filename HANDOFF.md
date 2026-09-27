@@ -223,12 +223,18 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
-> ### ⚠ Comece por aqui: a web está ATRÁS do banco
+> ### Comece por aqui (atualizado em 26/09)
 >
-> As migrations **072 a 079** estão aplicadas em produção e o site em
-> `gestor-af.pages.dev` é de **antes** da Rota nova — o Almoxarifado
-> inteiro, a mesa de despacho e a paginação não estão no ar. Conferido
-> baixando o bundle e comparando.
+> **A web está no ar e em dia com o banco** (migrations até a 089c),
+> conferido baixando o bundle publicado. A leva de 26/09 fechou o
+> **almoxarifado** em relação ao concorrente (cargas por técnico, baixa
+> por contrato, Kardex, auditoria, movimentações, catálogo de 418 itens,
+> transferência pedida pelo técnico com aceite e aprovação) e criou a
+> **Frota** (consumo real pelo odômetro, exceções, condutor = técnico).
+> Ver D-162 a D-165.
+>
+> Para publicar, **de dentro de `app`** — rodar na raiz dá
+> `ENOENT … \dist`, porque o `dist` mora em `app/dist`:
 >
 > ```powershell
 > cd app
@@ -236,10 +242,9 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 > npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
 > ```
 >
-> **A lista completa e atualizada do que ficou pendente está em
-> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 23/09/2026"** — ela
-> tem o que é urgente, o dado de conferência que ficou em produção e as
-> dívidas que atravessam telas. A tabela abaixo é das levas anteriores.
+> **O que falta está em `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente
+> em 26/09/2026"** — o primeiro item é trazer os 154 veículos, e depende
+> do Emanuel. A tabela abaixo é das levas anteriores.
 
 | O quê | Por quê |
 |---|---|
@@ -274,7 +279,7 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 |---|---|
 | 7 migrations aplicadas sem arquivo local (`007`, `009`, `016`, `017`, `019`, `021`, `022`) | `supabase/README.md` explica como sincronizar |
 | Permissão fina só nas RPCs, não nas 74 policies | decisão consciente, D-055 — o custo em toda linha não compensa |
-| Estoque, frota, produtividade, aferição | não iniciados |
+| Aferição | não iniciada (estoque e frota: feitos em 22 a 26/09; produtividade: tela existe) |
 | 3 tabelas sem RLS **no outro Supabase**, uma com 183 nomes de técnico | levantado em 04/09, decisão do Emanuel, pendente |
 
 ---

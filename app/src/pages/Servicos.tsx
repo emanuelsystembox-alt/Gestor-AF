@@ -9,6 +9,7 @@ import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useUltimoDiaComVisita } from '../lib/dia'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
+import { FILTRO_VAZIO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
 // Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
 import {
@@ -320,27 +321,19 @@ export default function Servicos() {
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
     : linhas, [linhas, soProdutivas])
 
+  const filtro = useMemo<FiltroContrato>(() => ({
+    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa,
+  }), [situacao, grupo, origem, resultado, culpa])
+
   const visiveis = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return base.filter(v => {
-      if (situacao === 'ABERTAS' && !EM_ABERTO.includes(v.situacao)) return false
-      if (situacao !== 'TODAS' && situacao !== 'ABERTAS' && v.situacao !== situacao) return false
+      // Situação, grupo, origem, resultado e responsável: a regra é a
+      // mesma de Equipes, e mora em um lugar só (lib/filtroContratos).
+      if (!passaNoFiltro(v, filtro)) return false
       if (area !== 'TODAS' && v.area?.apelido !== area && v.area?.codigo !== area) return false
       if (supervisor !== 'TODOS' && supervisorDo(v) !== supervisor) return false
       if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
-      if (grupo !== 'TODOS' && v.tipo_servico?.nome !== grupo) return false
-      if (origem !== 'TODAS' && v.origem !== origem) return false
-
-      if (resultado !== 'TODOS') {
-        const comBaixa = v.ordem_servico.filter(o => o.codigo_baixa)
-        if (resultado === 'SEM_BAIXA' && comBaixa.length > 0) return false
-        if (resultado === 'SUCESSO'
-          && !v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'SUCESSO')) return false
-        if (resultado === 'IMPRODUTIVA'
-          && !v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')) return false
-      }
-      if (culpa !== 'TODAS'
-        && !v.ordem_servico.some(o => o.codigo_baixa?.responsabilidade === culpa)) return false
 
       if (!t) return true
       return [
@@ -351,7 +344,7 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, situacao, busca, area, supervisor, equipe, grupo, origem, resultado, culpa])
+  }, [base, filtro, busca, area, supervisor, equipe])
 
   // ---- paginação ----
   const [pagina, setPagina] = useState(1)

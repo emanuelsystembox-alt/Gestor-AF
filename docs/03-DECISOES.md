@@ -4985,3 +4985,629 @@ sinal — é quem chegou adiantado.
 outras duas etapas (deslocamento, execução) são curtas e ficam em
 minutos; desenhar uma barra em horas ao lado de outra em minutos faria o
 tamanho mentir. O "Ver tabela" traz as duas leituras.
+
+---
+
+### D-159 · Equipes ganha o filtro de contrato, e a desconexão sai das contas
+
+> *"vamos colocar os filtros no menu equipes, inclusive de janela,
+> status entre outros"* · *"não vamos considerar desconexão nesses
+> dados da equipe, nem no gráfico do período […] o resto deixa"* ·
+> *"onde está escrito nome: vamos mudar para nome técnico"* — Emanuel, 23/09
+
+#### 1 · O filtro de contrato é UM só (`lib/filtroContratos.ts`)
+
+A regra de situação, grupo, origem, resultado e responsável morava
+dentro de `Servicos.tsx`. Copiá-la para Equipes seria o caminho de
+"Com improdutiva" querer dizer uma coisa numa tela e outra na vizinha —
+o mesmo motivo da linha de contrato única (D-095). Saiu para
+`passaNoFiltro()`, e as duas telas chamam. Ganhou dois campos novos:
+**janela** e **status do TOA** (D-158).
+
+Em Equipes, a barra tem duas linhas: a de cima escolhe **equipe** (área,
+supervisor, busca), a de baixo escolhe **contrato**. A equipe fica na
+lista se tiver ao menos um contrato que passe; a coluna Contratos mostra
+"N no filtro" embaixo do número do dia; a gaveta mostra só os que passam.
+Jornada não entra no filtro — não é contrato (079).
+
+**Os números do cartão e dos Períodos continuam sendo do dia inteiro.**
+Recalculá-los na tela seria uma segunda cópia da conta de pontos e TEC1
+para divergir da do servidor. A tela diz isso quando há filtro ligado.
+
+Para filtrar sem abrir equipe por equipe, a tela carrega os contratos do
+dia inteiro numa consulta só, em paralelo ao painel — a mesma carga que
+Serviços já faz. As opções de janela, status e grupo saem desse dado.
+
+#### 2 · A desconexão sai das ESTATÍSTICAS da equipe (084)
+
+Sai de: **pontos** concluídos (e o "+N sem regra"), **TEC1**, **tempos**
+e a régua de **Períodos**.
+
+Fica em: **Contratos**, **O.S.**, **Situação** ("o resto deixa") e em
+**BAIXOU / Último status**. Estes dois são decisão nossa, não dele: são
+fato do dia, não estatística, e tirar a desconexão só do cartão faria o
+BAIXOU dizer uma hora e o Último status outra na mesma linha.
+**Confirmar com o Emanuel.**
+
+O cartão ganha a linha **EXPURGO** ("N desconexão(ões) fora das contas e
+dos períodos") — número que encolhe calado parece defeito.
+
+Detecção pelo nome do grupo (`norm_txt = 'DESCONEXAO'`). Contrato sem
+grupo **não** é desconexão.
+
+#### 3 · Alinhamento e rótulo
+
+Contratos, O.S. e Último status centrados, cabeçalho e valor juntos.
+`NOME` vira `NOME TÉCNICO`.
+
+#### 4 · O OCIOSO media "hoje" em UTC — corrigido na mesma 084
+
+`painel_equipes` decidia OCIOSO e "minutos parada" com
+`p_data = current_date`. `current_date` é **UTC**: em Manaus o dia vira às
+20h, e dali até a meia-noite local a comparação dava falso para o dia de
+hoje — a tela parava de marcar equipe ociosa justamente no fim do turno.
+Agora `hoje_local()`, como manda `traps.md`. Achado nesta sessão, pedido
+pelo Emanuel em 23/09.
+
+Antes de escrever a 084 foi conferido que a `painel_equipes` viva é
+**idêntica** à da 083 (hash do corpo sem comentários e espaços): a 084
+parte do que está no banco, não do que está no arquivo.
+
+#### 5 · Medido depois de aplicar (23/09)
+
+Dia 23/09, antes → depois: TEC1 das equipes 001/002/003 passou de 9/9,
+11/11, 12/12 O.S. para **7/7, 8/8, 8/8**; execução média 33/22/28 →
+**36/24/37 min**; o "+1 sem regra" da 003 era uma desconexão e saiu; a
+régua da 003 deixou de acusar "08h–11h acima da capacidade (4 para 3)" —
+três das quatro eram desconexão. Pontos não mudaram: as desconexões do
+dia não pontuavam. As **9** desconexões fora batem com as 9 do grupo
+DESCONEXAO em Serviços.
+
+**Tempo, como `authenticated`, as duas versões lado a lado no mesmo
+instante** (a 083 recriada com outro nome numa transação desfeita): 083
+≈ **660 ms**, 084 ≈ **540 ms** — a 084 é mais rápida porque calcula o
+TEC1 de menos O.S.
+
+> ⚠ **Em aberto:** o painel já estava em ~660 ms, contra os 340 ms
+> registrados na D-150. Não é da 084. Vale medir onde vai o tempo
+> (`pontos_da_visita` e `tec1_da_os` por linha são os suspeitos) antes
+> que o dia com 1.300 visitas volte.
+
+Baterias: `testar_policies()` 16/16, `testar_campo()` 14/14. Nenhuma
+tabela sem RLS; nenhuma `SECURITY DEFINER` alcançável pelo `anon`.
+
+---
+
+### D-160 · O estado AFLINE, ao lado do estado do Atlas
+
+> *"olhando estoque, não sei como passar o técnico? por exemplo o perda eu
+> achei, como mudar o status para inicializado e transferir para o
+> técnico? para ele inserir no contrato quando ele for usar?"* — Emanuel, 23/09
+
+**Revê parte de D-152**, que dizia "estado: não se edita aqui". Continua
+não se editando o **do Atlas**. O que nasce é um terceiro eixo:
+
+| | quem afirma | quem grava |
+|---|---|---|
+| `estado_atlas` | a CLARO | só a importação da carga |
+| `estado_afline` | a AFLINE | só `declarar_estado_equipamento`, com motivo |
+| `posse` | a AFLINE | romaneio e baixa do campo |
+
+Três opções foram postas; ele escolheu esta. **Recusadas:**
+- *só a posse, Atlas intocado* — a peça achada continuaria gritando PERDA
+  em todo romaneio, sem ter como dizer "achei";
+- *editar `estado_atlas` direto* — a próxima carga desfaz calada, e o
+  sistema passa a afirmar o que a CLARO não disse.
+
+**O vocabulário é o do Atlas.** O estado declarado tem de ser um que a
+carga já trouxe. "RECUPERADA" seria categoria de patrimônio que ninguém
+combinou com a CLARO.
+
+**A importação não apaga a declaração**: `importar_estoque` grava colunas
+nomeadas (077). Quando a CLARO corrigir o Atlas, os dois passam a
+concordar, e a posição conta quantos **divergem** — é a lista que o
+almoxarife leva para a CLARO. O histórico
+(`equipamento_estado_evento`) guarda o que o Atlas dizia no instante de
+cada declaração.
+
+**O romaneio avisa pelo estado que vale**: `coalesce(estado_afline,
+estado_atlas)`. Declarada INICIALIZADO, a peça não grita PERDA. Continua
+sem bloquear (D-154).
+
+**O caminho da peça achada, na tela:** abrir a peça na lista → declarar →
+escolher o técnico → **entregar**. A entrega cai no romaneio de ENTREGA
+já aberto daquele técnico, ou abre um — dez peças achadas na mesma manhã
+são um documento, não dez. Nada muda até o técnico confirmar no
+aplicativo (D-157); ao lançar o serial na baixa, a posse vai para o
+assinante sozinha.
+
+> ⚠ A 085 foi escrita a partir das funções **vivas**, não dos arquivos:
+> `estoque_posicao` no banco tem `base as materialized`, que o arquivo 077
+> não tem, e `romaneio_por_serial` foi reaplicada sem os comentários. O
+> arquivo é histórico; o banco é o estado.
+
+**Testado como `authenticated`, numa transação desfeita:** sem motivo →
+recusa (23514); estado "RECUPERADA" → recusa (23514); declarada
+INICIALIZADO, o `estado_atlas` continua PERDA e a posição conta 1
+divergente; no romaneio de entrega a peça entra **sem** alerta; desfazer
+volta ao Atlas; técnico tentando declarar → 42501, e não lê o histórico.
+A primeira declaração real foi do próprio Emanuel, pela tela, às 22:57 de
+23/09 ("Equipamento encontrado, técnico ciente.").
+
+---
+
+### D-161 · Sub-falhas moram em Configurações, e o cadastro é aberto
+
+> *"vamos levar essa opção lá para as configurações, vamos usar somente o
+> hard, e vamos deixá-lo aberto […] se eu quiser ir no cód 500 e
+> cadastrar, excluir ou adicionar outra subfalha eu posso, e se eu quiser
+> adicionar essa subfalha em mais de um cód, também posso"* — Emanuel, 23/09
+
+**Configurações → Sub-falhas.** Escolhe-se o código à esquerda; à direita,
+as sub-falhas dele, com *excluir deste código*, *ligar a outros códigos*
+e *nova sub-falha* (com "também nos códigos" opcional). O item saiu do
+menu lateral; a tela antiga de importação continua, por link, para
+reimportar a planilha da CLARO.
+
+**Só o HARD:** o vigente já era `NÍVEL HARD` (938 sub-falhas, 155
+códigos). A aba edita só o vigente; `CASO 1` fica no banco, fora de uso.
+
+**Sem tabela de ligação.** "A mesma sub-falha em vários códigos" é o que o
+arquivo da CLARO já faz — **17 nomes** do HARD estão em mais de um
+código — com uma linha por par. As três telas de baixa (web, modal do
+contrato e aplicativo) já leem por código; uma tabela N:N obrigaria a
+reescrever as três para chegar ao mesmo lugar.
+
+**Excluir é `ativo = false`, nunca DELETE.** `ordem_servico` e
+`visita_evento` têm FK para `sub_falha`; baixa antiga que perde o nome da
+sub-falha é histórico apagado. As três telas de baixa passaram a filtrar
+`ativo` — antes não filtravam, e a coluna já existia. Excluída pode ser
+reativada.
+
+**Só ADMIN**, escolha do Emanuel. Não precisou de função nova: a policy
+`sf_escrita` já dava escrita em `sub_falha` só a ADMIN. A tela esconde
+os botões dos outros; quem barra é o banco.
+
+Nome novo entra em **maiúsculas** (o HARD inteiro está assim, e a chave
+única `(conjunto, código, nome)` distingue caixa); a categoria é a que o
+código já usa.
+
+---
+
+### D-162 · Dez seriais de uma vez, e a carga na mão do técnico
+
+> *"se eu quiser enviar 10 seriais pra ele de uma única vez e retirar?
+> como fazer? tenta pegar as ideias da concorrente"* — Emanuel, 26/09
+
+#### O que o concorrente faz (Alfa Gestor → Estoque, explorado em 26/09)
+
+Lido na tela e no código da própria página, sem gravar nada lá:
+
+| Tela deles | Como funciona | Aqui |
+|---|---|---|
+| **Saída Unificada** | assistente de 5 passos: equipe → bipar serial → tipo de miscelânea → miscelânea → termo | romaneio (D-154) |
+| **Colar do Excel** | cola a coluna; o servidor confere tudo e devolve a tabela do que foi **recusado** (serial, situação, equipe) | **entra agora** |
+| **Estoque Equipe** | embaixo do campo de bipar: o que a equipe já tem, com a coluna **Dias** | **entra agora** |
+| **Devolução** | equipe → endereçável (prateleira/caixa) → situação de destino (inicializado, retirado, com defeito) → bipar a partir do "Em conta" | parcial (marcar na carga) |
+| **Alocações** | carga por equipe, caixas de seleção, Resumo por situação, imprimir A4/cupom, termo de responsabilidade, **termo de desconto** | parcial |
+| **Aceite digital** | a remessa fica pendente no app do técnico; aceite por **biometria do aparelho**, credencial ou senha; termo assinado em PDF por e-mail | confirmação pelo app já existe (D-157), sem biometria |
+| **Bloqueio por carga vencida** | recusa entrega nova se a equipe tem peça "não utilizada nem devolvida há mais de N dias" | **não entra — pergunta** |
+| **Autonomia e previsão** | por modelo: instalado no período, em estoque, com técnico, média/dia, **autonomia em dias** | futuro |
+| **Pesquisar serial** | histórico do serial com situação, contrato, equipe, login; pesquisa em lote | `PecaDetalhe` parcial |
+
+Uma diferença de fundo: lá a carga é da **equipe**; aqui é do **técnico**
+(D-154, escolha do Emanuel). Não mudei.
+
+#### O que entrou
+
+**1. Vários seriais numa chamada — `romaneio_por_seriais` (086-A).** A
+tela ganhou "colar vários seriais de uma vez": cola a coluna do Excel ou
+a lista do WhatsApp, e o banco lança **cada serial no seu sub-bloco**.
+Um serial ruim não derruba os outros nove; volta para a caixa com o
+motivo, para corrigir e mandar de novo.
+
+O lote **chama** `romaneio_por_serial` por serial — não reescreve as
+recusas. Duas cópias da mesma regra divergem no dia em que alguém mexe
+numa delas. O documento é conferido uma vez antes do laço (romaneio
+fechado daria dez recusas iguais para um problema só), e o repetido na
+lista é recusado como "Repetido na lista.", normalizado igual
+(`abc 123` = `ABC123`). Teto de 500 por chamada — tamanho de corpo de
+requisição, não regra; a tela fatia.
+
+**2. Retirar sem bipar peça por peça.** O romaneio aberto mostra **"Com
+fulano agora"** — a carga dele, com os dias desde que chegou à mão e a
+origem (`romaneio 4`, `campo: retirado no contrato…`). Na **devolutiva**
+cada peça tem caixa, há "marcar todas" e **"Devolver as marcadas"**, que
+usa o mesmo lote. Na **entrega** a lista é leitura: o almoxarife vê o
+que ele já leva antes de mandar mais.
+
+**3. O técnico vê a própria carga — `minha_carga()` (086-B).** Antes ele
+só via os romaneios dos últimos sete dias, que é recibo, não saldo. A
+policy de `equipamento` exige `almoxarifado.ver`, que o técnico não tem
+nem deve ter (veria as 15.603 peças). A função devolve só as linhas
+`COM_TECNICO` dele. No app, "Material" virou **"Meu material"**, com
+"Com você agora" antes dos romaneios.
+
+**4. Na baixa, o serial vem da carga com um toque.** Em "Lançar
+equipamento → Instalou", o app lista as peças da carga dele. Digitado na
+calçada, um serial de 15 caracteres erra um dígito — e aí a peça não sai
+da posse dele para o assinante (D-157). Digitar continua valendo.
+
+#### Web → aplicativo
+
+Com isto, o que a web ganhou desde o D-157 e o campo não tinha: a
+**palavra do TOA** (status da atividade e motivo de fechamento externo,
+D-158) aparece na visita, como veio. A sub-falha excluída já não aparecia
+(D-161). D-159 e D-160 são telas do controle, sem contraparte no campo.
+
+#### Testado como `authenticated`, numa transação desfeita
+
+Lote de 5 (3 bons, 1 repetido com espaço e minúscula, 1 inexistente) →
+3 lançados, 2 recusados com o motivo · confirmado, a posse vai para o
+técnico · lote em romaneio confirmado → 23514 · `minha_carga` do dono → 3
+linhas, `dias = 0`; de outro técnico → 0 · técnico lendo `equipamento`
+direto → 0 linhas (RLS) · técnico chamando o lote → 42501 · devolutiva
+com as 3 dele + 1 que não é → 3 e 1 ("não está com este técnico") · 501
+seriais → 22023. Baterias 16/16 e 14/14; nenhuma função aberta ao `anon`.
+
+**Não verificado:** a tela web clicando (o servidor local pede login, e
+a senha do admin não passa pelo assistente) e o app num celular.
+
+#### Perguntas abertas — respondidas no mesmo dia: "siga a regra da concorrente" (D-163)
+
+1. **Bloqueio por carga parada.** Recusar entrega a quem tem peça há mais
+   de N dias? Qual N? Vale para peça retirada de cliente também? Hoje os
+   dias são só **mostrados**, sem cor de alerta.
+2. **Situação de destino na devolutiva** (boa / retirada / com defeito),
+   como o concorrente pede. Hoje a peça volta ao almoxarifado sem dizer
+   em que estado.
+3. **Transferência direta técnico → técnico**, sem passar pelo balcão.
+4. **Aceite com biometria** do aparelho e termo em PDF.
+5. **Termo de responsabilidade / de desconto** impresso.
+6. **Endereçamento** — prateleira e número da caixa no almoxarifado.
+
+---
+
+### D-163 · As regras do estoque do concorrente, do jeito que a AFLINE usa lá
+
+> *"pode seguir com a regra da concorrente"* — Emanuel, 26/09, respondendo
+> às seis perguntas do D-162
+
+#### Como "a regra deles" foi lida — e não imaginada
+
+Delegar não é carta branca para inventar (HANDOFF, "Decidi no lugar
+dele"). Então cada regra saiu do **próprio Alfa Gestor da AFLINE**, com
+o parâmetro que está configurado lá hoje, consultado só para leitura:
+
+| O que foi olhado | O que o dado disse |
+|---|---|
+| prazo da carga (`diasLimite`) | **0 em 10 de 10 equipes** — inclusive uma com peça de **233 dias**. A regra existe e está **desligada** |
+| endereçamentos cadastrados | **0** — a AFLINE nunca usou prateleira/caixa lá |
+| documentos de movimentação, 30 dias | **8.865** |
+| · Com Técnico - Inicializado | 1.643 (entregas) |
+| · Com Técnico - Retirado | 2.112 (retirado do cliente) |
+| · Em Estoque - Retirada | 739 (devolveu o retirado) |
+| · Em Estoque - Inicializado | 407 (devolveu peça boa) |
+| · Em Estoque - Com Defeito RNC | 0 |
+| · ACEITE DIGITAL - AGUARDANDO | 0 |
+| · Com Técnico - Processo de Cobrança | 0 (termo de desconto) |
+| valor por peça | `valor_inventario` 400 / 550 / 700 por modelo — tabela deles, que não temos |
+
+O servidor deles começou a responder **429** (limite de requisições) no
+meio da contagem de transferências. Parei ali: não vale pesar na conta da
+AFLINE por um número que não muda a decisão.
+
+#### O que entrou (migration 087)
+
+**1 · Prazo da carga — `carga_dias_limite`, nasce em 0.** Mesma frase e
+mesmo momento do concorrente: quem recebe (entrega ou transferência) com
+peça parada há mais de N dias **não recebe**, e o bloqueio é no **bipar**
+(`romaneio_por_serial`), não na confirmação — a peça do documento já
+montado pode estar na mão dele, e travar o aceite seria negar um fato. 0
+desliga, e **0 é o valor da AFLINE lá**. Editável em Configurações →
+Almoxarifado, só ADMIN (`definir_parametro` já exigia). Só **seriais**
+contam: o texto deles diz "equipamento(s)".
+
+A conta mora em `carga_vencida_de` (interna, fechada até para o
+`authenticated`), porque o almoxarife que lança pode ter
+`almoxarifado.editar` sem `ver`. A tela pergunta por `carga_vencida`, que
+confere permissão (almoxarifado ou o próprio técnico).
+
+**2 · A condição da peça — `equipamento.condicao`.** O concorrente junta
+lugar e condição numa palavra ("Em Estoque - Retirada"). Aqui o lugar já
+era `posse`; a condição é coluna nova, com os três valores da devolução
+deles: **inicializado · retirado · com defeito**. **Não** é o estado do
+Atlas nem o `estado_afline` (D-160, vocabulário da CLARO): é a leitura
+operacional do almoxarifado.
+
+- a **devolutiva declara** a condição ao abrir, antes de bipar — o passo
+  "Devolução - Situação" deles. Sem padrão: lá são três botões e nenhum
+  vem marcado;
+- o **campo carimba** `RETIRADO` ao lançar peça retirada (o gatilho de
+  079), e o INSTALADO limpa a condição;
+- entrega e transferência **levam** a condição que a peça tinha;
+- a carga mostra o "Resumo" deles: *19 inicializado · 5 retirado*.
+
+**3 · Transferência técnico → técnico.** Romaneio `TRANSFERENCIA` com
+`tecnico_origem_id`. `tecnico_id` continua sendo **quem recebe e quem
+confirma** — o técnico de origem **não** confirma pelo outro (medido:
+42501). O técnico de origem **lê** o documento (policy nova) e o app diz
+"aguardando fulano confirmar". Miscelânea também transfere, com o saldo
+conferido na origem. Na web, a carga do técnico de origem aparece com
+caixas: marca e "Transferir as marcadas".
+
+**4 · O aceite diz como foi dado — `confirmado_metodo`.**
+
+| método | quem | como |
+|---|---|---|
+| `APARELHO` | técnico | biometria **ou** bloqueio do celular (`expo-local-authentication`) |
+| `SENHA` | técnico | celular sem bloqueio nenhum: a senha do Gestor AF, conferida entrando de novo |
+| `BALCAO` | almoxarife | confirmação pela web |
+
+O aparelho **não conta** se foi o dedo ou o PIN, então não afirmamos
+"biometria" — é `APARELHO`. O banco não tem como conferir a biometria
+(lá também não); o que ele garante é que o técnico **tem** de declarar
+o método, e que ninguém pelo cliente se passa por `BALCAO` (medido:
+23514). O termo em PDF por e-mail do concorrente **não** entrou — não há
+infraestrutura de e-mail; o termo sai impresso (abaixo).
+
+**5 · Termo de responsabilidade A4.** Do documento (entrega e
+transferência) e da carga inteira do técnico, pela impressão do
+navegador ("Salvar como PDF" de graça). Traz o método do aceite no
+rodapé. **O texto da declaração é nosso e neutro** — o PDF deles é
+gerado no servidor e não foi baixado. Se a AFLINE tiver um texto
+jurídico, ele entra em `app/src/lib/termo.ts`, na constante `DECLARACAO`.
+
+**6 · Uma recusa de conta errada que faltava.** Entre o bipar e a
+confirmação o campo pode ter instalado a peça (079). `confirmar_romaneio`
+agora confere se cada peça ainda está onde o documento diz que ela sai, e
+recusa em vez de puxar da casa do cliente de volta para a van.
+
+#### O que não entrou, e por quê
+
+- **Termo de desconto** ("Processo de Cobrança"): **0 uso em 30 dias** e
+  exige valor por modelo, que é tabela deles.
+- **Endereçamento** (prateleira e caixa): **0 cadastrado** lá.
+- **Imprimir cupom** (impressora térmica): sem sinal de uso; o A4 cobre.
+
+#### Duas armadilhas que o próprio desenho armou
+
+- **Duas FKs de `romaneio` para `tecnico`** deixam o embed pelo nome da
+  tabela **ambíguo** — `select=id,tecnico(nome)` passou a devolver
+  PGRST201. O componente embute pela coluna (`tecnico:tecnico_id`,
+  `origem:tecnico_origem_id`); conferido no PostgREST. Nenhum outro
+  lugar embute `tecnico` a partir de `romaneio`.
+- `abrir_romaneio` e `confirmar_romaneio` ganharam parâmetros com
+  default: a versão antiga foi **derrubada** antes (traps.md), e as novas
+  nasceram com `revoke … from public, anon`.
+
+#### Testado como `authenticated`, numa transação desfeita — 14 cenários
+
+devolutiva sem condição → 23514 · transferência para si mesmo → 23514 ·
+entrega no balcão → `BALCAO` · aceite do técnico sem método → 23514 ·
+técnico dizendo `BALCAO` → 23514 · técnico com `APARELHO` → aceito ·
+técnico A consultando a carga de B → 42501 · prazo 1 dia com peça de 5 →
+`vencidos 1`, e a entrega recusa com o texto · transferência em lote com
+uma peça que não é da origem → 2 entram, 1 recusada · a origem vê o
+documento (`eu_recebo = false`) e **não** confirma → 42501 · o destino
+confirma com `SENHA` → carga dele 2 · devolutiva como RETIRADO →
+`NO_ALMOXARIFADO/RETIRADO` · peça instalada entre bipar e confirmar →
+23514 · campo lança RETIRADO → `COM_TECNICO/RETIRADO`.
+
+Baterias **16/16** e **14/14**; nenhuma `SECURITY DEFINER` alcançável
+pelo `anon`; `carga_vencida_de` fechada ao `authenticated`. O parâmetro
+ficou em **0** em produção.
+
+**Não verificado:** a tela web clicando (login) e o app num celular —
+biometria só se prova no aparelho. No Expo Go o iPhone cai no código do
+aparelho em vez do Face ID (a permissão só vale num build); Android usa
+a digital normalmente.
+
+---
+
+### D-164 · A frota nasce — copiando o que a AFLINE usa, e medindo o que o concorrente não mede
+
+> *"agora copie o modulo frota deles, ou faça até melhor"* · *"no nosso
+> caso vamos usar o nome do técnico como condutor tudo bem? nada de
+> equipe pra não ter duplicada"* — Emanuel, 26/09
+
+#### O que o dado da AFLINE no Alfa Gestor disse (26/09, só leitura)
+
+| Tela deles | Uso real | O que isso decidiu |
+|---|---|---|
+| Veículos | **154** ativos | entra |
+| Abastecimento | **195 na semana** (id > 26.800); 185 "aprovado", **4** "abastecido"; valor fixo R$ 150/200; odômetro em **191 de 195** | é o coração do módulo; nasce APROVADO por padrão |
+| Manutenção | **11 em um ano**, 8 sem valor | entra, simples, e sem valor ≠ R$ 0,00 |
+| Portaria | 74 registros num mutirão em **out/2023**, depois 2 | **não entra** |
+| Uso e Consumo | mede km pela portaria → **0 de 154** veículos, consumo "—" ao lado de **R$ 108.972** no mês | **refeito** a partir do abastecimento |
+| Checklist | 2 formulários de 2024, 1 e 3 perguntas | **não entra** |
+| `km_por_litro` | **10,00 em 154 de 154** — padrão nunca mexido | **não existe aqui**: o km/l é medido |
+| tipo do veículo | vazio em **153 de 154** | opcional |
+| "origem" | 19 opções que misturam **de quem é** com **onde está** (oficina, lanterneiro, férias, "VENDIDO SILAS - 92 9…", DETRAN) | **dois campos**, e vendido = **arquivar** |
+| condutor | o **login da equipe** ("109 - EQUIPE") | **o técnico**, com período (pedido do Emanuel) |
+
+O odômetro sobe direitinho carro a carro — três amostras de um mês deram
+**9,8 · 7,7 · 9,1 km/l**, contra o 10,00 fixo. E o PHY3690 tem **dois
+abastecimentos de 27 L com 2 km de diferença** em 04/09, que ninguém vê
+lá. Esse par virou o caso de teste.
+
+#### O modelo (migration 088)
+
+- `veiculo` — placa normalizada (`phy-3690` = `PHY3690`, única por
+  empresa), apelido, modelo, tipo, ano, chassi, renavam, rastreador;
+  **`propriedade`** (própria / locadora / do técnico) e **`situacao`**
+  (os quatro status do concorrente: ativo, na garagem, fora da garagem,
+  em manutenção). Arquivar exige motivo e encerra o condutor.
+- `veiculo_condutor` — técnico **com período** (`desde`/`ate`), um atual
+  por carro. O mesmo técnico em dois carros **não** é recusado (ninguém
+  combinou que não pode); a tela avisa.
+- `veiculo_evento` — situação, condutor, cadastro, arquivamento: prova.
+- `abastecimento` — o fluxo do concorrente (em aberto → aprovado →
+  abastecido; cancelado com motivo, sem volta). Litros = valor ÷ preço
+  quando não informados. O condutor vem do carro e pode ser trocado.
+- `manutencao` + `manutencao_item` — corretiva/preventiva, serviços com
+  valor; o total é soma, e serviço sem valor fica "sem valor".
+- Odômetro atual = o maior conhecido (cadastro, abastecimento,
+  manutenção), **calculado**, nunca guardado.
+
+Permissões: a fundação existia (papel `FROTA` no enum, `frota.ver`
+"Modulo ainda nao construido"). Acesa `frota.ver`, criada `frota.editar`,
+criado o perfil **"Frota"** para o papel que não tinha perfil; ADMIN
+recebe as duas. Leitura por RLS com `(select tem_permissao(...))`;
+escrita só por função `SECURITY DEFINER` que confere papel e chave.
+
+#### O que é melhor que o concorrente
+
+**1 · Consumo real.** `frota_intervalos` / `frota_consumo`: entre duas
+leituras **válidas** de odômetro o carro andou a diferença com todo o
+combustível que entrou no meio. Km/l e custo por km por veículo **e por
+técnico**, e da frota inteira ponderado (soma do km ÷ soma dos litros,
+nunca média de médias). Sem trecho medido: "sem km medido", não zero.
+
+**2 · Exceções sozinhas** (`frota_excecoes`), para conferir, nunca
+bloqueio:
+- **odômetro voltou** — menor que o maior já lido no carro;
+- **sem odômetro** — o combustível conta, o km não;
+- **km muito baixo** — o trecho rendeu menos de **1/3 do km/l mediano
+  do próprio carro** nos últimos 90 dias (com ≥ 3 trechos). **O corte de
+  1/3 é nosso**, não da AFLINE: compara o carro com ele mesmo, não com
+  número de fábrica. Está em um lugar só (088-G) para ajustar.
+
+**3 · Avisa antes de errar.** No lançamento, odômetro menor que o último
+conhecido fica âmbar e diz que vai virar exceção; o preço do litro repete
+o último (é o mesmo posto — 182 de 195 a R$ 7,29 na semana).
+
+#### O defeito que o teste pegou antes da tela
+
+A primeira versão comparava cada abastecimento com o **anterior** (`lag`).
+Com a sequência real do PHY3690 mais um odômetro digitado errado
+(131.000 depois de 131.697), os 697 km "voltavam" no trecho seguinte, e o
+abastecimento sem odômetro sumia do combustível: **13,61 km/l**. O certo
+é ir de leitura válida a leitura válida somando todo o combustível do
+meio — **1.264 km** (exatamente 131.933 − 130.669), **7,09 km/l**,
+R$ 1,19/km. Corrigido na mesma migration (088b), e o arquivo 088 tem a
+versão certa com a caixa explicando.
+
+#### Testado como `authenticated`, numa transação desfeita
+
+placa normalizada e repetida recusada (23505) · placa curta (23514) ·
+condutor trocado guarda os dois períodos · abastecimento herda o condutor
+· abastecido não volta a aprovado; cancelar sem motivo recusado · consumo
+e as três exceções da sequência real (acima) · painel com odômetro atual
+131.933 e o condutor · manutenção com um serviço de R$ 350 e um sem valor
+→ total 350, "1 sem valor" · carro arquivado não abastece · eventos
+CADASTRO, SITUACAO, ARQUIVADO · técnico lê **0** veículos, abastecimentos
+e painel, e não cadastra (42501). Baterias 16/16 e 14/14; nenhuma tabela
+sem RLS; nada alcançável pelo `anon`. Embeds conferidos no PostgREST.
+
+**Não verificado:** a tela clicando (login) e com volume real — o banco
+de produção tem **zero** veículo. Os 154 do concorrente não foram
+trazidos (ver pendências).
+
+#### Pendências — perguntas ao Emanuel
+
+1. **Trazer os 154 veículos** do sistema anterior? Placa, apelido,
+   modelo, ano, chassi, renavam e rastreador vêm limpos. O condutor
+   **não**: lá é a equipe, e cada equipe tem dois técnicos — alguém
+   precisa dizer qual.
+2. **O que são "REDE PRÓPRIA/ALUGADA", "CASA/FROTA PRÓPRIA" e "Vale
+   Transporte"** no campo origem deles? Não foram mapeados.
+3. **O técnico pede abastecimento pelo celular?** Lá 7 de 195 foram
+   lançados pelo próprio condutor. O banco já tem "em aberto"; falta a
+   tela no aplicativo.
+4. **O corte de 1/3** do "km muito baixo" serve, ou a AFLINE tem outro?
+
+---
+
+### D-165 · O estoque ganha os menus que faltavam, e o catálogo vem do concorrente
+
+> *"estou achando bem simples o nosso, tipo poucas opções"* · *"o técnico
+> envia, o outro aceita, e o time central do almox precisa aprovar"* ·
+> *"no modulo ferramenta, é bom ja pegar o que tem cadastrado deles pra
+> gente copiar os nomes"* · *"quantos carros alugados temos, e carros
+> próprios, quantos levam carro pra casa"* — Emanuel, 26/09
+
+#### A comparação, menu a menu (Alfa Gestor da AFLINE, só leitura)
+
+| Menu deles | Antes | Agora |
+|---|---|---|
+| Dashboard, Saída, Devolução, Transferência | ✅ (melhor: lote, condição, aceite, prazo) | ✅ |
+| **Equipes / Alocações** | ❌ só dentro do romaneio | ✅ aba **Cargas por técnico**, com termo e planilha |
+| **Movimentações** · **Pesquisar Serial** · **Pesquisa em Lote** | ⚠️ só o histórico de estado | ✅ aba **Movimentações e pesquisa** |
+| **Baixar Miscelâneas** (por contrato) | ❌ | ✅ aba **Baixa por contrato** |
+| **Kardex - Miscelânea** | ❌ | ✅ por item, no almoxarifado ou na mão de cada técnico |
+| **Auditar Miscelâneas** ("novo saldo") | ⚠️ ajuste solto | ✅ **contar** por item: vira AJUSTE com a diferença |
+| **Configurações → Miscelâneas** (catálogo com tipo) | ❌ código e nome | ✅ tipo, valor, C.A., "gasta no contrato" + **418 itens** |
+| Transferência **pedida pelo técnico**, com aprovação | ❌ | ✅ celular pede → colega aceita → almoxarifado aprova |
+| Reversas, Notas Fiscais, NetHome/BTP/VTal/Gestech, Em trânsito | — | **fora**: integrações de operadora que não se aplicam |
+| Reposições / kits | — | **fora**: os 11 kits deles não têm composição (lista de reposição vazia) |
+| Endereçáveis | — | **fora**: 0 cadastrados (D-163) |
+
+#### O catálogo (089b)
+
+687 itens lá, **420 ativos**: 96 ferramentas, 235 EMIS (material de
+instalação), 78 EPI/EPC, 11 acessórios. Os 267 inativos incluem a REDE
+EXTERNA inteira (145) e não vieram. O "código" deles é três coisas num
+campo só — SAP no EMIS, **C.A.** no EPI, "0000"/"-"/marca na ferramenta
+— e a carga separa: 233 materiais com código SAP, 68 EPIs com C.A. Valor
+0,00 lá virou NULO aqui (D-117). Fonte versionada em
+`supabase/dados/catalogo_miscelanea_alfa_2026-09-26.txt` (é catálogo de
+peça, não dado de assinante).
+
+**Levou três tentativas, e as duas falhas eram do nosso banco
+funcionando:** `codigo` nascera NOT NULL (089a tira) e depois o índice
+único de código SAP pegou **duas duplicatas deles** — 479 = 451
+(22025348) e 475 = 463 (22059179, este com "SE" no lugar de "5E"). Ficou
+o cadastro mais antigo de cada par: **418 itens**.
+
+#### Transferência pedida pelo técnico (089-C)
+
+`solicitar_transferencia` (origem, pelo celular) → `confirmar_romaneio`
+pelo destino grava o **aceite** (APARELHO/SENHA) sem mover nada →
+`confirmar_romaneio` pelo almoxarifado **aprova** e só aí posse e saldo
+mudam. O método que fica no documento é o do aceite de quem recebeu. A
+origem desiste e o destino recusa por `cancelar_romaneio`, enquanto não
+aprovado. O prazo da carga (087-A) vale para o destino também aqui.
+
+O técnico só lê a própria equipe em `tecnico` (RLS); para escolher o
+colega há `tecnicos_para_transferir()` — nome e matrícula dos ativos, e
+nada mais. `minha_miscelanea()` dá o saldo dele para escolher material.
+
+#### O que o teste de ponta a ponta mostrou (como `authenticated`, desfeito)
+
+Entrada de 100 conectores e 10 luvas → **entrega** a A (3 seriais, 40
+conectores, 2 luvas), aceita no celular (`APARELHO`) → A tenta mandar
+peça que não é dele (23514) e mais conector do que tem (23514) → A **pede**
+1 serial + 15 conectores para B → A tenta aceitar o próprio pedido
+(42501) → almoxarifado tenta aprovar **antes** do aceite (23514) → B
+aceita com `SENHA` e **a carga dele não muda** → almoxarifado aprova:
+peça e conectores mudam, método `SENHA` → **cargas**: A com 3 seriais e 2
+materiais, B com 2 e 1 → **devolução** de A como RETIRADO: posse
+`NO_ALMOXARIFADO/RETIRADO` → **baixa por contrato**: B baixar 50 é
+recusado, 3 entram como CONSUMO no contrato → **auditoria**: contou 58,
+sistema dizia 65, ajuste de −7 → **Kardex** e **histórico do serial**
+contando a história certa → técnico não lê cargas, Kardex nem histórico,
+e não baixa (42501). Baterias 16/16 e 14/14; nenhuma tabela sem RLS;
+nada alcançável pelo `anon`.
+
+**O defeito que o teste pegou:** o Kardex ordenava lançamentos do mesmo
+instante pelo `id` (uuid aleatório) — o saldo final batia, mas o "saldo
+anterior" de cada linha saía embaralhado. 089c acrescenta `seq` (ordem
+de gravação); conferido: 0 → 100 → 60 → 65 → 58.
+
+#### Frota: onde o carro dorme (089-A)
+
+`veiculo.pernoite` (leva para casa / dorme na base) separado de
+`propriedade`. Na aba Veículos, um quadro **propriedade × onde dorme** da
+frota ativa responde as duas perguntas do Emanuel.
+
+**"REDE PRÓPRIA/ALUGADA" e "Vale Transporte" continuam sem destino**:
+o Emanuel explicou que "isso é a frota" (alugado, próprio, leva para
+casa) — o que virou propriedade e pernoite. Se "REDE" for a frota da
+equipe de rede e "Vale Transporte" o técnico sem carro, são outra
+dimensão, e a pergunta fica em aberto.
+
+#### Não verificado
+
+A tela web clicando (login) e o app num celular. A importação dos 154
+veículos da frota não foi feita (pendente de decisão, D-164).

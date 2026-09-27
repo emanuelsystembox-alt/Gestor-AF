@@ -52,7 +52,13 @@
           "locationAlwaysAndWhenInUsePermission": "A localização comprova de onde a baixa do serviço foi dada. Sem ela o aplicativo não deixa baixar."
         }
       ],
-      "expo-image"
+      "expo-image",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "O Face ID confirma que foi você quem recebeu o material do almoxarifado."
+        }
+      ]
     ],
     "owner": "afline-instalacao-e-manutencao-eletrica",
     "extra": {

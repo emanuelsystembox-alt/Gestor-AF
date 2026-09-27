@@ -9,6 +9,7 @@ import Agenda from './src/telas/Agenda'
 import Visita from './src/telas/Visita'
 import Captura from './src/telas/Captura'
 import Romaneios from './src/telas/Romaneios'
+import Transferir from './src/telas/Transferir'
 import { Carregando } from './src/ui/componentes'
 import { cor } from './src/ui/tema'
 import type { Pilha } from './src/navegacao'
@@ -37,6 +38,7 @@ function Aplicacao() {
         <Stack.Screen name="Agenda" component={Agenda} />
         <Stack.Screen name="Visita" component={Visita} />
         <Stack.Screen name="Romaneios" component={Romaneios} />
+        <Stack.Screen name="Transferir" component={Transferir} />
         <Stack.Screen
           name="Captura" component={Captura}
           options={{ animation: 'fade', presentation: 'fullScreenModal' }}

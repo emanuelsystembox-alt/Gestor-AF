@@ -82,7 +82,13 @@ interface Detalhe {
   ordem_servico: OS[]
   evidencia: Evid[]
   equipamento_movimento: Equip[]
+  /** "Status da Atividade" e "Motivo de Fechamento Externo" do TOA, como
+   *  vieram (D-158). Nulos em contrato que não veio do TOA. */
+  status_toa: string | null
+  motivo_fechamento_toa: string | null
 }
+/** Uma peça que está na mão do técnico (`minha_carga`, 086-B). */
+interface PecaNaMao { serial: string; tipo: string | null; modelo: string | null }
 
 const SELECT = `
   id, contrato, cliente_nome, telefones,
@@ -101,7 +107,9 @@ const SELECT = `
     id, tipo, midia, arquivo_path, mime, tamanho_bytes, duracao_seg,
     lat, lng, precisao_m, capturada_em, login, os_id
   ),
-  equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login )
+  equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login ),
+  status_toa:dados_origem->>"Status da Atividade",
+  motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo"
 `
 
 type Props = NativeStackScreenProps<Pilha, 'Visita'>
@@ -141,6 +149,7 @@ export default function Visita({ route, navigation }: Props) {
   const [equipSerial, setEquipSerial] = useState('')
   const [equipTipo, setEquipTipo] = useState('')
   const [equipModelo, setEquipModelo] = useState('')
+  const [carga, setCarga] = useState<PecaNaMao[]>([])
 
   const recarregar = useCallback(async () => {
     const [dv, de] = await Promise.all([
@@ -200,6 +209,9 @@ export default function Visita({ route, navigation }: Props) {
     setSubSel('')
     if (!codEscolhido) { setSubFalhas([]); return }
     let q = supabase.from('sub_falha').select('id, nome').eq('codigo', codEscolhido.codigo)
+      // Excluída em Configurações = `ativo` falso: some da escolha, mas
+      // continua no histórico de quem já usou (D-161).
+      .eq('ativo', true)
     if (conjunto) q = q.eq('conjunto', conjunto)
     q.order('ordem').then(({ data }) => setSubFalhas((data ?? []) as SubFalha[]))
   }, [codEscolhido, conjunto])
@@ -286,6 +298,23 @@ export default function Visita({ route, navigation }: Props) {
   function fecharBaixa() {
     setOsBaixando(null); setBuscaCod(''); setCodEscolhido(null)
     setSubSel(''); setObsBaixa('')
+  }
+
+  /**
+   * Abre o lançamento de equipamento e traz a carga do técnico.
+   *
+   * ┌─ por que tocar em vez de digitar ────────────────────────────────┐
+   * │ Digitado na calçada, um serial de 15 caracteres erra um dígito — │
+   * │ e aí a peça não sai da posse dele para a casa do cliente (079):  │
+   * │ o estoque continua dizendo que ela está na van. Se a peça veio   │
+   * │ por romaneio, ela já está na lista: é um toque, e o serial chega │
+   * │ certo. Digitar continua valendo — peça de fora da carga existe.  │
+   * └──────────────────────────────────────────────────────────────────┘
+   */
+  async function abrirEquipamento() {
+    setEquipAberto(true); setErro(null)
+    const { data } = await supabase.rpc('minha_carga')
+    setCarga((data ?? []) as PecaNaMao[])
   }
 
   async function salvarEquipamento() {
@@ -418,6 +447,14 @@ export default function Visita({ route, navigation }: Props) {
             ))}
           </View>
         </Cartao>
+
+        {/* A palavra do TOA, como veio, ao lado da nossa etiqueta — as
+            duas podem divergir, e a diferença tem de aparecer (D-158). */}
+        {(v.status_toa || v.motivo_fechamento_toa) && (
+          <Text style={e.operadora}>
+            No TOA: {[v.status_toa, v.motivo_fechamento_toa].filter(Boolean).join(' · ')}
+          </Text>
+        )}
 
         {/* ---------- ordens de serviço ---------- */}
         <Text style={e.tituloSecao}>
@@ -571,7 +608,7 @@ export default function Visita({ route, navigation }: Props) {
         {podeAnexar && !equipAberto && (
           <Botao
             titulo="Lançar equipamento" tom="discreto"
-            aoTocar={() => { setEquipAberto(true); setErro(null) }}
+            aoTocar={abrirEquipamento}
           />
         )}
 
@@ -599,6 +636,38 @@ export default function Visita({ route, navigation }: Props) {
               placeholderTextColor={cor.graf300}
               style={e.campo}
             />
+            {/* Só para "Instalou": o que ele RETIRA vem da casa do
+                cliente, não da carga dele. */}
+            {equipOper === 'INSTALADO' && (() => {
+              const lancados = new Set(v.equipamento_movimento.map(m => m.serial))
+              const livres = carga.filter(p => !lancados.has(p.serial))
+              if (livres.length === 0) return null
+              return (
+                <View style={{ gap: 6 }}>
+                  <Text style={e.cargaTitulo}>Da sua carga · toque para usar</Text>
+                  <View style={e.cargaLista}>
+                    {livres.map(p => (
+                      <Pressable
+                        key={p.serial}
+                        onPress={() => {
+                          setEquipSerial(p.serial)
+                          setEquipTipo(p.tipo ?? '')
+                          setEquipModelo(p.modelo ?? '')
+                        }}
+                        style={[e.cargaChip, equipSerial === p.serial && e.opcaoAtiva]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Usar o serial ${p.serial}`}
+                      >
+                        <Text style={e.cargaSerial}>{p.serial}</Text>
+                        <Text style={e.cargaMiudo} numberOfLines={1}>
+                          {p.tipo ?? 'sem tipo'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )
+            })()}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TextInput
                 value={equipTipo} onChangeText={setEquipTipo}
@@ -931,6 +1000,15 @@ const e = StyleSheet.create({
   equipSelo: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   equipSeloTexto: { fontSize: 11, fontWeight: '800' },
   equipSerial: { fontSize: 15, fontWeight: '700', color: cor.tinta },
+  cargaTitulo: { fontSize: 12, fontWeight: '600', color: cor.graf500 },
+  cargaLista: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  cargaChip: {
+    minHeight: TOQUE, paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: raio.m, borderWidth: 1, borderColor: cor.graf200,
+    backgroundColor: cor.branco, justifyContent: 'center',
+  },
+  cargaSerial: { fontSize: 13, fontWeight: '700', color: cor.tinta },
+  cargaMiudo: { fontSize: 11, color: cor.graf500, maxWidth: 160 },
   equipMiudo: { fontSize: 12, color: cor.graf400 },
 
   evento: { flexDirection: 'row', gap: 10, paddingVertical: 6 },

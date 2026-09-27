@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { lerCargaEstoque, type LeituraEstoque } from '../lib/estoque'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { Romaneios } from '../components/Romaneios'
+import { PecaDetalhe, EstadoAfline } from '../components/PecaDetalhe'
 import { Miscelanea } from '../components/Miscelanea'
+import { Cargas } from '../components/Cargas'
+import { BaixaContrato } from '../components/BaixaContrato'
+import { Movimentacoes } from '../components/Movimentacoes'
 
 /**
  * Almoxarifado — a posição da carga (fase 1 do módulo).
@@ -36,6 +40,9 @@ import { Miscelanea } from '../components/Miscelanea'
 interface Posicao {
   total: number
   sem_posse: number
+  /** 085 -- ausentes enquanto a migration não estiver aplicada. */
+  com_estado_afline?: number
+  divergem_do_atlas?: number
   por_estado: { estado: string; qtd: number }[]
   por_tipo: { tipo: string; qtd: number }[]
   por_posse: { posse: string | null; qtd: number }[]
@@ -53,6 +60,10 @@ interface Equipamento {
   tipo: string | null; modelo: string | null
   estado_atlas: string | null; posse: string | null
   local_atlas: string | null; atlas_em: string | null
+  /** O que NÓS afirmamos, ao lado do Atlas (085, D-160). */
+  estado_afline: string | null
+  estado_afline_em: string | null
+  estado_afline_motivo: string | null
 }
 
 const POR_PAGINA = 50
@@ -111,7 +122,7 @@ export default function Almoxarifado() {
   /** As tres metades do almoxarifado (a terceira e o documento que
    *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
    *  atravessa as tres no mesmo atendimento de balcao. */
-  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'miscelanea'>('posicao')
+  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes'>('posicao')
   const [posicao, setPosicao] = useState<Posicao | null>(null)
   const [posses, setPosses] = useState<Posse[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -134,6 +145,10 @@ export default function Almoxarifado() {
   const [totalLista, setTotalLista] = useState(0)
   const [pagina, setPagina] = useState(1)
   const [carregandoLista, setCarregandoLista] = useState(false)
+  /** A peça com a gaveta aberta. */
+  const [pecaAberta, setPecaAberta] = useState<string | null>(null)
+  /** Recarrega só a lista (a declaração muda a linha, não o painel). */
+  const [versaoLista, setVersaoLista] = useState(0)
 
   const recarregar = useCallback(async () => {
     setCarregando(true); setErro(null)
@@ -157,7 +172,8 @@ export default function Almoxarifado() {
     setCarregandoLista(true)
     let q = supabase.from('equipamento')
       .select('id, serial, enderecavel, tipo, modelo, estado_atlas, posse, ' +
-              'local_atlas, atlas_em', { count: 'exact' })
+              'local_atlas, atlas_em, estado_afline, estado_afline_em, ' +
+              'estado_afline_motivo', { count: 'exact' })
     const t = busca.trim().toUpperCase().replace(/\s+/g, '')
     if (t) q = q.like('serial', `${t}%`)
     if (fEstado !== 'TODOS') q = q.eq('estado_atlas', fEstado)
@@ -174,7 +190,7 @@ export default function Almoxarifado() {
         setCarregandoLista(false)
       })
     return () => { vivo = false }
-  }, [busca, fEstado, fTipo, fPosse, pagina, posicao])
+  }, [busca, fEstado, fTipo, fPosse, pagina, posicao, versaoLista])
 
   useEffect(() => { setPagina(1) }, [busca, fEstado, fTipo, fPosse])
 
@@ -250,10 +266,16 @@ export default function Almoxarifado() {
           </p>
         </div>
 
-        <div className="flex rounded-lg bg-graf-900 p-0.5">
+        <div className="flex flex-wrap rounded-lg bg-graf-900 p-0.5">
+          {/* D-165: as telas que faltavam em relação ao concorrente —
+              Alocações, Baixar Miscelâneas, Movimentações/Pesquisar Serial
+              e Kardex/Auditoria (este dentro de Miscelânea, por item). */}
           {([['posicao', 'Posição'],
              ['romaneios', 'Romaneios'],
-             ['miscelanea', 'Miscelânea']] as const).map(([a, rot]) => (
+             ['cargas', 'Cargas por técnico'],
+             ['miscelanea', 'Material e ferramenta'],
+             ['baixa', 'Baixa por contrato'],
+             ['movimentacoes', 'Movimentações e pesquisa']] as const).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
@@ -264,6 +286,9 @@ export default function Almoxarifado() {
 
         {aba === 'romaneios' && <Romaneios podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'miscelanea' && <Miscelanea podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'cargas' && <Cargas />}
+        {aba === 'baixa' && <BaixaContrato podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'movimentacoes' && <Movimentacoes />}
 
         {aba === 'posicao' && (<>
 
@@ -415,7 +440,8 @@ export default function Almoxarifado() {
               <div className="border-b border-graf-800 px-4 py-2.5">
                 <h2 className="text-sm font-semibold">O que a CLARO diz</h2>
                 <p className="mt-0.5 text-[11px] text-graf-400">
-                  estado no Atlas · não se edita aqui
+                  estado no Atlas · não se edita aqui — o da AFLINE é declarado peça a
+                  peça, na lista abaixo, e fica ao lado deste
                 </p>
               </div>
               <ul className="px-4 py-2">
@@ -424,6 +450,17 @@ export default function Almoxarifado() {
                     total={posicao.total} cor={COR_ESTADO[e.estado]} />
                 ))}
               </ul>
+              {(posicao.com_estado_afline ?? 0) > 0 && (
+                <p className="border-t border-graf-800 px-4 py-2 text-[11px] text-graf-400">
+                  <strong className="text-graf-200">{n(posicao.com_estado_afline ?? 0)}</strong>{' '}
+                  com estado declarado pela AFLINE ·{' '}
+                  <strong className={(posicao.divergem_do_atlas ?? 0) > 0
+                    ? 'text-amber-400' : 'text-graf-200'}>
+                    {n(posicao.divergem_do_atlas ?? 0)}
+                  </strong>{' '}
+                  divergem do Atlas — é a lista para levar à CLARO.
+                </p>
+              )}
             </section>
 
             <section className="card-controle overflow-hidden">
@@ -445,8 +482,8 @@ export default function Almoxarifado() {
                 ))}
               </ul>
               <p className="border-t border-graf-800 px-4 py-2 text-[11px] text-graf-400">
-                Declarar a posse peça a peça é a <strong>fase 2</strong> — entrega e
-                devolutiva ao técnico por romaneio.
+                A posse muda por <strong>romaneio</strong> (entrega e devolutiva) e pela
+                baixa no campo. Para entregar uma peça, abra-a na lista abaixo.
               </p>
             </section>
 
@@ -506,14 +543,27 @@ export default function Almoxarifado() {
                     <th className="px-3 py-2 font-medium">Série</th>
                     <th className="px-3 py-2 font-medium">Tipo</th>
                     <th className="px-3 py-2 font-medium">Modelo</th>
-                    <th className="px-3 py-2 font-medium">Estado (Atlas)</th>
+                    <th className="px-3 py-2 font-medium">Estado (Atlas · AFLINE)</th>
                     <th className="px-3 py-2 font-medium">Posse (nossa)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lista.map(e => (
-                    <tr key={e.id} className="border-b border-graf-800">
+                  {lista.map(e => (<Fragment key={e.id}>
+                    <tr onClick={() => setPecaAberta(pecaAberta === e.id ? null : e.id)}
+                      className={`cursor-pointer border-b border-graf-800 hover:bg-graf-800/40
+                                  ${pecaAberta === e.id ? 'bg-graf-800/40' : ''}`}>
                       <td className="tabular px-3 py-1.5 text-xs font-medium text-graf-100">
+                        {/* O botão é o alvo de teclado; a linha inteira
+                            responde ao mouse. */}
+                        <button onClick={ev => {
+                            ev.stopPropagation()
+                            setPecaAberta(pecaAberta === e.id ? null : e.id)
+                          }}
+                          aria-expanded={pecaAberta === e.id}
+                          aria-label={`${pecaAberta === e.id ? 'Fechar' : 'Abrir'} a peça ${e.serial}`}
+                          className="mr-1.5 text-graf-400 hover:text-af-400">
+                          {pecaAberta === e.id ? '▾' : '▸'}
+                        </button>
                         {e.serial}
                         {e.enderecavel && (
                           <span className="ml-1.5 text-[10px] text-graf-400">
@@ -527,13 +577,20 @@ export default function Almoxarifado() {
                         {e.modelo ?? '—'}
                       </td>
                       <td className="px-3 py-1.5">
-                        {e.estado_atlas ? (
-                          <span className="pill text-[10px]"
-                            style={{ ['--pill-cor' as string]:
-                              COR_ESTADO[e.estado_atlas] ?? 'var(--color-graf-500)' }}>
-                            {e.estado_atlas}
-                          </span>
-                        ) : <span className="text-xs text-graf-400">—</span>}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {e.estado_atlas ? (
+                            <span className="pill text-[10px]"
+                              style={{ ['--pill-cor' as string]:
+                                COR_ESTADO[e.estado_atlas] ?? 'var(--color-graf-500)' }}>
+                              {e.estado_atlas}
+                            </span>
+                          ) : <span className="text-xs text-graf-400">—</span>}
+                          {/* A nossa, vazada, AO LADO -- nunca no lugar. */}
+                          {e.estado_afline && (
+                            <EstadoAfline estado={e.estado_afline}
+                              cor={COR_ESTADO[e.estado_afline] ?? 'var(--color-graf-400)'} />
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 text-xs">
                         {e.posse ? (
@@ -545,7 +602,21 @@ export default function Almoxarifado() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    {pecaAberta === e.id && (
+                      <tr className="border-b border-graf-800 bg-graf-900">
+                        <td colSpan={5} className="p-0"
+                          style={{ boxShadow: 'inset 3px 0 0 0 var(--color-af-500)' }}>
+                          <PecaDetalhe peca={e}
+                            estados={posicao.por_estado.map(x => x.estado)
+                              .filter(x => x !== '(sem estado)')}
+                            podeMexer={pode('almoxarifado.editar')}
+                            corEstado={x => COR_ESTADO[x] ?? 'var(--color-graf-400)'}
+                            rotuloPosse={rotuloPosse}
+                            aoMudar={() => { setVersaoLista(v => v + 1); recarregar() }} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>))}
                   {!carregandoLista && lista.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-3 py-8 text-center text-xs text-graf-400">

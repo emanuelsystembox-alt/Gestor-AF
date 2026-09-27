@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
@@ -14,6 +14,10 @@ import {
   TabelaContratos, SELECT_CONTRATO,
   type ContratoLinha, type PontoVisita,
 } from '../components/TabelaContratos'
+import {
+  FILTRO_VAZIO, SEM_JANELA, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
+  type FiltroContrato,
+} from '../lib/filtroContratos'
 
 /**
  * Equipes de campo.
@@ -31,6 +35,10 @@ import {
  */
 
 interface Periodo { janela: string; qtd: number }
+
+/** O contrato da carga do dia inteiro -- com a equipe dona, para o
+ *  filtro saber em que gaveta ele cai. */
+type ContratoDia = ContratoLinha & { equipe_id: string }
 /**
  * Uma situação da equipe no dia: quantos contratos, e quanto isso VALE.
  *
@@ -96,6 +104,10 @@ interface EquipePainel {
    *  outlier e pior que media nenhuma, porque parece um numero. */
   min_deslocamento: number | null
   min_execucao: number | null
+  /** Quantos contratos de DESCONEXAO ficaram FORA de pontos, TEC1,
+   *  tempos e periodos (084). Contratos, O.S. e Situacao contam com
+   *  eles. Ausente enquanto a 084 nao estiver aplicada. */
+  desconexoes?: number
 }
 
 /** A contagem de TEC1 da equipe. `pct` é NULO quando nenhuma O.S. entrou
@@ -333,6 +345,29 @@ export default function Equipes() {
   const [soAtivas, setSoAtivas] = useState(true)
   const [agrupar, setAgrupar] = useState<'nenhum' | 'supervisor' | 'area'>('nenhum')
 
+  /*
+   * ┌─ o filtro de CONTRATO dentro de Equipes ─────────────────────────┐
+   * │ > "vamos colocar os filtros no menu equipes, inclusive de        │
+   * │ >  janela, status entre outros" — Emanuel, 23/09                 │
+   * │                                                                  │
+   * │ Os de cima (área, supervisor, busca) escolhem EQUIPE. Estes      │
+   * │ escolhem CONTRATO: a equipe fica na lista se tiver ao menos um   │
+   * │ que passe, e a gaveta mostra só os que passam. A regra é a de    │
+   * │ Serviços, do mesmo arquivo (lib/filtroContratos).                │
+   * │                                                                  │
+   * │ Os números do cartão e dos Períodos continuam sendo do DIA: eles │
+   * │ vêm prontos do servidor, e recalculá-los aqui seria uma segunda  │
+   * │ cópia da conta de pontos e TEC1 para divergir da primeira. A     │
+   * │ tela diz isso quando há filtro ligado.                           │
+   * └──────────────────────────────────────────────────────────────────┘
+   */
+  const [filtro, setFiltro] = useState<FiltroContrato>(FILTRO_VAZIO)
+  const mudaFiltro = <K extends keyof FiltroContrato>(k: K, val: FiltroContrato[K]) =>
+    setFiltro(f => ({ ...f, [k]: val }))
+  /** Os contratos do dia de TODAS as equipes. Só o filtro usa: sem ele a
+   *  gaveta continua buscando por equipe, como sempre. Nulo = carregando. */
+  const [contratosDia, setContratosDia] = useState<ContratoDia[] | null>(null)
+
   // importação
   const inputRef = useRef<HTMLInputElement>(null)
   const [previa, setPrevia] = useState<Record<string, string>[] | null>(null)
@@ -403,6 +438,7 @@ export default function Equipes() {
     const meu = ++pedido.current
     setCarregando(true); setErro(null)
     setAberta(null); setDetalhe({})
+    carregarContratosDia(meu)
     const [p, t, o, lg, sd] = await Promise.all([
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
@@ -442,6 +478,24 @@ export default function Equipes() {
     setCarregando(false)
   }
   useEffect(() => { recarregar() }, [data])
+
+  // Corre em paralelo ao painel e NÃO segura o "Carregando…" dele: o
+  // painel abre na hora e os filtros de contrato ficam prontos logo
+  // depois. Mesmo carimbo do `recarregar` -- troca rápida de dia não
+  // mistura contratos de um dia com o painel de outro.
+  async function carregarContratosDia(meu: number) {
+    setContratosDia(null)
+    // `equipe_id` cru vai junto: o código não serve de chave -- SEM-LOGIN
+    // existe uma vez por base, com o mesmo código.
+    const { data: d, error } = await supabase.from('visita')
+      .select(`${SELECT_CONTRATO}, equipe_id`)
+      .eq('data_agendada', data).not('equipe_id', 'is', null)
+      .is('excluido_em', null)
+      .order('janela_inicio', { ascending: true, nullsFirst: false })
+    if (meu !== pedido.current) return
+    if (error) { setErro(error.message); setContratosDia([]); return }
+    setContratosDia((d ?? []) as unknown as ContratoDia[])
+  }
 
   async function abrir(e: EquipePainel) {
     if (aberta === e.equipe_id) { setAberta(null); return }
@@ -522,17 +576,53 @@ export default function Equipes() {
   const supervisores = useMemo(() =>
     [...new Set(painel.map(e => e.supervisor).filter(Boolean) as string[])].sort(), [painel])
 
+  const filtrando = quantosLigados(filtro)
+
+  /** Os contratos de cada equipe que passam no filtro. Jornada fica de
+   *  fora do filtro -- Refeição não tem janela nem baixa, e "com
+   *  improdutiva" nunca a escolheria; ela não é contrato (079). */
+  const passamPorEquipe = useMemo(() => {
+    const m = new Map<string, ContratoLinha[]>()
+    if (!filtrando || !contratosDia) return m
+    for (const v of contratosDia) {
+      if (v.tipo_atividade?.natureza === 'JORNADA') continue
+      if (!passaNoFiltro(v, filtro)) continue
+      m.set(v.equipe_id, [...(m.get(v.equipe_id) ?? []), v])
+    }
+    return m
+  }, [contratosDia, filtro, filtrando])
+
+  // As opções saem do que o dia TEM -- janela que ninguém tem não é
+  // opção, e o status do TOA sai escrito como veio.
+  const opContrato = useMemo(() => {
+    const cs = (contratosDia ?? []).filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+    const uniq = (xs: (string | null | undefined)[]) =>
+      [...new Set(xs.filter((x): x is string => !!x && x.trim() !== ''))]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    return {
+      janelas: uniq(cs.map(janelaDe)),
+      semJanela: cs.some(v => !janelaDe(v)),
+      status: uniq(cs.map(v => v.status_toa?.trim())),
+      semStatus: cs.some(v => !v.status_toa?.trim()),
+      grupos: uniq(cs.map(v => v.tipo_servico?.nome)),
+      situacoes: SITUACOES.filter(s => cs.some(v => v.situacao === s)),
+    }
+  }, [contratosDia])
+
   const eqFiltradas = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return painel.filter(e => {
       if (area !== 'TODAS' && e.area !== area) return false
       if (supervisor !== 'TODOS' && e.supervisor !== supervisor) return false
       if (soAtivas && e.visitas === 0) return false
+      // Enquanto o dia carrega, ninguém some: esconder equipe por falta
+      // de dado seria dizer "não tem" quando é "ainda não sei".
+      if (filtrando && contratosDia && !passamPorEquipe.has(e.equipe_id)) return false
       if (!t) return true
       return [e.codigo, e.nome, e.supervisor, e.area, e.login_toa]
         .some(x => x?.toLowerCase().includes(t))
     })
-  }, [painel, busca, area, supervisor, soAtivas])
+  }, [painel, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe])
 
   const grupos = useMemo(() => {
     const ordenadas = [...eqFiltradas].sort((a, b) =>
@@ -750,6 +840,78 @@ export default function Equipes() {
                   onChange={e => setSoAtivas(e.target.checked)} className="accent-af-600" />
                 Só com serviço no dia
               </label>
+
+              {/* ---- a segunda linha escolhe CONTRATO, não equipe ---- */}
+              <div className="flex basis-full flex-wrap items-center gap-2 border-t
+                              border-graf-800 pt-2">
+                <span className="text-[11px] uppercase tracking-wide text-graf-400">
+                  Contratos
+                </span>
+                <select value={filtro.janela} aria-label="Janela"
+                  onChange={e => mudaFiltro('janela', e.target.value)} className={sel}>
+                  <option value="TODAS">Toda janela</option>
+                  {opContrato.janelas.map(j => <option key={j} value={j}>{j}</option>)}
+                  {opContrato.semJanela && <option value={SEM_JANELA}>Sem janela</option>}
+                </select>
+                <select value={filtro.situacao} aria-label="Situação"
+                  onChange={e => mudaFiltro('situacao', e.target.value as FiltroContrato['situacao'])}
+                  className={sel}>
+                  <option value="TODAS">Toda situação</option>
+                  <option value="ABERTAS">Em aberto</option>
+                  {opContrato.situacoes.map(s => (
+                    <option key={s} value={s}>{SITUACAO_INFO[s]?.label ?? s}</option>))}
+                </select>
+                <select value={filtro.statusToa} aria-label="Status da Atividade no TOA"
+                  onChange={e => mudaFiltro('statusToa', e.target.value)} className={sel}>
+                  <option value="TODOS">Todo status do TOA</option>
+                  {opContrato.status.map(s => <option key={s} value={s}>TOA · {s}</option>)}
+                  {opContrato.semStatus && <option value={SEM_STATUS}>Sem status do TOA</option>}
+                </select>
+                <select value={filtro.grupo} aria-label="Grupo de serviço"
+                  onChange={e => mudaFiltro('grupo', e.target.value)} className={sel}>
+                  <option value="TODOS">Todo grupo de serviço</option>
+                  {opContrato.grupos.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <select value={filtro.resultado} aria-label="Resultado"
+                  onChange={e => mudaFiltro('resultado', e.target.value as FiltroContrato['resultado'])}
+                  className={sel}>
+                  <option value="TODOS">Qualquer resultado</option>
+                  <option value="SUCESSO">Com O.S. executada</option>
+                  <option value="IMPRODUTIVA">Com improdutiva</option>
+                  <option value="SEM_BAIXA">Sem baixa ainda</option>
+                </select>
+                <select value={filtro.culpa} aria-label="Responsável pela improdutiva"
+                  onChange={e => mudaFiltro('culpa', e.target.value)} className={sel}>
+                  <option value="TODAS">Qualquer responsável</option>
+                  <option value="TECNICO">Improdutiva nossa</option>
+                  <option value="CLIENTE">Improdutiva do cliente</option>
+                  <option value="REDE">Improdutiva de rede</option>
+                  <option value="OPERADORA">Improdutiva da operadora</option>
+                  <option value="TERCEIRO">Improdutiva de terceiro</option>
+                </select>
+                <select value={filtro.origem} aria-label="Origem"
+                  onChange={e => mudaFiltro('origem', e.target.value)} className={sel}>
+                  <option value="TODAS">Toda origem</option>
+                  <option value="TOA">TOA</option>
+                  <option value="MANUAL">Manual</option>
+                </select>
+                {filtrando > 0 && (
+                  <button onClick={() => setFiltro(FILTRO_VAZIO)}
+                    className="text-xs text-af-400 underline underline-offset-2">
+                    limpar {filtrando} filtro(s)
+                  </button>
+                )}
+                {contratosDia === null && (
+                  <span className="text-[11px] text-graf-400">carregando contratos do dia…</span>
+                )}
+              </div>
+              {filtrando > 0 && (
+                <p className="basis-full text-[11px] text-graf-400">
+                  O filtro escolhe <strong className="text-graf-300">contratos</strong>: a
+                  equipe aparece se tiver ao menos um, e a gaveta mostra só eles. Pontos,
+                  TEC1, tempos, períodos e situação da equipe continuam sendo do dia inteiro.
+                </p>
+              )}
             </>
           )}
         </section>
@@ -811,11 +973,15 @@ export default function Equipes() {
                         <tr>
                           <th className="w-8 px-2 py-2"></th>
                           <th className="px-3 py-2 font-medium">Equipe</th>
-                          <th className="px-3 py-2 text-right font-medium">Contratos</th>
-                          <th className="px-3 py-2 text-right font-medium">O.S.</th>
+                          {/* Número e hora CENTRADOS, cabeçalho e valor
+                              juntos: alinhados à direita sob um rótulo
+                              largo, o "10" ficava solto no canto e não se
+                              lia como sendo daquela coluna. */}
+                          <th className="px-3 py-2 text-center font-medium">Contratos</th>
+                          <th className="px-3 py-2 text-center font-medium">O.S.</th>
                           <th className="px-3 py-2 font-medium">Períodos</th>
                           <th className="px-3 py-2 font-medium">Situação</th>
-                          <th className="px-3 py-2 font-medium">Último status</th>
+                          <th className="px-3 py-2 text-center font-medium">Último status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -900,7 +1066,7 @@ export default function Equipes() {
                                       )
                                       return (
                                         <>
-                                          <dt className="text-graf-600">NOME</dt>
+                                          <dt className="text-graf-600">NOME TÉCNICO</dt>
                                           <dd className="min-w-0 truncate text-graf-200"
                                               title={ts.map(x => x.nome).join(' · ')}>
                                             {ts.length
@@ -1048,6 +1214,19 @@ export default function Equipes() {
                                             </dd>
                                           </>}
 
+                                          {/* 084: a desconexão sai das contas
+                                              acima e da régua de períodos.
+                                              Número que encolhe calado parece
+                                              defeito -- então o cartão diz. */}
+                                          {(e.desconexoes ?? 0) > 0 && <>
+                                            <dt className="text-graf-600">EXPURGO</dt>
+                                            <dd className="min-w-0 text-graf-400"
+                                              title="Contratos de DESCONEXÃO não entram em pontos, TEC1, tempos nem períodos desta equipe. Contratos, O.S. e Situação contam com eles.">
+                                              {e.desconexoes} desconexão(ões) fora
+                                              das contas e dos períodos
+                                            </dd>
+                                          </>}
+
                                         </>
                                       )
                                     })()}
@@ -1056,10 +1235,17 @@ export default function Equipes() {
                                   </div>
                                 </td>
 
-                                <td className="tabular px-3 py-2.5 text-right">
+                                <td className="tabular px-3 py-2.5 text-center">
                                   {e.visitas || <span className="text-graf-600">—</span>}
+                                  {/* Com filtro ligado, quantos DESTES passam.
+                                      O número grande continua o do dia. */}
+                                  {filtrando > 0 && contratosDia && (
+                                    <div className="mt-0.5 whitespace-nowrap text-[10px] text-af-400">
+                                      {passamPorEquipe.get(e.equipe_id)?.length ?? 0} no filtro
+                                    </div>
+                                  )}
                                 </td>
-                                <td className="tabular px-3 py-2.5 text-right text-graf-400">
+                                <td className="tabular px-3 py-2.5 text-center text-graf-400">
                                   {e.ordens || <span className="text-graf-600">—</span>}
                                 </td>
 
@@ -1097,7 +1283,7 @@ export default function Equipes() {
                                     │ `ultima_atividade` fica embaixo, dizendo   │
                                     │ o que e, porque e ela que decide OCIOSO.   │
                                     └────────────────────────────────────────────┘ */}
-                                <td className="px-3 py-2.5 text-xs">
+                                <td className="px-3 py-2.5 text-center text-xs">
                                   {e.ocioso ? (
                                     <span className="rounded bg-amber-900/40 px-1.5 py-0.5
                                                      font-semibold text-amber-300"
@@ -1163,11 +1349,15 @@ export default function Equipes() {
                                       <div className="quadro"
                                         style={{ ['--quadro-altura' as string]: '26rem' }}>
                                       <TabelaContratos
-                                        linhas={detalhe[e.equipe_id] ?? []}
+                                        linhas={filtrando > 0
+                                          ? passamPorEquipe.get(e.equipe_id) ?? []
+                                          : detalhe[e.equipe_id] ?? []}
                                         colunas={{ equipe: false }}
                                         pontos={pontos}
                                         porIndicador={porIndicador}
-                                        carregando={carregandoDetalhe === e.equipe_id}
+                                        carregando={filtrando > 0
+                                          ? contratosDia === null
+                                          : carregandoDetalhe === e.equipe_id}
                                         aoAbrir={v => setModal(v.id)}
                                         aoMenuContexto={(v, ev) => {
                                           setMenu(menu === v.id ? null : v.id)
@@ -1175,8 +1365,10 @@ export default function Equipes() {
                                         }}
                                         vazio={
                                           <p className="px-3 py-6 text-center text-xs text-graf-500">
-                                            Nenhum contrato para esta equipe em{' '}
-                                            {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.
+                                            {filtrando > 0
+                                              ? 'Nenhum contrato desta equipe passa no filtro.'
+                                              : <>Nenhum contrato para esta equipe em{' '}
+                                                  {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.</>}
                                           </p>
                                         }
                                         renderAcoes={v => (<>

@@ -28,6 +28,10 @@ desktop.ini
 # temporários
 *.log
 .cache/
+# cache do Wrangler (aparece quando o deploy roda fora de app/)
+.wrangler/
+app/.wrangler/
+.tmp-export/
 
 # arquivo temporario que o Vite cria ao recarregar a config
 vite.config.ts.timestamp-*

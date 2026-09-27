@@ -201,7 +201,7 @@ aparelho e sobe sozinha depois.
 
 ---
 
-## As 158 decisões
+## As 161 decisões
 
 Todas em `docs/03-DECISOES.md`, com o porquê de cada uma. Resumo por tema:
 
@@ -373,7 +373,52 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 26/09/2026 — o que ficou desta leva
+
+A leva de 26/09 (D-162 a D-165, migrations 086 a 089c) fechou o
+estoque em relação ao concorrente, criou a **Frota** e publicou tudo.
+**A web está no ar e em dia com o banco** — conferido baixando o bundle
+de `gestor-af.pages.dev`: o `index.js` publicado é o mesmo do build e os
+pedaços `Almoxarifado-*.js` e `Frota-*.js` contêm as telas novas.
+
+### Resolvido desde 23/09
+
+| Pendência de 23/09 | Como fechou |
+|---|---|
+| A web não estava publicada | Publicada em 26/09 (acima) |
+| A lista real de miscelânea | **418 itens** copiados do Alfa Gestor da AFLINE (089b): ferramenta, EPI com C.A., material com SAP e valor, acessório |
+| Inventário cíclico | Existe: **contar** por item vira AJUSTE com motivo, e o Kardex mostra (089-E) |
+| Confirmação do romaneio com prova | Aceite pelo celular com **biometria ou senha**, método gravado (087-D) |
+| Frota | Módulo inteiro (088): veículos, condutor = técnico, abastecimento, consumo real, exceções, manutenção |
+
+### Continua pendente — depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Trazer os 154 veículos** do Alfa Gestor | Placa, apelido, modelo, ano, chassi, renavam e rastreador vêm limpos; o **condutor não** (lá é a equipe, e cada equipe tem dois técnicos). O banco de produção tem **zero** veículo. |
+| **"REDE PRÓPRIA/ALUGADA" e "Vale Transporte"** | Não couberam em propriedade × pernoite. Se forem carro da equipe de rede e técnico sem carro, é outra dimensão. |
+| **Corte de 1/3 do "km muito baixo"** | Escolha nossa (088-G), comparando o carro com ele mesmo. A AFLINE pode ter outro. |
+| **Texto jurídico do termo de responsabilidade** | O texto em `app/src/lib/termo.ts` (`DECLARACAO`) é neutro e nosso. |
+| **Técnico pede abastecimento pelo celular** | O banco aceita "em aberto"; não há tela no app. No concorrente, 7 de 195 vêm do condutor. |
+| **Baixa de material pelo próprio técnico, na visita** | Hoje a baixa por contrato é do almoxarifado (como no concorrente). Levar para a tela de baixa do app é o próximo passo natural. |
+
+### Continua pendente — ninguém testou com o dedo
+
+- As telas novas do almoxarifado e da frota **clicando** (as sessões de
+  desenvolvimento não têm a senha do admin; o banco foi testado como
+  `authenticated`, cenário a cenário — ver D-162 a D-165).
+- O app no celular: **biometria** (só se prova no aparelho; no Expo Go o
+  iPhone cai no código do aparelho em vez do Face ID), a tela
+  **Transferir** e "Meu material".
+- Para o app funcionar, o login precisa estar vinculado a um técnico
+  (`tecnico.usuario_id`).
+
+---
+
 ## Pendente em 23/09/2026 — o que ficou desta leva
+
+> **Atualizado em 26/09:** o item 1 (web não publicada) e parte do 3 e do
+> 6 foram resolvidos — ver a seção acima. O resto continua valendo.
 
 Registrado no fim da sessão que entregou: paginação de contratos, a Rota
 como mesa de despacho, o mapa do Google, o almoxarifado (fases 1, 2 e 3)

@@ -142,6 +142,15 @@ As três últimas, para não repetir o esquecimento:
 | 081 | **A equipe mostra a nota TEC1** — `painel_equipes.tec1`, sobre O.S. (D-150) | ✓ |
 | 082 | **O TEC1 do painel sai do cache** — defeito meu: filtro por `visita.importacao_id` refrescava 1 de 30, e o painel lia cache enquanto a linha lia a regra (D-150) | ✓ |
 | 083 | **A régua sabe o tipo, e a equipe mostra os tempos** — `periodos[].vt`, `min_deslocamento`, `min_execucao` (D-151) | ✓ |
+| 084 | **A desconexão sai das contas da equipe** — pontos, TEC1, tempos e `periodos` sem DESCONEXAO; volta `desconexoes`; OCIOSO passa a medir hoje em `hoje_local()` (D-159) | ✓ |
+| 085 | **O estado AFLINE ao lado do Atlas** — `equipamento.estado_afline*`, `equipamento_estado_evento`, `declarar_estado_equipamento`; romaneio avisa pelo estado que vale (D-160) | ✓ |
+| 086 | **Dez seriais de uma vez, e a carga na mão** — `romaneio_por_seriais` (lote com recusa por serial, teto 500) e `minha_carga()` para o técnico ver o que tem (D-162) | ✓ |
+| 087 | **As regras do estoque do concorrente** — prazo da carga (`carga_dias_limite`, nasce 0), `equipamento.condicao` e condição na devolutiva, transferência técnico → técnico, `confirmado_metodo` (APARELHO/SENHA/BALCAO); `abrir_romaneio` e `confirmar_romaneio` recriadas com parâmetros novos (D-163) | ✓ |
+| 088 | **A frota nasce** — `veiculo` (propriedade e situacao separadas, arquivar com motivo), `veiculo_condutor` (tecnico com periodo), `veiculo_evento`, `abastecimento`, `manutencao`/`manutencao_item`; consumo real e excecoes pelo odometro (`frota_intervalos`, `frota_consumo`, `frota_excecoes`, `frota_painel`); perfil Frota. 088b corrige o intervalo para ir de leitura valida a leitura valida (D-164) | ✓ |
+| 089 | **O estoque ganha os menus que faltavam** — frota `pernoite`; catálogo com tipo/valor/C.A./consumível; transferência pedida pelo técnico (`solicitar_transferencia`, aceite + aprovação em `confirmar_romaneio`); `baixar_miscelanea`, `ajustar_saldo_miscelanea`, `estoque_cargas`, `estoque_historico_serial`, `estoque_movimentacoes`, `miscelanea_kardex` (D-165) | ✓ |
+| 089a | `item_miscelanea.codigo` deixa de ser NOT NULL (a carga do catálogo morreu no primeiro item sem código SAP) | ✓ |
+| 089b | **O catálogo do concorrente vira o nosso** — 418 itens ativos do Alfa Gestor, de `supabase/dados/catalogo_miscelanea_alfa_2026-09-26.txt`; 2 fora por código SAP repetido | ✓ |
+| 089c | O Kardex ganha `seq`: lançamentos no mesmo instante saíam fora de ordem | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY
 > DEFINER`.** Coluna nova no `returns table` não passa por `create or
@@ -149,7 +158,7 @@ As três últimas, para não repetir o esquecimento:
 > Nas duas, o `revoke ... from public, anon` no fim é a diferença entre
 > um painel de despacho e um vazamento. Conferido: `anon` não executa.
 
-> **A 074, a 079, a 081, a 082 e a 083 derrubam e recriam
+> **A 074, a 079, a 081, a 082, a 083 e a 084 derrubam e recriam
 > `painel_equipes`; a 079 derruba também `rota_do_dia`.** Coluna nova no
 > `returns table` não passa por `create or replace`, e função recriada
 > do zero **nasce com a ACL aberta ao `anon`** — o `revoke`/`grant` no

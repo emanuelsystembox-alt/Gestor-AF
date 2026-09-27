@@ -157,6 +157,86 @@ Quem estava sem sinal lê o que perdeu ao voltar.
 
 ---
 
+## Almoxarifado (077 a 087, D-152 a D-163)
+
+**Três eixos por peça, três donos.** `estado_atlas` é da CLARO e só a
+importação grava. `estado_afline` é a nossa correção dele, no
+vocabulário dele, com motivo (D-160). `posse` + `condicao` são a leitura
+operacional do almoxarifado (onde está; inicializado / retirado / com
+defeito). Não misture: a condição **não** é estado do Atlas.
+
+**A importação não inventa posse.** Peça importada nasce com `posse`
+nula — "sem posse declarada" é o trabalho que falta, não um estoque
+redondo (D-152).
+
+**Posse só se move por documento ou pelo campo.** Romaneio (entrega,
+devolutiva, transferência) ou o serial lançado na baixa (079). Nada se
+move enquanto o romaneio está ABERTO; confirmado não se cancela — a
+correção é o documento inverso (D-154).
+
+**O aceite é do técnico, pelo celular, com prova.** Quem recebe confirma
+— na transferência, o técnico de destino; a origem nunca confirma pelo
+outro. O técnico **tem** de declarar o método (`APARELHO` = biometria
+ou bloqueio do celular; `SENHA` = senha do sistema); a web grava
+`BALCAO` e ninguém pelo cliente se passa por balcão (087-D, D-163).
+
+**Prazo da carga.** Quem tem peça parada há mais de
+`carga_dias_limite` dias não **recebe** peça nova (entrega nem
+transferência). O bloqueio é no bipar, nunca na confirmação — a peça já
+pode estar na mão dele. **0 desliga, e é o valor da AFLINE** (copiado do
+sistema anterior, onde está em 0). Só seriais contam (087-A, D-163).
+
+**A devolutiva declara a condição** antes de bipar, sem padrão marcado.
+O campo carimba `RETIRADO` sozinho (087-B).
+
+**Transferência pedida pelo técnico tem três mãos** (089-C, D-165): o
+técnico de origem pede pelo celular, o de destino **aceita** (biometria
+ou senha) e o almoxarifado **aprova**. Só na aprovação a posse e o
+saldo mudam — até lá, continua na carga de quem pediu. A origem pode
+desistir e o destino pode recusar enquanto não houver aprovação.
+Transferência aberta pelo almoxarifado dispensa a aprovação (quem montou
+já é o almoxarifado).
+
+**Material gasto no contrato sai do saldo do TÉCNICO**, amarrado ao
+contrato (`baixar_miscelanea`). Baixar o que ele não tem é recusado.
+
+**Auditoria não sobrescreve saldo**: o contado entra como AJUSTE com a
+diferença e motivo obrigatório. O saldo é sempre soma do razão.
+
+**Peça em PERDA/SUCATA entra no romaneio com aviso, não com bloqueio.**
+48,9% da carga está em PERDA; travar seria política de patrimônio que
+ninguém combinou (D-154).
+
+**O que o campo declara nunca trava a baixa.** Serial fora da carga não
+move nada e não levanta exceção (D-157).
+
+---
+
+## Frota (088, D-164)
+
+**O condutor é o TÉCNICO, pelo nome — nunca a equipe.** "Nada de equipe
+pra não ter duplicada" (Emanuel). O concorrente grava o login da equipe e
+a dupla vira um nome só. O condutor tem **período** (`desde`/`ate`), um
+atual por carro; o histórico diz quem dirigiu cada carro e quando.
+
+**De quem é o carro, onde ele dorme e onde ele está são campos
+separados.** (O `pernoite` entrou na 089.) `propriedade` (própria, locadora, do técnico), `pernoite`
+(leva para casa ou dorme na base) e `situacao` (ativo, na garagem, fora
+da garagem, em manutenção). O concorrente mistura tudo num campo
+"origem" de 19 opções. A AFLINE precisa responder: quantos alugados,
+quantos próprios, quantos levam para casa.
+
+**Vendido, devolvido ou sinistrado sai da lista com motivo** —
+arquivar, nunca apagar e nunca virar "origem". O histórico continua.
+
+**O consumo é medido, não suposto.** Km/l sai do odômetro dos
+abastecimentos aprovados/abastecidos, de leitura válida a leitura
+válida. Não existe km/l "de referência": sem trecho medido, a tela diz
+"sem km medido". As exceções (odômetro que voltou, sem odômetro, km
+muito baixo) são para conferir, **nunca bloqueiam** lançamento.
+
+---
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

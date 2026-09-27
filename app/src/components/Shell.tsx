@@ -55,17 +55,19 @@ const OPERACAO: Item[] = [
   { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade' },
   { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
   { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar' },
-  { para: '/controle/sub-falhas', rotulo: 'Sub-falhas', icone: 'subfalhas' },
+  // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
 ]
 const ALMOXARIFADO: Item[] = [
   { para: '/almoxarifado', rotulo: 'Estoque', icone: 'estoque' },
+]
+const FROTA: Item[] = [
+  { para: '/frota', rotulo: 'Veículos e consumo', icone: 'frota' },
 ]
 const AJUSTES: Item[] = [
   { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes' },
   { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao' },
 ]
 const FUTURO: Item[] = [
-  { para: '/frota', rotulo: 'Frota', icone: 'frota', futuro: true },
   { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
   { para: '/rh', rotulo: 'RH', icone: 'equipes', futuro: true },
 ]
@@ -171,6 +173,9 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
               )}
               {pode('almoxarifado.ver') && (
                 <Grupo titulo="Almoxarifado" itens={ALMOXARIFADO} recolhido={!aberto} />
+              )}
+              {pode('frota.ver') && (
+                <Grupo titulo="Frota" itens={FROTA} recolhido={!aberto} />
               )}
               {(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && (
                 <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={!aberto} />

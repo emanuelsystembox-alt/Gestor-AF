@@ -182,7 +182,7 @@ export default function Agenda({ navigation }: Props) {
             continua sendo a primeira coisa que ele ve (D-112). */}
         <Pressable onPress={() => navigation.navigate('Romaneios')}
           style={e.material} hitSlop={8}
-          accessibilityRole="button" accessibilityLabel="Meus romaneios de material">
+          accessibilityRole="button" accessibilityLabel="Meu material: carga e romaneios">
           <Text style={e.materialTexto}>Material</Text>
         </Pressable>
         <Pressable onPress={sair} style={e.sair} hitSlop={8}>
