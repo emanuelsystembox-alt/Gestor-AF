@@ -5874,3 +5874,63 @@ corrigido.
 - `agenda_do_campo` e `painel_equipes` ainda chamam `pontos_da_visita`
   por linha — são de UM dia (dezenas de visitas por equipe), não do mês;
   trocar se medirem lentas.
+
+---
+
+### D-168 · O primeiro teste no celular: teclado, status livre, resposta do controlador e miscelânea
+
+> *"quando ele vai digitar, o campo de digitação não sobe […] quem tiver a
+> visão controlador […] quando o técnico responder o pendente que é o
+> impedimento, o operador deve aparecer a função responder e escolher o
+> status […] o técnico deve ter opção de escolher o status […] a opção
+> lançar equipamento […] não parece botão […] não aparece o botão de
+> lançar miscelânea"* — Emanuel, 27/09, testando no Expo Go.
+
+O chat funcionou de ponta a ponta no primeiro teste (técnico escreve →
+controle responde na web → chega no celular). O que o teste mostrou:
+
+**1. O teclado cobria o campo.** O Android do Expo SDK 57 é edge-to-edge:
+a janela não encolhe quando o teclado abre, e `KeyboardAvoidingView` com
+`behavior={undefined}` no Android não fazia nada. Agora `'height'` no
+Android (`'padding'` no iOS) na Conversa, no Abastecer e na tela do
+contrato — onde o rodapé é `position: absolute` e só sobe se a área
+encolher.
+
+**2. O controlador responde e muda o status.** Card "Responder ao
+técnico" na página do contrato: mostra o pedido de ajuda (o Impedimento
+vindo do campo, com a observação dele), deixa escolher o status e
+escrever a resposta — que chega no celular como AVISO, porque a
+observação de uma mudança de status já vira aviso (059). Não é canal
+novo. Contrato aberto muda por `registrar_etapa`; encerrado só volta por
+`reverter_situacao`, com motivo obrigatório (D-030). "Encerrado" é o que
+não está em `EM_ABERTO` — a lista que a web já tinha, sem cópia nova.
+E um botão abre a conversa com o técnico.
+
+**3. O técnico escolhe o status.** "Mudar status ›" no rodapé abre as
+sete situações que já existem. Perguntado sobre "não concluído", o
+Emanuel corrigiu: *"não concluído, cancelado e reagendado, me enganei —
+pode corrigir para como está"*. As travas continuam no banco (055):
+encerrar exige GPS e todas as O.S. baixadas; encerrado não volta pelo
+campo. A tela só antecipa ("falta baixar 1 O.S.").
+
+**4. Equipamento e miscelânea.** "Lançar equipamento" era `tom="discreto"`
+— cinza sobre o fundo cinza, parecia texto. Virou botão de contorno. E a
+miscelânea entrou no contrato (094): `baixar_miscelanea` era só do
+almoxarifado; `baixar_miscelanea_do_campo` faz a mesma conta (sai do
+saldo DELE, recusa o que ele não tem) com o técnico sempre sendo o do
+login, e passa pela MESMA trava da foto (`pode_anexar_na_visita`: equipe
+dele, só no dia). Ferramenta e EPI não aparecem — não se gastam.
+
+**Testado como `authenticated` (desfeito):** saldo 10 → lançou 3 → saldo
+7, aparece em `miscelanea_do_contrato`; 50 recusado (23514); contrato de
+10/09 recusado com o recado da trava (42501); a porta do almoxarifado
+continua fechada ao técnico (42501). Baterias 16/16 e 14/14.
+
+**Ferramenta:** `@expo/ngrok` como devDependency do `campo/` (a instalação
+global que o Expo oferece não é achada no Windows) e `app.cmd` na raiz
+(`.\app`) — todo terminal novo nasce na raiz, onde `npx expo start` falha.
+O túnel do ngrok caiu ("remote gone away"); o teste foi pelo Wi-Fi.
+
+**Não verificado:** o teclado corrigido e as telas novas no celular (tsc e
+`expo export` limpos; o Expo Go recarrega sozinho se o servidor estiver
+de pé). A resposta do controlador não foi gravada pela tela em produção.

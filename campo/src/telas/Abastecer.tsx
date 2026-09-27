@@ -118,7 +118,7 @@ export default function Abastecer() {
   return (
     <SafeAreaView style={e.tela} edges={['top']}>
       <CabecalhoAba titulo="Abastecer" subtitulo="Você pede, a frota aprova" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={e.conteudo} keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={atualizando} onRefresh={puxar} tintColor={cor.af600} />}>
           {veiculo === undefined && <Carregando />}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACAO_INFO, SITUACOES, EM_ABERTO, type Situacao } from '../lib/supabase'
+import { useCentral } from '../lib/central'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Pill } from '../components/ui'
@@ -50,6 +51,7 @@ interface Det {
   area: { codigo: string; apelido: string | null } | null
   equipe: { id: string; codigo: string; supervisor_nome: string | null } | null
   tecnico: { nome: string; matricula: string } | null
+  tecnico_responsavel_id: string | null
   ordem_servico: OS[]
 }
 
@@ -63,7 +65,7 @@ const SELECT = `
   segmentacao:segmentacao_id ( nome ),
   area:area_id ( codigo, apelido ),
   equipe:equipe_id ( id, codigo, supervisor_nome ),
-  tecnico:tecnico_responsavel_id ( nome, matricula ),
+  tecnico:tecnico_responsavel_id ( nome, matricula ), tecnico_responsavel_id,
   ordem_servico (
     id, sequencia, numero_os, ponto, status_operadora, produto, observacao,
     tipo_os:tipo_os_id ( codigo, descricao ),
@@ -148,6 +150,11 @@ export default function VisitaDetalhe() {
   const [transferindo, setTransferindo] = useState(false)
   const [novaEquipe, setNovaEquipe] = useState('')
   const [motivo, setMotivo] = useState('')
+  // Responder ao técnico e mudar o status (Emanuel, 27/09).
+  const [novaSituacao, setNovaSituacao] = useState('')
+  const [resposta, setResposta] = useState('')
+  const [respondendo, setRespondendo] = useState(false)
+  const { abrirChat, recarregar: recarregarCentral } = useCentral()
 
   async function carregar() {
     setCarregando(true); setErro(null)
@@ -202,6 +209,47 @@ export default function VisitaDetalhe() {
     }
     setTransferindo(false)
   }
+
+  /**
+   * Responde ao técnico mudando o status, com a resposta colada na mudança.
+   *
+   * Não é um canal novo: a observação da mudança JÁ vira aviso no celular
+   * dele (059, `aviso_do_evento`). Contrato aberto muda por
+   * `registrar_etapa` (encerrar exige todas as O.S. baixadas — a mesma
+   * trava do campo); contrato encerrado só volta por `reverter_situacao`,
+   * que exige motivo (D-030). A tela escolhe a porta; quem decide é o banco.
+   */
+  async function responder() {
+    if (!v || !novaSituacao) return
+    // Encerrado = fora de EM_ABERTO: a lista que a web já tem, sem cópia nova.
+    const encerrado = !EM_ABERTO.includes(v.situacao)
+    if (encerrado && !resposta.trim()) {
+      setErro('Contrato encerrado só volta com motivo — escreva a resposta.')
+      return
+    }
+    setRespondendo(true); setErro(null); setOk(null)
+    const { error } = encerrado
+      ? await supabase.rpc('reverter_situacao', {
+          p_visita: v.id, p_situacao: novaSituacao, p_motivo: resposta.trim(),
+        })
+      : await supabase.rpc('registrar_etapa', {
+          p_visita: v.id, p_situacao: novaSituacao,
+          p_observacao: resposta.trim() || null, p_lat: null, p_lng: null,
+        })
+    setRespondendo(false)
+    if (error) { setErro(error.message); return }
+    setOk(`Status mudado para ${SITUACAO_INFO[novaSituacao as Situacao]?.label ?? novaSituacao}`
+      + (resposta.trim() ? ' — o técnico recebe a resposta como aviso no celular.' : '.'))
+    setNovaSituacao(''); setResposta('')
+    await carregar()
+    recarregarCentral()
+  }
+
+  /** O último pedido de ajuda do campo: Impedimento registrado pelo celular. */
+  const pedidoDeAjuda = useMemo(() => {
+    const ev = eventos.find(e => (e.para as { situacao?: string } | null)?.situacao === 'COM_IMPEDIMENTO')
+    return ev && ev.origem === 'MOBILE' && v?.situacao === 'COM_IMPEDIMENTO' ? ev : null
+  }, [eventos, v])
 
   const resumo = useMemo(() => {
     if (!v) return null
@@ -421,6 +469,64 @@ export default function VisitaDetalhe() {
                 <strong> Valor</strong> e <strong>Pontos</strong> entram quando a
                 regra de pontuação for definida — ver <code>docs/06-PONTUACAO.md</code>.
               </p>
+            </section>
+
+            {/* ---------- responder ao técnico / mudar status ---------- */}
+            <section className={`card-controle p-4 ${pedidoDeAjuda ? 'ring-1 ring-orange-500/60' : ''}`}>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold">Responder ao técnico</h2>
+                {v.tecnico_responsavel_id && (
+                  <button onClick={() => abrirChat(v.tecnico_responsavel_id)}
+                    className="ml-auto rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                               hover:border-af-600 hover:text-af-400">
+                    Abrir conversa com {v.tecnico?.nome?.split(' ')[0] ?? 'o técnico'}
+                  </button>
+                )}
+              </div>
+
+              {pedidoDeAjuda && (
+                <div className="mb-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-orange-300">
+                    Pedido de ajuda do campo · {new Date(pedidoDeAjuda.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <p className="mt-0.5 text-sm text-graf-100">
+                    {pedidoDeAjuda.observacao ? `“${pedidoDeAjuda.observacao}”` : 'O técnico registrou impedimento sem observação.'}
+                  </p>
+                </div>
+              )}
+
+              <p className="mb-3 text-xs text-graf-400">
+                Escolha o status que faz sentido e escreva a resposta: ela chega no celular do
+                técnico como aviso, junto com a mudança. Encerrar exige todas as O.S. baixadas;
+                contrato já encerrado só volta com motivo.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-44">
+                  <label htmlFor="nova-situacao" className="mb-1 block text-[11px] text-graf-400">Novo status</label>
+                  <select id="nova-situacao" value={novaSituacao} onChange={e => setNovaSituacao(e.target.value)}
+                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
+                    <option value="">Selecione…</option>
+                    {SITUACOES.filter(s => s !== v.situacao).map(s => (
+                      <option key={s} value={s}>{SITUACAO_INFO[s].label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-56 flex-1">
+                  <label htmlFor="resposta-tecnico" className="mb-1 block text-[11px] text-graf-400">
+                    Resposta ao técnico
+                  </label>
+                  <input id="resposta-tecnico" value={resposta} onChange={e => setResposta(e.target.value)}
+                    maxLength={500}
+                    onKeyDown={e => { if (e.key === 'Enter') responder() }}
+                    placeholder="Ex.: pode seguir, liguei para o cliente e ele está em casa"
+                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
+                </div>
+                <button onClick={responder} disabled={!novaSituacao || respondendo}
+                  className="rounded-md bg-af-600 px-4 py-1.5 text-sm font-medium text-white
+                             hover:bg-af-500 disabled:opacity-40">
+                  {respondendo ? 'Enviando…' : 'Responder e mudar status'}
+                </button>
+              </div>
             </section>
 
             {/* ---------- transferir equipe ---------- */}

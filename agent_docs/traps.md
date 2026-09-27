@@ -173,6 +173,11 @@ serve para MOLDURA (rótulo de eixo, travessão decorativo); texto que
 carrega informação usa `graf-400` (5,88 / 4,76). E meça sempre com
 conversão de espaço de cor — regex de dígitos mente com `oklch`.
 
+**No Android do Expo SDK 57 o teclado NÃO encolhe a janela** (edge-to-edge).
+`KeyboardAvoidingView` com `behavior={undefined}` no Android — o padrão de
+muitos exemplos — deixa o teclado em cima do campo. Use `'height'` no
+Android, principalmente se o rodapé for `position: absolute`. Ver D-168.
+
 **`disabled` num campo TIRA O FOCO, e `.focus()` num campo desabilitado
 nao faz nada.** O padrao "desabilita enquanto salva" mata o fluxo de
 teclado: depois do Enter o foco vai para o `BODY` e a proxima leitura nao

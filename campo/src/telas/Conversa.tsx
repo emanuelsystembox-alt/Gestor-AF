@@ -86,7 +86,7 @@ export default function Conversa() {
   return (
     <SafeAreaView style={e.tela} edges={['top']}>
       <CabecalhoAba titulo="Conversa com o controle" subtitulo="Quem estiver com a sua equipe responde" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={rolagem}
           contentContainerStyle={e.lista}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Image, Linking, Modal, Pressable, RefreshControl, ScrollView,
-  StyleSheet, Text, TextInput, View,
+  Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl,
+  ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -34,6 +34,21 @@ import type { Pilha } from '../navegacao'
  * │    `usuario_id` (D-061).                                          │
  * └───────────────────────────────────────────────────────────────────┘
  */
+
+/** O que já saiu do saldo do técnico neste contrato (094). */
+interface MiscLancada { item: string; unidade: string | null; quantidade: number; criado_em: string }
+interface SaldoItem { item_id: string; codigo: string | null; nome: string; unidade: string | null; tipo: string | null; saldo: number }
+
+/**
+ * Os status que o técnico escolhe (Emanuel, 27/09): os que já existem,
+ * sem inventar "não concluído" — o não concluído É cancelado ou
+ * reagendado. As travas continuam no banco (055): encerrar exige GPS e
+ * todas as O.S. baixadas, e contrato encerrado não volta pelo campo.
+ */
+const STATUS_DO_CAMPO = [
+  'ENTRADA', 'EM_DESLOCAMENTO', 'EM_EXECUCAO', 'COM_IMPEDIMENTO',
+  'CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO',
+] as const
 
 interface CodigoBaixa {
   id: string; codigo: number; descricao: string
@@ -151,6 +166,15 @@ export default function Visita({ route, navigation }: Props) {
   const [equipModelo, setEquipModelo] = useState('')
   const [carga, setCarga] = useState<PecaNaMao[]>([])
 
+  // 094: a miscelânea do contrato, lançada pelo próprio técnico.
+  const [miscLancada, setMiscLancada] = useState<MiscLancada[]>([])
+  const [miscAberto, setMiscAberto] = useState(false)
+  const [meuSaldo, setMeuSaldo] = useState<SaldoItem[]>([])
+  const [miscQtd, setMiscQtd] = useState<Record<string, string>>({})
+  const [miscBusca, setMiscBusca] = useState('')
+  // A escolha livre de status (Emanuel, 27/09).
+  const [escolhendoStatus, setEscolhendoStatus] = useState(false)
+
   const recarregar = useCallback(async () => {
     const [dv, de] = await Promise.all([
       supabase.from('visita').select(SELECT).eq('id', id).single(),
@@ -162,6 +186,8 @@ export default function Visita({ route, navigation }: Props) {
     else setV(dv.data as unknown as Detalhe)
     setEventos((de.data ?? []) as unknown as Evento[])
     setPendentes(await pendentesDaVisita(id))
+    const { data: dm } = await supabase.rpc('miscelanea_do_contrato', { p_visita: id })
+    setMiscLancada((dm ?? []) as MiscLancada[])
   }, [id])
 
   useEffect(() => {
@@ -317,6 +343,53 @@ export default function Visita({ route, navigation }: Props) {
     setCarga((data ?? []) as PecaNaMao[])
   }
 
+  /** Abre a miscelânea: o saldo DELE, porque é dele que o material sai. */
+  async function abrirMiscelanea() {
+    setMiscAberto(true); setErro(null); setMiscQtd({}); setMiscBusca('')
+    const { data } = await supabase.rpc('minha_miscelanea')
+    // Ferramenta e EPI não se gastam no contrato: voltam para o
+    // almoxarifado. Só material e acessório entram aqui.
+    setMeuSaldo(((data ?? []) as SaldoItem[])
+      .filter(i => i.tipo !== 'FERRAMENTA' && i.tipo !== 'EPI'))
+  }
+
+  async function salvarMiscelanea() {
+    if (!v) return
+    const itens = Object.entries(miscQtd)
+      .map(([item_id, q]) => ({ item_id, quantidade: Number(q.replace(',', '.')) }))
+      .filter(x => Number.isFinite(x.quantidade) && x.quantidade > 0)
+    if (itens.length === 0) { setErro('Informe a quantidade de pelo menos um item.'); return }
+    setSalvando(true); setErro(null)
+    const { error } = await supabase.rpc('baixar_miscelanea_do_campo', {
+      p_visita: v.id, p_itens: itens, p_observacao: null,
+    })
+    setSalvando(false)
+    if (error) { setErro(error.message); return }
+    setMiscAberto(false); setMiscQtd({})
+    await recarregar()
+  }
+
+  /** O técnico escolhe o status. A tela só antecipa o recado das travas;
+   *  quem recusa de verdade é o banco (registrar_etapa, 055). */
+  function escolherStatus(s: string) {
+    setEscolhendoStatus(false)
+    if (!v || s === v.situacao) return
+    if (s === 'COM_IMPEDIMENTO') { setPedindoObs(true); return }
+    if (ehTerminal(s)) {
+      if (!todasBaixadas) {
+        setErro(`Para ${rotuloSituacao(s).toLowerCase()}, todas as O.S. precisam de baixa — falta ${faltam}.`)
+        return
+      }
+      Alert.alert(
+        rotuloSituacao(s),
+        'Depois disso o contrato fica encerrado e você não consegue reabrir — só o controlador.',
+        [{ text: 'Voltar', style: 'cancel' }, { text: 'Confirmar', onPress: () => etapa(s) }],
+      )
+      return
+    }
+    etapa(s)
+  }
+
   async function salvarEquipamento() {
     if (!v || equipSerial.trim().length < 4) return
     setSalvando(true); setErro(null)
@@ -367,6 +440,11 @@ export default function Visita({ route, navigation }: Props) {
         <Etiqueta situacao={v.situacao} />
       </View>
 
+      {/* O teclado do Android (edge-to-edge) não encolhe a janela: sem isto
+          ele cobria o campo do impedimento no rodapé (Emanuel, 27/09).
+          "height" encolhe a área, e o rodapé fixo sobe junto. */}
+      <KeyboardAvoidingView style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         contentContainerStyle={e.conteudo}
         refreshControl={
@@ -606,8 +684,10 @@ export default function Visita({ route, navigation }: Props) {
         ))}
 
         {podeAnexar && !equipAberto && (
+          // "discreto" era cinza sobre o fundo cinza da tela: parecia texto,
+          // não botão (Emanuel, 27/09).
           <Botao
-            titulo="Lançar equipamento" tom="discreto"
+            titulo="Lançar equipamento" tom="contorno"
             aoTocar={abrirEquipamento}
           />
         )}
@@ -721,6 +801,24 @@ export default function Visita({ route, navigation }: Props) {
             })}
           </Cartao>
         )}
+        {/* ---------- miscelânea (094) ---------- */}
+        <Text style={e.tituloSecao}>
+          Miscelânea{miscLancada.length > 0 ? ` · ${miscLancada.length}` : ''}
+        </Text>
+        {miscLancada.map((m, i) => (
+          <Cartao key={i} style={e.equipLinha}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={e.equipSerial} numberOfLines={2}>{m.item}</Text>
+              <Text style={e.equipMiudo}>{carimbo(m.criado_em)}</Text>
+            </View>
+            <Text style={e.miscQtd}>
+              {Number(m.quantidade)} <Text style={e.equipMiudo}>{m.unidade ?? 'un'}</Text>
+            </Text>
+          </Cartao>
+        ))}
+        {podeAnexar && (
+          <Botao titulo="Lançar miscelânea" tom="contorno" aoTocar={abrirMiscelanea} />
+        )}
       </ScrollView>
 
       {/* ---------- ações fixas: o polegar alcança ---------- */}
@@ -777,8 +875,91 @@ export default function Visita({ route, navigation }: Props) {
               />
             </View>
           )}
+          {!pedindoObs && (
+            <Pressable onPress={() => setEscolhendoStatus(true)} style={e.mudarStatus}
+              accessibilityRole="button" accessibilityLabel="Escolher outro status">
+              <Text style={e.mudarStatusTexto}>Mudar status ›</Text>
+            </Pressable>
+          )}
         </View>
       )}
+      </KeyboardAvoidingView>
+
+      {/* ---------- escolher o status (Emanuel, 27/09) ---------- */}
+      <Modal visible={escolhendoStatus} animationType="slide" transparent
+        onRequestClose={() => setEscolhendoStatus(false)}>
+        <Pressable style={e.fundoModal} onPress={() => setEscolhendoStatus(false)} />
+        <View style={e.folha}>
+          <Text style={e.folhaTitulo}>Mudar status</Text>
+          <Text style={e.folhaMiudo}>
+            Encerrar (concluída, cancelada, reagendamento) pede todas as O.S.
+            baixadas e o GPS ligado — e depois só o controlador reabre.
+          </Text>
+          {STATUS_DO_CAMPO.map(s => {
+            const atual = v.situacao === s
+            const bloqueado = ehTerminal(s) && !todasBaixadas
+            return (
+              <Pressable key={s} disabled={atual}
+                onPress={() => escolherStatus(s)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: atual, disabled: atual }}
+                style={({ pressed }) => [e.statusLinha, atual && e.statusAtual,
+                  pressed && { opacity: 0.8 }]}>
+                <Etiqueta situacao={s} />
+                <Text style={e.statusNota}>
+                  {atual ? 'status atual'
+                    : bloqueado ? `falta baixar ${faltam} O.S.`
+                    : s === 'COM_IMPEDIMENTO' ? 'avisa o controlador' : ''}
+                </Text>
+              </Pressable>
+            )
+          })}
+          <Botao titulo="Fechar" tom="contorno" aoTocar={() => setEscolhendoStatus(false)} />
+        </View>
+      </Modal>
+
+      {/* ---------- lançar miscelânea (094) ---------- */}
+      <Modal visible={miscAberto} animationType="slide" transparent
+        onRequestClose={() => setMiscAberto(false)}>
+        <Pressable style={e.fundoModal} onPress={() => setMiscAberto(false)} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={e.folha}>
+            <Text style={e.folhaTitulo}>Lançar miscelânea</Text>
+            <Text style={e.folhaMiudo}>
+              O material sai do SEU saldo e fica amarrado a este contrato.
+            </Text>
+            <TextInput value={miscBusca} onChangeText={setMiscBusca}
+              placeholder="Buscar material…" placeholderTextColor={cor.graf400}
+              style={e.campo} accessibilityLabel="Buscar material" />
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+              {meuSaldo.length === 0 && (
+                <Text style={e.folhaMiudo}>Você não tem material no saldo. Fale com o almoxarifado.</Text>
+              )}
+              {meuSaldo
+                .filter(i => !miscBusca.trim() || i.nome.toLowerCase().includes(miscBusca.trim().toLowerCase()))
+                .map(i => (
+                  <View key={i.item_id} style={e.miscLinha}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={e.equipSerial} numberOfLines={2}>{i.nome}</Text>
+                      <Text style={e.equipMiudo}>tem {Number(i.saldo)} {i.unidade ?? 'un'}</Text>
+                    </View>
+                    <TextInput value={miscQtd[i.item_id] ?? ''} keyboardType="decimal-pad"
+                      onChangeText={t => setMiscQtd(q => ({ ...q, [i.item_id]: t }))}
+                      placeholder="0" placeholderTextColor={cor.graf300}
+                      style={e.miscCampo} accessibilityLabel={`Quantidade de ${i.nome}`} />
+                  </View>
+                ))}
+            </ScrollView>
+            {erro && <Aviso tipo="erro">{erro}</Aviso>}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }}
+                aoTocar={() => setMiscAberto(false)} />
+              <Botao titulo="Lançar" style={{ flex: 1 }} carregando={salvando}
+                aoTocar={salvarMiscelanea} />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ---------- escolher o tipo da evidência ---------- */}
       <Modal
@@ -1016,6 +1197,24 @@ const e = StyleSheet.create({
   eventoTexto: { fontSize: 14, fontWeight: '600', color: cor.tinta },
   eventoLogin: { fontWeight: '400', color: cor.graf400 },
   eventoObs: { fontSize: 12, color: cor.graf500, marginTop: 2 },
+
+  mudarStatus: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  mudarStatusTexto: { fontSize: 15, fontWeight: '700', color: cor.graf600 },
+  statusLinha: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52,
+    paddingHorizontal: 10, borderRadius: raio.m, borderWidth: 1, borderColor: cor.graf100,
+  },
+  statusAtual: { backgroundColor: cor.graf50, borderColor: cor.graf300 },
+  statusNota: { flex: 1, textAlign: 'right', fontSize: 13, color: cor.graf500 },
+  miscQtd: { fontSize: 18, fontWeight: '900', color: cor.tinta },
+  miscLinha: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: cor.graf100,
+  },
+  miscCampo: {
+    width: 72, minHeight: 48, borderWidth: 1, borderColor: cor.graf200, borderRadius: raio.m,
+    textAlign: 'center', fontSize: 17, fontWeight: '700', color: cor.tinta, backgroundColor: cor.graf50,
+  },
 
   rodape: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
