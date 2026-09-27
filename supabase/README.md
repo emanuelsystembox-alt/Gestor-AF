@@ -155,6 +155,7 @@ As três últimas, para não repetir o esquecimento:
 | 092 | **A meta na Administração** — `metas_das_skills()`; trocar a meta não apaga mais o mês anterior; `hoje_local()` (D-167) | ✓ |
 | 093 | **Os pontos em conjunto** — `pontos_das_visitas(uuid[])`, `edificacao_de`/`edificacao_origem`; `pontos_por_periodo`, painel, ranking e ritmo passam a somar em conjunto (388 → 35 ms, 0 diferenças) (D-167) | ✓ |
 | 094 | **O campo lança a miscelânea** — `baixar_miscelanea_do_campo` (mesma trava da foto) e `miscelanea_do_contrato` (D-168) | ✓ |
+| 095 | **Um contrato por dia, um status ativo por vez, sinais** — chave (base, atividade, dia); gatilho `um_status_ativo_por_tecnico`; `sinal`/`sinal_dispensa`, `sinais_do_dia`, `dispensar_sinais`; **095b** a trava conta quem foi tocado; **095c** ritmo vigente = último corte (D-169) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

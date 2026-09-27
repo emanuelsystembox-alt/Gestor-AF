@@ -173,6 +173,18 @@ serve para MOLDURA (rótulo de eixo, travessão decorativo); texto que
 carrega informação usa `graf-400` (5,88 / 4,76). E meça sempre com
 conversão de espaço de cor — regex de dígitos mente com `oklch`.
 
+**`position: fixed` dentro de tabela não mede da janela.** Um ancestral com
+`transform`, `filter` ou `backdrop-filter` vira o referencial do `fixed` —
+o menu do botão direito abria ~150 px longe do clique. Menu flutuante vai
+por **portal** para a raiz (`.sup-controle`, que também dá o tema), e o
+"não cabe" se resolve com `translate(-100%)`, que usa o tamanho real, e não
+com altura estimada. Ver D-169.
+
+**"Finalizado no TOA" não quer dizer "parado".** O técnico pode reabrir uma
+atividade que o TOA fechou. Para saber se alguém mexeu depois da
+importação, olhe `bloqueado_em` (carimbado por `marca_bloqueio` em toda
+mudança de situação fora da importação). Ver D-169 (095b).
+
 **No Android do Expo SDK 57 o teclado NÃO encolhe a janela** (edge-to-edge).
 `KeyboardAvoidingView` com `behavior={undefined}` no Android — o padrão de
 muitos exemplos — deixa o teclado em cima do campo. Use `'height'` no

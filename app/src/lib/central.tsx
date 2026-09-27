@@ -44,7 +44,20 @@ export interface Central {
   gerado_em: string
 }
 
-export interface Toast { id: number; titulo: string; texto: string; tom: 'ajuda' | 'mensagem' }
+export interface Toast { id: number; titulo: string; texto: string; tom: 'ajuda' | 'mensagem' | 'sinal' }
+
+/**
+ * Um SINAL (095): cada coisa que a central acusou, com identidade.
+ * `vigente` = continua acontecendo agora; `dispensado` = ESTE usuário
+ * limpou. O sino conta vigente e não dispensado; o histórico mostra o dia.
+ */
+export interface Sinal {
+  id: number
+  tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO'
+  titulo: string; detalhe: string | null
+  visita_id: string | null; tecnico_id: string | null
+  criado_em: string; vigente: boolean; dispensado: boolean
+}
 
 /** Uma mensagem que acabou de chegar pelo Realtime — o chat aberto usa. */
 export interface MensagemAoVivo {
@@ -54,6 +67,10 @@ export interface MensagemAoVivo {
 
 interface Ctx {
   dados: Central | null
+  /** Os sinais do dia, na ordem do mais novo (095). */
+  sinais: Sinal[]
+  /** Limpa para ESTE usuário. Acontecendo de novo, a chave é outra e volta. */
+  dispensar: (ids: number[]) => void
   recarregar: () => void
   toasts: Toast[]
   fecharToast: (id: number) => void
@@ -68,16 +85,6 @@ interface Ctx {
 
 const CentralCtx = createContext<Ctx | null>(null)
 
-/** O que o sino conta: o que pede AÇÃO. Mensagem não entra — ela tem o
- *  próprio selo, no balão. O ritmo conta o último corte passado. */
-export function contarAtencao(d: Central | null): number {
-  if (!d) return 0
-  const ultimoCorte = d.ritmo?.length ? d.ritmo[d.ritmo.length - 1] : null
-  return (d.ajuda?.length ?? 0) + (d.tec1?.length ?? 0)
-    + (ultimoCorte?.abaixo.length ?? 0) + (d.quebrou?.length ?? 0)
-    + (d.material?.length ?? 0) + (d.abastecimento?.length ?? 0)
-}
-
 let proximoToast = 1
 
 export function CentralProvider({ children }: { children: ReactNode }) {
@@ -87,6 +94,11 @@ export function CentralProvider({ children }: { children: ReactNode }) {
   const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
 
   const [dados, setDados] = useState<Central | null>(null)
+  const [sinais, setSinais] = useState<Sinal[]>([])
+  // Os sinais já vistos nesta sessão: só o que é NOVO vira aviso na tela.
+  // A primeira leitura só aprende o que existe — senão, abrir o sistema
+  // dispararia um aviso para cada sinal do dia.
+  const conhecidos = useRef<Set<number> | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [ultimaMensagem, setUltimaMensagem] = useState<MensagemAoVivo | null>(null)
   const [chatAberto, setChatAberto] = useState(false)
@@ -94,23 +106,43 @@ export function CentralProvider({ children }: { children: ReactNode }) {
   const chatRef = useRef({ aberto: false, tecnico: null as string | null })
   chatRef.current = { aberto: chatAberto, tecnico: chatTecnico }
 
-  const recarregar = useCallback(() => {
-    if (!ligado) return
-    supabase.rpc('central_do_controle').then(({ data, error }) => {
-      // Erro não zera o que já se sabia: o sino continua com o último
-      // número conhecido, em vez de "0" que afirmaria que está tudo bem.
-      if (!error && data) setDados(data as Central)
-    })
-  }, [ligado])
-
   const avisar = useCallback((t: Omit<Toast, 'id'>) => {
     const id = proximoToast++
     setToasts(l => [...l.slice(-3), { ...t, id }])
     setTimeout(() => setToasts(l => l.filter(x => x.id !== id)), 9000)
   }, [])
 
+  const recarregar = useCallback(() => {
+    if (!ligado) return
+    // `sinais_do_dia` registra o que a central acusa agora e devolve a
+    // central junto: uma chamada, os dois.
+    supabase.rpc('sinais_do_dia').then(({ data, error }) => {
+      // Erro não zera o que já se sabia: o sino continua com o último
+      // número conhecido, em vez de "0" que afirmaria que está tudo bem.
+      if (error || !data) return
+      const r = data as { central: Central; sinais: Sinal[] }
+      setDados(r.central)
+      setSinais(r.sinais)
+      const ativos = r.sinais.filter(x => x.vigente && !x.dispensado)
+      if (conhecidos.current) {
+        for (const x of ativos) {
+          if (!conhecidos.current.has(x.id)) {
+            avisar({ tom: x.tipo === 'AJUDA' ? 'ajuda' : 'sinal', titulo: x.titulo, texto: x.detalhe ?? '' })
+          }
+        }
+      }
+      conhecidos.current = new Set(r.sinais.map(x => x.id))
+    })
+  }, [ligado, avisar])
+
+  const dispensar = useCallback((ids: number[]) => {
+    if (ids.length === 0) return
+    setSinais(l => l.map(x => ids.includes(x.id) ? { ...x, dispensado: true } : x))
+    supabase.rpc('dispensar_sinais', { p_ids: ids }).then(() => {})
+  }, [])
+
   useEffect(() => {
-    if (!ligado) { setDados(null); return }
+    if (!ligado) { setDados(null); setSinais([]); conhecidos.current = null; return }
     recarregar()
     const t = setInterval(recarregar, 60_000)
     return () => clearInterval(t)
@@ -124,11 +156,10 @@ export function CentralProvider({ children }: { children: ReactNode }) {
       .channel('central:ao-vivo')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'visita_evento' }, c => {
         const e = c.new as { origem?: string; para?: { situacao?: string } | null; observacao?: string | null }
-        if (e.origem === 'MOBILE' && e.para?.situacao === 'COM_IMPEDIMENTO') {
-          avisar({ tom: 'ajuda', titulo: 'Pedido de ajuda do campo',
-                   texto: e.observacao || 'Um técnico registrou impedimento num contrato.' })
-          recarregar()
-        }
+        // Suporte técnico = Impedimento pelo campo. O aviso na tela sai do
+        // SINAL novo que a releitura cria — aqui só se adianta a releitura,
+        // para não avisar duas vezes a mesma coisa.
+        if (e.origem === 'MOBILE' && e.para?.situacao === 'COM_IMPEDIMENTO') recarregar()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagem' }, c => {
         const m = c.new as MensagemAoVivo
@@ -146,9 +177,10 @@ export function CentralProvider({ children }: { children: ReactNode }) {
   }, [ligado, gestao, avisar, recarregar])
 
   const valor: Ctx = {
-    dados, recarregar, toasts, ultimaMensagem,
+    dados, sinais, dispensar, recarregar, toasts, ultimaMensagem,
     fecharToast: id => setToasts(l => l.filter(x => x.id !== id)),
-    total: contarAtencao(dados),
+    // 095: o sino conta SINAIS vigentes que este usuário não limpou.
+    total: sinais.filter(x => x.vigente && !x.dispensado).length,
     chatAberto, chatTecnico,
     abrirChat: tec => { setChatTecnico(tec ?? null); setChatAberto(true) },
     fecharChat: () => { setChatAberto(false); recarregar() },
@@ -163,10 +195,11 @@ export function CentralProvider({ children }: { children: ReactNode }) {
         {toasts.map(t => (
           <div key={t.id} role="status"
             className={`sup-controle pointer-events-auto rounded-lg border px-3.5 py-3 shadow-2xl ${
-              t.tom === 'ajuda' ? 'border-orange-500/60 bg-graf-900' : 'border-af-600/50 bg-graf-900'}`}>
+              t.tom === 'ajuda' ? 'border-orange-500/60 bg-graf-900'
+              : t.tom === 'sinal' ? 'border-sky-500/50 bg-graf-900' : 'border-af-600/50 bg-graf-900'}`}>
             <div className="flex items-start gap-2">
               <span aria-hidden className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                t.tom === 'ajuda' ? 'bg-orange-500' : 'bg-af-500'}`} />
+                t.tom === 'ajuda' ? 'bg-orange-500' : t.tom === 'sinal' ? 'bg-sky-500' : 'bg-af-500'}`} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-graf-100">{t.titulo}</p>
                 <p className="mt-0.5 line-clamp-2 text-xs text-graf-300">{t.texto}</p>

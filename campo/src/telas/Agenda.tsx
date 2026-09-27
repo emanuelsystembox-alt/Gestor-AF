@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
+  KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet,
+  Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -15,7 +16,7 @@ import { quantosPendentes, sincronizar } from '../lib/midia'
 import {
   assinarAvisos, carregarAvisos, marcarLidos, type Aviso as AvisoCampo,
 } from '../lib/avisos'
-import { Aviso, Botao, Carregando, Cartao, Etiqueta, Vazio } from '../ui/componentes'
+import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
 import { BarraInferior } from '../ui/BarraInferior'
 import { cor, raio, sombraCard } from '../ui/tema'
@@ -80,7 +81,19 @@ export default function Agenda({ navigation }: Props) {
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const [aba, setAba] = useState<'abertas' | 'feitas'>('abertas')
+  /**
+   * Três abas (Emanuel, 27/09): o que ainda vai fazer, o que está fazendo
+   * AGORA (em rota ou iniciado) e o que já baixou. O "agora" separado é o
+   * que ele procura com o celular na mão, na porta do cliente.
+   */
+  const [aba, setAba] = useState<'abertas' | 'andamento' | 'feitas'>('abertas')
+  // Solicitar suporte técnico (= Impedimento, D-168).
+  const [suporteAberto, setSuporteAberto] = useState(false)
+  const [suporteVisita, setSuporteVisita] = useState<string | null>(null)
+  const [suporteTexto, setSuporteTexto] = useState('')
+  const [suporteEnviando, setSuporteEnviando] = useState(false)
+  const [suporteErro, setSuporteErro] = useState<string | null>(null)
+  const [suporteOk, setSuporteOk] = useState<string | null>(null)
   const [producao, setProducao] = useState<Producao | null>(null)
   const [gps, setGps] = useState<EstadoGps | null>(null)
   const [pendentes, setPendentes] = useState(0)
@@ -150,12 +163,35 @@ export default function Agenda({ navigation }: Props) {
       })
   }, [perfil?.tecnico_id])
 
-  const { abertas, feitas } = useMemo(() => ({
-    abertas: linhas.filter(l => EM_ABERTO.includes(l.situacao)),
+  const ANDAMENTO = ['EM_DESLOCAMENTO', 'EM_EXECUCAO']
+  const { abertas, andamento, feitas } = useMemo(() => ({
+    abertas: linhas.filter(l => EM_ABERTO.includes(l.situacao) && !ANDAMENTO.includes(l.situacao)),
+    andamento: linhas.filter(l => ANDAMENTO.includes(l.situacao)),
     feitas: linhas.filter(l => !EM_ABERTO.includes(l.situacao)),
   }), [linhas])
 
-  const lista = aba === 'abertas' ? abertas : feitas
+  const lista = aba === 'abertas' ? abertas : aba === 'andamento' ? andamento : feitas
+
+  function abrirSuporte() {
+    setSuporteErro(null); setSuporteTexto('')
+    // O contrato em andamento é o provável; se não houver, ele escolhe.
+    setSuporteVisita(andamento[0]?.visita_id ?? abertas[0]?.visita_id ?? null)
+    setSuporteAberto(true)
+  }
+
+  async function enviarSuporte() {
+    if (!suporteVisita || !suporteTexto.trim()) return
+    setSuporteEnviando(true); setSuporteErro(null)
+    const { error } = await supabase.rpc('registrar_etapa', {
+      p_visita: suporteVisita, p_situacao: 'COM_IMPEDIMENTO',
+      p_observacao: `Suporte técnico: ${suporteTexto.trim()}`, p_lat: null, p_lng: null,
+    })
+    setSuporteEnviando(false)
+    if (error) { setSuporteErro(error.message); return }
+    setSuporteAberto(false)
+    setSuporteOk('Suporte solicitado. O controlador recebeu o aviso na central.')
+    carregar(data)
+  }
   const ehHoje = data === isoLocal()
 
   async function puxar() {
@@ -171,7 +207,7 @@ export default function Agenda({ navigation }: Props) {
   return (
     <SafeAreaView style={e.tela} edges={['top']}>
       <View style={e.cabecalho}>
-        <View style={e.logo}><Text style={e.logoTexto}>AF</Text></View>
+        <Marca tamanho={36} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={e.nome} numberOfLines={1}>{perfil?.nome ?? 'Técnico'}</Text>
           {/* O login aparece porque é ele que vai no histórico de cada
@@ -181,10 +217,12 @@ export default function Agenda({ navigation }: Props) {
         {/* A porta do romaneio fica no cabecalho, nao na agenda: nao e
             trabalho do dia, e conferencia de material -- e a agenda
             continua sendo a primeira coisa que ele ve (D-112). */}
-        <Pressable onPress={() => navigation.navigate('Romaneios')}
-          style={e.material} hitSlop={8}
-          accessibilityRole="button" accessibilityLabel="Meu material: carga e romaneios">
-          <Text style={e.materialTexto}>Material</Text>
+        {/* "Solicitar suporte técnico" (Emanuel, 27/09): o botão de ajuda.
+            É o Impedimento — cai direto na central do controlador. O
+            Material que ficava aqui foi para a barra de baixo. */}
+        <Pressable onPress={abrirSuporte} style={e.suporte} hitSlop={8}
+          accessibilityRole="button" accessibilityLabel="Solicitar suporte técnico">
+          <Text style={e.suporteTexto}>Suporte</Text>
         </Pressable>
         <Pressable onPress={sair} style={e.sair} hitSlop={8}>
           <Text style={e.sairTexto}>Sair</Text>
@@ -213,6 +251,15 @@ export default function Agenda({ navigation }: Props) {
           </Text>
         </Pressable>
         <Pressable
+          onPress={() => setAba('andamento')}
+          style={[e.aba, aba === 'andamento' && e.abaAtiva]}
+        >
+          <Text style={[e.abaTexto, aba === 'andamento' && e.abaTextoAtivo]}
+                numberOfLines={2}>
+            Em rota / Iniciado {andamento.length}
+          </Text>
+        </Pressable>
+        <Pressable
           onPress={() => setAba('feitas')}
           style={[e.aba, aba === 'feitas' && e.abaAtiva]}
         >
@@ -229,6 +276,7 @@ export default function Agenda({ navigation }: Props) {
         }
       >
         {erro && <Aviso tipo="erro">Não consegui carregar: {erro}</Aviso>}
+        {suporteOk && <Aviso tipo="ok">{suporteOk}</Aviso>}
 
         <PainelAvisos
           avisos={avisos}
@@ -284,7 +332,7 @@ export default function Agenda({ navigation }: Props) {
                 {producao.meta == null
                   ? 'A meta da sua skill ainda não foi cadastrada. Veja o Painel.'
                   : producao.fator == null
-                  ? `Faltam ${pts(falta)} para entrar na primeira faixa.`
+                  ? `Faltam ${pts(falta)} para a meta.`
                   : `Fator ${num2(Number(producao.fator))} · a receber ${reais(producao.valor)}`}
               </Text>
               <Text style={e.notinha}>
@@ -298,10 +346,14 @@ export default function Agenda({ navigation }: Props) {
 
         {!carregando && lista.length === 0 && (
           <Vazio
-            titulo={aba === 'feitas' ? 'Nada baixado neste dia' : 'Nenhuma visita pendente'}
+            titulo={aba === 'feitas' ? 'Nada baixado neste dia'
+              : aba === 'andamento' ? 'Nenhum contrato em rota ou iniciado'
+              : 'Nenhuma visita pendente'}
             descricao={aba === 'feitas'
               ? 'O que você fechar aparece aqui — e você ainda pode anexar foto no mesmo dia.'
-              : 'Sua agenda deste dia está limpa.'}
+              : aba === 'andamento'
+                ? 'Quando você tocar "Estou a caminho" num contrato, ele vem para cá.'
+                : 'Sua agenda deste dia está limpa.'}
           />
         )}
 
@@ -392,6 +444,47 @@ export default function Agenda({ navigation }: Props) {
           </Text>
         )}
       </ScrollView>
+
+      {/* ---------- solicitar suporte técnico ---------- */}
+      <Modal visible={suporteAberto} transparent animationType="slide"
+        onRequestClose={() => setSuporteAberto(false)}>
+        <Pressable style={e.veu} onPress={() => setSuporteAberto(false)} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={e.folha}>
+            <Text style={e.folhaTitulo}>Solicitar suporte técnico</Text>
+            <Text style={e.folhaMiudo}>
+              O contrato fica "com impedimento" e o controlador recebe o aviso na hora.
+            </Text>
+            {[...andamento, ...abertas.filter(l => l.situacao !== 'COM_IMPEDIMENTO')].length === 0 ? (
+              <Aviso tipo="atencao">Nenhum contrato aberto hoje para pedir suporte. Use a Conversa.</Aviso>
+            ) : (
+              <ScrollView style={{ maxHeight: 220 }}>
+                {[...andamento, ...abertas.filter(l => l.situacao !== 'COM_IMPEDIMENTO')].map(l => (
+                  <Pressable key={l.visita_id} onPress={() => setSuporteVisita(l.visita_id)}
+                    accessibilityRole="radio" accessibilityState={{ checked: suporteVisita === l.visita_id }}
+                    style={[e.opcaoSuporte, suporteVisita === l.visita_id && e.opcaoSuporteAtiva]}>
+                    <Text style={e.opcaoSuporteTitulo}>{l.servico}</Text>
+                    <Text style={e.opcaoSuporteMiudo}>
+                      {[l.contrato && `contrato ${l.contrato}`, l.logradouro].filter(Boolean).join(' · ')}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+            <TextInput value={suporteTexto} onChangeText={setSuporteTexto} multiline maxLength={400}
+              placeholder="O que está acontecendo?" placeholderTextColor={cor.graf500}
+              style={e.caixaSuporte} accessibilityLabel="O que está acontecendo" />
+            {suporteErro && <Aviso tipo="erro">{suporteErro}</Aviso>}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }}
+                aoTocar={() => setSuporteAberto(false)} />
+              <Botao titulo="Pedir suporte" tom="perigo" style={{ flex: 1.3 }}
+                desativado={!suporteVisita || !suporteTexto.trim()} carregando={suporteEnviando}
+                aoTocar={enviarSuporte} />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <BarraInferior ativa="Agenda" />
     </SafeAreaView>
   )
@@ -413,6 +506,29 @@ const e = StyleSheet.create({
   email: { fontSize: 11, color: cor.graf400 },
   sair: { paddingHorizontal: 10, paddingVertical: 8 },
   sairTexto: { color: cor.graf500, fontSize: 14, fontWeight: '600' },
+  suporte: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 2, borderColor: cor.af600,
+  },
+  suporteTexto: { color: cor.af700, fontSize: 14, fontWeight: '800' },
+  veu: { flex: 1, backgroundColor: 'rgba(15,17,21,0.45)' },
+  folha: {
+    backgroundColor: cor.branco, padding: 16, gap: 10,
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+  },
+  folhaTitulo: { fontSize: 17, fontWeight: '800', color: cor.tinta },
+  folhaMiudo: { fontSize: 13, color: cor.graf500, lineHeight: 18 },
+  opcaoSuporte: {
+    padding: 12, borderRadius: raio.m, borderWidth: 2, borderColor: cor.graf200, marginBottom: 6,
+  },
+  opcaoSuporteAtiva: { borderColor: cor.af600, backgroundColor: cor.af50 },
+  opcaoSuporteTitulo: { fontSize: 15, fontWeight: '700', color: cor.tinta },
+  opcaoSuporteMiudo: { fontSize: 12, color: cor.graf500 },
+  caixaSuporte: {
+    minHeight: 80, borderWidth: 1, borderColor: cor.graf200, borderRadius: raio.m,
+    padding: 12, fontSize: 15, color: cor.tinta, backgroundColor: cor.graf50,
+    textAlignVertical: 'top',
+  },
   material: {
     paddingHorizontal: 10, paddingVertical: 8,
     borderWidth: 1, borderColor: cor.graf200, borderRadius: 8,
@@ -436,7 +552,7 @@ const e = StyleSheet.create({
     borderRadius: raio.s, backgroundColor: cor.graf50,
   },
   abaAtiva: { backgroundColor: cor.tinta },
-  abaTexto: { fontSize: 14, fontWeight: '700', color: cor.graf500 },
+  abaTexto: { fontSize: 13, fontWeight: '700', color: cor.graf500, textAlign: 'center' },
   abaTextoAtivo: { color: cor.branco },
 
   conteudo: { padding: 12, gap: 10, paddingBottom: 40 },

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
@@ -757,11 +758,25 @@ export default function Servicos() {
                   </button>
                 </div>
 
-                {menu === v.id && (
+                {/* ┌─ o menu vai para a RAIZ da tela, por portal ─────────────┐
+                    │ Ele é `fixed`, mas morava dentro da linha da tabela: um    │
+                    │ ancestral com transform/backdrop-filter faz o navegador   │
+                    │ medir o `fixed` a partir DELE, não da janela — e o menu   │
+                    │ abria longe do clique (Emanuel, 27/09). Na raiz do Shell  │
+                    │ (`.sup-controle`) ele mede da janela e herda o tema.       │
+                    └────────────────────────────────────────────────────────────┘ */}
+                {menu === v.id && createPortal(
                   <div onClick={e => e.stopPropagation()}
+                    // A ponta do menu fica NO clique: sem espaço à direita,
+                    // abre para a esquerda; sem espaço embaixo, para cima.
+                    // Empurrar para dentro da tela (como era) o afastava do
+                    // cursor justamente na borda, onde mais se clica.
+                    // O translate usa o tamanho REAL do menu: nada de estimar
+                    // altura (a estimativa deixava 44 px entre o menu e o clique).
                     style={menuXY ? {
-                      left: Math.min(menuXY.x, window.innerWidth - 230),
-                      top: Math.min(menuXY.y, window.innerHeight - 250),
+                      left: menuXY.x, top: menuXY.y,
+                      transform: `translate(${menuXY.x + 216 > window.innerWidth ? '-100%' : '0'}, `
+                        + `${menuXY.y + 280 > window.innerHeight ? '-100%' : '0'})`,
                     } : undefined}
                     className="fixed z-50 w-52 overflow-hidden rounded-lg border
                                border-graf-700 bg-graf-900 text-left shadow-xl">
@@ -799,7 +814,8 @@ export default function Servicos() {
                       Editar não existe: o cadastro vem do TOA e é reescrito a cada
                       importação.
                     </div>
-                  </div>
+                  </div>,
+                  document.querySelector('.sup-controle') ?? document.body,
                 )}
               </>)}
             />

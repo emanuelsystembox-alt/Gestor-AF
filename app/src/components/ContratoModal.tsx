@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACOES, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { equipeRotulo, pts } from '../lib/formato'
@@ -455,6 +455,25 @@ export function ContratoModal({
                     {' '}{SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal}.
                   </p>
                 )}
+                {/* Só o status, sem código (Emanuel, 27/09): "quando o
+                    controlador quiser mudar apenas o contrato de status ele
+                    pode, não é obrigatório ter código de baixa". Encerrar
+                    continua exigindo todas as O.S. com código — é regra do
+                    banco (exige_todas_baixadas), e a mensagem acima avisa.
+                    Encerrado volta pelo "Voltar", que pede motivo (D-030). */}
+                {preenchidas === 0 && situacaoFinal && situacaoFinal !== v.situacao && (
+                  <button disabled={ocupado || bloqueiaSituacao || !EM_ABERTO.includes(v.situacao)}
+                    title={!EM_ABERTO.includes(v.situacao)
+                      ? 'Contrato encerrado: use Voltar, que pede o motivo' : undefined}
+                    onClick={() => comAviso(() => supabase.rpc('registrar_etapa', {
+                      p_visita: id, p_situacao: situacaoFinal, p_observacao: null,
+                      p_lat: null, p_lng: null,
+                    }), `Status mudado para ${SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal}.`)}
+                    className="ml-auto rounded-md border border-af-600 px-4 py-1.5 text-xs font-medium
+                               text-af-300 hover:bg-af-600/10 disabled:opacity-50">
+                    Só mudar o status
+                  </button>
+                )}
                 <button disabled={ocupado || preenchidas === 0 || bloqueiaSituacao}
                   onClick={() => comAviso(() => supabase.rpc('baixar_visita', {
                     p_visita: id,
@@ -468,8 +487,8 @@ export function ContratoModal({
                       })),
                     p_situacao: situacaoFinal || null,
                   }), `Baixa registrada em ${preenchidas} O.S.`)}
-                  className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
-                             text-white hover:bg-af-500 disabled:opacity-50">
+                  className={`${preenchidas === 0 && situacaoFinal ? '' : 'ml-auto'} rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                             text-white hover:bg-af-500 disabled:opacity-50`}>
                   Confirmar baixa de {preenchidas} O.S.
                 </button>
               </div>

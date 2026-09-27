@@ -438,6 +438,14 @@ export default function Visita({ route, navigation }: Props) {
           </Text>
         </View>
         <Etiqueta situacao={v.situacao} />
+        {/* Suporte técnico = o Impedimento (Emanuel, 27/09): cai direto na
+            central do controlador. Aqui abre o mesmo campo do rodapé. */}
+        {podeExecutar && !pedindoObs && (
+          <Pressable onPress={() => setPedindoObs(true)} style={e.suporte} hitSlop={6}
+            accessibilityRole="button" accessibilityLabel="Solicitar suporte técnico">
+            <Text style={e.suporteTexto}>Suporte</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* O teclado do Android (edge-to-edge) não encolhe a janela: sem isto
@@ -777,6 +785,25 @@ export default function Visita({ route, navigation }: Props) {
           </Cartao>
         )}
 
+        {/* ---------- miscelânea (094) — logo abaixo do equipamento: estava
+            depois do histórico e sumia no fim da tela (Emanuel, 27/09) ---------- */}
+        <Text style={e.tituloSecao}>
+          Miscelânea{miscLancada.length > 0 ? ` · ${miscLancada.length}` : ''}
+        </Text>
+        {miscLancada.map((m, i) => (
+          <Cartao key={i} style={e.equipLinha}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={e.equipSerial} numberOfLines={2}>{m.item}</Text>
+              <Text style={e.equipMiudo}>{carimbo(m.criado_em)}</Text>
+            </View>
+            <Text style={e.miscQtd}>
+              {Number(m.quantidade)} <Text style={e.equipMiudo}>{m.unidade ?? 'un'}</Text>
+            </Text>
+          </Cartao>
+        ))}
+        {podeAnexar && (
+          <Botao titulo="Lançar miscelânea" tom="contorno" aoTocar={abrirMiscelanea} />
+        )}
         {/* ---------- histórico ---------- */}
         {eventos.length > 0 && (
           <Cartao style={{ padding: 14 }}>
@@ -800,24 +827,6 @@ export default function Visita({ route, navigation }: Props) {
               )
             })}
           </Cartao>
-        )}
-        {/* ---------- miscelânea (094) ---------- */}
-        <Text style={e.tituloSecao}>
-          Miscelânea{miscLancada.length > 0 ? ` · ${miscLancada.length}` : ''}
-        </Text>
-        {miscLancada.map((m, i) => (
-          <Cartao key={i} style={e.equipLinha}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={e.equipSerial} numberOfLines={2}>{m.item}</Text>
-              <Text style={e.equipMiudo}>{carimbo(m.criado_em)}</Text>
-            </View>
-            <Text style={e.miscQtd}>
-              {Number(m.quantidade)} <Text style={e.equipMiudo}>{m.unidade ?? 'un'}</Text>
-            </Text>
-          </Cartao>
-        ))}
-        {podeAnexar && (
-          <Botao titulo="Lançar miscelânea" tom="contorno" aoTocar={abrirMiscelanea} />
         )}
       </ScrollView>
 
@@ -1198,6 +1207,11 @@ const e = StyleSheet.create({
   eventoLogin: { fontWeight: '400', color: cor.graf400 },
   eventoObs: { fontSize: 12, color: cor.graf500, marginTop: 2 },
 
+  suporte: {
+    minHeight: 36, paddingHorizontal: 10, borderRadius: 999, justifyContent: 'center',
+    borderWidth: 2, borderColor: cor.af600, marginLeft: 6,
+  },
+  suporteTexto: { fontSize: 13, fontWeight: '800', color: cor.af700 },
   mudarStatus: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   mudarStatusTexto: { fontSize: 15, fontWeight: '700', color: cor.graf600 },
   statusLinha: {

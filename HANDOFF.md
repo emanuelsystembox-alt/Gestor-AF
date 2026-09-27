@@ -225,7 +225,7 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 > ### Comece por aqui (atualizado em 26/09)
 >
-> **A web está no ar e em dia com o banco** (migrations até a 094),
+> **A web está no ar e em dia com o banco** (migrations até a 095),
 > conferido baixando o bundle publicado. A leva de 26/09 fechou o
 > **almoxarifado** em relação ao concorrente (cargas por técnico, baixa
 > por contrato, Kardex, auditoria, movimentações, catálogo de 418 itens,

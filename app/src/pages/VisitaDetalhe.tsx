@@ -487,7 +487,7 @@ export default function VisitaDetalhe() {
               {pedidoDeAjuda && (
                 <div className="mb-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2.5">
                   <p className="text-xs font-semibold text-orange-300">
-                    Pedido de ajuda do campo · {new Date(pedidoDeAjuda.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    Suporte técnico solicitado pelo campo · {new Date(pedidoDeAjuda.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                   <p className="mt-0.5 text-sm text-graf-100">
                     {pedidoDeAjuda.observacao ? `“${pedidoDeAjuda.observacao}”` : 'O técnico registrou impedimento sem observação.'}

@@ -51,8 +51,11 @@ anterior quando nos escolhermos a data que vamos atuar"* (Emanuel, 26/09).
   o `toa_recurso`. Um contrato com o dia num lugar e a hora de outro dia
   estraga o TEC1 em 24 h.
 - A "Data" da planilha **não se perde**: fica em `dados_origem` e no
-  evento. Contrato que já existia e muda de dia deixa evento
-  `DIA_DE_ATUACAO`.
+  evento `IMPORTADA`.
+- **A atividade do TOA é única POR DIA** (095, D-169). Importar o mesmo
+  arquivo em outro dia gera contratos NOVOS nesse dia — a mesma rota, sem
+  o histórico do outro dia. Reimportar no mesmo dia atualiza. (Até a 094 o
+  contrato mudava de dia com evento `DIA_DE_ATUACAO`; isso acabou.)
 - A prévia mostra a divergência **antes** do clique. Não adivinhe o dia
   pelo mais frequente do arquivo — isso é o sistema decidindo no lugar de
   quem opera (D-088).
@@ -179,11 +182,27 @@ Quem estava sem sinal lê o que perdeu ao voltar.
 
 ---
 
+## Um status ativo por técnico (095, D-169)
+
+**O técnico não está em dois lugares.** Em deslocamento / Em execução: um
+contrato por técnico por dia (sem técnico, por equipe) — nem o campo, nem o
+controlador, nem ninguém. Só a **importação** pode trazer dois. Fora da
+conta: jornada, e o que o TOA fechou e ninguém tocou (`finalizado_toa` com
+`bloqueado_em` nulo). Impedimento não conta. Mora num gatilho em `visita`.
+
+---
+
 ## O campo e o controle (091 e 092, D-167)
 
 Definições do Emanuel (27/09). **Uma conta só** (`producao_por_tecnico`)
 alimenta o painel do técnico, o ranking e a central; não some de outro jeito.
 
+- **Suporte técnico (pedido de ajuda) = o Impedimento feito pelo campo.**
+  O botão "Suporte" do app grava `COM_IMPEDIMENTO` com a observação (D-169).
+- **Mudar só o status não exige código de baixa** — encerrar continua
+  exigindo (D-169).
+- **Sinal limpo é por usuário, e volta se acontecer DE NOVO** (chave nova);
+  o mesmo não volta. Histórico do dia no sino (D-169).
 - **Pedido de ajuda = o Impedimento feito pelo campo.** Contrato de hoje
   em `COM_IMPEDIMENTO` cujo último evento veio de `origem = MOBILE`.
 - **Quebrado = visita com O.S. de baixa IMPRODUTIVA** (código da

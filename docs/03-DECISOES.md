@@ -5934,3 +5934,100 @@ O túnel do ngrok caiu ("remote gone away"); o teste foi pelo Wi-Fi.
 **Não verificado:** o teclado corrigido e as telas novas no celular (tsc e
 `expo export` limpos; o Expo Go recarrega sozinho se o servidor estiver
 de pé). A resposta do controlador não foi gravada pela tela em produção.
+
+---
+
+### D-169 · Um contrato por dia, um status ativo por vez, sinais que se limpam e o botão de suporte
+
+Segunda rodada de teste no celular e na web (Emanuel, 27/09). Sete pedidos.
+
+#### 1. O menu do botão direito abria longe do clique
+
+Era `fixed`, mas morava dentro da linha da tabela: um ancestral com
+transform/backdrop-filter faz o navegador medir o `fixed` a partir dele. Foi
+para a raiz do Shell por **portal**, e a posição passou a usar
+`translate(-100%)` quando não cabe (abre para a esquerda/para cima) — com o
+tamanho REAL do menu. Medido: o canto do menu cai a **0 px** do clique.
+
+#### 2. Miscelânea logo abaixo do equipamento
+
+Estava depois do histórico, no fim da tela, e sumia.
+
+#### 3. Agenda com três abas
+
+**A fazer** (na entrada, atribuída, com impedimento) · **Em rota / Iniciado**
+(em deslocamento, em execução) · **Baixadas**. Impedimento ficou em "A fazer":
+o contrato não está andando, está esperando.
+
+#### 4. Mudar só o status, sem código de baixa
+
+> *"quando o controlador ou quem seja quiser mudar apenas o contrato de
+> status ele pode, não é obrigatório ter código de baixa"*
+
+No modal do contrato, sem nenhuma O.S. preenchida, aparece "Só mudar o
+status" (`registrar_etapa`). **Encerrar continua exigindo todas as O.S. com
+código** — é regra do banco (`exige_todas_baixadas`, business-rules "A
+baixa") e não foi mexida; a tela avisa antes. Encerrado volta pelo
+"Voltar", com motivo (D-030).
+
+#### 5. Sinais: limpa, volta se acontecer de novo, histórico do dia (095)
+
+> *"o usuário pode limpar, e caso aconteça de novo a situação, ele retorna
+> […] não pode é ficar subindo a mesma sempre […] histórico de
+> notificações"*
+
+Cada coisa acusada vira um **sinal** com uma chave que define "a mesma
+coisa": TEC1 por **visita**; suporte por visita + hora do pedido; ritmo por
+técnico + dia + corte; quebrou por técnico + dia + **quantas**; material e
+abastecimento pelo pedido. Limpar é **por usuário** (`sinal_dispensa`). Uma
+perda nova tem chave nova e sobe; a mesma não volta. O sino tem "Agora" e
+"Histórico do dia" (ativo / limpo / resolvido). Aviso na tela só para sinal
+NOVO desde que a página abriu — a primeira leitura só aprende o que existe.
+Do ritmo, vigente é só o **último corte** (095c): o sino listava o mesmo
+técnico às 12h e às 15h.
+
+#### 6. "Solicitar suporte técnico"
+
+> *"o botão ajuda é o botão com impedimento […] quero colocar o botão
+> 'Solicita Suporte técnico' no canto superior direito do app"*
+
+"Suporte" no topo da Agenda (escolhe o contrato — o em andamento vem
+marcado — e escreve o que está acontecendo) e no topo do contrato (abre o
+campo do Impedimento). Grava `COM_IMPEDIMENTO` com a observação
+"Suporte técnico: …" — o mesmo status, a mesma central. Na web o sinal se
+chama "Suporte técnico".
+
+#### 7. Um status ativo por técnico (095)
+
+> *"não permita que a linha do técnico tenha dois status de contratos
+> diferentes […] só deixe isso acontecer se estiver na planilha de
+> importação […] nem pelo controlador, nem por ninguém"*
+
+Gatilho em `visita` (a porta de todas as outras): Em deslocamento / Em
+execução, mesmo dia, mesmo técnico (sem técnico, a equipe). Fora da conta:
+a importação; jornada; e o que o TOA **fechou e ninguém tocou**
+(`finalizado_toa` e `bloqueado_em` nulo) — a atividade fica "em execução"
+só esperando a baixa (D-097). **O teste pegou** a primeira versão, que
+ignorava todo `finalizado_toa`: o 1086530 (TOA concluiu, o campo reabriu)
+deixava passar um segundo ativo (095b). Testado (desfeito): gestão, reversão
+e campo recusados (23514); impedimento permitido; saindo do primeiro, o
+segundo entra. **Um conflito já existia em 27/09** (GABRIEL: 1150297 em
+deslocamento + 1039558 em execução) — a trava não corrige o passado.
+
+#### 8. O mesmo arquivo em outro dia gera contratos novos (095)
+
+> *"se eu importar um arquivo do dia 21, na data do dia 21, e por acidente
+> importar ele na data de hoje dia 27 sem querer, o sistema não deve puxar
+> o histórico de movimentações anterior, ele deve gerar contratos novos
+> para aquele dia, porém a mesma rota se repete"*
+
+A chave única era (base, atividade do TOA) — e a 090 MUDAVA o contrato de
+dia, levando baixa, foto e histórico. Agora é (base, atividade, **dia**).
+**Isto substitui a parte da D-166** em que o contrato já existente "mudava
+de dia com evento DIA_DE_ATUACAO": esse evento deixa de acontecer. Testado
+(desfeito): o arquivo de 27/09 importado no dia 28 criou **29 contratos
+novos**, os 29 originais ficaram no dia deles, e nenhum evento antigo foi
+junto.
+
+**Não verificado:** as telas do app no celular (tsc e `expo export` limpos);
+sinal limpo por um usuário e visto por outro, na tela.
