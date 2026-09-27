@@ -5611,3 +5611,98 @@ dimensão, e a pergunta fica em aberto.
 
 A tela web clicando (login) e o app num celular. A importação dos 154
 veículos da frota não foi feita (pendente de decisão, D-164).
+
+---
+
+### D-166 · A importação vai para o dia de atuação, e o menu ganha a marca
+
+> *"quando eu fizer a importação de algum arquivo, mesmo que a data esteja
+> diferente, a importação da rota, ele precisa ir para o dia atual, so
+> sera importado para o dia anterior quando nos escolhermos a data que
+> vamos atuar"* · *"vamos integrar essa logo da empresa no nosso sistema
+> […] explore o menu deles […] ajuste também o menu da importação, quando
+> fazemos uma importação o menu lateral some"* — Emanuel, 26/09
+
+#### Quem decide o dia é quem importa (090)
+
+**O defeito, medido:** a visita caía no dia da coluna "Data" da planilha.
+Em 26/09 a única importação do dia (`Atividades-ARN-AFLINE_25_09_26.xlsx`)
+trazia **Data = 25/09 nas 29 linhas**: a rota de hoje entrou ontem, e o
+painel de hoje abriu vazio. Nas 20 importações de 10 a 23/09 as duas
+datas batiam — por isso só apareceu agora.
+
+`importacao.data_atuacao` guarda a escolha. A tela nasce em **hoje** e só
+manda outro dia quando a pessoa escolhe (atalhos Hoje / Ontem, ou o
+calendário). Chamada sem data vale `hoje_local()` — o default da coluna e
+o `coalesce` da função — nunca `current_date`.
+
+O dia de atuação governa **tudo** que antes lia "Data": `data_agendada`
+(criação **e** atualização), a equipe do login na data, `inicio`/`fim`
+(que eram "Data + hora" — deixá-los no dia da planilha poria o contrato
+de hoje com início ontem, e o TEC1 daria 24 h de atraso) e o
+`toa_recurso` aprendido na reconciliação.
+
+**Nada se perde:** a "Data" original continua em `dados_origem`; o
+evento `IMPORTADA` grava `dia` e, quando diverge, `data_planilha`;
+contrato que **já existia** e muda de dia ganha evento `DIA_DE_ATUACAO`
+(sem aviso ao técnico — o gatilho de avisos ignora tipos que não
+conhece). Importação antiga fica com `data_atuacao` **nula**, e o
+histórico escreve "da planilha": ninguém escolheu dia nela, e preencher
+seria inventar a escolha.
+
+**A diferença aparece antes do clique.** A prévia mostra "a coluna Data
+diz 25/09 · vale o dia de atuação: 29 visitas entram em 26/09", com um
+atalho "atuar em 25/09". O botão diz o dia (`Importar 29 visitas em
+26/09`). Dia diferente de hoje deixa o cartão âmbar. Depois de importar,
+"Importar outra" volta para hoje: o dia anterior é escolha de uma
+importação, não um modo que fica ligado.
+
+**Recusado:** adivinhar o dia pelo mais frequente da planilha e só
+perguntar quando divergisse — seria o sistema decidindo no lugar de quem
+opera (D-088).
+
+**Testado** como `authenticated` (o usuário que fez a importação de
+26/09), numa transação desfeita: reimportar as 29 linhas com dia 26/09 →
+29 atualizadas, **29 em 26/09**, 29 eventos `DIA_DE_ATUACAO`, 0 início
+fora do dia, `data_atuacao` gravada. Baterias 16/16 e 14/14; nenhuma
+SECURITY DEFINER alcançável pelo `anon`; `j_ts_no_dia` fechada ao `anon`.
+
+#### A importação dentro do Shell
+
+A tela de Importação tinha cabeçalho próprio (logo + "Controle ›
+Importar planilha") e **não usava o `Shell`** — por isso o menu lateral
+sumia. Agora é uma tela como as outras.
+
+#### A marca, em vetor
+
+A arte veio como PNG quadrado com o fundo "de esfera" pintado. Reduzida a
+28 px vira borrão, e no tema claro o fundo escuro vira carimbo. Foi
+**redesenhada em SVG** sobre a arte original (sobreposta para conferir a
+geometria): `LogoCompleto` (AF + LINE, com o "LINE" em `currentColor`,
+branco no escuro e grafite no claro) na lateral e no login; `Logo` (só o
+AF num selo com fundo em tokens) no menu recolhido, no celular e no
+`favicon.svg`.
+
+#### O menu, olhando o do concorrente
+
+O ngestor (`docs/05`) separa módulos e, dentro, grupos com **contador ao
+lado do item** ("Serviços 13"). Veio: Serviços mostra os contratos **em
+aberto hoje**, na mesma conta da tela (situação em `EM_ABERTO`, jornada
+fora). Enquanto não sabe, **não mostra número** — um "0" no carregamento
+afirmaria que não há nada aberto (D-117). Recontagem a cada 2 min e a cada
+troca de tela; sem Realtime, porque cada canal é uma conexão do teto do
+plano Free.
+
+O que ele não tem e entrou:
+- o grupo **abre e fecha e lembra** (quem só mexe em estoque fecha
+  Operação uma vez); o grupo da tela atual nunca fica fechado;
+- **Ctrl+K** vai para qualquer tela digitando, sem conhecer o mapa;
+- o topo diz **onde você está** (Módulo › Tela);
+- a tela ativa tem a **barra vermelha** na borda, legível também recolhido;
+- quem está logado fica no **pé da lateral**;
+- no celular, **gaveta** com o mesmo menu. A faixa de botões antiga
+  escondia a Frota e ignorava a permissão de cada módulo.
+
+**Não explorado ao vivo:** o Chrome com a sessão do ngestor não estava
+conectado nesta sessão, e o navegador embutido não tem login lá. O
+desenho partiu do mapa já levantado em `docs/05`.

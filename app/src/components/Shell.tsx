@@ -1,197 +1,431 @@
-import { NavLink, useLocation } from 'react-router-dom'
-import { useEffect, useState, type ReactNode } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTema } from '../lib/tema'
-import { Marca } from './ui'
+import { supabase, EM_ABERTO } from '../lib/supabase'
+import { isoLocal } from '../lib/formato'
+import { Avatar, Logo, Marca } from './ui'
 import { Icone, type NomeIcone } from './icones'
 
 interface Item {
   para: string; rotulo: string; icone: NomeIcone
-  contagem?: number; futuro?: boolean
+  /** Palavras a mais para a busca (Ctrl+K) achar a tela pelo que ela faz. */
+  busca?: string
+  futuro?: boolean
+}
+
+interface Modulo {
+  chave: string; titulo: string; icone: NomeIcone; itens: Item[]
 }
 
 /**
- * Menu recolhido: a preferencia fica no navegador, como a do tema.
- *
- * Quem trabalha em tela de 1366 quer os 224px da lateral de volta para
- * a tabela; quem tem monitor grande quer o menu escrito. E preferencia,
- * e preferencia que volta ao normal a cada F5 nao e preferencia.
- *
- * Recolhido, a lateral NAO some: vira uma faixa de iniciais. Sumir de
- * vez tiraria a navegacao da tela -- a ideia e ganhar espaco, nao se
- * perder.
+ * Preferências do menu ficam no navegador, como a do tema: é conforto de
+ * quem olha, não dado da operação. Tudo em try/catch — janela anônima ou
+ * storage bloqueado devolve o padrão, e a tela funciona igual.
  */
 const CHAVE_MENU = 'afline:menu-recolhido'
+const CHAVE_FECHADOS = 'afline:menu-grupos-fechados'
 
 function lerRecolhido(): boolean {
   try { return localStorage.getItem(CHAVE_MENU) === '1' } catch { return false }
 }
+function lerFechados(): string[] {
+  try { return JSON.parse(localStorage.getItem(CHAVE_FECHADOS) ?? '[]') as string[] } catch { return [] }
+}
 
 /**
- * O menu passa a ser por MÓDULO, não por função.
+ * O menu é por MÓDULO, não por função (D-152).
  *
- * ┌─ por que mudou ──────────────────────────────────────────────────┐
- * │ > "se preferir mudar até o menu lateral para não confundir as     │
- * │ >  coisas sem problemas, até por que depois vai entrar            │
- * │ >  financeiro, frota, RH entre outros" — Emanuel, 22/09           │
- * │                                                                   │
- * │ "Operação / Entrada de dados / Ajustes" agrupava por VERBO, e     │
- * │ funcionava enquanto havia um produto só. Com almoxarifado,        │
- * │ financeiro, frota e RH chegando, "Importar TOA" e "Importar a     │
- * │ carga do Atlas" cairiam no mesmo grupo sendo de mundos            │
- * │ diferentes — e a pessoa que só mexe em estoque teria de aprender  │
- * │ o mapa inteiro para achar a tela dela.                            │
- * │                                                                   │
- * │ Agora cada módulo é um grupo e leva as telas dele junto,          │
- * │ inclusive a importação. AJUSTES fica de fora porque é             │
- * │ transversal: configura todos.                                     │
- * └───────────────────────────────────────────────────────────────────┘
+ * ┌─ o que veio do concorrente, e o que foi além (D-166) ────────────┐
+ * │ O ngestor separa módulos no topo e, dentro de cada um, grupos    │
+ * │ (Operação, Análise, Importadores) com CONTADOR ao lado do item — │
+ * │ o COP vê "Serviços 13" sem abrir a tela. Isso é bom e veio.      │
+ * │                                                                  │
+ * │ O que ele não tem, e entrou aqui:                                │
+ * │  · o grupo abre e fecha, e LEMBRA — quem só mexe em estoque      │
+ * │    fecha Operação uma vez e não vê mais;                         │
+ * │  · Ctrl+K: vai para qualquer tela digitando, sem conhecer o mapa;│
+ * │  · o topo diz onde você está (Módulo › Tela);                    │
+ * │  · no celular, gaveta com o mesmo menu, e não uma faixa de botões│
+ * │    que escondia a Frota e ignorava a permissão.                  │
+ * └──────────────────────────────────────────────────────────────────┘
  */
-const OPERACAO: Item[] = [
-  { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard' },
-  { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos' },
-  { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes' },
-  { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota' },
-  { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade' },
-  { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
-  { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar' },
-  // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
-]
-const ALMOXARIFADO: Item[] = [
-  { para: '/almoxarifado', rotulo: 'Estoque', icone: 'estoque' },
-]
-const FROTA: Item[] = [
-  { para: '/frota', rotulo: 'Veículos e consumo', icone: 'frota' },
-]
-const AJUSTES: Item[] = [
-  { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes' },
-  { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao' },
-]
-const FUTURO: Item[] = [
-  { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
-  { para: '/rh', rotulo: 'RH', icone: 'equipes', futuro: true },
-]
+const OPERACAO: Modulo = {
+  chave: 'operacao', titulo: 'Operação', icone: 'servicos', itens: [
+    { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard', busca: 'painel controle inicio' },
+    { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos', busca: 'contratos os visitas baixa' },
+    { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes', busca: 'tecnicos login' },
+    { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota', busca: 'mapa' },
+    { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
+    { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
+    { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },
+    // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
+  ],
+}
+const ALMOXARIFADO: Modulo = {
+  chave: 'almoxarifado', titulo: 'Almoxarifado', icone: 'estoque', itens: [
+    { para: '/almoxarifado', rotulo: 'Estoque', icone: 'estoque', busca: 'almoxarifado romaneio serial miscelanea carga' },
+  ],
+}
+const FROTA: Modulo = {
+  chave: 'frota', titulo: 'Frota', icone: 'frota', itens: [
+    { para: '/frota', rotulo: 'Veículos e consumo', icone: 'frota', busca: 'carro abastecimento km' },
+  ],
+}
+const AJUSTES: Modulo = {
+  chave: 'ajustes', titulo: 'Ajustes', icone: 'configuracoes', itens: [
+    { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes', busca: 'sub-falhas situacao parametros' },
+    { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao', busca: 'usuarios perfil acesso' },
+  ],
+}
+const FUTURO: Modulo = {
+  chave: 'futuro', titulo: 'Próximas fases', icone: 'relatorios', itens: [
+    { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
+    { para: '/rh', rotulo: 'RH', icone: 'equipes', futuro: true },
+  ],
+}
 
-function Grupo({ titulo, itens, recolhido }: {
-  titulo: string; itens: Item[]; recolhido?: boolean
+/** Os módulos que ESTA pessoa enxerga. A barreira real é o RLS; isto é
+ *  para a tela não oferecer o que vai dar em porta fechada. */
+function useModulos(): Modulo[] {
+  const { pode, ehGestor, temPapel } = useAuth()
+  const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
+  return [
+    ...(gestao ? [OPERACAO] : []),
+    ...(pode('almoxarifado.ver') ? [ALMOXARIFADO] : []),
+    ...(pode('frota.ver') ? [FROTA] : []),
+    ...(gestao ? [AJUSTES] : []),
+    FUTURO,
+  ]
+}
+
+/** A tela ativa é a do caminho EXATO. Prefixo não serve: o detalhe da
+ *  visita (`/controle/visita/…`) acenderia o Dashboard só porque começa
+ *  com `/controle`. */
+function ativo(pathname: string, para: string) {
+  return pathname === para
+}
+
+/**
+ * Contratos EM ABERTO hoje, para o contador de Serviços.
+ *
+ * Mesma conta da tela de Serviços: situação em `EM_ABERTO` e jornada
+ * fora (Na Base / Refeição não é serviço — D-117 e business-rules).
+ * Enquanto não sabe, devolve `null` e o menu NÃO mostra número: um "0"
+ * no carregamento seria afirmar que não há nada aberto.
+ */
+function useAbertosHoje(ligado: boolean): number | null {
+  const [n, setN] = useState<number | null>(null)
+  const local = useLocation()
+
+  useEffect(() => {
+    if (!ligado) return
+    let vivo = true
+    const contar = () => {
+      supabase.from('visita')
+        .select('id, tipo_atividade:tipo_atividade_id ( natureza )')
+        .eq('data_agendada', isoLocal())
+        .is('excluido_em', null)
+        .in('situacao', EM_ABERTO)
+        .then(({ data, error }) => {
+          if (!vivo) return
+          if (error) { setN(null); return }
+          const linhas = (data ?? []) as unknown as { tipo_atividade: { natureza: string } | null }[]
+          setN(linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA').length)
+        })
+    }
+    contar()
+    // A cada 2 min: o menu é olhado de relance, não precisa de Realtime
+    // (e cada canal é uma conexão do teto do plano Free).
+    const t = setInterval(contar, 120_000)
+    return () => { vivo = false; clearInterval(t) }
+    // Recontar ao trocar de tela: quem volta de uma baixa quer ver o
+    // número já descontado.
+  }, [ligado, local.pathname])
+
+  return n
+}
+
+function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
+  modulo: Modulo; recolhido: boolean; fechado: boolean; alternar: () => void
+  contagens: Record<string, number | null>; aoNavegar?: () => void
 }) {
   const local = useLocation()
+  const temAtivo = modulo.itens.some(i => ativo(local.pathname, i.para))
+  // O grupo da tela atual nunca fica fechado: esconder onde você está
+  // é perder o fio.
+  const aberto = recolhido || !fechado || temAtivo
+
   return (
-    <div className={recolhido ? 'mb-3' : 'mb-5'}>
+    <div className={recolhido ? 'mb-2' : 'mb-3'}>
       {recolhido ? (
-        // Um traco no lugar do titulo: o agrupamento continua legivel
-        // sem a palavra, que nao caberia em 3rem.
         <div className="mx-3 mb-1.5 border-t border-graf-800" />
       ) : (
-        <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-graf-600">
-          {titulo}
-        </p>
+        <button onClick={alternar} aria-expanded={aberto}
+          className="group mb-1 flex w-full items-center gap-2 rounded px-3 py-1
+                     text-[10px] font-semibold uppercase tracking-widest text-graf-400
+                     hover:text-graf-200">
+          {modulo.titulo}
+          <span className="ml-auto h-px flex-1 bg-graf-800 group-hover:bg-graf-700" />
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden
+               className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`}>
+            <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+        </button>
       )}
-      <nav className="space-y-0.5">
-        {itens.map(i => {
-          const ativo = local.pathname === i.para
-          if (i.futuro) return (
-            <span key={i.para}
-              className={`flex cursor-not-allowed items-center gap-2.5 rounded-md py-1.5
-                          text-sm text-graf-600 ${recolhido ? 'justify-center px-0' : 'px-3'}`}
-              title={recolhido ? `${i.rotulo} — ainda não construído` : 'Ainda não construído — Fase 2'}>
-              <Icone nome={i.icone} />
-              {!recolhido && <>
-                {i.rotulo}
-                <span className="ml-auto rounded bg-graf-800 px-1.5 py-0.5 text-[9px]
-                                 font-semibold uppercase text-graf-500">em breve</span>
-              </>}
-            </span>
-          )
-          return (
-            <NavLink key={i.para} to={i.para} title={recolhido ? i.rotulo : undefined}
-              className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition ${
-                recolhido ? 'justify-center px-0' : 'px-3'} ${
-                ativo ? 'bg-af-600/15 font-medium text-af-300 ring-1 ring-af-600/30'
-                      : 'text-graf-300 hover:bg-graf-800'}`}>
-              <Icone nome={i.icone} />
-              {!recolhido && <>
-                {i.rotulo}
-                {i.contagem !== undefined && (
-                  <span className="tabular ml-auto rounded bg-graf-800 px-1.5 text-[11px]">
-                    {i.contagem}
-                  </span>
+      {aberto && (
+        <nav className="space-y-0.5">
+          {modulo.itens.map(i => {
+            const eh = ativo(local.pathname, i.para)
+            const n = contagens[i.para]
+            if (i.futuro) return (
+              <span key={i.para}
+                className={`flex cursor-not-allowed items-center gap-2.5 rounded-md py-1.5
+                            text-sm text-graf-500 ${recolhido ? 'justify-center px-0' : 'px-3'}`}
+                title={recolhido ? `${i.rotulo} — ainda não construído` : 'Ainda não construído'}>
+                <Icone nome={i.icone} />
+                {!recolhido && <>
+                  {i.rotulo}
+                  <span className="ml-auto rounded bg-graf-800 px-1.5 py-0.5 text-[9px]
+                                   font-semibold uppercase text-graf-400">em breve</span>
+                </>}
+              </span>
+            )
+            return (
+              <NavLink key={i.para} to={i.para} onClick={aoNavegar}
+                title={recolhido ? (n != null ? `${i.rotulo} · ${n} em aberto hoje` : i.rotulo) : undefined}
+                aria-current={eh ? 'page' : undefined}
+                className={`relative flex items-center gap-2.5 rounded-md py-1.5 text-sm transition ${
+                  recolhido ? 'justify-center px-0' : 'px-3'} ${
+                  eh ? 'bg-af-600/15 font-medium text-af-300'
+                     : 'text-graf-300 hover:bg-graf-800 hover:text-graf-100'}`}>
+                {/* a barra vermelha na borda: o "você está aqui" que se
+                    lê de canto de olho, inclusive no menu recolhido */}
+                {eh && <span aria-hidden
+                  className="absolute -left-2 top-1.5 bottom-1.5 w-[3px] rounded-r bg-af-500" />}
+                <Icone nome={i.icone} />
+                {!recolhido && <>
+                  <span className="truncate">{i.rotulo}</span>
+                  {n != null && (
+                    <span title="Em aberto hoje (sem jornada)"
+                      className={`tabular ml-auto rounded px-1.5 text-[11px] font-medium ${
+                        eh ? 'bg-af-600/25 text-af-200' : 'bg-graf-800 text-graf-300'}`}>
+                      {n}
+                    </span>
+                  )}
+                </>}
+                {recolhido && n != null && n > 0 && (
+                  <span aria-hidden className="absolute right-2 top-1 h-1.5 w-1.5 rounded-full bg-af-500" />
                 )}
-              </>}
-            </NavLink>
-          )
-        })}
-      </nav>
+              </NavLink>
+            )
+          })}
+        </nav>
+      )}
+    </div>
+  )
+}
+
+/** Ctrl+K: ir para qualquer tela pelo nome ou pelo que ela faz. */
+function BuscaDeTelas({ modulos, fechar }: { modulos: Modulo[]; fechar: () => void }) {
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState(0)
+  const navegar = useNavigate()
+  const campo = useRef<HTMLInputElement>(null)
+  useEffect(() => { campo.current?.focus() }, [])
+
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const itens = useMemo(() => {
+    const todos = modulos.flatMap(m => m.itens.filter(i => !i.futuro)
+      .map(i => ({ ...i, modulo: m.titulo })))
+    const termos = norm(q).split(/\s+/).filter(Boolean)
+    return todos.filter(i => {
+      const alvo = norm(`${i.rotulo} ${i.modulo} ${i.busca ?? ''}`)
+      return termos.every(t => alvo.includes(t))
+    })
+  }, [q, modulos])
+
+  useEffect(() => { setSel(0) }, [q])
+
+  function ir(para: string) { fechar(); navegar(para) }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[12vh]"
+         onMouseDown={fechar} role="dialog" aria-modal="true" aria-label="Ir para uma tela">
+      <div className="card-controle w-full max-w-md overflow-hidden shadow-2xl"
+           onMouseDown={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 border-b border-graf-800 px-3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.8" className="text-graf-400" aria-hidden>
+            <circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" />
+          </svg>
+          <input ref={campo} value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Ir para… (ex.: estoque, importar, meta)"
+            aria-label="Buscar tela"
+            onKeyDown={e => {
+              if (e.key === 'Escape') fechar()
+              else if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(s + 1, itens.length - 1)) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(s - 1, 0)) }
+              else if (e.key === 'Enter' && itens[sel]) ir(itens[sel].para)
+            }}
+            // Sem o anel de foco global: a caixa inteira É o foco aqui,
+            // e o anel dentro dela desenhava uma segunda moldura.
+            className="w-full bg-transparent py-3 text-sm outline-none
+                       placeholder:text-graf-500 focus-visible:outline-none" />
+          <kbd className="rounded border border-graf-700 px-1.5 text-[10px] text-graf-400">Esc</kbd>
+        </div>
+        <ul className="max-h-80 overflow-y-auto p-1.5">
+          {itens.length === 0 && (
+            <li className="px-3 py-6 text-center text-sm text-graf-400">Nenhuma tela com esse nome.</li>
+          )}
+          {itens.map((i, k) => (
+            <li key={i.para}>
+              <button onMouseEnter={() => setSel(k)} onClick={() => ir(i.para)}
+                className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm ${
+                  k === sel ? 'bg-af-600/15 text-af-200' : 'text-graf-200'}`}>
+                <Icone nome={i.icone} />
+                {i.rotulo}
+                <span className="ml-auto text-[11px] text-graf-400">{i.modulo}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }
 
 export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactNode }) {
-  const { perfil, papeis, sair, pode, ehGestor, temPapel } = useAuth()
+  const { perfil, papeis, sair, ehGestor, temPapel } = useAuth()
   const [tema, setTema] = useTema()
+  const local = useLocation()
+  const modulos = useModulos()
   const [recolhido, setRecolhido] = useState(lerRecolhido)
+  const [fechados, setFechados] = useState<string[]>(lerFechados)
   /** Recolhido, mas com o mouse em cima: abre só enquanto o cursor
-   *  estiver lá. Não mexe na preferência guardada. */
+   *  estiver lá (D-110). Não mexe na preferência guardada. */
   const [espiando, setEspiando] = useState(false)
+  const [gaveta, setGaveta] = useState(false)
+  const [busca, setBusca] = useState(false)
   const aberto = !recolhido || espiando
+
+  const abertos = useAbertosHoje(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR'))
+  const contagens = { '/controle/servicos': abertos }
 
   useEffect(() => {
     try { localStorage.setItem(CHAVE_MENU, recolhido ? '1' : '0') } catch { /* sem storage */ }
   }, [recolhido])
+  useEffect(() => {
+    try { localStorage.setItem(CHAVE_FECHADOS, JSON.stringify(fechados)) } catch { /* sem storage */ }
+  }, [fechados])
+
+  // Ctrl+K (ou ⌘K) em qualquer tela.
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); setBusca(b => !b)
+      }
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [])
+
+  // Trocou de tela, a gaveta do celular fecha.
+  useEffect(() => { setGaveta(false) }, [local.pathname])
+
+  const alternar = (chave: string) =>
+    setFechados(f => f.includes(chave) ? f.filter(x => x !== chave) : [...f, chave])
+
+  // Onde estou: o módulo e a tela, para o topo.
+  const aqui = modulos.flatMap(m => m.itens.map(i => ({ m, i })))
+    .find(x => ativo(local.pathname, x.i.para))
+
+  const menu = (compacto: boolean, aoNavegar?: () => void) => (
+    <div className="flex h-full flex-col">
+      <div className={`flex items-center py-4 ${compacto ? 'justify-center px-0' : 'px-4'}`}>
+        <Marca compacto={compacto} />
+      </div>
+
+      <div className={compacto ? 'px-2 pb-2' : 'px-3 pb-3'}>
+        <button onClick={() => setBusca(true)} title="Ir para uma tela (Ctrl+K)"
+          className={`flex w-full items-center gap-2 rounded-md border border-graf-800
+                      bg-graf-950/40 text-xs text-graf-400 hover:border-graf-700 hover:text-graf-200
+                      ${compacto ? 'justify-center py-2' : 'px-2.5 py-1.5'}`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               strokeWidth="1.8" aria-hidden className="shrink-0">
+            <circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" />
+          </svg>
+          {!compacto && <>
+            Ir para…
+            <kbd className="ml-auto rounded border border-graf-700 px-1 text-[10px]">Ctrl K</kbd>
+          </>}
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-2">
+        {modulos.map(m => (
+          <Grupo key={m.chave} modulo={m} recolhido={compacto}
+            fechado={fechados.includes(m.chave)} alternar={() => alternar(m.chave)}
+            contagens={contagens} aoNavegar={aoNavegar} />
+        ))}
+      </div>
+
+      {/* quem está logado, no pé da lateral */}
+      <div className={`border-t border-graf-800 py-3 ${compacto ? 'px-2' : 'px-3'}`}>
+        <div className={`flex items-center gap-2.5 ${compacto ? 'justify-center' : ''}`}>
+          <Avatar nome={perfil?.nome ?? perfil?.email} tamanho={30}
+            titulo={compacto ? `${perfil?.nome ?? '—'} · ${papeis.join(' · ')}` : undefined} />
+          {!compacto && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-xs font-medium">{perfil?.nome ?? '—'}</div>
+              <div className="truncate text-[10px] text-graf-400">
+                {papeis.join(' · ') || 'sem papel'}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="sup-controle flex min-h-screen">
-      {/* ---------- lateral ---------- */}
+      {/* ---------- lateral (desktop) ---------- */}
       {/*
         * Recolhido, a lateral vira uma faixa de ícones de 56px — e
         * ABRE SOZINHA quando o mouse encosta (D-110). A faixa segura o
         * espaço no layout; o painel que cresce é `absolute`, por cima
         * do conteúdo, para a tabela não se mexer a cada passada de
-        * mouse. Menu que empurra a tela ao passar o cursor é pior que
-        * menu estreito.
+        * mouse.
         */}
-      <aside className={`relative hidden shrink-0 lg:block
-                         ${recolhido ? 'w-14' : 'w-56'}`}>
+      <aside className={`relative hidden shrink-0 lg:block ${recolhido ? 'w-14' : 'w-60'}`}>
         <div onMouseEnter={() => recolhido && setEspiando(true)}
              onMouseLeave={() => setEspiando(false)}
              className={`absolute left-0 top-0 h-full border-r border-graf-800
                          bg-graf-900 transition-[width] duration-150
-                         ${aberto ? 'w-56' : 'w-14'}
+                         ${aberto ? 'w-60' : 'w-14'}
                          ${espiando ? 'z-40 shadow-2xl shadow-black/40' : ''}`}>
-          <div className="sticky top-0">
-            <div className={`flex items-center py-4 ${aberto ? 'px-4' : 'justify-center px-0'}`}>
-              <Marca compacto={!aberto} />
-            </div>
-            <div className="px-2">
-              {/* Cada modulo so aparece para quem tem a chave dele: o
-                  almoxarife nao precisa ver Serviços, e o controlador
-                  nao precisa ver Estoque se ninguem lhe deu a permissao.
-                  A barreira real continua sendo o RLS -- isto e para a
-                  tela nao oferecer o que vai dar em porta fechada. */}
-              {(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && (
-                <Grupo titulo="Operação" itens={OPERACAO} recolhido={!aberto} />
-              )}
-              {pode('almoxarifado.ver') && (
-                <Grupo titulo="Almoxarifado" itens={ALMOXARIFADO} recolhido={!aberto} />
-              )}
-              {pode('frota.ver') && (
-                <Grupo titulo="Frota" itens={FROTA} recolhido={!aberto} />
-              )}
-              {(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && (
-                <Grupo titulo="Ajustes" itens={AJUSTES} recolhido={!aberto} />
-              )}
-              <Grupo titulo="Próximas fases" itens={FUTURO} recolhido={!aberto} />
-            </div>
-          </div>
+          <div className="sticky top-0 h-screen">{menu(!aberto)}</div>
         </div>
       </aside>
+
+      {/* ---------- gaveta (celular) ---------- */}
+      {gaveta && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setGaveta(false)} />
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r border-graf-800
+                          bg-graf-900 shadow-2xl">
+            {menu(false, () => setGaveta(false))}
+          </div>
+        </div>
+      )}
+
+      {busca && <BuscaDeTelas modulos={modulos} fechar={() => setBusca(false)} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ---------- topo ---------- */}
         <header className="sticky top-0 z-30 border-b border-graf-800 bg-graf-950/95 backdrop-blur">
           <div className="flex items-center gap-3 px-4 py-2.5">
-            {/* So no desktop: no celular a navegacao e a barra de baixo,
-                e nao ha lateral para recolher. */}
             <button onClick={() => { setRecolhido(r => !r); setEspiando(false) }}
               title={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
               aria-label={recolhido ? 'Expandir o menu' : 'Recolher o menu'}
@@ -200,11 +434,27 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
                          hover:text-af-400 lg:block">
               {recolhido ? '»' : '«'}
             </button>
-            <div className="lg:hidden"><Marca compacto /></div>
-            <span className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1
-                             text-xs font-medium text-graf-300">
+            <button onClick={() => setGaveta(true)} aria-label="Abrir o menu"
+              className="rounded-md border border-graf-700 p-1.5 text-graf-300 lg:hidden">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="1.8" aria-hidden><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
+            <div className="lg:hidden"><Logo tamanho={28} /></div>
+
+            {/* onde estou */}
+            <nav aria-label="Você está em" className="flex min-w-0 items-center gap-1.5 text-sm">
+              {aqui ? <>
+                <span className="hidden text-graf-400 sm:inline">{aqui.m.titulo}</span>
+                <span className="hidden text-graf-600 sm:inline" aria-hidden>›</span>
+                <span className="truncate font-medium">{aqui.i.rotulo}</span>
+              </> : null}
+            </nav>
+
+            <span className="hidden rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1
+                             text-xs font-medium text-graf-300 md:inline">
               MANAUS · AM
             </span>
+
             <div className="ml-auto flex items-center gap-3">
               {acoes}
               <button
@@ -215,12 +465,6 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
                            hover:border-af-600 hover:text-af-400">
                 {tema === 'escuro' ? '☀' : '☾'}
               </button>
-              <div className="hidden text-right sm:block">
-                <div className="text-xs font-medium leading-tight">{perfil?.nome ?? '—'}</div>
-                <div className="text-[10px] leading-tight text-graf-500">
-                  {papeis.join(' · ') || 'sem papel'}
-                </div>
-              </div>
               <button onClick={sair}
                 className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-400
                            hover:border-af-600 hover:text-af-400">
@@ -228,18 +472,6 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
               </button>
             </div>
           </div>
-
-          {/* navegação móvel */}
-          <nav className="flex gap-1 overflow-x-auto border-t border-graf-800 px-4 py-1.5 lg:hidden">
-            {[...OPERACAO, ...ALMOXARIFADO, ...AJUSTES].filter(i => !i.futuro).map(i => (
-              <NavLink key={i.para} to={i.para}
-                className={({ isActive }) =>
-                  `whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${
-                    isActive ? 'bg-af-600 text-white' : 'bg-graf-800 text-graf-300'}`}>
-                {i.rotulo}
-              </NavLink>
-            ))}
-          </nav>
         </header>
 
         <main className="min-w-0 flex-1">{children}</main>

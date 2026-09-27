@@ -225,13 +225,16 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 > ### Comece por aqui (atualizado em 26/09)
 >
-> **A web está no ar e em dia com o banco** (migrations até a 089c),
+> **A web está no ar e em dia com o banco** (migrations até a 090),
 > conferido baixando o bundle publicado. A leva de 26/09 fechou o
 > **almoxarifado** em relação ao concorrente (cargas por técnico, baixa
 > por contrato, Kardex, auditoria, movimentações, catálogo de 418 itens,
 > transferência pedida pelo técnico com aceite e aprovação) e criou a
 > **Frota** (consumo real pelo odômetro, exceções, condutor = técnico).
-> Ver D-162 a D-165.
+> Ver D-162 a D-165. Depois (D-166): a importação entra no **dia de
+> atuação** escolhido (hoje, por padrão), não na Data da planilha; a
+> Importação voltou para dentro do menu; a marca AFLINE em vetor; menu
+> com contador, grupos que recolhem, Ctrl+K e gaveta no celular.
 >
 > Para publicar, **de dentro de `app`** — rodar na raiz dá
 > `ENOENT … \dist`, porque o `dist` mora em `app/dist`:

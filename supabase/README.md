@@ -151,6 +151,7 @@ As três últimas, para não repetir o esquecimento:
 | 089a | `item_miscelanea.codigo` deixa de ser NOT NULL (a carga do catálogo morreu no primeiro item sem código SAP) | ✓ |
 | 089b | **O catálogo do concorrente vira o nosso** — 418 itens ativos do Alfa Gestor, de `supabase/dados/catalogo_miscelanea_alfa_2026-09-26.txt`; 2 fora por código SAP repetido | ✓ |
 | 089c | O Kardex ganha `seq`: lançamentos no mesmo instante saíam fora de ordem | ✓ |
+| 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY
 > DEFINER`.** Coluna nova no `returns table` não passa por `create or

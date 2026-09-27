@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { Alerta, Marca } from '../components/ui'
+import { Alerta, LogoCompleto } from '../components/ui'
 
 export default function Login() {
   const { session } = useAuth()
@@ -41,7 +41,8 @@ export default function Login() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3">
-          <Marca />
+          <LogoCompleto altura={84} />
+          <p className="-mt-1 text-lg font-semibold tracking-tight">Manager</p>
           <p className="text-sm text-graf-400">Gestão de campo · CLARO Manaus</p>
         </div>
 

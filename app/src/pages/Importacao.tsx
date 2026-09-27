@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from '../lib/toa'
-import { Alerta, Marca } from '../components/ui'
+import { Alerta } from '../components/ui'
+import { Shell } from '../components/Shell'
+import { isoLocal, dataBR } from '../lib/formato'
 
 type Fase = 'ocioso' | 'lendo' | 'lida' | 'enviando' | 'pronto'
 
@@ -13,6 +15,23 @@ interface Resumo {
    *  abortada nao e trabalho, e some da tela -- mas nao daqui. */
   suspensas?: number
   erros: number; conflitos: number; ordens_servico: number
+  /** O dia em que as visitas entraram (090). */
+  dia?: string
+}
+
+/**
+ * "25/09/26" (como o TOA escreve a coluna Data) → "2026-09-25".
+ * Devolve `null` para o que não souber ler — nunca um dia chutado.
+ */
+function isoDaPlanilha(txt: string | undefined): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec((txt ?? '').trim())
+  if (!m) return null
+  const ano = m[3].length === 2 ? `20${m[3]}` : m[3]
+  return `${ano}-${m[2]}-${m[1]}`
+}
+
+function ontem(): string {
+  const d = new Date(); d.setDate(d.getDate() - 1); return isoLocal(d)
 }
 
 /** Uma linha do histórico — o "log" que o sistema atual mostra. */
@@ -27,6 +46,7 @@ interface Historico {
   qtd_conflito: number | null
   criado_em: string
   aplicado_em: string | null
+  data_atuacao: string | null
   usuario: { nome: string | null; email: string | null } | null
 }
 
@@ -47,12 +67,24 @@ export default function Importacao() {
   const [progresso, setProgresso] = useState('')
   const [arrastando, setArrastando] = useState(false)
   const [historico, setHistorico] = useState<Historico[]>([])
+  /**
+   * O dia em que as visitas vão entrar. Nasce HOJE, e só muda quando a
+   * pessoa escolhe (090, D-166):
+   *
+   * > "mesmo que a data esteja diferente, a importação da rota, ele
+   * >  precisa ir para o dia atual, so sera importado para o dia
+   * >  anterior quando nos escolhermos a data que vamos atuar" — Emanuel
+   *
+   * A "Data" da planilha não decide nada: aparece na prévia, ao lado,
+   * para a diferença ficar à vista antes do clique.
+   */
+  const [dia, setDia] = useState(isoLocal)
 
   /** O log de importações: o que subiu, quem subiu, quando e no que deu. */
   async function carregarHistorico() {
     const { data } = await supabase.from('importacao')
       .select(`id, arquivo_nome, status, total_linhas, qtd_criadas, qtd_atualizadas,
-               qtd_erro, qtd_conflito, criado_em, aplicado_em,
+               qtd_erro, qtd_conflito, criado_em, aplicado_em, data_atuacao,
                usuario:usuario_id ( nome, email )`)
       .order('criado_em', { ascending: false }).limit(30)
     setHistorico((data ?? []) as unknown as Historico[])
@@ -90,6 +122,8 @@ export default function Importacao() {
           arquivo_nome: arquivo.name,
           arquivo_path: `manual/${arquivo.name}`,
           fonte: 'TOA',
+          // 090: quem decide o dia é quem importa, não a coluna Data.
+          data_atuacao: dia,
         })
         .select('id').single()
       if (ei || !imp) throw new Error(ei?.message ?? 'Falha ao registrar a importação.')
@@ -131,6 +165,9 @@ export default function Importacao() {
   function limpar() {
     setFase('ocioso'); setArquivo(null); setLeitura(null)
     setResumo(null); setErro(null); setProblemas([])
+    // A próxima importação volta a nascer em HOJE: o dia anterior é
+    // escolha de uma importação, não um modo que fica ligado.
+    setDia(isoLocal())
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -141,27 +178,30 @@ export default function Importacao() {
     : {}
   const totalOS = leitura ? leitura.linhas.reduce((s, l) => s + contarOS(l), 0) : 0
 
-  return (
-    <div className="sup-controle min-h-screen">
-      <header className="border-b border-graf-800">
-        <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-2.5">
-          <Marca compacto />
-          <nav className="flex items-center gap-1 text-sm">
-            <Link to="/controle" className="rounded-md px-2.5 py-1 text-graf-300 hover:bg-graf-800">
-              Controle
-            </Link>
-            <span className="rounded-md bg-graf-800 px-2.5 py-1 font-medium">Importar planilha</span>
-          </nav>
-        </div>
-      </header>
+  /** Os dias que a coluna "Data" traz, com quantas linhas cada. */
+  const diasPlanilha = leitura
+    ? Object.entries(leitura.linhas.reduce<Record<string, number>>((a, l) => {
+        const iso = isoDaPlanilha(l['Data']) ?? 'sem data'
+        a[iso] = (a[iso] ?? 0) + 1; return a
+      }, {})).sort((a, b) => b[1] - a[1])
+    : []
+  const hoje = isoLocal()
+  const divergentes = diasPlanilha.filter(([d]) => d !== dia)
+    .reduce((s, [, n]) => s + n, 0)
+  const nomeDoDia = (iso: string) =>
+    iso === hoje ? 'hoje' : iso === ontem() ? 'ontem' : dataBR(iso)
 
-      <main className="mx-auto max-w-4xl space-y-4 px-4 py-8">
+  return (
+    <Shell>
+      <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
         <div>
           <h1 className="text-xl font-semibold">Importar planilha do TOA</h1>
           <p className="mt-1 text-sm text-graf-400">
             O arquivo <code className="text-graf-300">Atividades-MAN-AFLINE_*.xlsx</code> exportado
             do sistema da CLARO. Pode subir a mesma planilha várias vezes ao dia:
-            a importação atualiza sem duplicar.
+            a importação atualiza sem duplicar. As visitas entram no <strong
+            className="text-graf-200">dia de atuação</strong> que você escolher —
+            hoje, a menos que você troque.
           </p>
         </div>
 
@@ -283,6 +323,74 @@ export default function Importacao() {
               </div>
             </div>
 
+            {/* ---------- dia de atuação (090) ---------- */}
+            <div className={`card-controle p-4 ${dia !== hoje ? 'ring-1 ring-amber-500/50' : ''}`}>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label htmlFor="dia-atuacao"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-graf-400">
+                    Dia de atuação
+                  </label>
+                  <input id="dia-atuacao" type="date" value={dia} required
+                    onChange={e => setDia(e.target.value || hoje)}
+                    className="rounded-lg border border-graf-700 bg-graf-900 px-3 py-2 text-sm
+                               text-graf-100 outline-none focus:border-af-500" />
+                </div>
+                <div className="flex gap-1.5">
+                  {[['Hoje', hoje], ['Ontem', ontem()]].map(([r, d]) => (
+                    <button key={r} onClick={() => setDia(d)} aria-pressed={dia === d}
+                      className={`rounded-md border px-2.5 py-2 text-xs ${
+                        dia === d ? 'border-af-600 bg-af-600/15 text-af-200'
+                                  : 'border-graf-700 text-graf-300 hover:bg-graf-800'}`}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <p className="min-w-0 flex-1 text-sm text-graf-300">
+                  As {leitura.linhas.length} visitas entram em{' '}
+                  <strong className={dia === hoje ? 'text-graf-100' : 'text-amber-300'}>
+                    {dataBR(dia)} ({nomeDoDia(dia)})
+                  </strong>.
+                </p>
+              </div>
+
+              {/* A diferença fica À VISTA antes do clique: é a única
+                  hora em que alguém pode perceber que subiu o arquivo
+                  errado. */}
+              {divergentes > 0 && (
+                <div className="mt-3 rounded-lg border border-graf-700 bg-graf-900 px-3 py-2.5 text-xs">
+                  <p className="text-graf-200">
+                    A coluna <strong>Data</strong> da planilha diz{' '}
+                    {diasPlanilha.map(([d, n], k) => (
+                      <span key={d}>
+                        {k > 0 && ' · '}
+                        <strong>{d === 'sem data' ? 'sem data' : dataBR(d)}</strong>
+                        {diasPlanilha.length > 1 && <> ({n})</>}
+                      </span>
+                    ))}.
+                    {' '}Vale o dia de atuação: {divergentes} visita(s) entram em {dataBR(dia)}.
+                  </p>
+                  <p className="mt-1 text-graf-400">
+                    A data original não se perde — fica gravada no contrato e no histórico.
+                    {diasPlanilha.length === 1 && diasPlanilha[0][0] !== 'sem data' && (
+                      <> Se a rota é mesmo de {dataBR(diasPlanilha[0][0])},{' '}
+                        <button onClick={() => setDia(diasPlanilha[0][0])}
+                          className="text-af-400 underline underline-offset-2 hover:text-af-300">
+                          atuar em {dataBR(diasPlanilha[0][0])}
+                        </button>.
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+              {dia !== hoje && (
+                <p className="mt-2 text-xs text-amber-300">
+                  Você escolheu um dia que não é hoje. Contrato que já existia muda
+                  para {dataBR(dia)} — e fica registrado no histórico dele.
+                </p>
+              )}
+            </div>
+
             {problemas.length > 0 && (
               <Alerta tipo="aviso">
                 <p className="mb-1 font-medium">Confira antes de continuar:</p>
@@ -297,11 +405,12 @@ export default function Importacao() {
             <div className="flex items-center gap-3">
               <button
                 onClick={enviar}
-                disabled={fase === 'enviando' || leitura.linhas.length === 0}
+                disabled={fase === 'enviando' || leitura.linhas.length === 0 || !dia}
                 className="toque rounded-lg bg-af-600 px-6 font-semibold text-white
                            hover:bg-af-500 disabled:opacity-50"
               >
-                {fase === 'enviando' ? 'Importando…' : `Importar ${leitura.linhas.length} visitas`}
+                {fase === 'enviando' ? 'Importando…'
+                  : `Importar ${leitura.linhas.length} visitas em ${dataBR(dia).slice(0, 5)}`}
               </button>
               {progresso && <span className="text-sm text-graf-400">{progresso}</span>}
             </div>
@@ -311,7 +420,10 @@ export default function Importacao() {
         {/* ---------- resultado ---------- */}
         {fase === 'pronto' && resumo && (
           <div className="space-y-4">
-            <Alerta tipo="ok">Importação concluída.</Alerta>
+            <Alerta tipo="ok">
+              Importação concluída
+              {resumo.dia && <> — visitas em <strong>{dataBR(resumo.dia)}</strong></>}.
+            </Alerta>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
@@ -386,6 +498,7 @@ export default function Importacao() {
                                   text-[11px] uppercase tracking-wide text-graf-400">
                   <tr>
                     <th className="px-3 py-2 font-medium">Arquivo</th>
+                    <th className="px-3 py-2 font-medium">Dia</th>
                     <th className="px-3 py-2 font-medium">Resultado</th>
                     <th className="px-3 py-2 font-medium">Criação</th>
                     <th className="px-3 py-2 font-medium">Conclusão</th>
@@ -401,6 +514,14 @@ export default function Importacao() {
                       <tr key={h.id} className="border-b border-graf-800">
                         <td className="max-w-72 truncate px-3 py-2" title={h.arquivo_nome ?? ''}>
                           {h.arquivo_nome ?? '—'}
+                        </td>
+                        {/* Nula = importação anterior à 090: ninguém
+                            escolheu dia nela, e a tela não finge que sim. */}
+                        <td className="tabular whitespace-nowrap px-3 py-2 text-xs text-graf-300"
+                            title={h.data_atuacao ? 'Dia de atuação escolhido'
+                                   : 'Anterior ao dia de atuação: usou a Data da planilha'}>
+                          {h.data_atuacao ? dataBR(h.data_atuacao).slice(0, 5)
+                            : <span className="text-graf-400">da planilha</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-graf-300">
                           {h.total_linhas
@@ -439,7 +560,7 @@ export default function Importacao() {
             </div>
           )}
         </section>
-      </main>
-    </div>
+      </div>
+    </Shell>
   )
 }

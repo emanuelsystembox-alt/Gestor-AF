@@ -1,34 +1,90 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { SITUACAO_INFO, type Situacao } from '../lib/supabase'
 
-/** Marca AFLINE: o "AF" em vermelho sobre grafite. */
-export function Logo({ tamanho = 32 }: { tamanho?: number }) {
+/**
+ * A marca da AFLINE, redesenhada em vetor a partir da arte oficial.
+ *
+ * ┌─ por que SVG e não o PNG ────────────────────────────────────────┐
+ * │ A arte veio como imagem quadrada com o fundo grafite "de esfera" │
+ * │ pintado junto. No menu recolhido ela tem 28px, e um PNG reduzido │
+ * │ a isso vira borrão vermelho; no tema claro o fundo escuro        │
+ * │ pintado viraria um carimbo preto no meio da tela branca.         │
+ * │                                                                  │
+ * │ Em vetor o "AF" fica nítido em qualquer tamanho, e o "LINE" usa  │
+ * │ `currentColor`: branco no controle escuro, grafite no claro —    │
+ * │ a mesma marca, legível nos dois. O traçado foi sobreposto à arte │
+ * │ original para conferir a geometria (26/09).                      │
+ * └──────────────────────────────────────────────────────────────────┘
+ *
+ * As coordenadas estão na grade da arte original (447 × 447).
+ */
+const AF_PERNA = 'M142 136 L152 136 L127 296 L76 296 Z'
+const AF_F = 'M154 121 L371 121 L358 164.5 L228 164.5 L236 187 L321 187 L308 226 L249 226 L288 338 L229 338 Z'
+
+function GradienteAF({ id }: { id: string }) {
+  // O vermelho da arte não é chapado: acende no alto e escurece embaixo.
   return (
-    <div
-      className="grid place-items-center rounded-full bg-graf-900 ring-1 ring-graf-700 select-none"
-      style={{ width: tamanho, height: tamanho }}
-      aria-hidden
-    >
-      <span
-        className="font-black leading-none text-af-500 tracking-tighter"
-        style={{ fontSize: tamanho * 0.42 }}
-      >
-        AF
-      </span>
-    </div>
+    <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stopColor="#f2464e" />
+      <stop offset="1" stopColor="#c81a23" />
+    </linearGradient>
+  )
+}
+
+/** Só o "AF", num selo — para onde a marca inteira não caberia legível
+ *  (menu recolhido, celular, favicon). */
+export function Logo({ tamanho = 32 }: { tamanho?: number }) {
+  const g = useId()
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="58 64 330 330" aria-hidden
+         className="shrink-0 select-none">
+      <defs>
+        <GradienteAF id={g} />
+        <radialGradient id={`${g}f`} cx="0.7" cy="0.25" r="0.9">
+          {/* var() em `style`, não no atributo: atributo de
+              apresentação do SVG não resolve variável CSS */}
+          <stop offset="0" style={{ stopColor: 'var(--color-graf-700)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--color-graf-900)' }} />
+        </radialGradient>
+      </defs>
+      {/* o fundo "de esfera" da arte, em tokens: acompanha o tema */}
+      <rect x="58" y="64" width="330" height="330" rx="78" fill={`url(#${g}f)`} />
+      <g fill={`url(#${g})`} transform="translate(223 229.5) scale(.8) translate(-223 -229.5)">
+        <path d={AF_PERNA} /><path d={AF_F} />
+      </g>
+    </svg>
+  )
+}
+
+/** A marca inteira: AF + LINE, sem fundo. */
+export function LogoCompleto({ altura = 36 }: { altura?: number }) {
+  const g = useId()
+  return (
+    <svg height={altura} width={altura * 320 / 232} viewBox="58 112 320 232"
+         role="img" aria-label="AFLINE" className="shrink-0 select-none">
+      <defs><GradienteAF id={g} /></defs>
+      <g fill={`url(#${g})`}><path d={AF_PERNA} /><path d={AF_F} /></g>
+      {/* "LINE" em traço inclinado, como na arte; a base do E corre
+          até o pé do F, que é o que amarra as duas palavras */}
+      <g fill="none" stroke="currentColor" strokeWidth="4.5"
+         transform="translate(0 336) skewX(-16) translate(0 -336)">
+        <path d="M72 307 V334 H100" /><path d="M114 307 V336" />
+        <path d="M128 336 V307 L156 336 V307" />
+        <path d="M200 309 H170 V334 H232 M170 321.5 H196" />
+      </g>
+    </svg>
   )
 }
 
 export function Marca({ compacto = false }: { compacto?: boolean }) {
+  if (compacto) return <Logo tamanho={30} />
   return (
-    <div className="flex items-center gap-2.5">
-      <Logo tamanho={compacto ? 28 : 34} />
-      {!compacto && (
-        <div className="leading-tight">
-          <div className="font-semibold tracking-tight">AFLINE</div>
-          <div className="text-[11px] text-graf-400 -mt-0.5">Manager</div>
-        </div>
-      )}
+    <div className="flex items-center gap-3">
+      <LogoCompleto altura={34} />
+      <div className="border-l border-graf-700 pl-3 leading-tight">
+        <div className="text-[13px] font-semibold tracking-tight">Manager</div>
+        <div className="text-[10px] uppercase tracking-widest text-graf-400">Gestão de campo</div>
+      </div>
     </div>
   )
 }

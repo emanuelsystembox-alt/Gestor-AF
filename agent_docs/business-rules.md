@@ -37,6 +37,28 @@ manual (D-063). Os números da operadora têm 10 dígitos.
 
 ---
 
+## A importação (090, D-166)
+
+**O dia da visita é o DIA DE ATUAÇÃO, não a coluna "Data" da planilha.**
+Quem decide é quem importa: a tela nasce em **hoje** (Manaus) e só vai
+para outro dia quando a pessoa escolhe. *"so sera importado para o dia
+anterior quando nos escolhermos a data que vamos atuar"* (Emanuel, 26/09).
+
+- `importacao.data_atuacao` guarda a escolha; sem ela, vale
+  `hoje_local()` — nunca `current_date`, nunca a "Data" do arquivo.
+- O dia de atuação governa **tudo** que é dia: `data_agendada` (na
+  criação e na atualização), a equipe do login na data, `inicio`/`fim` e
+  o `toa_recurso`. Um contrato com o dia num lugar e a hora de outro dia
+  estraga o TEC1 em 24 h.
+- A "Data" da planilha **não se perde**: fica em `dados_origem` e no
+  evento. Contrato que já existia e muda de dia deixa evento
+  `DIA_DE_ATUACAO`.
+- A prévia mostra a divergência **antes** do clique. Não adivinhe o dia
+  pelo mais frequente do arquivo — isso é o sistema decidindo no lugar de
+  quem opera (D-088).
+
+---
+
 ## A baixa
 
 **O status da operadora NÃO diz a situação; o CÓDIGO diz.** No analítico
