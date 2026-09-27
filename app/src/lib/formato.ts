@@ -115,3 +115,29 @@ export function equipeRotulo(
   const semPrefixo = n.replace(/^\s*\d+\s*[-–·]\s*/, '').trim()
   return `${c.padStart(3, '0')} - ${semPrefixo || 'EQUIPE'}`
 }
+
+/**
+ * Telefone brasileiro em máscara: (92) 99999-9999 ou (92) 3333-4444.
+ * Aceita o que vier (só dígitos, com máscara, pela metade) e devolve a
+ * máscara do que já foi digitado — serve para o campo enquanto a pessoa
+ * digita e para exibir o que o banco guardou (só dígitos, 096).
+ * Duplicado de propósito entre a web e o aplicativo (D-112).
+ */
+export function mascaraTelefone(entrada: string | null | undefined): string {
+  const d = (entrada ?? '').replace(/\D/g, '').slice(0, 11)
+  if (d.length === 0) return ''
+  if (d.length <= 2) return `(${d}`
+  const ddd = d.slice(0, 2)
+  const resto = d.slice(2)
+  // 9 dígitos depois do DDD = celular (5+4); 8 = fixo (4+4).
+  const corte = resto.length > 8 ? 5 : 4
+  return resto.length <= corte
+    ? `(${ddd}) ${resto}`
+    : `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`
+}
+
+/** Metros para leitura: "35 m", "1,2 km". Nulo continua nulo. */
+export function metros(m: number | null | undefined): string | null {
+  if (m == null) return null
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`
+}

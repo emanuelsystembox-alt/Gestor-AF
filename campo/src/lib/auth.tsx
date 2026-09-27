@@ -3,6 +3,8 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { encerrarRastro } from './rastro'
+import { esquecerAntifraude } from './antifraude'
 
 export type Papel =
   | 'ADMIN' | 'COP' | 'CONTROLADOR' | 'SUPERVISOR'
@@ -134,7 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error.message.toLowerCase().includes('network')) return 'Sem internet. Verifique o sinal e tente de novo.'
       return error.message
     },
-    sair: async () => { await supabase.auth.signOut() },
+    sair: async () => {
+      // O rastro fecha ANTES do signOut: depois dele não há sessão para
+      // subir o ponto final, e a fila deste login não pode sobrar para
+      // o próximo (096).
+      await encerrarRastro().catch(() => {})
+      esquecerAntifraude()
+      await supabase.auth.signOut()
+    },
   }
 
   return <AuthCtx.Provider value={valor}>{children}</AuthCtx.Provider>

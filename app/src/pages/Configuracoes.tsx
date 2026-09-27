@@ -760,6 +760,9 @@ export default function Configuracoes() {
               )}
             </section>
 
+            {/* ---- o raio da baixa (096) ---- */}
+            <RaioDaBaixa />
+
             {/* ---- o de/para ---- */}
             <section className="card-controle overflow-hidden">
               <div className="border-b border-graf-800 px-4 py-3">
@@ -1217,5 +1220,86 @@ export default function Configuracoes() {
         )}
       </div>
     </Shell>
+  )
+}
+
+/**
+ * O raio da baixa (096): a partir de quantos metros do endereço do
+ * cliente a baixa do celular aparece como FORA DO RAIO. 200 m foi a
+ * escolha do Emanuel em 27/09 — tolera o erro normal do GPS em rua com
+ * prédio e a coordenada do TOA um pouco deslocada.
+ *
+ * Só ACUSA: não bloqueia a baixa. Bloquear seria outra regra (o que
+ * fazer com o técnico que está na porta e o TOA errou o endereço?), e
+ * ninguém decidiu isso.
+ */
+function RaioDaBaixa() {
+  const [atual, setAtual] = useState<number | null>(null)
+  const [rascunho, setRascunho] = useState('')
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const [ocupado, setOcupado] = useState(false)
+
+  useEffect(() => {
+    supabase.rpc('ler_parametro', { p_chave: 'raio_baixa_m' }).then(({ data }) => {
+      const n = data == null ? null : Number(data)
+      setAtual(n); setRascunho(n == null ? '' : String(n))
+    })
+  }, [])
+
+  async function salvar() {
+    const n = Number(rascunho)
+    if (!Number.isInteger(n) || n < 20 || n > 5000) {
+      setMsg({ tipo: 'erro', texto: 'O raio é um número inteiro de metros, de 20 a 5.000.' })
+      return
+    }
+    setOcupado(true); setMsg(null)
+    const { error } = await supabase.rpc('definir_parametro', { p_chave: 'raio_baixa_m', p_valor: n })
+    setOcupado(false)
+    // definir_parametro já recusa com frase de gente ('Somente ADMIN…').
+    if (error) { setMsg({ tipo: 'erro', texto: error.message }); return }
+    setAtual(n)
+    setMsg({ tipo: 'ok', texto: `Raio da baixa: ${n} m. Vale na hora, para todos os dias — a distância é calculada na leitura.` })
+  }
+
+  return (
+    <section className="card-controle p-4">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-64 flex-1">
+          <h2 className="font-medium">Raio da baixa</h2>
+          <p className="mt-1 text-sm text-graf-400">
+            A baixa dada pelo celular grava onde o técnico estava. Mais longe do
+            endereço do cliente do que este raio, o contrato aparece{' '}
+            <strong className="text-af-400">fora do raio</strong> em Serviços, Equipes e
+            no Monitoramento.
+          </p>
+          <p className="mt-1.5 text-xs text-graf-400">
+            Só acusa — não impede a baixa. Endereço que veio do TOA sem coordenada
+            aparece como "sem coordenada", nunca como "dentro".
+          </p>
+        </div>
+        <div className="flex items-end gap-2">
+          <label className="text-[11px] text-graf-400">
+            <span className="mb-1 block">Metros</span>
+            <input value={rascunho} inputMode="numeric"
+              onChange={e => setRascunho(e.target.value.replace(/\D/g, ''))}
+              className="w-24 rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5
+                         text-right text-sm outline-none focus:border-af-500" />
+          </label>
+          <button onClick={salvar}
+            disabled={ocupado || rascunho === '' || Number(rascunho) === atual}
+            className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-semibold text-white
+                       hover:bg-af-500 disabled:opacity-40">
+            Salvar
+          </button>
+        </div>
+      </div>
+      {msg && (
+        <p className={`mt-2 text-xs ${msg.tipo === 'ok' ? 'text-emerald-400' : 'text-af-400'}`}>{msg.texto}</p>
+      )}
+      <p className="mt-3 border-t border-graf-800 pt-2.5 text-xs text-graf-400">
+        Hoje: <strong className="text-graf-200">{atual == null ? 'não lido' : `${atual} m`}</strong>.
+        Só ADMIN altera — quem barra é o banco.
+      </p>
+    </section>
   )
 }

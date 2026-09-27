@@ -4,6 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { View } from 'react-native'
 import { AuthProvider, useAuth } from './src/lib/auth'
+import { useRastro } from './src/lib/useRastro'
+import { GuardaGps } from './src/ui/GuardaGps'
+import { AvisoRastro, useCienciaRastro } from './src/ui/AvisoRastro'
 import Entrar from './src/telas/Entrar'
 import Agenda from './src/telas/Agenda'
 import Visita from './src/telas/Visita'
@@ -21,7 +24,12 @@ import type { Pilha } from './src/navegacao'
 const Stack = createNativeStackNavigator<Pilha>()
 
 function Aplicacao() {
-  const { session, carregando } = useAuth()
+  const { session, carregando, tecnicoId, ehCampo } = useAuth()
+  const ehTecnico = !!session && !!tecnicoId
+  // 097: o técnico dá ciência do registro ANTES de o rastro começar.
+  const { ciente, darCiencia } = useCienciaRastro(session?.user.id ?? null, ehTecnico)
+  // O rastro do dia (096): só para login de técnico, e depois da ciência.
+  useRastro(ehTecnico && ciente === true)
 
   if (carregando && !session) {
     return (
@@ -34,6 +42,8 @@ function Aplicacao() {
   if (!session) return <Entrar />
 
   return (
+    // 097: GPS desligado, negado ou simulado pausa o app de quem é do campo.
+    <GuardaGps ativo={ehTecnico && ehCampo}>
     <NavigationContainer>
       {/* `headerShown: false` porque cada tela desenha o próprio
           cabeçalho: no campo o topo carrega situação, janela e contrato
@@ -54,6 +64,8 @@ function Aplicacao() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    <AvisoRastro visivel={ehTecnico && ciente === false} aoCiente={darCiencia} />
+    </GuardaGps>
   )
 }
 

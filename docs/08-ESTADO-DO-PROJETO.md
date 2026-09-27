@@ -373,6 +373,50 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 27/09/2026 — rastro, local da baixa e monitoramento (D-170)
+
+Migration **096**; tela nova **Monitoramento** (`/controle/monitor`);
+botão **Atualizar** em Serviços e Equipes; selo do **local da baixa** nas
+listas, na janela do contrato e no analítico; **melhor contato** no app.
+
+### Resolvido no mesmo dia (D-171, migration 097)
+
+| Pendência | Como fechou |
+|---|---|
+| APK | Gerado (versão **0.2.0**, perfil `preview`) com o rastro em segundo plano, a guarda do GPS e o aviso |
+| Retenção do rastro | **90 dias**, expurgo diário no pg_cron (03:17 em Manaus) |
+| Aviso ao técnico | "Estou ciente" versionado, gravado em `ciencia_rastro`; o Monitoramento mostra quem não deu |
+| Geocerca e garagens | Desenhadas no Monitoramento; quem desenha decide equipes e aviso; alerta no sino |
+| Antifraude | GPS desligado/negado/simulado pausa o app; simulado trava baixa e status no banco |
+
+### Continua pendente (D-171)
+
+| O quê | Por quê |
+|---|---|
+| **Texto do aviso pelo jurídico** | O texto descreve o que o sistema faz; não é parecer. Trocou o texto, suba `VERSAO_AVISO` em `campo/src/ui/AvisoRastro.tsx`. |
+| **Provar a trava de simulação no aparelho** | Instalar um app de local fictício, escolher em Opções do desenvolvedor e ver o app pausar e a central receber "Localização simulada". Só no APK. |
+| **Medir o monitor com volume real** | Emanuel pediu para medir durante os testes (`monitor_tecnicos` como `authenticated`). |
+| **iPhone** | Não tem a marca de simulação; lá o antifraude é só GPS desligado/negado. |
+
+### Depende do Emanuel (levantado na D-170)
+
+| O quê | Por quê |
+|---|---|
+| ~~**Gerar o APK novo**~~ (feito, D-171) (`npx eas-cli@latest build --platform android --profile preview`) | O rastro **com o app fechado** só existe no APK: o Expo Go não tem o serviço de localização em segundo plano. No Expo Go o rastro grava só com o app aberto. O `app.json` já tem as permissões e o plugin configurados. |
+| **Retenção do rastro** | Não há expurgo. O concorrente guarda **90 dias**. ~100 técnicos × ~20 pontos/h × 10 h ≈ 20 mil linhas/dia — o plano Free aguenta meses, não anos. É LGPD (dado de empregado) e custo: decisão da AFLINE. |
+| **Aviso formal ao técnico sobre o rastro** | O app avisa na Agenda e antes de pedir a permissão. Termo assinado / política interna é jurídico, não código. O concorrente mostra um "Aviso sobre monitoramento de localização" com "Estou ciente". |
+| **Play Store** | Publicar na loja com localização em segundo plano exige declaração e vídeo justificando o uso. Para APK instalado direto (perfil `preview`) não se aplica. |
+| **Geocerca e garagens** | O concorrente tem; ninguém definiu qual cerca, qual garagem nem o que acontece ao sair. |
+| **Km por mês com custo/km** | O "Km Rodados" do concorrente cruza km do rastro com o abastecimento. Temos os dois dados (rastro + Frota); falta a tela. |
+
+### Ninguém testou com o dedo
+
+- A caixinha do melhor contato ao concluir, no celular.
+- O rastro em qualquer celular (com app aberto no Expo Go; em segundo plano no APK).
+  Alguns fabricantes (Xiaomi, Samsung com economia de bateria) matam serviço em
+  segundo plano — só o teste de um dia inteiro no aparelho real diz.
+- `monitor_tecnicos` com volume real de rastro: medido só com 40 pontos (21 ms).
+
 ## Pendente em 26/09/2026 — o que ficou desta leva
 
 A leva de 26/09 (D-162 a D-165, migrations 086 a 089c) fechou o

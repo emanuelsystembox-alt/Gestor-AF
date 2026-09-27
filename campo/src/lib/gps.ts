@@ -26,13 +26,22 @@ export interface Posicao {
 
 export type EstadoGps =
   | { ok: true; posicao: Posicao }
-  | { ok: false; motivo: 'PERMISSAO' | 'DESLIGADO' | 'SEM_SINAL'; recado: string }
+  | { ok: false; motivo: 'PERMISSAO' | 'DESLIGADO' | 'SEM_SINAL' | 'SIMULADO'; recado: string }
 
-const RECADO: Record<'PERMISSAO' | 'DESLIGADO' | 'SEM_SINAL', string> = {
+const RECADO: Record<'PERMISSAO' | 'DESLIGADO' | 'SEM_SINAL' | 'SIMULADO', string> = {
   PERMISSAO: 'Autorize a localização para este aplicativo nos ajustes do celular.',
   DESLIGADO: 'A localização do celular está desligada. Ligue para dar baixa.',
   SEM_SINAL: 'Sem sinal de GPS ainda. Vá para um lugar aberto e tente de novo.',
+  // 097: o Android marca a leitura que vem de app de localização falsa.
+  SIMULADO: 'O celular está usando uma localização simulada. Desative o app de localização simulada para continuar.',
 }
+
+/**
+ * A leitura veio de um provedor SIMULADO (app de GPS falso, "local
+ * fictício" das opções do desenvolvedor)? O Android marca cada leitura;
+ * no iPhone o campo não existe e vale falso (097, D-171).
+ */
+export const ehSimulada = (l: Location.LocationObject | null | undefined) => l?.mocked === true
 
 /** Pede a permissão uma vez. Devolve se ficou concedida. */
 export async function pedirPermissao(): Promise<boolean> {
@@ -61,6 +70,7 @@ export async function ondeEstou(): Promise<EstadoGps> {
     const p = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     })
+    if (ehSimulada(p)) return { ok: false, motivo: 'SIMULADO', recado: RECADO.SIMULADO }
     return {
       ok: true,
       posicao: {
@@ -74,6 +84,7 @@ export async function ondeEstou(): Promise<EstadoGps> {
     // Cai aqui quando o aparelho tem permissão e serviço ligados mas
     // ainda não fixou satélite — sair de dentro de um prédio resolve.
     const ultima = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 })
+    if (ultima && ehSimulada(ultima)) return { ok: false, motivo: 'SIMULADO', recado: RECADO.SIMULADO }
     if (ultima) {
       return {
         ok: true,

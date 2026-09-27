@@ -68,13 +68,13 @@ Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
 select * from testar_policies();   -- 16 cenários, todos têm que passar
-select * from testar_campo();      -- 14 cenários das travas do campo
+select * from testar_campo();      -- 18 cenários das travas do campo (e do antifraude)
 ```
 
 # Estrutura
 
 ```
-app/                  web do controle (15 telas, com Almoxarifado e Frota)
+app/                  web do controle (16 telas, com Almoxarifado, Frota e Monitoramento)
   src/lib/            toa.ts (leitor da planilha) · metricas · relatorio
                       supabase · auth · tempoReal · formato
   src/components/     Shell, gráficos (SVG à mão), TabelaContratos, ui
@@ -82,11 +82,11 @@ app/                  web do controle (15 telas, com Almoxarifado e Frota)
                       Relatorios · Importacao · Administracao · Visita…
   scripts/            criar-usuarios-teste.mjs (exige service_role)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
-  src/lib/            gps · midia · avisos · dominio · formato · auth
+  src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
-docs/                 mapeamento, domínio, 169 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (92 arquivos, até a 095)
+docs/                 mapeamento, domínio, 171 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (94 arquivos, até a 097)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -122,7 +122,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 169 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 171 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |

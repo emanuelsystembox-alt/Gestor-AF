@@ -29,6 +29,9 @@ export const EVENTO_ROTULO: Record<string, string> = {
   CONCLUSAO:       'Finalizou a visita',
   // 090: reimportada com outro dia de atuacao (D-166).
   DIA_DE_ATUACAO:  'Dia de atuação alterado',
+  // 096: a resposta do técnico à pergunta do melhor contato (o número
+  // não viaja no evento; mora em contato_cliente).
+  CONTATO:         'Melhor contato do cliente',
 }
 
 export const rotuloEvento = (tipo: string) =>

@@ -18,6 +18,7 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
+import { useEstadoRastro } from '../lib/useRastro'
 import { BarraInferior } from '../ui/BarraInferior'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
@@ -76,6 +77,7 @@ type Props = NativeStackScreenProps<Pilha, 'Agenda'>
 
 export default function Agenda({ navigation }: Props) {
   const { perfil, equipeId, sair } = useAuth()
+  const rastro = useEstadoRastro()
   const [data, setData] = useState(isoLocal())
   const [linhas, setLinhas] = useState<LinhaAgenda[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -297,6 +299,18 @@ export default function Agenda({ navigation }: Props) {
           </Aviso>
         )}
 
+        {/* 096: o técnico SABE que a rota do dia está sendo registrada,
+            e de que jeito. Transparência com quem é rastreado — e o
+            recado diz o que fazer quando só grava com o app aberto. */}
+        {rastro.modo !== 'DESLIGADO' && (
+          <Text style={e.rastro}>
+            {rastro.modo === 'SEGUNDO_PLANO'
+              ? 'Rota do dia sendo registrada, inclusive com o app fechado.'
+              : (rastro.recado ?? 'Rota do dia registrada enquanto o app está aberto.')}
+            {rastro.naFila > 0 ? ` ${rastro.naFila} ponto(s) esperando sinal.` : ''}
+          </Text>
+        )}
+
         {pendentes > 0 && (
           <Cartao style={e.pendentes}>
             <Text style={e.pendentesTexto}>
@@ -491,6 +505,7 @@ export default function Agenda({ navigation }: Props) {
 }
 
 const e = StyleSheet.create({
+  rastro: { fontSize: 12, color: cor.graf500, lineHeight: 17 },
   tela: { flex: 1, backgroundColor: cor.graf50 },
   cabecalho: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

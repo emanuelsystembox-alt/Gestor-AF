@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **08/09/2026**, por Claude (Opus 5).
+Última atualização: **27/09/2026**, por Claude (Opus 5.5).
 
 ---
 
@@ -223,7 +223,29 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
-> ### Comece por aqui (atualizado em 26/09)
+> ### Comece por aqui (atualizado em 27/09, noite)
+>
+> **Banco até a migration 097, web publicada e conferida, APK 0.2.0.**
+> A leva de 27/09 (D-170 e D-171) trouxe o **rastro do técnico** (2 a 5
+> min, com o app fechado no APK, até o fim da rota), o **local da baixa**
+> (distância do endereço, raio de 200 m, selo em Serviços/Equipes/contrato
+> e no analítico), o **melhor contato do cliente** ao concluir, o botão
+> **Atualizar**, a central de **Monitoramento** (`/controle/monitor`:
+> onde cada um está, trilha com replay, paradas, próximos, cercas e
+> garagens desenhadas no mapa) e o **antifraude do GPS** (desligado,
+> negado ou simulado pausa o app; simulado trava baixa e status no banco).
+> Retenção do rastro: 90 dias (pg_cron). Baterias: `testar_policies()`
+> 16/16 e `testar_campo()` **18/18**.
+>
+> **O que falta está em `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente
+> em 27/09/2026"** — principalmente provar no celular (APK) a trava de
+> localização simulada e o rastro com o app fechado, e passar o texto do
+> aviso pelo jurídico. Para o aplicativo, ver `campo/README.md`, seção
+> "Rastro, antifraude e o que só funciona no APK".
+>
+> ---
+>
+> ### Antes disso (26/09)
 >
 > **A web está no ar e em dia com o banco** (migrations até a 095),
 > conferido baixando o bundle publicado. A leva de 26/09 fechou o

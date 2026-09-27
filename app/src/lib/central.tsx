@@ -53,7 +53,7 @@ export interface Toast { id: number; titulo: string; texto: string; tom: 'ajuda'
  */
 export interface Sinal {
   id: number
-  tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO'
+  tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO' | 'CERCA' | 'GPS'
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean
@@ -127,7 +127,9 @@ export function CentralProvider({ children }: { children: ReactNode }) {
       if (conhecidos.current) {
         for (const x of ativos) {
           if (!conhecidos.current.has(x.id)) {
-            avisar({ tom: x.tipo === 'AJUDA' ? 'ajuda' : 'sinal', titulo: x.titulo, texto: x.detalhe ?? '' })
+            // GPS anormal e cerca chegam com o mesmo destaque do pedido de ajuda (097).
+            avisar({ tom: x.tipo === 'AJUDA' || x.tipo === 'GPS' || x.tipo === 'CERCA' ? 'ajuda' : 'sinal',
+                     titulo: x.titulo, texto: x.detalhe ?? '' })
           }
         }
       }
@@ -160,6 +162,14 @@ export function CentralProvider({ children }: { children: ReactNode }) {
         // SINAL novo que a releitura cria — aqui só se adianta a releitura,
         // para não avisar duas vezes a mesma coisa.
         if (e.origem === 'MOBILE' && e.para?.situacao === 'COM_IMPEDIMENTO') recarregar()
+      })
+      // 097: GPS anormal e cerca — a linha é magra (sem dado de assinante);
+      // o aviso sai do SINAL que a releitura cria, como no suporte técnico.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gps_alerta' }, c => {
+        if ((c.new as { tipo?: string }).tipo !== 'NORMALIZADO') recarregar()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cerca_evento' }, c => {
+        if ((c.new as { alerta?: boolean }).alerta) recarregar()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagem' }, c => {
         const m = c.new as MensagemAoVivo

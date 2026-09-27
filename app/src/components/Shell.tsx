@@ -59,6 +59,8 @@ const OPERACAO: Modulo = {
     { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos', busca: 'contratos os visitas baixa' },
     { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes', busca: 'tecnicos login' },
     { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota', busca: 'mapa' },
+    // 096: onde cada técnico está, a trilha, os próximos e o local da baixa.
+    { para: '/controle/monitor', rotulo: 'Monitoramento', icone: 'monitor', busca: 'gps rastro trilha localizacao tecnico mapa proximos' },
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
     { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
     { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },

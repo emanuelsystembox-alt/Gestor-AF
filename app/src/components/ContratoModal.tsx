@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { Alerta, Pill } from './ui'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
-import { equipeRotulo, pts } from '../lib/formato'
+import { equipeRotulo, mascaraTelefone, pts } from '../lib/formato'
+import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
+import { SeloLocal } from './TabelaContratos'
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -58,11 +60,16 @@ interface Visita {
   ordem_servico: OS[]
   visita_marcador: { id: string; indicador_id: string }[]
   visita_evento: Evento[]
+  /** 096. `unique` por visita (é a chave), então o PostgREST devolve
+   *  OBJETO ou null — não array (armadilha da `reincidencia`). */
+  contato_cliente: { telefone: string | null; login: string | null
+                     atualizado_em: string } | null
 }
 
 const SELECT = `
   id, contrato, wo_numero, toa_atividade_id, cliente_nome,
   tipo_pessoa, tipo_residencia, telefones,
+  contato_cliente ( telefone, login, atualizado_em ),
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim, situacao, inicio, fim,
   bloqueado_em, origem, rota_fixada_em, rota_fixada_motivo,
@@ -160,7 +167,11 @@ export function ContratoModal({
   const [novaNumero, setNovaNumero] = useState('')
   const [novaDescricao, setNovaDescricao] = useState('')
 
+  // Onde a baixa do campo foi dada (096). Nulo = ninguém baixou pelo celular.
+  const [local, setLocal] = useState<LocalBaixa | null>(null)
+
   async function carregar() {
+    carregarLocais([id]).then(m => setLocal(m.get(id) ?? null)).catch(() => setLocal(null))
     const { data, error } = await supabase.from('visita').select(SELECT).eq('id', id).single()
     if (error) setErro(error.message)
     else {
@@ -807,6 +818,31 @@ export function ContratoModal({
                   <Dado r="Endereço" v={endereco} largo />
                   <Dado r="Telefones" v={v.telefones?.join(' · ')} />
                   <Dado r="CEP" v={v.cep} />
+                  {/* 096: a resposta do técnico ao concluir. Três estados,
+                      e nenhum deles é "—" calado: informou, disse NÃO, ou
+                      nunca foi perguntado (concluído fora do app). */}
+                  <Dado r="Melhor contato (técnico)" largo v={
+                    v.contato_cliente
+                      ? v.contato_cliente.telefone
+                        ? <span title={`Informado por ${v.contato_cliente.login ?? '—'} em ${new Date(v.contato_cliente.atualizado_em).toLocaleString('pt-BR')}`}
+                            className="font-semibold text-emerald-300">
+                            {mascaraTelefone(v.contato_cliente.telefone)}
+                            <span className="ml-1.5 text-[11px] font-normal text-graf-400">
+                              {v.contato_cliente.login}
+                            </span>
+                          </span>
+                        : <span className="text-amber-300"
+                            title={`${v.contato_cliente.login ?? 'O técnico'} respondeu NÃO`}>
+                            técnico respondeu NÃO
+                          </span>
+                      : v.situacao === 'CONCLUIDA'
+                        ? <span className="text-graf-400">não perguntado (concluído fora do app)</span>
+                        : null} />
+                  <Dado r="Local da baixa" largo v={
+                    local ? <SeloLocal local={local} />
+                      : v.ordem_servico.some(o => o.baixa_afline)
+                        ? <span className="text-graf-400">baixa sem GPS (dada pela web)</span>
+                        : null} />
                 </div>
                 {(!v.cliente_nome || !v.tipo_pessoa) && (
                   <p className="mt-1.5 text-[11px] text-graf-600">

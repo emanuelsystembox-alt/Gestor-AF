@@ -42,6 +42,49 @@ não acha equipe nenhuma para ela. Não é bug do aplicativo.
 
 ---
 
+## Rastro, antifraude e o que só funciona no APK (0.2.0 · D-170, D-171)
+
+| | Expo Go | APK (`preview`) |
+|---|---|---|
+| Rastro com o app **aberto** (2 a 5 min) | ✓ | ✓ |
+| Rastro com o app **fechado** | ✗ — grava um ponto "saiu" e a trilha mostra "app fechado" | ✓ com a permissão **"Permitir o tempo todo"** e a notificação fixa "Gestor AF · rota do dia" |
+| Pausa com GPS desligado / permissão negada | ✓ | ✓ |
+| Pausa com **localização simulada** | ✓ (Android) | ✓ (Android) |
+| Aviso "Estou ciente" antes do rastro | ✓ | ✓ |
+
+O que o técnico vê, na ordem:
+
+1. **Entra** → o aviso sobre o registro de localização, com um botão só:
+   **Estou ciente**. Fica gravado com a versão do texto
+   (`VERSAO_AVISO` em `src/ui/AvisoRastro.tsx` — trocou o texto, suba a
+   versão, e todos veem de novo).
+2. O Android pede a localização; depois, explicado antes, pede **"o tempo
+   todo"**. Negar o "tempo todo" não trava: o rastro segue com o app aberto.
+3. **GPS desligado, permissão negada ou localização simulada** → o app
+   fica **pausado** numa janela que diz o que fazer, com o botão que leva ao
+   lugar certo. Some sozinha quando corrige. Simulada também trava baixa e
+   status **no banco**, e a central recebe o alerta.
+4. **Sem satélite ainda** (GPS ligado, sem fixar) **não trava** — D-113.
+5. Na Agenda, uma linha diz como a rota está sendo registrada.
+6. O rastro com o app fechado **desliga sozinho** quando o último contrato
+   do dia fecha, e **sai do login apaga** a fila de pontos do aparelho.
+
+**Para provar a trava de simulação:** instale um app de "Fake GPS", ligue
+as Opções do desenvolvedor, em *Selecionar app de local fictício* escolha
+esse app, e abra o Gestor AF. Ele deve pausar com "Localização com
+comportamento anormal", e o sino da web deve receber "Localização
+simulada". Volte o local fictício para *Nenhum* e toque em **Verificar de
+novo**.
+
+> **iPhone:** o sistema não marca localização simulada; lá o antifraude é
+> só GPS desligado/negado.
+
+> **Aparelhos que matam app em segundo plano** (Xiaomi, alguns Samsung):
+> se a trilha tiver buracos com o app fechado, tire o Gestor AF da
+> "economia de bateria" do aparelho.
+
+---
+
 ## Publicar nas lojas
 
 A pasta **já está ligada** ao projeto EAS
@@ -112,7 +155,7 @@ só as explica antes de o botão falhar:
 Confira que continuam valendo:
 
 ```sql
-select * from testar_campo();      -- 14 cenários
+select * from testar_campo();      -- 18 cenários
 select * from testar_policies();   -- 16 cenários
 ```
 

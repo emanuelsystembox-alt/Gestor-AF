@@ -57,6 +57,9 @@ const P = {
   // Rota: os pontos ligados do dia
   rota: <><circle cx="6" cy="6.5" r="2.2" /><circle cx="18" cy="17.5" r="2.2" />
           <path d="M8.2 6.5h4.3a3.3 3.3 0 0 1 0 6.5h-1a3.3 3.3 0 0 0 0 4.5h4.3" /></>,
+  // Monitoramento: o alvo sobre o ponto — onde cada técnico está (096)
+  monitor: <><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.2" />
+             <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" /></>,
 } as const
 
 export type NomeIcone = keyof typeof P

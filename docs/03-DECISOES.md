@@ -6031,3 +6031,284 @@ junto.
 
 **Não verificado:** as telas do app no celular (tsc e `expo export` limpos);
 sinal limpo por um usuário e visto por outro, na tela.
+
+---
+
+### D-170 · Atualizar forçado, o melhor contato, o rastro do técnico, o local da baixa e a central de monitoramento
+
+Cinco pedidos do Emanuel (27/09), numa leva só. Migration **096**.
+
+#### 1. "Atualizar" em Equipes e em Serviços
+
+> *"é bom colocarmos um botão atualizar, para atualizar forçado os status
+> do contrato quando necessário. na aba serviços também ok?"*
+
+`BotaoAtualizar` (componente único) no topo das duas telas e do
+Monitoramento. Busca de novo e diz **há quanto tempo** a tela foi
+buscada ("· há 3 min"). O tempo real continua; o botão é para quando ele
+cai ou quando se desconfia do que se vê. Em Serviços é o mesmo que aceitar
+as "mudanças em espera" (zera o contador).
+
+#### 2. O melhor contato do cliente, ao concluir
+
+> *"na hora em que o técnico finalizar no app como concluído, o sistema
+> automaticamente deve subir uma caixinha informando, você deseja subir o
+> melhor contato do cliente? SIM ou NÃO? […] essa informação deve subir
+> no analítico também quando for exportar, quem está colocando número e
+> quem não está. So é pra aparecer nesse status ok?"*
+
+- Tabela `contato_cliente` (uma linha por contrato) e **não** um item a
+  mais em `visita.telefones`: aquele array é do TOA e a reimportação o
+  reescreve.
+- **O NÃO também é gravado** (telefone nulo) — é justamente o que mostra
+  quem não está colocando. Sem linha = **não perguntado** (concluído fora
+  do app). Três estados, nenhum vazio calado (regra 6). No analítico:
+  `Melhor contato informado` = SIM / NÃO / NÃO PERGUNTADO, mais o número
+  e quem informou.
+- Só em `CONCLUIDA`, e a trava é do banco (`informar_contato_cliente`
+  recusa outro status, 23514). Mesma porta do anexo: equipe dele, e o
+  campo só no dia (`pode_anexar_na_visita`).
+- Telefone com DDD, 10 ou 11 dígitos (`(92) 99999-9999`), validado no
+  banco. A caixinha **não fecha** tocando fora nem no "voltar": pede SIM
+  ou NÃO. Se o app fechar no meio, o contrato concluído mostra
+  "Informar o melhor contato" para responder depois (no dia).
+- O histórico ganha o evento `CONTATO` dizendo SÓ se foi informado — o
+  número não entra em `visita_evento`, que vai pelo Realtime e é magra de
+  propósito (D-119/D-120).
+
+#### 3. O rastro do técnico
+
+> *"deve mostrar a trilha do técnico desde o momento que o técnico loga até
+> o final, o final da rota, ou enquanto ele estiver usando o app, o sistema
+> deve captar a cada 2 a 5 minutos o sinal do gps do técnico"*
+
+Pergunta feita e respondida: **também em segundo plano** (Emanuel, 27/09).
+
+- **"2 a 5 minutos"** virou: ponto a cada 2 min se ele andou 30 m ou mais;
+  parado, um a cada 5 min mesmo assim. Andando, resolução de rua; parado,
+  não enche o banco (plano Free).
+- **Segundo plano** = `expo-location` + `expo-task-manager`, com a
+  notificação fixa que o Android exige ("Gestor AF · rota do dia"). Exige
+  **APK (EAS Build)** e a permissão **"Permitir o tempo todo"**; o app
+  explica antes de pedir. **No Expo Go não funciona** — lá o rastro grava
+  com o app aberto, e ao ir para trás grava um ponto `SAIU`: a trilha mostra
+  o buraco como **app fechado**, não como "parado".
+- **"Até o final da rota"**: `registrar_rastro` devolve `rota_aberta` (ainda
+  há contrato produtivo de hoje em aberto para ele). Sem nenhum, o segundo
+  plano desliga sozinho. Com o app aberto continua gravando ("ou enquanto
+  ele estiver usando o app"). **Rastrear o técnico em casa depois do último
+  contrato não foi pedido** — e localização de empregado é dado pessoal.
+- Fila no aparelho (sem sinal, o ponto espera); ponto repetido (técnico +
+  instante) é recusado pelo servidor, então reenviar é seguro. **Sair do
+  login apaga a fila**: quem é o técnico o servidor decide pelo login
+  (D-061), e ponto de um login não pode subir na sessão de outro.
+- A Agenda do app diz ao técnico que a rota está sendo registrada, e de
+  que jeito. Transparência com quem é rastreado.
+- RLS: o rastro é lido **só pela gestão**, e só de técnico de equipe
+  visível. O técnico não lê rastro de ninguém — nem o dele.
+
+#### 4. O local da baixa
+
+> *"quando ele baixar também no nosso sistema, a baixa deve pegar a
+> distancia que ele baixou da casa do cliente ou seja. técnicos precisam
+> baixar no local, temos que ver o raio na tela de contratos ou equipe
+> quando ele baixar"*
+
+- A coordenada da baixa já era gravada (é a trava D-113). Faltava a
+  **precisão**: `baixar_os` e `registrar_etapa` ganharam `p_precisao`, e
+  `visita_evento.precisao_m`. As versões antigas foram **derrubadas**, não
+  deixadas convivendo (traps.md: assinatura com default ambígua). Todas as
+  chamadas existentes (web por nome, bateria posicional de 7) continuam
+  valendo — conferido pela bateria.
+- **Raio: 200 m** (escolha do Emanuel entre 100/200/300/500, 27/09), em
+  `parametro.raio_baixa_m`, editável em Configurações › Baixa e situação.
+  **Só acusa, não bloqueia**: bloquear seria outra regra (o técnico na
+  porta com o endereço do TOA errado?), e ninguém decidiu.
+- `local_da_baixa(visitas)` devolve, por contrato, o registro do campo
+  **mais longe** do endereço (baixa de O.S. ou encerramento): basta uma
+  afirmação de longe para "baixou no local?" ser não. Calculado **na
+  leitura**, não guardado — se o TOA corrigir a coordenada, a conta
+  acompanha (D-150).
+- Selo na linha do contrato (Serviços e Equipes, o mesmo componente —
+  D-095), resumo no cartão da equipe ("3 de 4 no raio · 1 fora · até
+  2,2 km"), na janela do contrato e no analítico. Endereço sem coordenada
+  do TOA aparece como **"sem coord. do endereço"**, nunca como "dentro".
+
+#### 5. A central de monitoramento (`/controle/monitor`)
+
+> *"precisamos saber onde esta cada técnico, técnicos proximos, trilha,
+> informações de monitoramento ok? explore se necessário da concorrente"*
+
+Olhado no Alfa Gestor em 27/09 (Monitoramento App): **Km Rodados**,
+Caminho percorrido, **Status Técnicos** (legenda: Deslogado, Pendente,
+Ocioso, Em deslocamento, Em execução), Código de Baixa (mapa de calor),
+Geo Cerca e Garagens. Lá as posições **ficam 90 dias**.
+
+O nosso tem: estado do sinal de cada técnico (com sinal / sem sinal /
+**app fechado** / rota encerrada / sem sinal no dia), bateria, km estimado,
+placa (condutor atual da Frota), contrato em andamento, baixas fora do
+raio; o mapa pinta por **sinal** ou por **trabalho** — e o "ocioso" é o da
+D-026, lido de `painel_equipes` (uma regra, um lugar). Selecionando um
+técnico: a trilha do dia (trechos cheios, **buracos tracejados**), as
+**paradas** (≥ 15 min num raio de 50 m) com o contrato mais perto, os
+contratos dele com o **raio desenhado** e a linha até onde baixou, e o
+**replay** (arrastar a hora e ver onde ele estava). **Técnicos próximos**
+de um técnico ou de um contrato, para despacho. Atualiza sozinho a cada
+minuto no dia de hoje.
+
+- "Sem sinal" = mais de 10 min sem ponto: o dobro do maior intervalo de
+  captura — não é regra de negócio, sai da regra do app.
+- Parada e buraco são **leitura da trilha, não infração**: a tela mostra,
+  quem opera julga.
+- O km é **estimado** (linha reta entre pontos com precisão ≤ 100 m e
+  deslocamento ≥ 25 m) e a tela diz isso.
+
+**Recusado / não feito:**
+
+- **Geocerca e garagens**: exigem regra (qual cerca, qual garagem, o que
+  acontece ao sair) que ninguém definiu.
+- **Km por mês com custo/km** (o "Km Rodados" deles cruza com o
+  abastecimento): a Frota tem o dado, mas é outra tela — próximo passo.
+- **Bloquear a baixa fora do raio**: não pedido (ver item 4).
+- **Retenção do rastro**: não há expurgo. O concorrente guarda 90 dias;
+  quanto a AFLINE guarda é decisão dela (LGPD + plano Free).
+
+**Testado como `authenticated` (desfeito ou apagado):** técnico grava 3
+pontos (o 4º, com data de 2030, é descartado), reenvio grava 0; técnico
+lê 0 pontos e o monitor o recusa (42501); contato em contrato em execução
+recusado (23514), telefone "123" recusado (23514), contrato de outra
+equipe recusado (42501), SIM e depois NÃO gravam (a última resposta vale);
+baixa com precisão grava `precisao_m`; baixa a ~30 m + encerramento a
+2,2 km → `local_da_baixa` devolve 2.224 m, fora, 2 registros / 1 fora, e
+o monitor conta 2 / 1. Baterias **16/16 e 14/14**. Nenhuma tabela sem RLS,
+nenhuma DEFINER aberta ao `anon`. Medido como `authenticated`:
+`monitor_tecnicos` 21 ms e `local_da_baixa` (240 visitas do mês) 5 ms —
+**com quase nenhum rastro gravado**; em volume real não foi medido.
+Na tela (web local): trilha de teste de 40 pontos desenhada, parada de
+24 min detectada a 594 m do contrato, buraco "app fechado" de 27 min,
+selo "FORA DO RAIO · 389 m ±12 m" na lista e na janela do contrato. Os
+dados de teste foram apagados.
+
+**Não verificado:** nada disso rodou num celular. O segundo plano só
+existe no APK (não no Expo Go) e depende da permissão "o tempo todo" e do
+fabricante do Android (economia de bateria agressiva mata serviço em
+segundo plano em alguns aparelhos). A caixinha do contato e o rastro com o
+app aberto: `tsc` e `expo export` limpos, sem teste com o dedo.
+
+---
+
+### D-171 · Cercas e garagens, antifraude do GPS, ciência do rastro, 90 dias e o APK
+
+Respostas do Emanuel (27/09) às pendências da D-170. Migration **097**
+(aplicada em três partes: 097, 097b, 097c).
+
+#### 1. Retenção: 90 dias
+
+> *"vamos fazer 90 também"* (o concorrente guarda 90)
+
+`parametro.rastro_retencao_dias = 90` e `expurgar_rastro()` agendado no
+**pg_cron** (instalado nesta migration) às 07:17 UTC = 03:17 em Manaus.
+Apaga `rastro_ponto`, `gps_alerta` e `cerca_evento` mais velhos que isso.
+Não toca em `visita_evento` (a coordenada da baixa é prova do atendimento,
+não rastro) nem em `sinal`.
+
+#### 2. Cercas e garagens
+
+> *"podemos configurar isso no mapa, tipo cerca, area 1 - desenhar ela no
+> mapa, se ele sair daquilo, deve chegar notificação para o cop e gestores
+> que estão conectados ao nosso sistema, então garagem, cerca no mapa deve
+> ter de fato"*
+
+- Desenhada no **Monitoramento**: clicar no mapa marca os cantos, arrastar
+  ajusta, botão direito apaga um canto. Polígono de 3 a 300 cantos.
+- **Quem desenha decide** (o sistema não decide nada): a quais equipes vale
+  (todas as da base, ou as escolhidas) e se avisa ao **sair** e/ou ao
+  **entrar**. Área nasce avisando ao sair; garagem nasce sem aviso — só
+  registra a saída e a volta na linha do dia.
+- Conferida **no banco**, a cada ponto que chega (`registrar_rastro`). A
+  troca dentro/fora só vale com **2 pontos seguidos** do outro lado e
+  precisão até 100 m: GPS tremendo na borda não pode disparar alerta. O
+  evento leva a hora do PRIMEIRO ponto do outro lado.
+- O aviso vai para o **sino** como sinal `CERCA` (095): vigente enquanto ele
+  continua do lado que disparou. A central escuta `cerca_evento` pelo
+  Realtime e relê o sino na hora — não espera o minuto.
+- Redesenhar ou trocar as equipes **recomeça o dentro/fora** de todo mundo
+  sem alerta. Arquivar, não apagar: os eventos antigos continuam dizendo de
+  que cerca eram.
+- Sem o mapa do Google (chave recusada), não se desenha — a tela diz.
+
+#### 3. Antifraude do GPS
+
+> *"se ele desligar o gps e quiser usar o sistema, o sistema vai travar as
+> ações dele e deve subir uma mensagem informando para que ele ligue o gps
+> novamente, se ele habilitar no celular dele o modo desenvolvedor para
+> instalar o gps simulator, o app também deve bloquear isso, informar que
+> há ações anormais no gps e que ele precisa corrigir isso para usar o app.
+> temos que ser intuitivos sem ser agressivo"*
+
+| situação | o app | o banco | a central |
+|---|---|---|---|
+| GPS desligado | pausa, com "Ligar localização" (diálogo do Android) | baixa/encerramento já exigiam coordenada (D-113) | sinal "GPS desligado" |
+| Permissão negada | pausa, com "Permitir" / ajustes | idem | sinal "Localização negada" |
+| **Localização simulada** | pausa, com o passo a passo (Opções do desenvolvedor › local fictício › Nenhum) | **recusa baixa e mudança de status** (`gps_bloqueado`) até chegar um ponto REAL | sinal "Localização simulada" |
+| Salto > 1 km a > 180 km/h | nada | registra | sinal "Salto de posição" |
+| Aparelho com root | nada | registra | sinal "Aparelho modificado" |
+| Sem satélite ainda | **não trava** | — | — |
+
+- A simulação é detectada pela marca que o **Android** põe em cada leitura
+  vinda de provedor falso (`mocked`). Cada ponto do rastro leva a marca; o
+  ponto simulado não entra em cerca nem em km.
+- **O modo desenvolvedor sozinho não trava**: muita gente tem ligado sem
+  fraudar nada. O que frauda é o app de local fictício — e esse é pego.
+- **Só um ponto real destrava a simulação**: o app dizer "está normal" não
+  basta (`registrar_estado_gps('NORMAL')` não tira `SIMULADO`).
+- Root: dá para esconder a marca com root, então vira alerta ao controle —
+  sem travar (a detecção do Expo é "experimental").
+- **iPhone não tem a marca**: lá o antifraude é só GPS desligado/negado.
+  Simular GPS no iPhone exige computador ligado ao aparelho.
+- Sem satélite (GPS ligado, ainda sem fixar) **não trava** — é a razão da
+  D-113. Travar é para o que o técnico DESLIGOU ou FALSIFICOU.
+- Tom: a tela diz o que aconteceu, por que pausou e como resolver, com o
+  botão que leva direto ao lugar certo. Nada de acusação.
+
+#### 4. Aviso formal ("Estou ciente")
+
+> *"Aviso formal ao técnico sobre o rastro […] pode fazer também"*
+
+Uma janela antes de o rastro começar, com um botão só, **"Estou ciente"**
+(como o concorrente). O texto diz o que o sistema faz: de quanto em quanto,
+quando para, quem vê, 90 dias, o que acontece com GPS desligado ou
+simulado. A ciência fica em `ciencia_rastro` com a **versão** do texto
+(`rastro-v1-2026-09-27`): mudou o texto, sobe a versão, todo mundo vê de
+novo. O Monitoramento mostra quem ainda não deu ciência. **O texto não é
+parecer jurídico** — a AFLINE deve passá-lo pelo jurídico.
+
+#### 5. O APK
+
+Autorizado pelo Emanuel. Versão **0.2.0** (perfil `preview`, APK instalado
+direto, sem loja). É nele que o rastro com o app fechado funciona — no Expo
+Go não.
+
+#### Testado
+
+Bateria `testar_campo()` **18/18** (4 cenários novos: baixa com GPS
+simulado barrada; ponto real destrava; técnico não lê rastro; 2 pontos fora
+da cerca = 1 evento SAIU, visto pelo controlador; funções da 096/097
+fechadas ao `anon`). `testar_policies()` sem falha, nenhuma tabela sem RLS,
+nada DEFINER aberto ao `anon`, `expurgo` agendado no cron. Como
+`authenticated` (desfeito): cerca desenhada pelo admin; técnico dentro →
+fora → fora → ponto simulado; o sino do admin traz "Saiu da área…" e
+"Localização simulada…" **vigentes**, o monitor mostra `SIMULADO` e "fora
+de: Área teste". Na tela (web local): cerca desenhada com 4 cliques no
+mapa, salva com 4 cantos no banco, e apagada.
+
+**Defeitos pegos no teste da tela**, e corrigidos: o polígono novo (vazio)
+não tinha caminho — `getPath()` voltava indefinido e a tela quebrava; e o
+`MVCArray` passado no construtor era **copiado** pelo Maps, então os
+cliques contavam mas o desenho não aparecia. Ícone de loja do Google
+engolia clique: desligado durante o desenho. Ver `traps.md`.
+
+**Não verificado:** nada no celular ainda — a guarda do GPS, o aviso, o
+rastro em segundo plano e a detecção de simulação precisam do APK na mão
+(e de um app de local fictício para provar a trava). Volume real do monitor
+com muitos pontos e cercas: a medir nos testes, como o Emanuel pediu.

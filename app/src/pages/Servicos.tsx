@@ -8,6 +8,8 @@ import { Alerta, Vazio } from '../components/ui'
 import { ContratoModal } from '../components/ContratoModal'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useUltimoDiaComVisita } from '../lib/dia'
+import { useLocaisDaBaixa } from '../lib/localBaixa'
+import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
 import { FILTRO_VAZIO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
@@ -89,6 +91,9 @@ export default function Servicos() {
   /** Mudanças que chegaram ao vivo enquanto o controlador estava com
    *  contratos marcados. Ver o bloco de tempo real mais abaixo. */
   const [mudancasEmEspera, setMudancasEmEspera] = useState(0)
+  /** Quando a lista chegou do banco pela última vez — o botão Atualizar
+   *  mostra, para o controlador saber quão velho é o que está vendo. */
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
 
   // filtros
   const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(() => {
@@ -286,7 +291,7 @@ export default function Servicos() {
       .then(({ data, error }) => {
         if (!vivo) return
         if (error) setErro(error.message)
-        else setLinhas((data ?? []) as unknown as V[])
+        else { setLinhas((data ?? []) as unknown as V[]); setAtualizadoEm(new Date()) }
         setCarregando(false)
       })
     return () => { vivo = false }
@@ -364,6 +369,9 @@ export default function Servicos() {
       ? visiveis.slice(inicio, inicio + POR_PAGINA)
       : visiveis),
     [visiveis, inicio])
+
+  // Onde baixou (096): só a PÁGINA na tela — 50 contratos, não o mês.
+  const locais = useLocaisDaBaixa(naPagina.map(v => v.id), versao)
 
   const totalPontos = useMemo(
     () => visiveis.reduce((soma, v) => soma + Number(pontos.get(v.id)?.pontos_claro ?? 0), 0),
@@ -462,6 +470,10 @@ export default function Servicos() {
         <span className="text-xs text-graf-500">a</span>
         <input type="date" value={ate} onChange={e => setAte(e.target.value)}
           className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+        {/* Atualizar = o mesmo que aceitar as mudanças em espera: busca
+            de novo e zera o contador. */}
+        <BotaoAtualizar aoAtualizar={aplicarMudancas} carregando={carregando}
+          atualizadoEm={atualizadoEm} />
         <button onClick={() => setNovo(true)}
           className="ml-1 rounded-md bg-af-600 px-3 py-1 text-xs font-semibold text-white
                      hover:bg-af-500">
@@ -699,6 +711,7 @@ export default function Servicos() {
               detalhada={detalhada}
               pontos={pontos}
               porIndicador={porIndicador}
+              locais={locais}
               carregando={carregando}
               aoAbrir={v => setModal(v.id)}
               aoMenuContexto={(v, e) => {

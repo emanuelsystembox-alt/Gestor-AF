@@ -233,6 +233,19 @@ cor, ou pelo menos recusar o que não souber ler.
 não em CSS: variável CSS não resolve e o marcador sai **preto, calado**.
 Cor para o mapa vai escrita.
 
+**Polígono do Maps criado vazio não tem caminho, e caminho passado no
+construtor é COPIADO.** `new google.maps.Polygon({ paths: [] })` →
+`getPath()` volta `undefined` e o `addListener` derruba a tela. E passar um
+`MVCArray` pronto em `paths` faz o Maps copiar: os cliques iam para a lista
+original (a contagem subia), e o desenho não aparecia. O certo é
+`poly.setPath(lista)` e depois `poly.getPath()` — o caminho do próprio
+polígono. Ver D-171 (`MapaMonitor`, desenho de cerca).
+
+**Ícone de loja do Google engole o clique no mapa.** Clicar em cima de um
+ponto de interesse abre a ficha do lugar e o `click` do mapa não chega
+como esperado: metade dos cantos da cerca sumia. Durante o desenho,
+`clickableIcons: false`.
+
 **`"types"` no `tsconfig.json` é uma lista FECHADA.** Com
 `"types": ["vite/client"]`, instalar `@types/google.maps` não faz o
 menor efeito — o `tsc` só carrega os pacotes de tipo listados ali. Tem
@@ -275,6 +288,12 @@ bash.
 
 **Heredoc com JSX/aspas quebra no shell.** Para escrever arquivo com
 apóstrofo e crase, use a ferramenta de edição, não `cat <<'EOF'`.
+
+**`Set-Content -Encoding utf8` no PowerShell 5.1 grava COM BOM.** O
+`app.json` do `campo/` saiu com `EF BB BF` na frente depois de uma troca de
+versão pelo PowerShell. JSON com BOM pode quebrar o build do Expo. Edite JSON
+com a ferramenta de edição ou com Node; se passou pelo PowerShell, confira os
+3 primeiros bytes (`head -c 3 arquivo | od -An -tx1`). Ver D-171.
 
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`

@@ -1,4 +1,6 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
+import { mascaraTelefone } from './formato'
+import type { LocalBaixa } from './localBaixa'
 
 /**
  * Montagem das linhas do relatório.
@@ -113,6 +115,9 @@ export interface VisitaLinha {
   // como um-para-um: vem OBJETO ou null, não array. Tratar como array
   // rebentava a tela inteira em `reincidencia[0]`.
   reincidencia: Reincidencia | Reincidencia[] | null
+  /** 096: o melhor contato perguntado ao concluir. Chave = visita_id,
+   *  então vem OBJETO ou null (mesma armadilha da reincidência). */
+  contato_cliente: { telefone: string | null; login: string | null } | null
 }
 
 interface Reincidencia {
@@ -142,6 +147,7 @@ export interface Indicador { id: string; nome: string }
 export const SELECT_RELATORIO = `
   id, toa_atividade_id, wo_numero, contrato, origem,
   cliente_nome, tipo_pessoa, tipo_residencia, telefones,
+  contato_cliente ( telefone, login ),
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim,
   situacao, situacao_em, inicio, fim, tempo_deslocamento, tec1,
@@ -279,9 +285,33 @@ const CAB_VISITA = [
   'Serviço anterior — equipe', 'Serviço anterior — baixa',
   'Serviço anterior — tipo de serviço',
   'Bloqueado em', 'Importado por', 'Importado em', 'Arquivo', 'Cadastrado por',
+  // 096 — "essa informação deve subir no analítico também quando for
+  // exportar, quem está colocando número e quem não está" (Emanuel).
+  'Melhor contato informado', 'Melhor contato', 'Melhor contato — quem',
+  // 096 — onde a baixa do campo foi dada. Vazio = não houve baixa pelo
+  // celular; "SEM COORDENADA" = o endereço veio do TOA sem lat/lng.
+  'Baixa — distância do endereço (m)', 'Baixa — precisão GPS (m)',
+  'Baixa — dentro do raio', 'Baixa — lat', 'Baixa — lng',
 ]
 
-function linhaVisita(v: VisitaLinha): string[] {
+/** SIM / NÃO / NÃO PERGUNTADO — três respostas, nenhuma vazia calada
+ *  onde o contrato está concluído (regra 6). */
+function contatoInformado(v: VisitaLinha): string {
+  if (v.contato_cliente) return v.contato_cliente.telefone ? 'SIM' : 'NÃO'
+  return v.situacao === 'CONCLUIDA' ? 'NÃO PERGUNTADO' : ''
+}
+
+function colunasLocal(l: LocalBaixa | undefined): string[] {
+  if (!l) return ['', '', '', '', '']
+  return [
+    l.distancia_m == null ? 'SEM COORDENADA' : String(l.distancia_m),
+    l.precisao_m == null ? '' : String(Math.round(Number(l.precisao_m))),
+    l.fora_do_raio == null ? '' : l.fora_do_raio ? `NÃO (raio ${l.raio_m} m)` : 'SIM',
+    String(l.lat), String(l.lng),
+  ]
+}
+
+function linhaVisita(v: VisitaLinha, locais?: Map<string, LocalBaixa>): string[] {
   const inst = v.equipamento_movimento.filter(e => e.operacao === 'INSTALADO')
   const retr = v.equipamento_movimento.filter(e => e.operacao === 'RETIRADO')
   const eq = (l: typeof inst) =>
@@ -325,6 +355,10 @@ function linhaVisita(v: VisitaLinha): string[] {
     v.importacao?.usuario?.nome ?? '', dt(v.importacao?.criado_em ?? null),
     v.importacao?.arquivo_nome ?? '',
     v.criador?.nome ?? '',
+    contatoInformado(v),
+    v.contato_cliente?.telefone ? mascaraTelefone(v.contato_cliente.telefone) : '',
+    v.contato_cliente?.login ?? '',
+    ...colunasLocal(locais?.get(v.id)),
   ]
 }
 
@@ -344,6 +378,7 @@ export function porContrato(
   visitas: VisitaLinha[],
   pontos: Map<string, PontoVisita>,
   indicadores: Indicador[],
+  locais?: Map<string, LocalBaixa>,
 ): string[][] {
   const cab = [
     ...CAB_VISITA,
@@ -357,7 +392,7 @@ export function porContrato(
   return [cab, ...visitas.map(v => {
     const p = pontos.get(v.id)
     return [
-      ...linhaVisita(v),
+      ...linhaVisita(v, locais),
       String(v.ordem_servico.length),
       listaOS(v, o => o.numero_os),
       listaOS(v, o => o.descricao ?? o.tipo_os?.descricao),
@@ -380,6 +415,7 @@ export function porOS(
   visitas: VisitaLinha[],
   pontos: Map<string, PontoVisita>,
   indicadores: Indicador[],
+  locais?: Map<string, LocalBaixa>,
 ): string[][] {
   const cab = [
     ...CAB_VISITA,
@@ -410,7 +446,7 @@ export function porOS(
       // para a soma da planilha não contar em dobro.
       const primeira = !o || o.sequencia === ordenadas[0].sequencia
       saida.push([
-        ...linhaVisita(v),
+        ...linhaVisita(v, locais),
         o ? String(o.sequencia) : '',
         o?.numero_os ?? '',
         o?.descricao ?? o?.tipo_os?.descricao ?? '',

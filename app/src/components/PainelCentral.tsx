@@ -23,15 +23,19 @@ import { useCentral, type Sinal } from '../lib/central'
  * meta do dia × fração da jornada.
  */
 
-const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
+// 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
+// que o controle precisa ver primeiro.
+const ORDEM: Sinal['tipo'][] = ['AJUDA', 'GPS', 'CERCA', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
 const ROTULO: Record<Sinal['tipo'], string> = {
   AJUDA: 'Suporte técnico', TEC1: 'TEC1 perdido', RITMO: 'Abaixo do ritmo',
   QUEBROU: 'Contratos quebrados', MATERIAL: 'Material sinalizado pelo campo',
   ABASTECIMENTO: 'Abastecimento aguardando aprovação',
+  GPS: 'GPS com comportamento anormal', CERCA: 'Cercas e garagens',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
   QUEBROU: 'bg-rose-500', MATERIAL: 'bg-violet-500', ABASTECIMENTO: 'bg-emerald-500',
+  GPS: 'bg-red-600', CERCA: 'bg-indigo-500',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -40,6 +44,8 @@ function destino(s: Sinal): string | null {
   if (s.visita_id) return `/controle/visita/${s.visita_id}`
   if (s.tipo === 'MATERIAL') return '/almoxarifado?aba=sinalizacoes'
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
+  // 097: GPS e cerca abrem o técnico no Monitoramento.
+  if ((s.tipo === 'GPS' || s.tipo === 'CERCA') && s.tecnico_id) return `/controle/monitor?tecnico=${s.tecnico_id}`
   return null
 }
 

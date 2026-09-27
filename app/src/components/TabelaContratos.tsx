@@ -4,6 +4,7 @@ import { SITUACAO_INFO } from '../lib/supabase'
 import { Pill } from './ui'
 import { FaixaJanela } from './telemetria'
 import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
+import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -182,8 +183,45 @@ export function corBaixaAfline(natureza: string | null | undefined): string {
   return 'text-graf-400 ring-graf-600/50'
 }
 
+/**
+ * O selo "onde baixou" (096): a distância entre a baixa do campo e a casa
+ * do cliente, com a precisão do GPS. Verde dentro do raio, vermelho fora.
+ * Sem coordenada do endereço, diz isso — não pinta de verde o que não
+ * sabe (regra 6). Clicar abre o mapa com os dois pontos.
+ */
+export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; compacto?: boolean }) {
+  const fora = local.fora_do_raio === true
+  const semEndereco = local.distancia_m == null
+  const prec = local.precisao_m != null ? ` ±${Math.round(Number(local.precisao_m))} m` : ''
+  const titulo = semEndereco
+    ? `Baixado pelo celular, mas o endereço veio do TOA sem coordenada — não dá para medir.${prec ? ' Precisão do GPS:' + prec : ''}`
+    : `${fora ? 'FORA do raio' : 'Dentro do raio'} de ${local.raio_m} m: o registro mais longe do endereço foi a ${textoDistancia(local.distancia_m)}${prec ? ' (GPS' + prec + ')' : ''}. `
+      + `${local.registros} registro(s) do campo neste contrato${local.registros_fora ? ', ' + local.registros_fora + ' fora do raio' : ''}. Clique para ver no mapa.`
+  const cor = semEndereco
+    ? 'bg-graf-800 text-graf-300 ring-graf-600/50'
+    : fora ? 'bg-af-900/50 text-af-200 ring-af-600/60'
+      : 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/50'
+  return (
+    <a href={linkMapaDaBaixa(local)} target="_blank" rel="noreferrer"
+      onClick={e => e.stopPropagation()} title={titulo}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold
+                  ring-1 hover:brightness-125 ${cor}`}>
+      <span aria-hidden>⌖</span>
+      {semEndereco ? 'sem coord. do endereço'
+        : <>
+            {fora && !compacto && <span className="uppercase tracking-wide">fora do raio ·</span>}
+            <span className="tabular">{textoDistancia(local.distancia_m)}</span>
+            {prec && !compacto && <span className="font-normal opacity-80">{prec}</span>}
+          </>}
+    </a>
+  )
+}
+
 interface Props {
   linhas: ContratoLinha[]
+  /** Onde a baixa do campo foi dada, por visita (096). Sem o mapa, o
+   *  selo não aparece — a tela que não carregou não diz "no local". */
+  locais?: Map<string, LocalBaixa>
   /** Detalhada traz O.S. e baixa para dentro da linha. */
   detalhada?: boolean
   pontos?: Map<string, PontoVisita>
@@ -203,7 +241,7 @@ interface Props {
 }
 
 export function TabelaContratos({
-  linhas, detalhada = true, pontos, porIndicador,
+  linhas, detalhada = true, pontos, porIndicador, locais,
   colunas, aoAbrir, aoMenuContexto, renderAcoes, carregando, vazio,
   selecionados, aoSelecionar, aoSelecionarTodos,
 }: Props) {
@@ -357,6 +395,13 @@ export function TabelaContratos({
                           className="text-[10px] text-sky-400">⚲</span>
                   )}
                 </div>
+                {/* Onde baixou (096). Ao lado da situação porque é a
+                    pergunta que vem junto dela: "concluiu — e estava lá?" */}
+                {locais?.get(v.id) && (
+                  <div className="mt-1">
+                    <SeloLocal local={locais.get(v.id)!} compacto={!detalhada} />
+                  </div>
+                )}
                 {/* ┌─ a palavra do TOA, ao lado da nossa ────────────────┐
                     │ A etiqueta acima é a situação DESTA casa. O TOA tem │
                     │ o próprio "Status da Atividade" e, às vezes, um     │

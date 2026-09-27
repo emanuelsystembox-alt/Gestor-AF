@@ -18,6 +18,7 @@ const Campo = lazy(() => import('./pages/Campo'))
 const Visita = lazy(() => import('./pages/Visita'))
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'))
 const Frota = lazy(() => import('./pages/Frota'))
+const Monitor = lazy(() => import('./pages/Monitor'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -84,6 +85,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Rota /></Protegida>} />
         <Route path="/controle/visita/:id" element={
           <Protegida exige="GESTAO"><VisitaDetalhe /></Protegida>} />
+        <Route path="/controle/monitor" element={
+          <Protegida exige="GESTAO"><Monitor /></Protegida>} />
         <Route path="/controle/equipes" element={
           <Protegida exige="GESTAO"><Equipes /></Protegida>} />
         <Route path="/controle/importar" element={

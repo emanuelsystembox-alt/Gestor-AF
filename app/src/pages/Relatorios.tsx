@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import {
   SELECT_RELATORIO, PONTUACAO_NA_PRIMEIRA, porContrato, porOS, paraCSV,
   type VisitaLinha, type PontoVisita, type Indicador,
@@ -45,6 +46,8 @@ export default function Relatorios() {
       .then(({ data }) => setIndicadores((data ?? []) as Indicador[]))
   }, [])
 
+  const [locais, setLocais] = useState<Map<string, LocalBaixa>>(new Map())
+
   useEffect(() => {
     if (!de || !ate) return
     let vivo = true
@@ -61,7 +64,13 @@ export default function Relatorios() {
     ]).then(([v, p]) => {
       if (!vivo) return
       if (v.error) setErro(v.error.message)
-      else setLinhas((v.data ?? []) as unknown as VisitaLinha[])
+      else {
+        const ls = (v.data ?? []) as unknown as VisitaLinha[]
+        setLinhas(ls)
+        // Onde a baixa do campo foi dada (096) — colunas do analítico.
+        carregarLocais(ls.map(l => l.id)).then(m => { if (vivo) setLocais(m) })
+          .catch(() => { if (vivo) setLocais(new Map()) })
+      }
       const m = new Map<string, PontoVisita>()
       for (const x of (p.data ?? []) as PontoVisita[]) m.set(x.visita_id, x)
       setPontos(m)
@@ -89,9 +98,9 @@ export default function Relatorios() {
 
   const montado = useMemo(
     () => tipo === 'contrato'
-      ? porContrato(filtradas, pontos, indicadores)
-      : porOS(filtradas, pontos, indicadores),
-    [filtradas, pontos, indicadores, tipo])
+      ? porContrato(filtradas, pontos, indicadores, locais)
+      : porOS(filtradas, pontos, indicadores, locais),
+    [filtradas, pontos, indicadores, tipo, locais])
 
   const somaPontos = useMemo(() => {
     let s = 0

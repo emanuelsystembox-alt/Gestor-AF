@@ -307,6 +307,52 @@ muito baixo) são para conferir, **nunca bloqueiam** lançamento.
 
 ---
 
+## Rastro, local da baixa e melhor contato (096, D-170)
+
+**O rastro vai do login ao fim da rota.** Um ponto a cada 2 min andando
+(30 m ou mais), a cada 5 min parado. Com o app fechado só no APK, com a
+permissão "o tempo todo"; no Expo Go, só com o app aberto — e a saída do
+app vira ponto `SAIU` ("app fechado" na trilha, não "parado"). Sem
+contrato produtivo de hoje em aberto, o segundo plano **desliga
+sozinho**: rastrear o técnico fora da rota não foi pedido e é dado
+pessoal de empregado. O técnico **sabe** que é registrado (aviso na
+Agenda). Só a gestão lê o rastro, e só de equipe visível.
+
+**Sair do login apaga a fila de pontos do aparelho.** Quem é o técnico o
+servidor decide pelo login (D-061); ponto de um login não sobe na sessão
+de outro.
+
+**O local da baixa acusa, não bloqueia.** Raio de **200 m**
+(`raio_baixa_m`, Emanuel, 27/09). Vale o registro do campo **mais longe**
+do endereço (baixa de O.S. ou encerramento). Endereço sem coordenada do
+TOA é "sem coordenada", **nunca** "dentro do raio". Baixa pela web não tem
+GPS e não é por isso que está errada. A distância é calculada na leitura,
+não guardada.
+
+**O melhor contato só existe em CONCLUIDA**, e o NÃO também é gravado.
+Três estados: informou / respondeu NÃO / não perguntado. O número mora em
+`contato_cliente`, nunca em `visita_evento` (vai pelo Realtime) nem em
+`visita.telefones` (é do TOA e a importação reescreve).
+
+**Parada, buraco e "sem sinal" são leitura da trilha, não infração.** A
+tela mostra onde e quanto; quem opera julga.
+
+**Cerca: quem desenha decide** para quem vale e se avisa ao sair/entrar
+(097, D-171). O sistema não decide nenhuma das duas. A troca dentro/fora só
+vale com 2 pontos seguidos e precisão até 100 m. Redesenhar recomeça o
+estado sem alerta; arquivar, nunca apagar.
+
+**GPS desligado, negado ou simulado pausa o app do campo.** Simulado também
+trava no BANCO (baixa e status) até chegar um ponto real. Sem satélite não
+trava (D-113). Modo desenvolvedor sozinho não trava; root e salto só
+acusam. iPhone não tem a marca de simulação.
+
+**O rastro só começa depois do "Estou ciente"**, gravado com a versão do
+texto. Texto novo = versão nova. Retenção: **90 dias**, expurgo diário
+(pg_cron).
+
+---
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth'
 import {
   ehTerminal, rotuloEvento, rotuloEvidencia, rotuloSituacao, TIPOS_EVIDENCIA,
 } from '../lib/dominio'
-import { carimbo, duracao, hhmm, isoLocal, tamanho } from '../lib/formato'
+import { carimbo, duracao, hhmm, isoLocal, mascaraTelefone, tamanho } from '../lib/formato'
 import { distanciaM, ondeEstou, type EstadoGps } from '../lib/gps'
 import { pendentesDaVisita, urlAssinada } from '../lib/midia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
@@ -174,6 +174,11 @@ export default function Visita({ route, navigation }: Props) {
   const [miscBusca, setMiscBusca] = useState('')
   // A escolha livre de status (Emanuel, 27/09).
   const [escolhendoStatus, setEscolhendoStatus] = useState(false)
+  // 096: o melhor contato do cliente, perguntado ao CONCLUIR.
+  // null = ninguém perguntou ainda; { telefone: null } = ele disse NÃO.
+  const [contato, setContato] = useState<{ telefone: string | null } | null>(null)
+  const [perguntaContato, setPerguntaContato] = useState<'PERGUNTA' | 'DIGITA' | null>(null)
+  const [telefoneNovo, setTelefoneNovo] = useState('')
 
   const recarregar = useCallback(async () => {
     const [dv, de] = await Promise.all([
@@ -188,6 +193,9 @@ export default function Visita({ route, navigation }: Props) {
     setPendentes(await pendentesDaVisita(id))
     const { data: dm } = await supabase.rpc('miscelanea_do_contrato', { p_visita: id })
     setMiscLancada((dm ?? []) as MiscLancada[])
+    const { data: dc } = await supabase.from('contato_cliente')
+      .select('telefone').eq('visita_id', id).maybeSingle()
+    setContato((dc as { telefone: string | null } | null) ?? null)
   }, [id])
 
   useEffect(() => {
@@ -265,14 +273,20 @@ export default function Visita({ route, navigation }: Props) {
       String(c.codigo).includes(t) || c.descricao.toLowerCase().includes(t))
   }, [codigos, buscaCod])
 
-  async function coordenada(): Promise<{ lat: number; lng: number } | null> {
-    const g = gps?.ok ? gps : await ondeEstou()
+  /** A coordenada vai com a PRECISÃO (096): 35 m do cliente com ±8 m e
+   *  com ±2.000 m contam histórias diferentes na central. */
+  async function coordenada(): Promise<{ lat: number; lng: number; precisao: number | null } | null> {
+    // Lê de novo se a leitura guardada tem mais de 2 min: a baixa afirma
+    // onde ele está AGORA, não onde estava quando abriu a tela.
+    const recente = gps?.ok && Date.now() - gps.posicao.em.getTime() < 2 * 60 * 1000
+    const g = recente && gps?.ok ? gps : await ondeEstou()
     setGps(g)
     if (!g.ok) {
-      setErro(`Sem localização — não dá para baixar. ${g.recado}`)
+      // 097: simulada não é "sem localização" — é outra coisa, com outro remédio.
+      setErro(g.motivo === 'SIMULADO' ? g.recado : `Sem localização — não dá para baixar. ${g.recado}`)
       return null
     }
-    return { lat: g.posicao.lat, lng: g.posicao.lng }
+    return { lat: g.posicao.lat, lng: g.posicao.lng, precisao: g.posicao.precisao }
   }
 
   async function etapa(nova: string, observacao?: string) {
@@ -281,7 +295,7 @@ export default function Visita({ route, navigation }: Props) {
     // Encerrar é a mesma afirmação da baixa, pela outra porta: exige GPS.
     const precisaGps = ehCampo && ehTerminal(nova)
     const c = precisaGps ? await coordenada() : (gps?.ok
-      ? { lat: gps.posicao.lat, lng: gps.posicao.lng } : null)
+      ? { lat: gps.posicao.lat, lng: gps.posicao.lng, precisao: gps.posicao.precisao } : null)
     if (precisaGps && !c) { setSalvando(false); return }
 
     const { error } = await supabase.rpc('registrar_etapa', {
@@ -290,11 +304,32 @@ export default function Visita({ route, navigation }: Props) {
       p_observacao: observacao?.trim() || null,
       p_lat: c?.lat ?? null,
       p_lng: c?.lng ?? null,
+      p_precisao: c?.precisao ?? null,
     })
     if (error) setErro(error.message)
-    else { setPedindoObs(false); setObsEtapa(''); await recarregar() }
+    else {
+      setPedindoObs(false); setObsEtapa(''); await recarregar()
+      // "Só é pra aparecer nesse status" — Emanuel, 27/09.
+      if (nova === 'CONCLUIDA') { setTelefoneNovo(''); setPerguntaContato('PERGUNTA') }
+    }
     setSalvando(false)
   }
+
+  /** Grava a resposta. `null` = ele respondeu NÃO — e isso também fica
+   *  gravado: é o que mostra quem não está colocando o número. */
+  async function responderContato(telefone: string | null) {
+    if (!v) return
+    setSalvando(true); setErro(null)
+    const { error } = await supabase.rpc('informar_contato_cliente', {
+      p_visita: v.id, p_telefone: telefone,
+    })
+    setSalvando(false)
+    if (error) { setErro(error.message); return }
+    setPerguntaContato(null); setTelefoneNovo('')
+    await recarregar()
+  }
+  const digitosTelefone = telefoneNovo.replace(/\D/g, '')
+  const telefoneValido = /^[1-9][1-9]\d{8,9}$/.test(digitosTelefone)
 
   async function confirmarBaixa() {
     if (!osBaixando || !codEscolhido) return
@@ -310,6 +345,7 @@ export default function Visita({ route, navigation }: Props) {
       p_situacao: null,
       p_lat: c.lat,
       p_lng: c.lng,
+      p_precisao: c.precisao,
     })
     if (error) setErro(error.message)
     else { fecharBaixa(); await recarregar() }
@@ -532,6 +568,22 @@ export default function Visita({ route, navigation }: Props) {
               />
             ))}
           </View>
+
+          {/* 096: o melhor contato, quando concluído. Sem resposta ainda
+              (o app fechou no meio, por exemplo), dá para responder aqui. */}
+          {v.situacao === 'CONCLUIDA' && (
+            contato ? (
+              <Text style={e.contatoLinha}>
+                Melhor contato: {contato.telefone
+                  ? mascaraTelefone(contato.telefone) : 'não informado'}
+              </Text>
+            ) : podeAnexar ? (
+              <Pressable onPress={() => { setTelefoneNovo(''); setPerguntaContato('PERGUNTA') }}
+                hitSlop={8} accessibilityRole="button">
+                <Text style={e.contatoAcao}>Informar o melhor contato do cliente ›</Text>
+              </Pressable>
+            ) : null
+          )}
         </Cartao>
 
         {/* A palavra do TOA, como veio, ao lado da nossa etiqueta — as
@@ -893,6 +945,55 @@ export default function Visita({ route, navigation }: Props) {
         </View>
       )}
       </KeyboardAvoidingView>
+
+      {/* ---------- o melhor contato do cliente (096) ----------
+          Não fecha tocando fora nem no "voltar": a pergunta pede um SIM
+          ou um NÃO — "o ideal é que todos apertem sim" (Emanuel, 27/09),
+          e o NÃO também é resposta, gravada. */}
+      <Modal visible={perguntaContato !== null} animationType="fade" transparent
+        onRequestClose={() => {}}>
+        <KeyboardAvoidingView style={e.centroModal}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={e.caixaContato}>
+            <Text style={e.folhaTitulo}>Contrato concluído</Text>
+            {perguntaContato === 'PERGUNTA' ? (
+              <>
+                <Text style={e.perguntaContato}>
+                  Você deseja subir o melhor contato do cliente?
+                </Text>
+                {erro && <Aviso tipo="erro">{erro}</Aviso>}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <Botao titulo="NÃO" tom="contorno" grande style={{ flex: 1 }}
+                    carregando={salvando} aoTocar={() => responderContato(null)} />
+                  <Botao titulo="SIM" tom="sucesso" grande style={{ flex: 1.4 }}
+                    desativado={salvando}
+                    aoTocar={() => { setErro(null); setPerguntaContato('DIGITA') }} />
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={e.folhaMiudo}>Telefone com DDD</Text>
+                <TextInput
+                  autoFocus value={telefoneNovo}
+                  onChangeText={t => setTelefoneNovo(mascaraTelefone(t))}
+                  placeholder="(92) 99999-9999"
+                  placeholderTextColor={cor.graf300}
+                  keyboardType="phone-pad" maxLength={15}
+                  style={[e.campo, e.campoTelefone]}
+                />
+                {erro && <Aviso tipo="erro">{erro}</Aviso>}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <Botao titulo="Voltar" tom="contorno" style={{ flex: 1 }}
+                    desativado={salvando} aoTocar={() => setPerguntaContato('PERGUNTA')} />
+                  <Botao titulo="Salvar contato" tom="sucesso" style={{ flex: 1.6 }}
+                    desativado={!telefoneValido} carregando={salvando}
+                    aoTocar={() => responderContato(digitosTelefone)} />
+                </View>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ---------- escolher o status (Emanuel, 27/09) ---------- */}
       <Modal visible={escolhendoStatus} animationType="slide" transparent
@@ -1264,6 +1365,15 @@ const e = StyleSheet.create({
   escolhido: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
 
   fundoModal: { flex: 1, backgroundColor: 'rgba(15,17,21,0.4)' },
+  centroModal: {
+    flex: 1, justifyContent: 'center', padding: 20,
+    backgroundColor: 'rgba(15,17,21,0.5)',
+  },
+  caixaContato: { backgroundColor: cor.branco, borderRadius: 20, padding: 18, gap: 8 },
+  perguntaContato: { fontSize: 17, fontWeight: '700', color: cor.tinta, lineHeight: 23 },
+  campoTelefone: { fontSize: 22, fontWeight: '700', letterSpacing: 0.5, minHeight: 56 },
+  contatoLinha: { fontSize: 14, fontWeight: '600', color: cor.graf600, marginTop: 12 },
+  contatoAcao: { fontSize: 14, fontWeight: '700', color: cor.af600, marginTop: 12 },
   folha: {
     backgroundColor: cor.branco, padding: 16, gap: 8,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,

@@ -14,6 +14,8 @@ import {
   TabelaContratos, SELECT_CONTRATO,
   type ContratoLinha, type PontoVisita,
 } from '../components/TabelaContratos'
+import { BotaoAtualizar } from '../components/BotaoAtualizar'
+import { textoDistancia, useLocaisDaBaixa } from '../lib/localBaixa'
 import {
   FILTRO_VAZIO, SEM_JANELA, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
   type FiltroContrato,
@@ -310,6 +312,10 @@ export default function Equipes() {
 
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  // "Atualizar" forçado (Emanuel, 27/09): sobe de 1 a cada clique e
+  // recarrega o que não mora no `recarregar` (pontos, local da baixa).
+  const [versao, setVersao] = useState(0)
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
 
   // Pontuação e marcadores do dia: a linha do contrato mostra os dois
   // (D-095), e sem eles a mesma linha diria menos aqui do que em
@@ -404,7 +410,7 @@ export default function Equipes() {
       for (const x of (d ?? []) as PontoVisita[]) m.set(x.visita_id, x)
       setPontos(m)
     })
-  }, [data])
+  }, [data, versao])
 
   // Cada carregamento carimba um número; resposta de pedido velho é
   // descartada. Trocar de data rápido não embaralha mais o painel.
@@ -476,6 +482,7 @@ export default function Equipes() {
     setLogins((lg.data ?? []) as LoginEquipe[])
     setSemDono((sd.data ?? []) as LoginSemDono[])
     setCarregando(false)
+    setAtualizadoEm(new Date())
   }
   useEffect(() => { recarregar() }, [data])
 
@@ -495,6 +502,31 @@ export default function Equipes() {
     if (meu !== pedido.current) return
     if (error) { setErro(error.message); setContratosDia([]); return }
     setContratosDia((d ?? []) as unknown as ContratoDia[])
+  }
+
+  // Onde cada baixa do dia foi dada (096). Um pedido para o dia inteiro:
+  // o cartão da equipe resume, a gaveta mostra contrato a contrato.
+  const locais = useLocaisDaBaixa(useMemo(
+    () => (contratosDia ?? []).map(c => c.id), [contratosDia]), versao)
+  const localPorEquipe = useMemo(() => {
+    const m = new Map<string, { n: number; fora: number; pior: number | null }>()
+    for (const c of contratosDia ?? []) {
+      const l = locais.get(c.id)
+      if (!l || !c.equipe_id) continue
+      const r = m.get(c.equipe_id) ?? { n: 0, fora: 0, pior: null }
+      r.n++
+      if (l.fora_do_raio) {
+        r.fora++
+        if (l.distancia_m != null && (r.pior == null || l.distancia_m > r.pior)) r.pior = l.distancia_m
+      }
+      m.set(c.equipe_id, r)
+    }
+    return m
+  }, [contratosDia, locais])
+
+  function atualizarTudo() {
+    setVersao(v => v + 1)
+    recarregar()
   }
 
   async function abrir(e: EquipePainel) {
@@ -683,6 +715,8 @@ export default function Equipes() {
       <div className="flex items-center gap-2">
         <input type="date" value={data} onChange={e => setData(e.target.value)}
           className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+        <BotaoAtualizar aoAtualizar={atualizarTudo} carregando={carregando}
+          atualizadoEm={atualizadoEm} />
         <button onClick={() => inputRef.current?.click()}
           className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium text-white hover:bg-af-500">
           Importar planilha
@@ -1164,6 +1198,32 @@ export default function Equipes() {
                                             )}
                                           </dd>
 
+                                          {/* Onde baixou (096): resumo do dia. O
+                                              detalhe, contrato a contrato, está
+                                              na gaveta. Sem baixa pelo celular,
+                                              a linha não aparece — não é "no raio". */}
+                                          {(() => {
+                                            const l = localPorEquipe.get(e.equipe_id)
+                                            if (!l) return null
+                                            return (
+                                              <>
+                                                <dt className="text-graf-600">LOCAL</dt>
+                                                <dd className="min-w-0"
+                                                  title="Distância entre a baixa dada pelo celular e o endereço do cliente. Abra a equipe para ver contrato a contrato.">
+                                                  <span className="tabular text-graf-200">
+                                                    {l.n - l.fora} de {l.n} no raio
+                                                  </span>
+                                                  {l.fora > 0 && (
+                                                    <span className="ml-1.5 rounded bg-af-900/50 px-1 text-[9px]
+                                                                     font-semibold uppercase text-af-200">
+                                                      {l.fora} fora{l.pior != null ? ` · até ${textoDistancia(l.pior)}` : ''}
+                                                    </span>
+                                                  )}
+                                                </dd>
+                                              </>
+                                            )
+                                          })()}
+
                                           <dt className="text-graf-600">PONTOS</dt>
                                           <dd className="min-w-0">
                                             {/* Zero e desconhecido não são a mesma coisa
@@ -1354,6 +1414,7 @@ export default function Equipes() {
                                           : detalhe[e.equipe_id] ?? []}
                                         colunas={{ equipe: false }}
                                         pontos={pontos}
+                                        locais={locais}
                                         porIndicador={porIndicador}
                                         carregando={filtrando > 0
                                           ? contratosDia === null
