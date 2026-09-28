@@ -6,6 +6,17 @@ import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { equipeRotulo, mascaraTelefone, pts } from '../lib/formato'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { SeloLocal } from './TabelaContratos'
+import type { AcaoContrato } from './MenuContrato'
+
+/** O código de baixa com o destino dele (D-097): é o destino que diz
+ *  para qual situação final o código serve (098). */
+export interface CodigoDeBaixa {
+  codigo: number; descricao: string; situacao_destino: string | null
+}
+
+/** As três situações que encerram — as únicas com código de baixa (098).
+ *  A lista canônica é `situacoes_terminais()` no banco; esta é a cara dela. */
+const TERMINAIS = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'] as const
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -120,24 +131,28 @@ function Dado({ r, v, largo }: { r: string; v: React.ReactNode; largo?: boolean 
 }
 
 export function ContratoModal({
-  id, indicadores, codigos, conjunto, equipes, pontos, onFechar, onMudou,
+  id, indicadores, codigos, conjunto, equipes, pontos, onFechar, onMudou, acaoInicial,
 }: {
   id: string
   indicadores: { id: string; nome: string }[]
-  codigos: { codigo: number; descricao: string }[]
+  codigos: CodigoDeBaixa[]
   conjunto: string | null
   equipes: { id: string; codigo: string; nome: string }[]
   pontos?: { pontos_claro: number | null; edificacao: string; edificacao_de: string } | null
   onFechar: () => void
   onMudou: () => void
+  /** Veio do menu do botão direito: abre já na ação escolhida. */
+  acaoInicial?: AcaoContrato | null
 }) {
   const [v, setV] = useState<Visita | null>(null)
-  const [aba, setAba] = useState<'detalhe' | 'historico' | 'marcadores'>('detalhe')
+  const [aba, setAba] = useState<'detalhe' | 'historico' | 'marcadores'>(
+    acaoInicial === 'marcadores' ? 'marcadores' : 'detalhe')
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [acao, setAcao] = useState<
-    'baixar' | 'transferir' | 'excluir' | 'editar' | 'voltar' | 'nova_os' | null>(null)
+    'baixar' | 'transferir' | 'excluir' | 'editar' | 'status' | 'nova_os' | null>(
+    acaoInicial && acaoInicial !== 'marcadores' ? acaoInicial : null)
 
   // Baixa — uma linha por O.S., todas de uma vez.
   //
@@ -158,7 +173,7 @@ export function ContratoModal({
   const [confirmaE, setConfirmaE] = useState('')
   // edição do cadastro — o que o sistema atual não deixa fazer
   const [ed, setEd] = useState<Record<string, string>>({})
-  // voltar contrato
+  // mudar status (o antigo "Voltar")
   const [situacaoAlvo, setSituacaoAlvo] = useState<Situacao | ''>('')
   const [motivoV, setMotivoV] = useState('')
   // nova O.S. no contrato existente
@@ -182,6 +197,9 @@ export function ContratoModal({
         codigo: o.baixa_afline ? String(o.baixa_afline.codigo) : '',
         sub: '', obs: o.baixa_observacao ?? '',
       }])))
+      // Encerrado: a baixa já parte da situação em que ele está. Aberto:
+      // quem baixa escolhe como termina — o sistema não escolhe por ele.
+      setSituacaoFinal((TERMINAIS as readonly string[]).includes(d.situacao) ? d.situacao : '')
     }
   }
   useEffect(() => { carregar() }, [id])
@@ -317,11 +335,11 @@ export function ContratoModal({
                          hover:border-af-600 hover:text-af-400">
               + O.S.
             </button>
-            <button onClick={() => setAcao(acao === 'voltar' ? null : 'voltar')}
-              title="Voltar a situação do contrato — o sistema da CLARO não faz isso"
+            <button onClick={() => setAcao(acao === 'status' ? null : 'status')}
+              title="Levar o contrato para o status que você escolher — o sistema da CLARO não volta status"
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400">
-              Voltar
+              Mudar status
             </button>
             <button onClick={() => setAcao(acao === 'transferir' ? null : 'transferir')}
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
@@ -373,9 +391,19 @@ export function ContratoModal({
           {acao === 'baixar' && v && (() => {
             const ordenadas = [...v.ordem_servico].sort((a, b) => a.sequencia - b.sequencia)
             const preenchidas = ordenadas.filter(o => baixas[o.id]?.codigo).length
-            const terminal = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
             const faltam = ordenadas.length - preenchidas
-            const bloqueiaSituacao = terminal.includes(situacaoFinal) && faltam > 0
+            // 098: o código serve a UMA situação final (o destino dele, D-097).
+            // 409 não cancela; código de cancelamento não conclui.
+            const doDestino = codigos.filter(c => c.situacao_destino === situacaoFinal)
+            const destinoDe = new Map(codigos.map(c => [String(c.codigo), c.situacao_destino]))
+            const rotuloFinal = SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal
+            const trocarFinal = (s: string) => {
+              setSituacaoFinal(s)
+              // O código que não serve à situação nova sai — deixá-lo lá seria
+              // oferecer um botão que o banco recusa.
+              setBaixas(a => Object.fromEntries(Object.entries(a).map(([k, b]) =>
+                [k, destinoDe.get(b.codigo) === s ? b : { ...b, codigo: '', sub: '' }])))
+            }
 
             return (
             <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
@@ -385,11 +413,42 @@ export function ContratoModal({
                   esta é a baixa da AFLINE — a da operadora vem do TOA e não se edita
                 </span>
               </p>
-              <p className="mb-2.5 text-[11px] text-graf-500">
-                Concluir, cancelar ou reagendar exige o código de <strong>todas</strong> as
-                {' '}{ordenadas.length} O.S. — {preenchidas} preenchida(s).
+              <p className="mb-2.5 text-[11px] text-graf-400">
+                Código de baixa só entra para <strong>concluir</strong>, <strong>cancelar</strong> ou
+                {' '}<strong>reagendar</strong> — e cada código serve a uma delas. Outro status,
+                sem código, é pelo{' '}
+                <button onClick={() => setAcao('status')}
+                  className="text-af-400 underline underline-offset-2">Mudar status</button>.
               </p>
 
+              {/* ---- 1. como o contrato termina ---- */}
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[11px] text-graf-400">Situação final</span>
+                {TERMINAIS.map(s => {
+                  const ativo = situacaoFinal === s
+                  const cor = SITUACAO_INFO[s]?.cor ?? '#64748b'
+                  return (
+                    <button key={s} onClick={() => trocarFinal(s)} aria-pressed={ativo}
+                      style={ativo ? { borderColor: cor, color: cor } : undefined}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${ativo
+                        ? 'bg-graf-850' : 'border-graf-700 text-graf-400 hover:text-graf-200'}`}>
+                      {SITUACAO_INFO[s]?.label ?? s}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {!situacaoFinal ? (
+                <p className="rounded-md border border-dashed border-graf-700 px-3 py-4 text-center
+                              text-xs text-graf-400">
+                  Escolha a situação final — a lista de códigos depende dela.
+                </p>
+              ) : (<>
+              <p className="mb-2 text-[11px] text-graf-400">
+                {rotuloFinal} exige o código de <strong>todas</strong> as {ordenadas.length} O.S.
+                {' '}— {preenchidas} preenchida(s). {doDestino.length} código(s) de
+                {' '}{rotuloFinal.toLowerCase()}.
+              </p>
               <div className="space-y-2">
                 {ordenadas.map(o => {
                   const b = baixas[o.id] ?? { codigo: '', sub: '', obs: '' }
@@ -407,8 +466,8 @@ export function ContratoModal({
                           {o.descricao ?? o.tipo_os?.descricao ?? '—'}
                         </span>
                         {o.baixa_afline && (
-                          <span className="text-[10px] text-graf-600">
-                            já baixada em {quando(o.baixa_em)}
+                          <span className="text-[10px] text-graf-400">
+                            baixada em {quando(o.baixa_em)} com {o.baixa_afline.codigo}
                           </span>
                         )}
                       </div>
@@ -418,7 +477,7 @@ export function ContratoModal({
                           <select value={b.codigo} className={`${campo} w-64`}
                             onChange={e => mudar({ codigo: e.target.value, sub: '' })}>
                             <option value="">— escolha —</option>
-                            {codigos.map(c => (
+                            {doDestino.map(c => (
                               <option key={c.codigo} value={c.codigo}>
                                 {c.codigo} · {c.descricao}
                               </option>
@@ -429,7 +488,7 @@ export function ContratoModal({
                           <span className="mb-1 block">
                             Sub-falha
                             {b.codigo && subs.length === 0 &&
-                              <span className="ml-1 text-graf-600">(nenhuma)</span>}
+                              <span className="ml-1 text-graf-400">(nenhuma)</span>}
                           </span>
                           <select value={b.sub} disabled={!subs.length}
                             onChange={e => mudar({ sub: e.target.value })}
@@ -449,60 +508,29 @@ export function ContratoModal({
                 })}
               </div>
 
-              <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-graf-800 pt-3">
-                <label className="text-[11px] text-graf-400">
-                  <span className="mb-1 block">Situação do contrato depois da baixa</span>
-                  <select value={situacaoFinal} className={`${campo} w-56`}
-                    onChange={e => setSituacaoFinal(e.target.value)}>
-                    <option value="">— não mudar —</option>
-                    {SITUACOES.map(x => (
-                      <option key={x} value={x}>{SITUACAO_INFO[x]?.label ?? x}</option>
-                    ))}
-                  </select>
-                </label>
-                {bloqueiaSituacao && (
-                  <p className="pb-1.5 text-[11px] text-amber-300">
-                    Faltam {faltam} O.S. sem código — o banco vai recusar
-                    {' '}{SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal}.
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-graf-800 pt-3">
+                {faltam > 0 && (
+                  <p className="text-[11px] text-amber-300">
+                    Faltam {faltam} O.S. sem código de {rotuloFinal.toLowerCase()}.
                   </p>
                 )}
-                {/* Só o status, sem código (Emanuel, 27/09): "quando o
-                    controlador quiser mudar apenas o contrato de status ele
-                    pode, não é obrigatório ter código de baixa". Encerrar
-                    continua exigindo todas as O.S. com código — é regra do
-                    banco (exige_todas_baixadas), e a mensagem acima avisa.
-                    Encerrado volta pelo "Voltar", que pede motivo (D-030). */}
-                {preenchidas === 0 && situacaoFinal && situacaoFinal !== v.situacao && (
-                  <button disabled={ocupado || bloqueiaSituacao || !EM_ABERTO.includes(v.situacao)}
-                    title={!EM_ABERTO.includes(v.situacao)
-                      ? 'Contrato encerrado: use Voltar, que pede o motivo' : undefined}
-                    onClick={() => comAviso(() => supabase.rpc('registrar_etapa', {
-                      p_visita: id, p_situacao: situacaoFinal, p_observacao: null,
-                      p_lat: null, p_lng: null,
-                    }), `Status mudado para ${SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal}.`)}
-                    className="ml-auto rounded-md border border-af-600 px-4 py-1.5 text-xs font-medium
-                               text-af-300 hover:bg-af-600/10 disabled:opacity-50">
-                    Só mudar o status
-                  </button>
-                )}
-                <button disabled={ocupado || preenchidas === 0 || bloqueiaSituacao}
+                <button disabled={ocupado || faltam > 0}
                   onClick={() => comAviso(() => supabase.rpc('baixar_visita', {
                     p_visita: id,
-                    p_itens: ordenadas
-                      .filter(o => baixas[o.id]?.codigo)
-                      .map(o => ({
-                        os_id: o.id,
-                        codigo: Number(baixas[o.id].codigo),
-                        sub_falha_id: baixas[o.id].sub || null,
-                        observacao: baixas[o.id].obs || null,
-                      })),
-                    p_situacao: situacaoFinal || null,
-                  }), `Baixa registrada em ${preenchidas} O.S.`)}
-                  className={`${preenchidas === 0 && situacaoFinal ? '' : 'ml-auto'} rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
-                             text-white hover:bg-af-500 disabled:opacity-50`}>
-                  Confirmar baixa de {preenchidas} O.S.
+                    p_itens: ordenadas.map(o => ({
+                      os_id: o.id,
+                      codigo: Number(baixas[o.id].codigo),
+                      sub_falha_id: baixas[o.id].sub || null,
+                      observacao: baixas[o.id].obs || null,
+                    })),
+                    p_situacao: situacaoFinal,
+                  }), `Baixa registrada: ${preenchidas} O.S., contrato ${rotuloFinal.toLowerCase()}.`)}
+                  className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
+                             text-white hover:bg-af-500 disabled:opacity-50">
+                  Baixar {ordenadas.length} O.S. como {rotuloFinal.toLowerCase()}
                 </button>
               </div>
+              </>)}
             </div>
             )
           })()}
@@ -722,42 +750,88 @@ export function ContratoModal({
             </div>
           )}
 
-          {acao === 'voltar' && v && (
+          {/* ┌─ Mudar status (o antigo "Voltar") ────────────────────────┐
+              │ > "deve aparecer a opção mudar status, para o controlador │
+              │ >  devolver para o status que ele achar melhor" — Emanuel │
+              │                                                           │
+              │ Uma porta na tela, três no banco — quem decide é ele:     │
+              │  · concluir/cancelar/reagendar é BAIXA: exige código de   │
+              │    todas as O.S., do destino certo (098). Vai para lá.    │
+              │  · encerrado voltando: `reverter_situacao`, com motivo    │
+              │    obrigatório (D-030).                                   │
+              │  · aberto para aberto: `registrar_etapa`, observação      │
+              │    opcional — e ela vira aviso no celular do técnico.     │
+              └───────────────────────────────────────────────────────────┘ */}
+          {acao === 'status' && v && (() => {
+            const encerrado = !EM_ABERTO.includes(v.situacao)
+            const alvoTerminal = (TERMINAIS as readonly string[]).includes(situacaoAlvo)
+            const rotulo = (s: string) => SITUACAO_INFO[s as Situacao]?.label ?? s
+            return (
             <div className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-3">
-              <p className="text-xs font-medium text-amber-200">Voltar o contrato</p>
+              <p className="text-xs font-medium text-amber-200">Mudar status</p>
               <p className="mt-1 text-[11px] text-amber-200/80">
-                O sistema da CLARO não volta situação. O nosso volta — e por isso
-                registra quem voltou, quando e por quê. Está hoje em{' '}
-                <strong>{SITUACAO_INFO[v.situacao]?.label ?? v.situacao}</strong>.
+                Está hoje em <strong>{rotulo(v.situacao)}</strong>. O sistema da CLARO não volta
+                status; o nosso volta — e registra quem mudou, quando e por quê.
               </p>
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <label className="text-[11px] text-graf-400">
-                  <span className="mb-1 block">Voltar para</span>
+                  <span className="mb-1 block">Novo status</span>
                   <select value={situacaoAlvo} className={`${campo} w-48`}
                     onChange={e => setSituacaoAlvo(e.target.value as Situacao)}>
                     <option value="">— escolha —</option>
                     {SITUACOES.filter(s => s !== v.situacao).map(s => (
-                      <option key={s} value={s}>{SITUACAO_INFO[s]?.label ?? s}</option>
+                      <option key={s} value={s}>{rotulo(s)}</option>
                     ))}
                   </select>
                 </label>
-                <label className="min-w-64 flex-1 text-[11px] text-graf-400">
-                  <span className="mb-1 block">Motivo (obrigatório)</span>
-                  <input value={motivoV} onChange={e => setMotivoV(e.target.value)}
-                    placeholder="Baixa indevida, técnico marcou errado, reabertura…"
-                    className={`${campo} w-full`} />
-                </label>
-                <button disabled={ocupado || !situacaoAlvo || !motivoV.trim()}
-                  onClick={() => comAviso(() => supabase.rpc('reverter_situacao', {
-                    p_visita: id, p_situacao: situacaoAlvo, p_motivo: motivoV.trim(),
-                  }), 'Contrato voltado.')}
-                  className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-medium text-white
-                             hover:bg-amber-500 disabled:opacity-50">
-                  Voltar contrato
-                </button>
+
+                {alvoTerminal ? (
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    <p className="text-[11px] text-amber-200/90">
+                      {rotulo(situacaoAlvo)} é baixa: pede o código de cada O.S.
+                    </p>
+                    <button disabled={!v.ordem_servico.length}
+                      onClick={() => {
+                        setSituacaoFinal(situacaoAlvo)
+                        setBaixas(a => Object.fromEntries(Object.entries(a).map(([k, b]) => [k,
+                          codigos.find(c => String(c.codigo) === b.codigo)?.situacao_destino === situacaoAlvo
+                            ? b : { ...b, codigo: '', sub: '' }])))
+                        setAcao('baixar')
+                      }}
+                      className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                                 hover:bg-af-500 disabled:opacity-50">
+                      Ir para a baixa
+                    </button>
+                  </div>
+                ) : (<>
+                  <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                    <span className="mb-1 block">
+                      {encerrado ? 'Motivo (obrigatório)' : 'Observação para o técnico (opcional)'}
+                    </span>
+                    <input value={motivoV} onChange={e => setMotivoV(e.target.value)}
+                      placeholder={encerrado
+                        ? 'Baixa indevida, técnico marcou errado, reabertura…'
+                        : 'Vai como aviso no celular do técnico'}
+                      className={`${campo} w-full`} />
+                  </label>
+                  <button disabled={ocupado || !situacaoAlvo || (encerrado && !motivoV.trim())}
+                    onClick={() => comAviso(() => encerrado
+                      ? supabase.rpc('reverter_situacao', {
+                          p_visita: id, p_situacao: situacaoAlvo, p_motivo: motivoV.trim(),
+                        })
+                      : supabase.rpc('registrar_etapa', {
+                          p_visita: id, p_situacao: situacaoAlvo,
+                          p_observacao: motivoV.trim() || null, p_lat: null, p_lng: null,
+                        }), `Status mudado para ${rotulo(situacaoAlvo)}.`)}
+                    className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-medium text-white
+                               hover:bg-amber-500 disabled:opacity-50">
+                    Mudar status
+                  </button>
+                </>)}
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Exclusao DEFINITIVA (D-101): aqui e no lote, a mesma coisa.
               Duas travas -- motivo e a palavra APAGAR -- porque nao ha

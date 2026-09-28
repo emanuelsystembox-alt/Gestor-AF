@@ -3,7 +3,7 @@ import * as Location from 'expo-location'
 import * as Device from 'expo-device'
 import { supabase } from './supabase'
 import { anotar, enviar } from './rastro'
-import { ehSimulada } from './gps'
+import { ehSimulada, lerPosicao } from './gps'
 
 /**
  * O antifraude do GPS (097, D-171).
@@ -41,10 +41,6 @@ export type EstadoGuarda = 'VERIFICANDO' | 'OK' | 'DESLIGADO' | 'SEM_PERMISSAO' 
 
 interface Leitura { estado: EstadoGuarda; loc: Location.LocationObject | null; podePedir: boolean }
 
-function comPrazo<T>(p: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), ms))])
-}
-
 /** Lê o estado do GPS agora. `pedir` = pode abrir o pedido de permissão. */
 export async function verificarGps(pedir = false): Promise<Leitura> {
   try {
@@ -58,10 +54,10 @@ export async function verificarGps(pedir = false): Promise<Leitura> {
     if (!(await Location.hasServicesEnabledAsync())) {
       return { estado: 'DESLIGADO', loc: null, podePedir: true }
     }
-    // Leitura fresca: com app de local fictício ligado, é ela que vem marcada.
-    const loc = await comPrazo(
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), 8000)
-      ?? await Location.getLastKnownPositionAsync({ maxAge: 2 * 60 * 1000 }).catch(() => null)
+    // Leitura de até 90 s: com app de local fictício ligado, é ela que vem
+    // marcada. Pela leitura única (`lerPosicao`, 098) — a conferência de
+    // 20 em 20 s não liga o GPS de novo a cada volta.
+    const loc = await lerPosicao({ maxIdadeMs: 90 * 1000, prazoMs: 8000 })
     if (ehSimulada(loc)) return { estado: 'SIMULADO', loc, podePedir: true }
     // Sem leitura ainda (sem satélite) conta como OK — D-113.
     return { estado: 'OK', loc, podePedir: true }

@@ -673,3 +673,10 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── A entrada (Login) — o modelo do painel de indicadores do Grupo AFLINE.
+   Fontes da própria página; o resto do sistema segue em Inter. ── */
+.entrada { font-family: "Barlow", var(--font-sans); }
+@keyframes afFlutua { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+@keyframes afPulsa { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.5) } 100% { box-shadow: 0 0 0 10px rgba(22,163,74,0) } }
+.entrada-titulo { font-family: "Exo 2", var(--font-sans); }

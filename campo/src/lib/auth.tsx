@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { encerrarRastro } from './rastro'
 import { esquecerAntifraude } from './antifraude'
+import { esquecerPosicao } from './gps'
 
 export type Papel =
   | 'ADMIN' | 'COP' | 'CONTROLADOR' | 'SUPERVISOR'
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // o próximo (096).
       await encerrarRastro().catch(() => {})
       esquecerAntifraude()
+      esquecerPosicao()
       await supabase.auth.signOut()
     },
   }

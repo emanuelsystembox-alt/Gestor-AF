@@ -2,10 +2,14 @@ import { StatusBar } from 'expo-status-bar'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { useEffect } from 'react'
 import { View } from 'react-native'
 import { AuthProvider, useAuth } from './src/lib/auth'
 import { useRastro } from './src/lib/useRastro'
 import { GuardaGps } from './src/ui/GuardaGps'
+import { Tropeco } from './src/ui/Tropeco'
+import { conferirFechamentoAnterior, instalarRedeDeErros } from './src/lib/diagnostico'
+import { anotarQueDerrubou } from './src/lib/rastro'
 import { AvisoRastro, useCienciaRastro } from './src/ui/AvisoRastro'
 import Entrar from './src/telas/Entrar'
 import Agenda from './src/telas/Agenda'
@@ -23,6 +27,9 @@ import type { Pilha } from './src/navegacao'
 
 const Stack = createNativeStackNavigator<Pilha>()
 
+// 098: erro fatal de JavaScript vira tela com a mensagem, não app fechado.
+instalarRedeDeErros()
+
 function Aplicacao() {
   const { session, carregando, tecnicoId, ehCampo } = useAuth()
   const ehTecnico = !!session && !!tecnicoId
@@ -30,6 +37,15 @@ function Aplicacao() {
   const { ciente, darCiencia } = useCienciaRastro(session?.user.id ?? null, ehTecnico)
   // O rastro do dia (096): só para login de técnico, e depois da ciência.
   useRastro(ehTecnico && ciente === true)
+
+  // 098: o app fechou no meio de um passo da última vez? Sobe ao banco
+  // (precisa do login) — e, se foi ao ligar a rota em segundo plano, não
+  // tenta de novo neste celular. Ver lib/diagnostico.ts.
+  const usuario = session?.user.id ?? null
+  useEffect(() => {
+    if (!usuario) return
+    conferirFechamentoAnterior().then(anotarQueDerrubou).catch(() => {})
+  }, [usuario])
 
   if (carregando && !session) {
     return (
@@ -44,6 +60,7 @@ function Aplicacao() {
   return (
     // 097: GPS desligado, negado ou simulado pausa o app de quem é do campo.
     <GuardaGps ativo={ehTecnico && ehCampo}>
+    <Tropeco>
     <NavigationContainer>
       {/* `headerShown: false` porque cada tela desenha o próprio
           cabeçalho: no campo o topo carrega situação, janela e contrato
@@ -64,6 +81,7 @@ function Aplicacao() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    </Tropeco>
     <AvisoRastro visivel={ehTecnico && ciente === false} aoCiente={darCiencia} />
     </GuardaGps>
   )

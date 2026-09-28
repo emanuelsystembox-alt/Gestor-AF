@@ -303,11 +303,23 @@ export function TabelaContratos({
 
         {!carregando && linhas.map(v => {
           const improd = v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
-          const cor = SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
+          // ┌─ jornada é informativo, não contrato ─────────────────────┐
+          // │ Refeição, Na Base, Almoxarifado… vêm do TOA como atividade │
+          // │ e ficam fora de toda conta (volume, produtividade, pontos, │
+          // │ "um status por técnico"). Na lista elas apareciam com "—"  │
+          // │ no lugar do contrato e a etiqueta EM EXECUÇÃO pulsando —   │
+          // │ pareciam contrato quebrado (Emanuel, 27/09: "não sei por   │
+          // │ que não tem nome […] tem que ser só um informativo").      │
+          // │ Agora: o NOME da atividade na coluna do contrato, cinza,   │
+          // │ sem etiqueta de situação e sem pulso. Ver D-173.           │
+          // └────────────────────────────────────────────────────────────┘
+          const jornada = v.tipo_atividade?.natureza === 'JORNADA'
+          const cor = jornada ? '#94a3b8' : SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
           // O que está acontecendo AGORA respira: o trilho e a bolinha
           // da etiqueta pulsam. Só estas duas situações — se a lista
           // inteira pulsasse, o pulso não separaria nada.
-          const vivo = v.situacao === 'EM_EXECUCAO' || v.situacao === 'EM_DESLOCAMENTO'
+          const vivo = !jornada
+            && (v.situacao === 'EM_EXECUCAO' || v.situacao === 'EM_DESLOCAMENTO')
           const marcados = (v.visita_marcador ?? [])
             .map(m => ({ m, ind: porIndicador?.get(m.indicador_id) }))
             .filter(x => x.ind)
@@ -334,7 +346,16 @@ export function TabelaContratos({
                 </td>
               )}
               <td className="tabular whitespace-nowrap px-3 py-2 align-top">
-                <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
+                {jornada && !v.contrato ? (
+                  <>
+                    <div className="font-medium text-graf-300">
+                      {v.tipo_atividade?.nome ?? 'Jornada'}
+                    </div>
+                    <div className="text-[10px] text-graf-400">jornada · não conta</div>
+                  </>
+                ) : (
+                  <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
+                )}
                 {detalhada && v.wo_numero && (
                   <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
                 )}
@@ -378,7 +399,13 @@ export function TabelaContratos({
 
               <td className="px-3 py-2 align-top">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Pill situacao={v.situacao} vivo={vivo} />
+                  {jornada ? (
+                    <span title="Atividade de jornada: só informa onde o técnico estava. Não entra em volume, produtividade nem pontos."
+                      className="rounded-full bg-graf-800 px-2 py-0.5 text-[10px] font-semibold
+                                 uppercase tracking-wide text-graf-300">
+                      Informativo
+                    </span>
+                  ) : <Pill situacao={v.situacao} vivo={vivo} />}
                   {v.bloqueado_em && (
                     <span title="Tocada pelo campo — o TOA não sobrescreve mais"
                           className="text-[10px] text-af-400">●</span>
@@ -449,7 +476,9 @@ export function TabelaContratos({
               </td>
 
               <td className="whitespace-nowrap px-3 py-2 align-top text-xs">
-                {v.tipo_servico?.nome ?? <span className="text-graf-600">—</span>}
+                {v.tipo_servico?.nome
+                  ?? (jornada ? <span className="text-graf-400">Jornada</span>
+                              : <span className="text-graf-600">—</span>)}
                 <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
                   ? 'italic text-graf-600' : 'text-graf-500'}`}>
                   {v.tipo_atividade?.nome}

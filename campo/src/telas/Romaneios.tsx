@@ -277,12 +277,12 @@ export default function Romaneios({ navigation }: Props) {
                   <Text style={e.descricaoEmColuna} numberOfLines={1}>
                     {[p.tipo, p.modelo].filter(Boolean).join(' · ') || '—'}
                   </Text>
-                  {p.condicao && (
+                  {!!p.condicao && (
                     <Text style={e.descricaoEmColuna} numberOfLines={1}>
                       {CONDICAO[p.condicao] ?? p.condicao}
                     </Text>
                   )}
-                  {p.posse_motivo && (
+                  {!!p.posse_motivo && (
                     <Text style={e.descricaoEmColuna} numberOfLines={1}>{p.posse_motivo}</Text>
                   )}
                 </View>

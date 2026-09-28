@@ -225,7 +225,16 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 > ### Comece por aqui (atualizado em 27/09, noite)
 >
-> **Banco até a migration 097, web publicada e conferida, APK 0.2.0.**
+> **Pendências da noite de 27/09 (APK 0.2.1, causa do fechamento do app,
+> números reais da entrada): `docs/08-ESTADO-DO-PROJETO.md`, seção
+> "Pendente em 27/09/2026, noite".**
+>
+> **Banco até a migration 099 (D-174: o campo encerra pelo código; só o controlador reabre), web publicada e conferida, APK 0.2.0 (o
+> código já está em 0.2.1, sem APK gerado).** A 098 (D-172/D-173): baixa
+> manual só com Concluída/Cancelada/Reagendamento e código do destino
+> certo; "Mudar status" no botão direito; o app manda para `erro_app` onde
+> fechou — **olhe essa tabela antes de caçar fechamento do app**.
+>
 > A leva de 27/09 (D-170 e D-171) trouxe o **rastro do técnico** (2 a 5
 > min, com o app fechado no APK, até o fim da rota), o **local da baixa**
 > (distância do endereço, raio de 200 m, selo em Serviços/Equipes/contrato

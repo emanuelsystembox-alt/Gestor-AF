@@ -68,7 +68,7 @@ Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
 select * from testar_policies();   -- 16 cenários, todos têm que passar
-select * from testar_campo();      -- 18 cenários das travas do campo (e do antifraude)
+select * from testar_campo();      -- 23 cenários das travas do campo (e do antifraude)
 ```
 
 # Estrutura
@@ -85,8 +85,8 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
-docs/                 mapeamento, domínio, 171 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (94 arquivos, até a 097)
+docs/                 mapeamento, domínio, 175 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (96 arquivos, até a 099)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -122,7 +122,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 171 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 175 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |

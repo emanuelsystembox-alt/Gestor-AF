@@ -378,7 +378,7 @@ export default function Agenda({ navigation }: Props) {
             style={({ pressed }) => [e.card, pressed && { opacity: 0.85 }]}
           >
             <View style={e.linhaTopo}>
-              {l.janela_inicio && (
+              {!!l.janela_inicio && (
                 <Text style={e.janela}>
                   {hhmm(l.janela_inicio)}{l.janela_fim ? `–${hhmm(l.janela_fim)}` : ''}
                 </Text>
@@ -400,20 +400,20 @@ export default function Agenda({ navigation }: Props) {
                 contrato é o que o técnico fala ao telefone com o COP, e
                 o node é o pedaço da planta onde ele está. */}
             <View style={e.linhaIds}>
-              {l.contrato && (
+              {!!l.contrato && (
                 <Text style={e.identificador}>
                   <Text style={e.rotuloId}>contrato </Text>{l.contrato}
                 </Text>
               )}
-              {l.node && (
+              {!!l.node && (
                 <Text style={e.identificador}>
                   <Text style={e.rotuloId}>node </Text>{l.node}
                 </Text>
               )}
             </View>
 
-            {l.cliente_nome && <Text style={e.cliente}>{l.cliente_nome}</Text>}
-            {l.logradouro && (
+            {!!l.cliente_nome && <Text style={e.cliente}>{l.cliente_nome}</Text>}
+            {!!l.logradouro && (
               <Text style={e.endereco}>
                 {l.logradouro}{l.bairro ? ` · ${l.bairro}` : ''}
               </Text>

@@ -34,7 +34,9 @@ export function useRastro(ligado: boolean) {
         return
       }
       if (await jaPerguntouSegundoPlano()) {
-        await iniciarSegundoPlano(false)
+        // Não ligou (app fora da frente, por exemplo): esquece a resposta
+        // para o próximo passo do relógio tentar de novo (098).
+        if (!(await iniciarSegundoPlano(false))) rotaAnterior = null
         return
       }
       // Primeira vez neste aparelho: explica ANTES de o Android mandar

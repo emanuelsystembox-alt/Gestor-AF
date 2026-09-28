@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gestor AF Campo",
     "slug": "afline-manager",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "gestoraf",
@@ -12,11 +12,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "br.com.afline.campo",
       "infoPlist": {
-        "NSCameraUsageDescription": "A cÃ¢mera registra a evidÃªncia do serviÃ§o executado no endereÃ§o do assinante.",
-        "NSMicrophoneUsageDescription": "O microfone grava o Ã¡udio do vÃ­deo de evidÃªncia do serviÃ§o.",
-        "NSLocationWhenInUseUsageDescription": "A localizaÃ§Ã£o comprova de onde a baixa do serviÃ§o foi dada e registra a rota do dia de trabalho. Sem ela o aplicativo nÃ£o deixa baixar.",
-        "NSPhotoLibraryAddUsageDescription": "Guarda no celular uma cÃ³pia da foto de evidÃªncia.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Enquanto houver contrato aberto no dia, o aplicativo registra a rota de trabalho a cada 2 a 5 minutos, inclusive fechado. Ao terminar o Ãºltimo contrato, o registro para."
+        "NSCameraUsageDescription": "A câmera registra a evidência do serviço executado no endereço do assinante.",
+        "NSMicrophoneUsageDescription": "O microfone grava o áudio do vídeo de evidência do serviço.",
+        "NSLocationWhenInUseUsageDescription": "A localização comprova de onde a baixa do serviço foi dada e registra a rota do dia de trabalho. Sem ela o aplicativo não deixa baixar.",
+        "NSPhotoLibraryAddUsageDescription": "Guarda no celular uma cópia da foto de evidência.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Enquanto houver contrato aberto no dia, o aplicativo registra a rota de trabalho a cada 2 a 5 minutos, inclusive fechado. Ao terminar o último contrato, o registro para."
       }
     },
     "android": {
@@ -45,16 +45,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "A cÃ¢mera registra a evidÃªncia do serviÃ§o executado no endereÃ§o do assinante.",
-          "microphonePermission": "O microfone grava o Ã¡udio do vÃ­deo de evidÃªncia do serviÃ§o.",
+          "cameraPermission": "A câmera registra a evidência do serviço executado no endereço do assinante.",
+          "microphonePermission": "O microfone grava o áudio do vídeo de evidência do serviço.",
           "recordAudioAndroid": true
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Enquanto houver contrato aberto no dia, o aplicativo registra a rota de trabalho a cada 2 a 5 minutos, inclusive fechado. Ao terminar o Ãºltimo contrato, o registro para.",
-          "locationWhenInUsePermission": "A localizaÃ§Ã£o comprova de onde a baixa do serviÃ§o foi dada e registra a rota do dia de trabalho. Sem ela o aplicativo nÃ£o deixa baixar.",
+          "locationAlwaysAndWhenInUsePermission": "Enquanto houver contrato aberto no dia, o aplicativo registra a rota de trabalho a cada 2 a 5 minutos, inclusive fechado. Ao terminar o último contrato, o registro para.",
+          "locationWhenInUsePermission": "A localização comprova de onde a baixa do serviço foi dada e registra a rota do dia de trabalho. Sem ela o aplicativo não deixa baixar.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
@@ -64,7 +64,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "O Face ID confirma que foi vocÃª quem recebeu o material do almoxarifado."
+          "faceIDPermission": "O Face ID confirma que foi você quem recebeu o material do almoxarifado."
         }
       ]
     ],

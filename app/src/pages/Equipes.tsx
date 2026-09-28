@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
@@ -6,7 +6,8 @@ import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
-import { ContratoModal } from '../components/ContratoModal'
+import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
+import { MenuContrato, type AcaoContrato } from '../components/MenuContrato'
 import { FaixaJornada, FaixaPeriodos, SituacaoComPontos } from '../components/telemetria'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
 // linha só, um componente só (D-095).
@@ -156,17 +157,6 @@ interface LoginEquipe {
   origem: 'CADASTRO' | 'MATRICULA' | 'SEM_CADASTRO'
   visitas: number
 }
-/** Login que aparece no TOA e ninguém disse de quem é. Enquanto não
- *  disser, o contrato dele fica na equipe "Sem login definido".
- *
- *  Sem sugestão de EQUIPE (D-089): deduzir pela matrícula acerta quase
- *  sempre, e é por isso que ninguém confere. O `nome_toa` é outra
- *  coisa — é a coluna "Recurso" que o próprio TOA emite ao lado do
- *  login (D-091). Dado da fonte, não palpite nosso. */
-interface LoginSemDono {
-  login: string; visitas: number; primeira: string; ultima: string
-  nome_toa: string | null
-}
 interface Orfao {
   matricula: string; visitas: number
   primeira: string; ultima: string; equipes_sugeridas: string | null
@@ -302,8 +292,6 @@ export default function Equipes() {
   const [tecnicos, setTecnicos] = useState<Tec[]>([])
   const [orfaos, setOrfaos] = useState<Orfao[]>([])
   const [logins, setLogins] = useState<LoginEquipe[]>([])
-  const [semDono, setSemDono] = useState<LoginSemDono[]>([])
-  const [equipeDoLogin, setEquipeDoLogin] = useState<Record<string, string>>({})
   const [carregando, setCarregando] = useState(true)
   /** Último dia com contrato, quando NÃO é o dia na tela. Vira atalho
    *  no estado vazio — nunca troca a data sozinho (ver lib/dia.ts). */
@@ -328,10 +316,13 @@ export default function Equipes() {
   // O contrato abre em JANELA, como em Serviços (D-056) — e não numa
   // página separada. Era a última diferença entre as duas telas.
   const [modal, setModal] = useState<string | null>(null)
-  const [menu, setMenu] = useState<string | null>(null)
-  const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
+  // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
+  const [acaoModal, setAcaoModal] = useState<AcaoContrato | null>(null)
+  // O menu do contrato — o mesmo de Serviços, por portal (ver MenuContrato).
+  const [menu, setMenu] = useState<{ v: ContratoLinha; x: number; y: number } | null>(null)
+  const fecharMenu = useCallback(() => setMenu(null), [])
   // O que o modal precisa para baixar, transferir e marcar.
-  const [codigos, setCodigos] = useState<{ codigo: number; descricao: string }[]>([])
+  const [codigos, setCodigos] = useState<CodigoDeBaixa[]>([])
   const [conjunto, setConjunto] = useState<string | null>(null)
   const [equipesLista, setEquipesLista] =
     useState<{ id: string; codigo: string; nome: string }[]>([])
@@ -393,8 +384,8 @@ export default function Equipes() {
   useEffect(() => {
     supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data: d }) => setIndicadores((d ?? []) as { id: string; nome: string }[]))
-    supabase.from('codigo_baixa').select('codigo, descricao').order('codigo')
-      .then(({ data: d }) => setCodigos((d ?? []) as { codigo: number; descricao: string }[]))
+    supabase.from('codigo_baixa').select('codigo, descricao, situacao_destino').order('codigo')
+      .then(({ data: d }) => setCodigos((d ?? []) as CodigoDeBaixa[]))
     supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
       .then(({ data: d }) => setConjunto(
         (d as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
@@ -445,7 +436,7 @@ export default function Equipes() {
     setCarregando(true); setErro(null)
     setAberta(null); setDetalhe({})
     carregarContratosDia(meu)
-    const [p, t, o, lg, sd] = await Promise.all([
+    const [p, t, o, lg] = await Promise.all([
       supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('tecnico')
         .select(`id, matricula, nome, situacao, equipe_id, foto_url,
@@ -456,7 +447,6 @@ export default function Equipes() {
         .order('matricula'),
       supabase.rpc('tecnicos_nao_cadastrados'),
       supabase.rpc('logins_das_equipes', { p_data: data }),
-      supabase.rpc('logins_sem_cadastro'),
     ])
     if (meu !== pedido.current) return
     if (p.error) setErro(p.error.message)
@@ -480,7 +470,6 @@ export default function Equipes() {
     if (t.data) setTecnicos(t.data as unknown as Tec[])
     if (o.data) setOrfaos(o.data as Orfao[])
     setLogins((lg.data ?? []) as LoginEquipe[])
-    setSemDono((sd.data ?? []) as LoginSemDono[])
     setCarregando(false)
     setAtualizadoEm(new Date())
   }
@@ -691,23 +680,6 @@ export default function Equipes() {
 
   const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
 
-  /** Declara de quem é o login e leva os contratos junto — cadastrar e
-   *  continuar com 337 contratos no abrigo faria o cadastro parecer
-   *  inútil. */
-  async function cadastrarLogin(login: string, equipeId: string) {
-    setOcupado(true); setErro(null); setOk(null)
-    const { data, error } = await supabase.rpc('cadastrar_login_da_equipe',
-      { p_equipe: equipeId, p_login: login })
-    if (error) setErro(error.message)
-    else {
-      const r = data as { equipe: string; contratos_movidos: number; desde: string }
-      setOk(`Login ${login} é da equipe ${r.equipe}. `
-        + `${r.contratos_movidos} contrato(s) movido(s), desde `
-        + new Date(r.desde + 'T12:00').toLocaleDateString('pt-BR') + '.')
-      await recarregar()
-    }
-    setOcupado(false)
-  }
 
 
   return (
@@ -1420,10 +1392,8 @@ export default function Equipes() {
                                           ? contratosDia === null
                                           : carregandoDetalhe === e.equipe_id}
                                         aoAbrir={v => setModal(v.id)}
-                                        aoMenuContexto={(v, ev) => {
-                                          setMenu(menu === v.id ? null : v.id)
-                                          setMenuXY({ x: ev.clientX, y: ev.clientY })
-                                        }}
+                                        aoMenuContexto={(v, ev) =>
+                                          setMenu({ v, x: ev.clientX, y: ev.clientY })}
                                         vazio={
                                           <p className="px-3 py-6 text-center text-xs text-graf-500">
                                             {filtrando > 0
@@ -1432,7 +1402,7 @@ export default function Equipes() {
                                                   {new Date(data + 'T12:00').toLocaleDateString('pt-BR')}.</>}
                                           </p>
                                         }
-                                        renderAcoes={v => (<>
+                                        renderAcoes={v => (
                                           <div className="flex items-center justify-end gap-1">
                                             <Link to={`/controle/visita/${v.id}`}
                                               onClick={ev => ev.stopPropagation()}
@@ -1444,8 +1414,8 @@ export default function Equipes() {
                                             <button
                                               onClick={ev => {
                                                 ev.stopPropagation()
-                                                setMenu(menu === v.id ? null : v.id)
-                                                setMenuXY({ x: ev.clientX, y: ev.clientY })
+                                                setMenu(menu?.v.id === v.id ? null
+                                                  : { v, x: ev.clientX, y: ev.clientY })
                                               }}
                                               title="Ações do contrato"
                                               className="rounded border border-graf-700 px-1.5 py-0.5
@@ -1454,51 +1424,7 @@ export default function Equipes() {
                                               ⋯
                                             </button>
                                           </div>
-
-                                          {menu === v.id && (
-                                            <div onClick={ev => ev.stopPropagation()}
-                                              style={menuXY ? {
-                                                left: Math.min(menuXY.x, window.innerWidth - 230),
-                                                top: Math.min(menuXY.y, window.innerHeight - 250),
-                                              } : undefined}
-                                              className="fixed z-50 w-52 overflow-hidden rounded-lg
-                                                         border border-graf-700 bg-graf-900
-                                                         text-left shadow-xl">
-                                              <Link to={`/controle/visita/${v.id}`}
-                                                className="block px-3 py-2 text-xs text-graf-200
-                                                           hover:bg-graf-800">
-                                                Abrir contrato
-                                              </Link>
-                                              <button
-                                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                                className="block w-full px-3 py-2 text-left text-xs
-                                                           text-graf-200 hover:bg-graf-800">
-                                                Marcadores…
-                                              </button>
-                                              <button
-                                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                                disabled={v.ordem_servico.length === 0}
-                                                className="block w-full px-3 py-2 text-left text-xs
-                                                           text-graf-200 hover:bg-graf-800
-                                                           disabled:opacity-40">
-                                                Baixar serviço…
-                                              </button>
-                                              <button
-                                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                                className="block w-full px-3 py-2 text-left text-xs
-                                                           text-graf-200 hover:bg-graf-800">
-                                                Transferir equipe…
-                                              </button>
-                                              <button
-                                                onClick={() => { setModal(v.id); setMenu(null) }}
-                                                className="block w-full border-t border-graf-800
-                                                           px-3 py-2 text-left text-xs text-af-300
-                                                           hover:bg-af-900/20">
-                                                Apagar do banco…
-                                              </button>
-                                            </div>
-                                          )}
-                                        </>)}
+                                        )}
                                       />
                                       </div>
                                     </div>
@@ -1523,79 +1449,10 @@ export default function Equipes() {
             de fundo — importa, aparece, mas não empurra o painel para
             fora da primeira tela. */}
         {/* ====== logins sem dono ======
-            O contrato só vai para uma equipe quando alguém diz de quem é
-            o login. Até lá fica em "Sem login definido", visível, em vez
-            de a gente adivinhar pela matrícula e acertar calado. */}
-        {semDono.length > 0 && (
-          <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
-            <h2 className="font-medium text-amber-200">
-              {semDono.length} login(s) sem equipe definida
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-amber-200/80">
-              Os contratos desses logins estão em{' '}
-              <strong>Sem login definido</strong> e ficam fora da produtividade até
-              alguém dizer de quem é cada um. O nome ao lado do login é o{' '}
-              <strong>Recurso do TOA</strong> — quem estava logado, segundo a
-              própria planilha. A equipe, quem diz é você.
-            </p>
-
-            <div className="mt-3 space-y-1.5">
-              {semDono.map(l => {
-                const escolhida = equipeDoLogin[l.login] ?? ''
-                return (
-                  <div key={l.login}
-                    className="rounded-md border border-amber-800/50 bg-graf-900 px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                      <span className="tabular font-semibold">{l.login}</span>
-                      {/* Quem o TOA diz que estava logado. Não decide a
-                          equipe — diz de quem é o login, que é a pergunta
-                          que trava o cadastro. */}
-                      {l.nome_toa ? (
-                        <span className="text-xs text-graf-300">
-                          {l.nome_toa}
-                          <span className="ml-1 rounded bg-graf-800 px-1 text-[9px]
-                                           font-semibold uppercase text-graf-400">
-                            no TOA
-                          </span>
-                        </span>
-                      ) : (
-                        <span title="A planilha importada não trazia a coluna Recurso"
-                          className="text-xs text-graf-600">nome não veio na planilha</span>
-                      )}
-                      <span className="text-graf-400">{l.visitas} visitas</span>
-                      <span className="text-xs text-graf-600">
-                        {new Date(l.primeira + 'T12:00').toLocaleDateString('pt-BR')}
-                        {l.primeira !== l.ultima &&
-                          ` a ${new Date(l.ultima + 'T12:00').toLocaleDateString('pt-BR')}`}
-                      </span>
-
-                      <select value={escolhida} className={`${sel} ml-auto w-56`}
-                        onChange={e => setEquipeDoLogin(v =>
-                          ({ ...v, [l.login]: e.target.value }))}>
-                        <option value="">— escolha a equipe —</option>
-                        {painel
-                          .filter(e => e.codigo !== 'SEM-LOGIN')
-                          .map(e => (
-                            <option key={e.equipe_id} value={e.equipe_id}>
-                              {equipeRotulo(e.codigo, e.nome)}
-                            </option>
-                          ))}
-                      </select>
-
-                      <button disabled={ocupado || !escolhida}
-                        onClick={() => cadastrarLogin(l.login, escolhida)}
-                        className="rounded-md bg-af-600 px-3 py-1 text-xs font-medium
-                                   text-white hover:bg-af-500 disabled:opacity-40">
-                        é desta equipe
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
+            A fila "login sem equipe definida" saiu daqui (Emanuel, 27/09:
+            "precisa tirar, não precisa aparecer"). O contrato desses
+            logins continua VISÍVEL na equipe "Sem login definido", e o
+            vínculo login → equipe se declara em Administração. Ver D-173. */}
         {orfaos.length > 0 && (
           <section className="rounded-lg border border-amber-700/60 bg-amber-900/15 p-4">
             <h2 className="font-medium text-amber-200">
@@ -1672,15 +1529,21 @@ export default function Equipes() {
         </p>
       </div>
 
+      {menu && (
+        <MenuContrato v={menu.v} xy={menu} aoFechar={fecharMenu}
+          aoEscolher={acao => { setAcaoModal(acao); setModal(menu.v.id) }} />
+      )}
+
       {modal && (
         <ContratoModal
           id={modal}
+          acaoInicial={acaoModal}
           indicadores={indicadores}
           codigos={codigos}
           conjunto={conjunto}
           equipes={equipesLista}
           pontos={pontos.get(modal) ?? null}
-          onFechar={() => setModal(null)}
+          onFechar={() => { setModal(null); setAcaoModal(null) }}
           onMudou={() => { setDetalhe({}); recarregar() }}
         />
       )}

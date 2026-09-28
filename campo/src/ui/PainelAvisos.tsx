@@ -71,7 +71,7 @@ export function PainelAvisos({
                   </Pressable>
                 </View>
 
-                {a.situacao_de && a.situacao_para && (
+                {!!a.situacao_de && a.situacao_para && (
                   <Text style={e.transicao}>
                     {rotuloSituacao(a.situacao_de)} → {rotuloSituacao(a.situacao_para)}
                   </Text>
@@ -80,7 +80,7 @@ export function PainelAvisos({
                 {/* A observação do controlador. É a "mensagem" que o
                     Emanuel pediu — ela viaja colada à mudança, não num
                     canal separado. */}
-                {a.detalhe && <Text style={e.detalhe}>“{a.detalhe}”</Text>}
+                {!!a.detalhe && <Text style={e.detalhe}>“{a.detalhe}”</Text>}
 
                 <Text style={e.rodape}>
                   {[a.contrato && `contrato ${a.contrato}`, a.servico]

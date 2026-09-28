@@ -6312,3 +6312,292 @@ engolia clique: desligado durante o desenho. Ver `traps.md`.
 rastro em segundo plano e a detecção de simulação precisam do APK na mão
 (e de um app de local fictício para provar a trava). Volume real do monitor
 com muitos pontos e cercas: a medir nos testes, como o Emanuel pediu.
+
+---
+
+### D-172 · A baixa manual coerente, o aviso sem o nome do arquivo e o app que diz onde fechou
+
+Migration **098**. Pedidos do Emanuel em 27/09, à noite, com prints.
+
+#### 1. O aviso de "contrato novo" não mostra o arquivo
+
+> *"não precisa mostrar de onde vem a atividade, técnico não sabe, por
+> exemplo: MAN-AFLINE_27"*
+
+O aviso `NOVO` copiava a observação do evento `IMPORTADA` — que é o **nome
+da planilha**. `aviso_do_evento` passa a gravar o `NOVO` sem detalhe, e os
+avisos antigos foram limpos (`update … where tipo = 'NOVO'`). O evento da
+importação **continua** guardando o arquivo: é o rastro de quem importou.
+Consertado no banco, e não na tela, porque a linha do aviso é a verdade
+(D-119) — e porque o APK já instalado lê a mesma linha.
+
+#### 2. Código de baixa só com Concluída, Cancelada ou Reagendamento — e do destino certo
+
+> *"o sistema não deve aceitar baixar a o.s do contrato e ir para entrada
+> […] so pode ter opção de inserir o codigo de baixa se for para concluido,
+> cancelado, reagendado […] eu não posso baixar com 409 - cancelado […] se
+> eu for querer baixar manual […] talvez se estiver assim no toa ok?"*
+
+**O defeito que o print mostrou:** o contrato 226470184 estava CONCLUÍDO;
+o controlador lançou 409 nas duas O.S. com "Na entrada" e `baixar_visita`
+aceitou. Só `exige_todas_baixadas` olhava a situação, e ela só se importa
+com situação terminal. Um contrato encerrado voltou para a entrada **sem
+motivo** (o "Voltar" pede motivo, D-030), com código de instalação
+efetuada.
+
+A regra, no banco:
+
+| Onde | O que passa a valer |
+|---|---|
+| `baixar_visita` (baixa manual da web) | com código de baixa, a situação final é **obrigatória** e tem de ser terminal; e **todo** código da AFLINE no contrato tem de ter `situacao_destino` igual a ela (`confere_destino_das_baixas`) |
+| `registrar_etapa` pela web, para situação terminal | a mesma conferência |
+| TOA | **nada muda**: a baixa da operadora é leitura (D-042), e a automática aplica o destino do próprio código — "se estiver assim no toa ok" |
+| campo (`baixar_os` + encerrar) | **nada muda nesta leva** — ver "Pergunta aberta" |
+
+O destino de cada código já existia (D-097, 168 códigos: 116 concluem, 24
+cancelam, 28 reagendam). A tela agora pede **primeiro** a situação final
+(três botões) e só então mostra os códigos daquele destino; trocar a
+situação limpa o código que não serve mais.
+
+**Testado como `authenticated` (transação desfeita)**, no próprio
+226470184: 409 + Na entrada → recusado; 409 sem situação → recusado; 409 +
+Cancelada → recusado, com a lista das O.S. e o destino de cada código;
+mudar para Cancelada pela web com 409 gravado → recusado; um código de
+cancelamento numa O.S. e 409 na outra → recusado; 409 + Concluída →
+aceito.
+
+**Recusado:** travar também o TOA (a operadora baixa como baixa; a
+divergência tem de aparecer, não sumir — D-042).
+
+**Pergunta aberta ao Emanuel:** o encerramento pelo **campo** deve passar
+pela mesma conferência? Hoje o técnico baixa O.S. por O.S. e depois toca
+"Finalizar"/"Cancelar"/"Reagendar" livremente — com um 106 (reagendamento)
+nas O.S. ele consegue finalizar como Concluída. Aplicar é uma linha em
+`registrar_etapa`, mas muda o dia do técnico: pergunte antes.
+
+**Observado e não mexido:** `registrar_etapa` pela web ainda leva um
+contrato **encerrado** de volta a um status aberto sem motivo (só o campo é
+barrado). A tela manda esse caso para `reverter_situacao`, que pede motivo
+— mas a barreira hoje é da tela, não do banco.
+
+#### 3. O app diz onde fechou
+
+> *"tem que fazer um debug no app […] eu acho que tem a ver com GPS […]
+> fecha só na tela quando o contrato esta aberto"*
+
+Sem o celular ligado ao computador não há log do Android. O que se mapeou
+no código:
+
+- **O GPS era lido por quatro caminhos independentes** — a guarda do GPS a
+  cada 20 s, o rastro a cada 1 min, a Agenda e o contrato ao abrir —, cada
+  um pedindo leitura NOVA ao Android, às vezes duas ao mesmo tempo, e a do
+  contrato sem prazo. É o "procurando o GPS direto". Agora há **uma
+  leitura por vez para o app inteiro** (`lerPosicao`): reaproveita a
+  recente, junta pedidos simultâneos, e toda leitura tem prazo.
+- **O serviço de localização em segundo plano liga exatamente quando há
+  contrato aberto** (`rota_aberta`). Se o Android recusa subir o serviço
+  (app fora da frente, depois dos ajustes da permissão "o tempo todo"), o
+  processo morre com erro **nativo** — nenhum `try/catch` pega. É o
+  suspeito mais forte para "fecha quando o contrato está aberto". Agora:
+  só liga com o app na frente; anota o passo antes; e se o app fechou
+  nesse passo, **neste aparelho e nesta versão** não tenta de novo (grava
+  só com o app aberto e avisa).
+- **Texto vazio fora de `<Text>` derruba o APK.** `{v.complemento && …}`
+  com `''` é erro fatal no React Native — no Expo Go é tela vermelha, no
+  APK é "o app tem um bug". Hoje o banco não tem esses campos vazios
+  (conferido), mas 16 trechos foram blindados com `!!`.
+
+E, para a próxima vez não ser palpite: tabela **`erro_app`** (só a gestão
+lê; grava-se pela função `registrar_erro_app`, autor carimbado pelo
+servidor, teto de 30 por hora por usuário, expurgo de 90 dias junto com o
+rastro). O app manda três coisas: erro ao desenhar uma tela, erro de
+JavaScript fora dela, e — no início seguinte — **o passo em que estava
+quando fechou** (`FECHOU`). No APK, um erro de JavaScript deixa de fechar
+o app: vira a tela "Esta tela tropeçou", com a mensagem real e o botão de
+voltar para a agenda. No Expo Go continua a tela vermelha do RN (traz a
+pilha).
+
+Consulta para ver o que aconteceu:
+
+```sql
+select criado_em, tipo, mensagem, contexto, versao, aparelho
+  from erro_app order by criado_em desc limit 20;
+```
+
+`app.json` também foi consertado: as mensagens de permissão estavam
+embaralhadas (`cÃ¢mera`) — resto da gravação pelo PowerShell (D-171). A
+versão sobe para **0.2.1**.
+
+**Não verificado:** nada disto rodou num celular. O `tsc` e o `expo
+export` passam. A causa do fechamento **não está provada** — está
+cercada, e a próxima ocorrência sobe para `erro_app` com o nome do passo.
+O teste do segundo plano só vale no **APK** (o Expo Go não tem o serviço):
+testar primeiro no Expo Go cobre GPS, telas e a rede de erros; o
+fechamento ao ligar a rota só se prova com APK novo.
+
+---
+
+### D-173 · Mudar status pelo botão direito, o menu que faltava em Equipes, jornada como informativo e a entrada no modelo da empresa
+
+Só web. Pedidos do Emanuel em 27/09.
+
+#### 1. "Mudar status…" no botão direito
+
+> *"quando clicar no lado direito na tela de serviço e técnico deve
+> aparecer a opção mudar status, para o controlador devolver para o status
+> que ele achar melhor"*
+
+O botão "Voltar" do contrato virou **Mudar status**, e o menu do botão
+direito ganhou **Mudar status…**. Uma porta na tela, três no banco:
+
+| Para onde | Por onde | Exige |
+|---|---|---|
+| Concluída, Cancelada, Reagendamento | vai para a **baixa** (D-172) | código de todas as O.S., do destino certo |
+| contrato encerrado → status aberto | `reverter_situacao` | **motivo** (D-030) |
+| aberto → aberto | `registrar_etapa` | nada; a observação vira aviso no celular |
+
+#### 2. O botão direito e o "⋯" em Equipes
+
+> *"botão lado direito não esta funcionando […] as 3 bolinhas também não
+> funciona"*
+
+Eram **duas cópias** do menu. A de Serviços ia para a raiz da tela por
+portal (D-169); a de Equipes não — e ela mora dentro da gaveta da equipe,
+que é animada (`transform`) e rola por dentro (`overflow`). Um ancestral
+com transform vira o referencial do `fixed`, e o overflow corta: o menu
+abria longe e sumia recortado. Agora é **um componente só**
+(`MenuContrato`), por portal, que fecha com clique fora, Esc e rolagem.
+Conferido no navegador: abre no ponto do clique, nas duas telas, pelo
+botão direito e pelo "⋯". A nota "Editar não existe" do menu saiu — o
+contrato tem o botão "Editar" na janela.
+
+#### 3. A fila "login sem equipe definida" saiu de Equipes
+
+> *"essa tela de sugestão de equipe, precisa tirar, nao precisa aparecer"*
+
+Saiu a seção amarela. O contrato desses logins continua **visível** na
+equipe "Sem login definido" (D-088), e o vínculo login → equipe se declara
+em Administração. A função `logins_sem_cadastro` continua no banco.
+
+#### 4. Jornada é informativo
+
+> *"essas atividades cinza, não sei por que não tem nome? […] só não pode
+> contar em nada, ex: volume de contrato, ou produtividade, tem que ser só
+> um informativo"*
+
+Já não contavam (`natureza = 'JORNADA'` fica fora do volume, da
+produtividade, dos pontos, do "um status por técnico" e da agenda do
+campo). O defeito era de **leitura**: a linha mostrava "—" no contrato e a
+etiqueta EM EXECUÇÃO pulsando, e parecia contrato quebrado. Agora mostra o
+nome da atividade do TOA (Refeicao, Na Base, Almoxarifado…), "jornada · não
+conta" e uma etiqueta cinza **Informativo**, sem pulso. O nome vem como o
+TOA escreve (sem acento): não traduzimos cadastro da operadora.
+
+#### 5. A entrada no modelo do painel da empresa
+
+> *"a entrada do nosso sistema eu quero que seja muito parecido a essa, pra
+> ser um modelo so"*
+
+Mesmo desenho do painel de indicadores do Grupo AFLINE: fundo claro com a
+rede de pontos animada (canvas à mão; parada para quem pede menos
+movimento), marca e "16 anos conectando vidas." à esquerda, cartão à
+direita. Fontes Exo 2 e Manrope, só nesta tela. Clara sempre, mesmo com o
+controle no escuro.
+
+**Recusado do modelo:** "Cadastre-se" — aqui conta é criada pela
+Administração com o perfil escolhido (security.md). "Esqueci minha senha"
+**não** manda e-mail: diz que a senha é trocada pela Administração, em vez
+de prometer um e-mail que o sistema não envia. Se o Emanuel quiser a troca
+por e-mail, é outra conversa (SMTP, página de nova senha).
+
+**Conferido no navegador:** a entrada no computador e no celular (sem
+rolagem lateral, sem erro no console); o menu em Equipes e em Serviços; o
+Mudar status até o "Ir para a baixa"; a baixa só com os códigos do destino.
+Nada foi confirmado em contrato real. Publicado e conferido no ar.
+
+---
+
+### D-174 · O campo encerra pelo código, e só o controlador reabre
+
+Migration **099**. Respostas do Emanuel às duas perguntas da D-172:
+
+> *"acho que o finalizar é o mesmo que concluir? correto? se não for temos
+> que corrigir"*
+
+É: "Finalizar visita" grava CONCLUIDA. Então a conferência da 098
+(`confere_destino_das_baixas`) passa a valer **também para o campo**, e o
+app deixa de oferecer o que o banco recusaria:
+
+- o botão principal segue o código: **Finalizar visita** (código de
+  conclusão), **Cancelar visita** (de cancelamento), **Reagendar visita**
+  (de reagendamento);
+- depois da primeira O.S. baixada, as outras só listam códigos do mesmo
+  desfecho — o técnico não fica preso com códigos misturados, que só o
+  controlador desfaz;
+- o selo do código na lista diz CONCLUI / CANCELA / REAGENDA, no lugar de
+  OK / IMPROD.
+
+> *"so pode voltar o controlador, equipe nao pode"*
+
+Contrato encerrado voltando para status aberto é **só** `reverter_situacao`
+(controlador ou gestão, com motivo — D-030). `registrar_etapa` recusa essa
+volta para qualquer um (antes, pela web, um supervisor reabria sem motivo),
+e `baixar_visita` recusa trocar o desfecho de um encerrado para quem não é
+controlador nem gestão.
+
+**A bateria testava a incoerência:** `testar_campo()` baixava com o menor
+código ativo (-2, que **cancela**) e depois "finalizava" como concluída.
+Passa a usar um código de conclusão e ganha 5 cenários: finalizar com
+código de reagendamento (barrado), reagendar com ele (permitido), técnico
+voltando encerrado mesmo com motivo (barrado), controlador voltando sem
+motivo por `registrar_etapa` (barrado) e com motivo por
+`reverter_situacao` (permitido). **23/23**; `testar_policies()` 16/16.
+
+**Não mexido:** a página `/campo` da web (a execução pelo navegador) ainda
+mostra "Finalizar" sempre; se o código não for de conclusão, o banco recusa
+com a mensagem. O app de verdade é o `campo/`.
+
+**Não verificado no celular:** `tsc` e `expo export` passam; o fluxo de
+reagendar pelo botão principal não foi tocado num aparelho.
+
+---
+
+### D-175 · A entrada no design "Entrada Gestor AF", com o Brasil inteiro e o time de verdade
+
+Só web. O Emanuel mandou o design (Claude Design, `Entrada Gestor AF
+Inovadora.zip`) com três correções:
+
+> *"agora vamos mudar o norte, vamos colocar todo o brasil"*
+> *"area técnico vamos colocar [a foto do time] e tirar a parte do
+> coordenador da entrada"*
+> *"pode inventar os dados" — "coloque dados bons"*
+
+Feito como no desenho: abertura escura (o AF se montando, quatro frases,
+"16 anos conectando vidas."), a rede de pontos com o pulso vermelho,
+chamadas que se revezam, fotos flutuando, o cartão de entrar com
+"Mostrar/Ocultar" senha, e os cartões de vidro em volta.
+
+- **Norte → Brasil:** "Fibra chegando a todo o Brasil", "Do Oiapoque ao
+  Chuí, quem conecta o Brasil é o campo", e o cartão "Fibra no Brasil" com
+  os **27 estados** acendendo do Norte ao Sul.
+- **Fotos:** a foto do time da AFLINE (`app/public/entrada/time-de-campo.webp`)
+  no lugar do técnico de banco de imagem; a de Coordenação saiu. "Cliente
+  conectado" continua a do desenho (Unsplash, carregada de lá).
+- **Números:** ilustrativos, por decisão do Emanuel, em `app/src/lib/entrada.ts`
+  (48.270 clientes, +1,9 mil/mês, satisfação 96,8%, qualidade 95,2%, NPS 87).
+  Duas coisas mantidas: a curva de 2026 **para em setembro** (mês que não
+  aconteceu é `null`) e a seção diz "Fonte: indicadores ilustrativos" — a
+  página é pública, antes do login. Número real: troque no arquivo e
+  escreva a fonte.
+
+**Mudado do desenho, de propósito:** a abertura (10 s) roda **uma vez por
+navegador** — o COP entra todo dia; "Ver abertura" repete, "Pular" e Esc
+encerram, e quem pede menos movimento no sistema não a vê. O login do
+desenho era falso ("Acesso liberado" sempre); aqui é o Supabase. O cartão
+"Fibra no Brasil" desceu para a borda do formulário: com 27 estados ele
+ficou mais alto que o de 7 e tampava o "Esqueci minha senha" (medido: 577 ×
+610 px; agora começa em 736, o texto termina em 716).
+
+**Conferido no navegador:** a abertura inteira, a tela em 1440×900 e em
+celular (sem rolagem lateral), a seção de indicadores. Publicado e
+conferido no ar (a foto responde 200).

@@ -157,7 +157,7 @@ export default function Captura({ route, navigation }: Props) {
 
         <View style={e.rodapeEscuro}>
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
-          {recado && <Text style={e.recado}>{recado}</Text>}
+          {!!recado && <Text style={e.recado}>{recado}</Text>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Botao
               titulo="Refazer" tom="contorno" style={{ flex: 1 }}

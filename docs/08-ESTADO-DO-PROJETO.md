@@ -373,6 +373,48 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 27/09/2026, noite — baixa coerente, app que diz onde fechou, entrada nova (D-172 a D-175)
+
+Migrations **098** e **099**; web publicada e conferida no ar; app em
+**0.2.1** no código (sem APK gerado). Baterias: `testar_policies()` 16/16,
+`testar_campo()` **23/23**.
+
+### Resolvido nesta leva
+
+| O quê | Como |
+|---|---|
+| Aviso "contrato novo" mostrava o nome da planilha | `aviso_do_evento` grava o `NOVO` sem detalhe; avisos antigos limpos (098) |
+| Baixa com 409 ia para "Na entrada" e tirava contrato do encerramento sem motivo | Código de baixa só com Concluída/Cancelada/Reagendamento, e do **destino** certo (098, `confere_destino_das_baixas`) |
+| Técnico "finalizava" com código de reagendamento | "Finalizar" = CONCLUIDA; a mesma conferência vale no campo, e o botão do app segue o código: Finalizar / Cancelar / Reagendar visita (099) |
+| Encerrado voltava a aberto sem motivo pela web | Só `reverter_situacao` — controlador ou gestão, com motivo (099) |
+| Botão direito e "⋯" mortos em Equipes | `MenuContrato` único, por portal; ganhou **Mudar status…** |
+| Jornada (Refeição, Na Base) parecia contrato quebrado | Nome da atividade + etiqueta cinza **Informativo** |
+| Seção amarela "login sem equipe definida" | Removida de Equipes (vínculo continua em Administração) |
+| Entrada do site | Design "Entrada Gestor AF": Brasil inteiro, foto do time, abertura 1× por navegador |
+| `app.json` com acento embaralhado | Consertado; versão 0.2.1 |
+
+### Continua pendente — precisa do celular
+
+| O quê | Por quê |
+|---|---|
+| **Gerar o APK 0.2.1** (`npx eas-cli@latest build --platform android --profile preview`) | Tudo do app desta leva (leitura única do GPS, guarda do segundo plano, tela "tropeçou", botão Reagendar/Cancelar) só chega ao APK instalado com build novo. No Expo Go já dá para testar, **menos** o rastro com o app fechado |
+| **Achar a causa do app fechando** | Não está provada — está cercada (D-172). Depois de instalar o 0.2.1, se fechar de novo: `select criado_em, tipo, mensagem, contexto, versao, aparelho from erro_app order by criado_em desc;` — o passo em que fechou sobe no início seguinte |
+| **Testar com o dedo** o botão "Reagendar visita" / "Cancelar visita" e a lista de códigos travada no desfecho da 1ª O.S. | `tsc` e `expo export` passam; nada foi tocado num aparelho |
+| Provar a trava de GPS simulado e o rastro em segundo plano | Herdado da D-171 — só no APK |
+
+### Continua pendente — depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Números reais da entrada** | Os da tela são **ilustrativos** (decisão do Emanuel). Quando houver dado de verdade (AFLINE 360, pesquisa da CLARO), trocar em `app/src/lib/entrada.ts` e escrever a fonte |
+| **Autorização de imagem** da foto do time | A entrada é pública, antes do login: os rostos aparecem para qualquer um com o endereço |
+| Foto de cliente real | "Cliente conectado" é foto do Unsplash, carregada de lá — se o Unsplash sair do ar, o quadro fica vazio |
+| "Esqueci minha senha" por e-mail | Hoje diz que a Administração troca. E-mail exige SMTP e página de nova senha |
+| Página `/campo` da web | Ainda mostra "Finalizar" sempre; o banco recusa com mensagem se o código não for de conclusão. Alinhar ao app ou aposentar a página |
+| Contrato **226470184** | Passou por "Na entrada" com 409 antes da 098; às 20:39 foi baixado de novo como Concluída pela tela — conferir se é o desfecho certo |
+
+---
+
 ## Pendente em 27/09/2026 — rastro, local da baixa e monitoramento (D-170)
 
 Migration **096**; tela nova **Monitoramento** (`/controle/monitor`);

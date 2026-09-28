@@ -143,7 +143,7 @@ export default function Transferir({ navigation }: Props) {
                   <Pressable key={c.id} onPress={() => { setDestino(c); setBusca('') }} style={e.opcao}
                     accessibilityRole="button" accessibilityLabel={`Escolher ${c.nome}`}>
                     <Text style={e.opcaoTexto}>{c.nome}</Text>
-                    {c.matricula && <Text style={e.miudo}>{c.matricula}</Text>}
+                    {!!c.matricula && <Text style={e.miudo}>{c.matricula}</Text>}
                   </Pressable>
                 ))}
                 {busca.trim().length >= 2 && achados.length === 0 && (

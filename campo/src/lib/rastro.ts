@@ -4,6 +4,8 @@ import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import * as Battery from 'expo-battery'
 import { supabase } from './supabase'
+import { lerPosicao } from './gps'
+import { concluirPasso, iniciarPasso, passoPendente, VERSAO_APP } from './diagnostico'
 
 /**
  * O rastro do técnico — a trilha que a central de monitoramento desenha.
@@ -222,6 +224,40 @@ TaskManager.defineTask<{ locations: Location.LocationObject[] }>(TAREFA_RASTRO, 
   }
 })
 
+/**
+ * ┌─ O SEGUNDO PLANO NÃO PODE DERRUBAR O APP DUAS VEZES (098, D-172) ─┐
+ * │ O APK fechou quando havia contrato aberto — que é exatamente      │
+ * │ quando o serviço de localização em segundo plano liga. O Android  │
+ * │ derruba o processo se o serviço sobe com o app fora da frente      │
+ * │ (ou por defeito do aparelho), e esse erro é NATIVO: nenhum         │
+ * │ try/catch do JavaScript o pega.                                     │
+ * │ Por isso: (1) só liga com o app na frente; (2) anota o passo antes │
+ * │ de ligar; (3) se o app fechou nesse passo, NESTE aparelho e NESTA  │
+ * │ versão, não tenta de novo — a rota segue gravando com o app        │
+ * │ aberto, e o fechamento sobe para `erro_app` como FECHOU.           │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+export const PASSO_SEGUNDO_PLANO = 'ligar o registro da rota em segundo plano'
+const DERRUBOU = `rastro:segundo-plano-derrubou:${VERSAO_APP}`
+
+/** O início do app achou um fechamento nesse passo: não liga mais. */
+export async function anotarQueDerrubou(passo: string | null) {
+  if (passo !== PASSO_SEGUNDO_PLANO) return
+  try { await AsyncStorage.setItem(DERRUBOU, '1') } catch { /* tanto faz */ }
+}
+
+async function derrubouAntes(): Promise<boolean> {
+  try {
+    if ((await AsyncStorage.getItem(DERRUBOU)) === '1') return true
+    // O fechamento ainda não subiu (o início do app corre em paralelo).
+    if ((await passoPendente()) === PASSO_SEGUNDO_PLANO) {
+      await AsyncStorage.setItem(DERRUBOU, '1')
+      return true
+    }
+  } catch { /* sem leitura: segue */ }
+  return false
+}
+
 export async function segundoPlanoLigado(): Promise<boolean> {
   try { return await Location.hasStartedLocationUpdatesAsync(TAREFA_RASTRO) } catch { return false }
 }
@@ -236,6 +272,13 @@ export async function segundoPlanoLigado(): Promise<boolean> {
  */
 export async function iniciarSegundoPlano(perguntar: boolean): Promise<boolean> {
   try {
+    // Fora da frente o Android recusa o serviço — e a recusa derruba o app.
+    // Quem chama tenta de novo no próximo passo do relógio.
+    if (AppState.currentState !== 'active') return false
+    if (await derrubouAntes()) {
+      mudar({ recado: 'Rota registrada só com o app aberto neste celular. O registro com o app fechado foi desligado depois de uma falha — a equipe do sistema já foi avisada.' })
+      return false
+    }
     if (!(await TaskManager.isAvailableAsync())) {
       mudar({ recado: 'Rota registrada só com o app aberto nesta versão do aplicativo.' })
       return false
@@ -250,7 +293,11 @@ export async function iniciarSegundoPlano(perguntar: boolean): Promise<boolean> 
       mudar({ recado: 'Rota registrada só com o app aberto. Para registrar com ele fechado, permita a localização "o tempo todo" nos ajustes.' })
       return false
     }
+    // A permissão "o tempo todo" pode ter mandado para os ajustes: confere
+    // de novo que o app voltou para a frente antes de subir o serviço.
+    if (AppState.currentState !== 'active') return false
     if (!(await segundoPlanoLigado())) {
+      await iniciarPasso(PASSO_SEGUNDO_PLANO)
       await Location.startLocationUpdatesAsync(TAREFA_RASTRO, {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: MIN_MS,
@@ -268,10 +315,14 @@ export async function iniciarSegundoPlano(perguntar: boolean): Promise<boolean> 
           killServiceOnDestroy: false,
         },
       })
+      // O defeito nativo aparece logo depois de o serviço subir, não na
+      // chamada: a anotação fica mais uns segundos.
+      setTimeout(() => { concluirPasso() }, 8000)
     }
     mudar({ modo: 'SEGUNDO_PLANO', recado: null })
     return true
   } catch {
+    await concluirPasso()
     // Expo Go cai aqui: ele não tem o serviço de localização em segundo plano.
     mudar({ recado: 'Rota registrada só com o app aberto (Expo Go não grava em segundo plano).' })
     return false
@@ -305,10 +356,10 @@ async function lerAgora(): Promise<Location.LocationObject | null> {
   try {
     const perm = await Location.getForegroundPermissionsAsync()
     if (perm.status !== 'granted') return null
-    return await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-  } catch {
-    return await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 }).catch(() => null)
-  }
+  } catch { return null }
+  // A leitura única do app (098): reaproveita a da guarda do GPS se for
+  // de menos de 1 min, em vez de ligar o GPS de novo.
+  return lerPosicao({ maxIdadeMs: 60 * 1000 })
 }
 
 /**

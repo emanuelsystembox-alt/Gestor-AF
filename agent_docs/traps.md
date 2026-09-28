@@ -185,6 +185,30 @@ atividade que o TOA fechou. Para saber se alguém mexeu depois da
 importação, olhe `bloqueado_em` (carimbado por `marca_bloqueio` em toda
 mudança de situação fora da importação). Ver D-169 (095b).
 
+**Texto vazio fora de `<Text>` derruba o APK.** `{v.complemento && <Text>…}`
+com `complemento = ''` renderiza a string vazia direto numa `View` — erro
+fatal no React Native. No Expo Go é tela vermelha; no APK é "o app fechou
+porque tem um bug", sem pista nenhuma. Em JSX do `campo/`, campo de texto
+que pode vir vazio vai com `!!` (`{!!v.complemento && …}`), e número com
+`!= null` (`lat` 0 é falso). Ver D-172.
+
+**No APK, qualquer erro de JavaScript não tratado FECHA o app.** Sem tela
+vermelha e sem log à mão. É por isso que existem `Tropeco` e `erro_app`
+(D-172): antes de caçar a causa de um fechamento, olhe
+`select * from erro_app order by criado_em desc`.
+
+**Serviço de localização em segundo plano derruba o processo com erro
+NATIVO.** Subir o serviço com o app fora da frente (por exemplo, voltando
+dos ajustes da permissão "o tempo todo") é recusado pelo Android e mata o
+app — nenhum `try/catch` pega. Só ligue com `AppState` ativo, e anote o
+passo antes (`iniciarPasso`). Ver D-172.
+
+**Menu com `position: fixed` copiado para outra tela sem o portal.** A
+correção da D-169 (portal para `.sup-controle`) só valia em Serviços: a
+cópia de Equipes, dentro de uma gaveta com `transform` e `overflow`, abria
+longe e sumia recortada. Hoje é um componente só (`MenuContrato`). Ver
+D-173.
+
 **No Android do Expo SDK 57 o teclado NÃO encolhe a janela** (edge-to-edge).
 `KeyboardAvoidingView` com `behavior={undefined}` no Android — o padrão de
 muitos exemplos — deixa o teclado em cima do campo. Use `'height'` no

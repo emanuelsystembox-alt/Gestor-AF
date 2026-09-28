@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
-import { ContratoModal } from '../components/ContratoModal'
+import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
+import { MenuContrato, type AcaoContrato } from '../components/MenuContrato'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useUltimoDiaComVisita } from '../lib/dia'
 import { useLocaisDaBaixa } from '../lib/localBaixa'
@@ -83,6 +83,8 @@ export default function Servicos() {
   const [erro, setErro] = useState<string | null>(null)
   // O contrato abre em JANELA, nao em linha expandida (D-056).
   const [modal, setModal] = useState<string | null>(null)
+  // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
+  const [acaoModal, setAcaoModal] = useState<AcaoContrato | null>(null)
   // Cadastro manual: o serviço que não veio do TOA precisa entrar
   // mesmo assim, senão não é despachado nem cobrado.
   const [novo, setNovo] = useState(false)
@@ -119,10 +121,10 @@ export default function Servicos() {
   // Marcadores (indicadores de qualidade) — o analista aponta no contrato
   // qual foi cumprido. Catálogo vem de `indicador_qualidade` (025).
   const [indicadores, setIndicadores] = useState<Indicador[]>([])
-  const [menu, setMenu] = useState<string | null>(null)
-  // Onde desenhar o menu: o sistema atual abre onde o mouse esta, nao
-  // encostado na borda direita da tabela.
-  const [menuXY, setMenuXY] = useState<{ x: number; y: number } | null>(null)
+  // O menu do contrato: qual linha e onde desenhar. O sistema atual abre
+  // onde o mouse esta, nao encostado na borda direita da tabela.
+  const [menu, setMenu] = useState<{ v: ContratoLinha; x: number; y: number } | null>(null)
+  const fecharMenu = useCallback(() => setMenu(null), [])
 
   // Selecao em lote. Guarda IDs, nao objetos: a lista e recarregada e
   // objeto novo com conteudo igual nao e o mesmo objeto (D-085).
@@ -216,7 +218,7 @@ export default function Servicos() {
 
 
   // ---- baixa da AFLINE, com sub-falha do código escolhido ----
-  const [codigos, setCodigos] = useState<{ codigo: number; descricao: string }[]>([])
+  const [codigos, setCodigos] = useState<CodigoDeBaixa[]>([])
 
   // Os dois conjuntos de sub-falha convivem no banco; só um vale. Sem
   // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
@@ -256,8 +258,8 @@ export default function Servicos() {
   }, [busca])
 
   useEffect(() => {
-    supabase.from('codigo_baixa').select('codigo, descricao').order('codigo')
-      .then(({ data }) => setCodigos((data ?? []) as { codigo: number; descricao: string }[]))
+    supabase.from('codigo_baixa').select('codigo, descricao, situacao_destino').order('codigo')
+      .then(({ data }) => setCodigos((data ?? []) as CodigoDeBaixa[]))
     supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
       .then(({ data }) =>
         setConjunto((data as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
@@ -717,8 +719,7 @@ export default function Servicos() {
               aoMenuContexto={(v, e) => {
                 // Botão direito abre as ações do contrato — é como o COP
                 // está acostumado a trabalhar.
-                setMenu(menu === v.id ? null : v.id)
-                setMenuXY({ x: e.clientX, y: e.clientY })
+                setMenu({ v, x: e.clientX, y: e.clientY })
               }}
               vazio={
                 <Vazio
@@ -750,7 +751,7 @@ export default function Servicos() {
                         className="rounded-lg border border-graf-700 px-4 py-2 text-sm
                                    text-graf-300 hover:border-af-600">Limpar filtros</button>} />
               }
-              renderAcoes={v => (<>
+              renderAcoes={v => (
                 <div className="flex items-center justify-end gap-1">
                   <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
                     className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
@@ -760,8 +761,7 @@ export default function Servicos() {
                   <button
                     onClick={e => {
                       e.stopPropagation()
-                      setMenu(menu === v.id ? null : v.id)
-                      setMenuXY({ x: e.clientX, y: e.clientY })
+                      setMenu(menu?.v.id === v.id ? null : { v, x: e.clientX, y: e.clientY })
                     }}
                     title="Ações do contrato"
                     className="rounded border border-graf-700 px-1.5 py-0.5 text-[11px]
@@ -770,67 +770,7 @@ export default function Servicos() {
                     ⋯
                   </button>
                 </div>
-
-                {/* ┌─ o menu vai para a RAIZ da tela, por portal ─────────────┐
-                    │ Ele é `fixed`, mas morava dentro da linha da tabela: um    │
-                    │ ancestral com transform/backdrop-filter faz o navegador   │
-                    │ medir o `fixed` a partir DELE, não da janela — e o menu   │
-                    │ abria longe do clique (Emanuel, 27/09). Na raiz do Shell  │
-                    │ (`.sup-controle`) ele mede da janela e herda o tema.       │
-                    └────────────────────────────────────────────────────────────┘ */}
-                {menu === v.id && createPortal(
-                  <div onClick={e => e.stopPropagation()}
-                    // A ponta do menu fica NO clique: sem espaço à direita,
-                    // abre para a esquerda; sem espaço embaixo, para cima.
-                    // Empurrar para dentro da tela (como era) o afastava do
-                    // cursor justamente na borda, onde mais se clica.
-                    // O translate usa o tamanho REAL do menu: nada de estimar
-                    // altura (a estimativa deixava 44 px entre o menu e o clique).
-                    style={menuXY ? {
-                      left: menuXY.x, top: menuXY.y,
-                      transform: `translate(${menuXY.x + 216 > window.innerWidth ? '-100%' : '0'}, `
-                        + `${menuXY.y + 280 > window.innerHeight ? '-100%' : '0'})`,
-                    } : undefined}
-                    className="fixed z-50 w-52 overflow-hidden rounded-lg border
-                               border-graf-700 bg-graf-900 text-left shadow-xl">
-                    <Link to={`/controle/visita/${v.id}`}
-                      className="block px-3 py-2 text-xs text-graf-200 hover:bg-graf-800">
-                      Abrir contrato
-                    </Link>
-                    <button
-                      onClick={() => { setModal(v.id); setMenu(null) }}
-                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                 hover:bg-graf-800">
-                      Marcadores…
-                    </button>
-                    <button
-                      onClick={() => { setModal(v.id); setMenu(null) }}
-                      disabled={v.ordem_servico.length === 0}
-                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                 hover:bg-graf-800 disabled:opacity-40">
-                      Baixar serviço…
-                    </button>
-                    <button
-                      onClick={() => { setModal(v.id); setMenu(null) }}
-                      className="block w-full px-3 py-2 text-left text-xs text-graf-200
-                                 hover:bg-graf-800">
-                      Transferir equipe…
-                    </button>
-                    <button
-                      onClick={() => { setModal(v.id); setMenu(null) }}
-                      className="block w-full border-t border-graf-800 px-3 py-2
-                                 text-left text-xs text-af-300 hover:bg-af-900/20">
-                      Apagar do banco…
-                    </button>
-                    <div className="border-t border-graf-800 px-3 py-2 text-[10px]
-                                    leading-snug text-graf-600">
-                      Editar não existe: o cadastro vem do TOA e é reescrito a cada
-                      importação.
-                    </div>
-                  </div>,
-                  document.querySelector('.sup-controle') ?? document.body,
-                )}
-              </>)}
+              )}
             />
           </div>
 
@@ -937,15 +877,21 @@ export default function Servicos() {
         />
       )}
 
+      {menu && (
+        <MenuContrato v={menu.v} xy={menu} aoFechar={fecharMenu}
+          aoEscolher={acao => { setAcaoModal(acao); setModal(menu.v.id) }} />
+      )}
+
       {modal && (
         <ContratoModal
           id={modal}
+          acaoInicial={acaoModal}
           indicadores={indicadores}
           codigos={codigos}
           conjunto={conjunto}
           equipes={equipes}
           pontos={pontos.get(modal) ?? null}
-          onFechar={() => setModal(null)}
+          onFechar={() => { setModal(null); setAcaoModal(null) }}
           onMudou={() => setVersao(x => x + 1)}
         />
       )}

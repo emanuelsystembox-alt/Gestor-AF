@@ -50,12 +50,58 @@ export async function pedirPermissao(): Promise<boolean> {
 }
 
 /**
+ * ┌─ UMA LEITURA DE GPS POR VEZ, PARA O APP INTEIRO (098, D-172) ─────┐
+ * │ > "eu to vendo que ele ta so procurando o gps direto" — Emanuel.   │
+ * │ Era verdade: a guarda do GPS lia a cada 20 s, o rastro a cada      │
+ * │ minuto, e a Agenda e o contrato liam de novo ao abrir — cada um    │
+ * │ pedindo uma leitura NOVA ao Android, às vezes duas ao mesmo tempo, │
+ * │ e a leitura sem prazo podia ficar pendurada para sempre.           │
+ * │ Agora todos passam por aqui:                                        │
+ * │  · leitura recente (dentro de `maxIdadeMs`) é reaproveitada;       │
+ * │  · duas pedidas ao mesmo tempo viram UMA (a segunda espera a       │
+ * │    primeira);                                                        │
+ * │  · toda leitura tem prazo; sem satélite no prazo, vale a última    │
+ * │    conhecida.                                                        │
+ * │ A baixa continua exigindo leitura de no máximo 2 min (Visita).     │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+let ultima: Location.LocationObject | null = null
+let emVoo: Promise<Location.LocationObject | null> | null = null
+
+function comPrazo<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), ms))])
+}
+
+export async function lerPosicao(
+  { maxIdadeMs = 60 * 1000, prazoMs = 12 * 1000 }: { maxIdadeMs?: number; prazoMs?: number } = {},
+): Promise<Location.LocationObject | null> {
+  if (ultima && Date.now() - ultima.timestamp <= maxIdadeMs) return ultima
+  if (emVoo) return emVoo
+  emVoo = (async () => {
+    try {
+      const p = await comPrazo(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), prazoMs)
+      if (p) { ultima = p; return p }
+    } catch { /* sem satélite ainda: cai na última conhecida */ }
+    const u = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 }).catch(() => null)
+    if (u) ultima = u
+    return u
+  })()
+  try { return await emVoo } finally { emVoo = null }
+}
+
+/** Esquece a leitura guardada (troca de login). */
+export function esquecerPosicao() { ultima = null }
+
+/**
  * Lê a posição agora. `Balanced` e não `Highest` de propósito: em rua
  * de Manaus, com prédio dos dois lados, a precisão máxima demora 20 s e
  * chega ao mesmo lugar. Vinte segundos com o técnico parado esperando o
  * botão liberar é o que faz um aplicativo ser desligado.
+ *
+ * `maxIdadeMs` é quanto uma leitura guardada ainda vale para quem chama.
  */
-export async function ondeEstou(): Promise<EstadoGps> {
+export async function ondeEstou(maxIdadeMs = 60 * 1000): Promise<EstadoGps> {
   try {
     const perm = await Location.getForegroundPermissionsAsync()
     if (perm.status !== 'granted') {
@@ -66,37 +112,21 @@ export async function ondeEstou(): Promise<EstadoGps> {
     if (!(await Location.hasServicesEnabledAsync())) {
       return { ok: false, motivo: 'DESLIGADO', recado: RECADO.DESLIGADO }
     }
-
-    const p = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    })
-    if (ehSimulada(p)) return { ok: false, motivo: 'SIMULADO', recado: RECADO.SIMULADO }
-    return {
-      ok: true,
-      posicao: {
-        lat: p.coords.latitude,
-        lng: p.coords.longitude,
-        precisao: p.coords.accuracy ?? null,
-        em: new Date(p.timestamp),
-      },
-    }
   } catch {
-    // Cai aqui quando o aparelho tem permissão e serviço ligados mas
-    // ainda não fixou satélite — sair de dentro de um prédio resolve.
-    const ultima = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 })
-    if (ultima && ehSimulada(ultima)) return { ok: false, motivo: 'SIMULADO', recado: RECADO.SIMULADO }
-    if (ultima) {
-      return {
-        ok: true,
-        posicao: {
-          lat: ultima.coords.latitude,
-          lng: ultima.coords.longitude,
-          precisao: ultima.coords.accuracy ?? null,
-          em: new Date(ultima.timestamp),
-        },
-      }
-    }
     return { ok: false, motivo: 'SEM_SINAL', recado: RECADO.SEM_SINAL }
+  }
+
+  const p = await lerPosicao({ maxIdadeMs })
+  if (!p) return { ok: false, motivo: 'SEM_SINAL', recado: RECADO.SEM_SINAL }
+  if (ehSimulada(p)) return { ok: false, motivo: 'SIMULADO', recado: RECADO.SIMULADO }
+  return {
+    ok: true,
+    posicao: {
+      lat: p.coords.latitude,
+      lng: p.coords.longitude,
+      precisao: p.coords.accuracy ?? null,
+      em: new Date(p.timestamp),
+    },
   }
 }
 

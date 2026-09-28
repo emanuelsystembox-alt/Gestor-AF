@@ -12,6 +12,21 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "afline-sem-sessao",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "app",
+        "--",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174
     }
   ]
 }

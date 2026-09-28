@@ -53,6 +53,17 @@ const STATUS_DO_CAMPO = [
 interface CodigoBaixa {
   id: string; codigo: number; descricao: string
   natureza: string; responsabilidade: string | null
+  /** Para qual desfecho o código serve (D-097): é ele que decide se a
+   *  visita se finaliza, se cancela ou se reagenda (099). */
+  situacao_destino: string | null
+}
+
+/** O verbo do botão principal para cada desfecho (099, D-174). */
+const ENCERRAR: Record<string, string> = {
+  CONCLUIDA: 'Finalizar visita', CANCELADA: 'Cancelar visita', REAGENDAMENTO: 'Reagendar visita',
+}
+const PALAVRA_DESTINO: Record<string, string> = {
+  CONCLUIDA: 'CONCLUI', CANCELADA: 'CANCELA', REAGENDAMENTO: 'REAGENDA',
 }
 interface SubFalha { id: string; nome: string }
 interface OS {
@@ -114,8 +125,8 @@ const SELECT = `
   ordem_servico (
     id, sequencia, numero_os, descricao, status_operadora, baixa_observacao,
     tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( id, codigo, descricao, natureza, responsabilidade ),
-    baixa_afline:codigo_baixa_afline_id ( id, codigo, descricao, natureza, responsabilidade ),
+    codigo_baixa:codigo_baixa_id ( id, codigo, descricao, natureza, responsabilidade, situacao_destino ),
+    baixa_afline:codigo_baixa_afline_id ( id, codigo, descricao, natureza, responsabilidade, situacao_destino ),
     sub_falha:sub_falha_id ( nome )
   ),
   evidencia (
@@ -204,7 +215,7 @@ export default function Visita({ route, navigation }: Props) {
       setCarregando(true)
       const [dc, dm] = await Promise.all([
         supabase.from('codigo_baixa')
-          .select('id, codigo, descricao, natureza, responsabilidade')
+          .select('id, codigo, descricao, natureza, responsabilidade, situacao_destino')
           .eq('ativo', true).order('codigo'),
         supabase.from('empresa').select('conjunto_sub_falha').limit(1).maybeSingle(),
       ])
@@ -261,6 +272,19 @@ export default function Visita({ route, navigation }: Props) {
     && v.ordem_servico.every(o => o.baixa_afline)
   const faltam = v ? v.ordem_servico.filter(o => !o.baixa_afline).length : 0
 
+  // ┌─ o desfecho sai do código (099, D-174) ─────────────────────────┐
+  // │ "Finalizar" é CONCLUÍDA. Com código de reagendamento nas O.S., o │
+  // │ botão vira "Reagendar visita"; com código de cancelamento,       │
+  // │ "Cancelar visita". Códigos de desfechos diferentes na mesma      │
+  // │ visita não encerram: o banco recusa, e só o controlador corrige. │
+  // └──────────────────────────────────────────────────────────────────┘
+  const destinos = [...new Set((v?.ordem_servico ?? [])
+    .map(o => o.baixa_afline?.situacao_destino).filter((d): d is string => !!d))]
+  const misturado = destinos.length > 1
+  /** Depois da 1ª O.S. baixada, as outras só aceitam código do mesmo desfecho. */
+  const destinoTravado = destinos.length === 1 ? destinos[0] : null
+  const destinoFinal = todasBaixadas && destinoTravado ? destinoTravado : null
+
   const distancia = useMemo(() => {
     if (!v?.lat || !v?.lng || !gps?.ok) return null
     return distanciaM(gps.posicao.lat, gps.posicao.lng, Number(v.lat), Number(v.lng))
@@ -268,10 +292,12 @@ export default function Visita({ route, navigation }: Props) {
 
   const filtrados = useMemo(() => {
     const t = buscaCod.trim().toLowerCase()
-    if (!t) return codigos
-    return codigos.filter(c =>
+    const doDesfecho = destinoTravado
+      ? codigos.filter(c => c.situacao_destino === destinoTravado) : codigos
+    if (!t) return doDesfecho
+    return doDesfecho.filter(c =>
       String(c.codigo).includes(t) || c.descricao.toLowerCase().includes(t))
-  }, [codigos, buscaCod])
+  }, [codigos, buscaCod, destinoTravado])
 
   /** A coordenada vai com a PRECISÃO (096): 35 m do cliente com ±8 m e
    *  com ±2.000 m contam histórias diferentes na central. */
@@ -416,6 +442,12 @@ export default function Visita({ route, navigation }: Props) {
         setErro(`Para ${rotuloSituacao(s).toLowerCase()}, todas as O.S. precisam de baixa — falta ${faltam}.`)
         return
       }
+      if (misturado || (destinoFinal && s !== destinoFinal)) {
+        setErro(misturado
+          ? 'As O.S. foram baixadas com códigos de desfechos diferentes. Peça ao controlador para corrigir.'
+          : `Os códigos de baixa são de ${rotuloSituacao(destinoFinal!).toLowerCase()} — não dá para ${rotuloSituacao(s).toLowerCase()}.`)
+        return
+      }
       Alert.alert(
         rotuloSituacao(s),
         'Depois disso o contrato fica encerrado e você não consegue reabrir — só o controlador.',
@@ -540,15 +572,15 @@ export default function Visita({ route, navigation }: Props) {
 
         {/* ---------- endereço ---------- */}
         <Cartao style={{ padding: 16 }}>
-          {v.cliente_nome && <Text style={e.clienteNome}>{v.cliente_nome}</Text>}
+          {!!v.cliente_nome && <Text style={e.clienteNome}>{v.cliente_nome}</Text>}
           <Text style={e.endereco}>{v.logradouro ?? 'Sem endereço'}</Text>
-          {v.complemento && <Text style={e.enderecoMiudo}>{v.complemento}</Text>}
+          {!!v.complemento && <Text style={e.enderecoMiudo}>{v.complemento}</Text>}
           <Text style={e.enderecoMiudo}>
             {v.bairro}{v.cep ? ` · ${v.cep}` : ''}
           </Text>
 
           <View style={{ gap: 8, marginTop: 14 }}>
-            {v.lat && v.lng && (
+            {v.lat != null && v.lng != null && (
               <Botao
                 titulo="Abrir rota no mapa"
                 tom="contorno"
@@ -632,7 +664,7 @@ export default function Visita({ route, navigation }: Props) {
                   {os.baixa_afline.codigo} · {os.baixa_afline.descricao}
                 </Text>
                 {os.sub_falha && <Text style={e.baixaMiudo}>{os.sub_falha.nome}</Text>}
-                {os.baixa_observacao && (
+                {!!os.baixa_observacao && (
                   <Text style={e.baixaMiudo}>{os.baixa_observacao}</Text>
                 )}
                 {/* Sem "trocar código" para o campo. A baixa é o que a
@@ -871,7 +903,7 @@ export default function Visita({ route, navigation }: Props) {
                       {sit ?? rotuloEvento(ev.tipo)}
                       {ev.login ? <Text style={e.eventoLogin}> · {ev.login}</Text> : null}
                     </Text>
-                    {ev.observacao && (
+                    {!!ev.observacao && (
                       <Text style={e.eventoObs}>{ev.observacao}</Text>
                     )}
                   </View>
@@ -922,15 +954,18 @@ export default function Visita({ route, navigation }: Props) {
                 aoTocar={() => setPedindoObs(true)} desativado={salvando}
               />
               <Botao
-                titulo={todasBaixadas ? 'Finalizar visita' : `Falta baixar ${faltam} O.S.`}
-                tom="sucesso" grande style={{ flex: 1.5 }}
-                desativado={!todasBaixadas} carregando={salvando}
-                aoTocar={() => Alert.alert(
-                  'Finalizar visita',
+                titulo={!todasBaixadas ? `Falta baixar ${faltam} O.S.`
+                  : misturado ? 'Códigos não combinam'
+                  : ENCERRAR[destinoFinal ?? 'CONCLUIDA']}
+                tom={!destinoFinal || destinoFinal === 'CONCLUIDA' ? 'sucesso' : 'principal'}
+                grande style={{ flex: 1.5 }}
+                desativado={!todasBaixadas || misturado || !destinoFinal} carregando={salvando}
+                aoTocar={() => destinoFinal && Alert.alert(
+                  ENCERRAR[destinoFinal],
                   'Depois disso o contrato fica encerrado e você não consegue reabrir — só o controlador.',
                   [
                     { text: 'Voltar', style: 'cancel' },
-                    { text: 'Finalizar', onPress: () => etapa('CONCLUIDA') },
+                    { text: 'Confirmar', onPress: () => etapa(destinoFinal) },
                   ],
                 )}
               />
@@ -1007,7 +1042,9 @@ export default function Visita({ route, navigation }: Props) {
           </Text>
           {STATUS_DO_CAMPO.map(s => {
             const atual = v.situacao === s
-            const bloqueado = ehTerminal(s) && !todasBaixadas
+            const semBaixa = ehTerminal(s) && !todasBaixadas
+            const outroDesfecho = ehTerminal(s) && !semBaixa
+              && (misturado || (!!destinoFinal && s !== destinoFinal))
             return (
               <Pressable key={s} disabled={atual}
                 onPress={() => escolherStatus(s)}
@@ -1018,7 +1055,9 @@ export default function Visita({ route, navigation }: Props) {
                 <Etiqueta situacao={s} />
                 <Text style={e.statusNota}>
                   {atual ? 'status atual'
-                    : bloqueado ? `falta baixar ${faltam} O.S.`
+                    : semBaixa ? `falta baixar ${faltam} O.S.`
+                    : outroDesfecho ? (misturado ? 'códigos não combinam'
+                      : `códigos de ${rotuloSituacao(destinoFinal!).toLowerCase()}`)
                     : s === 'COM_IMPEDIMENTO' ? 'avisa o controlador' : ''}
                 </Text>
               </Pressable>
@@ -1141,6 +1180,12 @@ export default function Visita({ route, navigation }: Props) {
 
             {!codEscolhido ? (
               <>
+                {destinoTravado && (
+                  <Aviso tipo="atencao">
+                    Só códigos de {rotuloSituacao(destinoTravado).toLowerCase()}: a outra O.S.
+                    desta visita já foi baixada assim.
+                  </Aviso>
+                )}
                 <TextInput
                   autoFocus value={buscaCod} onChangeText={setBuscaCod}
                   placeholder="Buscar por número ou descrição…"
@@ -1164,7 +1209,8 @@ export default function Visita({ route, navigation }: Props) {
                           e.naturezaTexto,
                           { color: c.natureza === 'SUCESSO' ? cor.verde900 : cor.af700 },
                         ]}>
-                          {c.natureza === 'SUCESSO' ? 'OK' : 'IMPROD'}
+                          {PALAVRA_DESTINO[c.situacao_destino ?? '']
+                            ?? (c.natureza === 'SUCESSO' ? 'OK' : 'IMPROD')}
                         </Text>
                       </View>
                     </Pressable>

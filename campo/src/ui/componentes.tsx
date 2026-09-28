@@ -114,7 +114,7 @@ export function Vazio({ titulo, descricao }: { titulo: string; descricao?: strin
   return (
     <View style={e.vazio}>
       <Text style={e.vazioTitulo}>{titulo}</Text>
-      {descricao && <Text style={e.vazioDesc}>{descricao}</Text>}
+      {!!descricao && <Text style={e.vazioDesc}>{descricao}</Text>}
     </View>
   )
 }
