@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **27/09/2026**, por Claude (Opus 5.5).
+Última atualização: **17/10/2026**, por Claude (Opus 5.5).
 
 ---
 
@@ -223,7 +223,30 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
-> ### Comece por aqui (atualizado em 27/09, noite)
+> ### Comece por aqui (atualizado em 17/10)
+>
+> **O banco foi ZERADO do teste em 17/10 (D-177)**: só existe o admin
+> (`admin@afline.com.br`), nenhum técnico, nenhum contrato; em Manaus, só a
+> equipe abrigo "Sem login definido". A regra "usuário não se apaga, se
+> desativa" continua valendo para dado real — isto foi apagar teste, a
+> pedido, antes da operação começar.
+>
+> **Novo (D-176, migration 100): o cadastro de uma cidade por planilha
+> padrão** — Administração › **Importar planilha** (só ADMIN). Baixa a
+> planilha da cidade (com listas suspensas do cadastro de hoje), envia
+> preenchida, vê a PRÉVIA (a importação de verdade, desfeita), importa
+> Áreas → Equipes → Técnicos → Veículos e cria os acessos; senha gerada por
+> pessoa ou uma senha inicial comum, que quem importa digita (D-177).
+>
+> **Próximo passo, do Emanuel:** importar Manaus — 55 técnicos e 55 equipes,
+> planilha já convertida para o padrão e com prévia limpa (está nos
+> Downloads dele, fora do Git). Depois, conferir no banco os 55 acessos, o
+> vínculo acesso↔técnico e os logins roteados. Pendências em
+> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 14/10/2026".
+>
+> ---
+>
+> ### Antes disso (27/09, noite)
 >
 > **Pendências da noite de 27/09 (APK 0.2.1, causa do fechamento do app,
 > números reais da entrada): `docs/08-ESTADO-DO-PROJETO.md`, seção

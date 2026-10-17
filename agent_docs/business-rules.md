@@ -353,6 +353,27 @@ texto. Texto novo = versão nova. Retenção: **90 dias**, expurgo diário
 
 ---
 
+## Cadastro de uma cidade por planilha (100, D-176)
+
+**A planilha padrão é gerada pelo sistema**, para a cidade escolhida, com as
+listas do cadastro de hoje (perfil, cargo, skill, tipo/propriedade/pernoite
+do veículo): a célula recusa o que não existe. Não se aceita planilha "de
+fora": sem as abas Áreas/Equipes/Pessoas/Veículos, a importação recusa.
+
+**Reimportar atualiza, não duplica; célula vazia não apaga.** Linha com
+problema fica de fora e aparece como erro — o resto entra. A prévia é a
+importação de verdade, desfeita.
+
+**Só ADMIN importa**, porque o lote cria acesso. Senha gerada pelo servidor,
+devolvida UMA vez na planilha de resultado — ou uma senha inicial comum ao
+lote, que QUEM IMPORTA digita na tela (D-177); ela não é gravada em lugar
+nenhum além da conta. E-mail que já tem acesso não é alterado.
+
+**O código de área é único no sistema inteiro**: use o prefixo da cidade
+(`BEL-AREA01`).
+
+---
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

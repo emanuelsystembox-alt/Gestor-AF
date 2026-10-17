@@ -148,6 +148,13 @@ sintaxe que só existe no seu teste.
 
 ## Front (web e aplicativo)
 
+**`new Date('1990-02-31')` não falha: vira 03/03, calado.** Conferir data
+digitada só com "deu `Date` válido?" aceita 31 de fevereiro. O certo é montar
+a data e conferir que dia, mês e ano voltaram iguais. Pegou na importação da
+planilha de cadastro (D-176, `dataIso` em `lib/cadastroCidade.ts`). E data
+lida do Excel chega como meia-noite **UTC**: leia com `getUTC*`, senão em
+Manaus vira o dia anterior.
+
 **`toISOString()` devolve a data em UTC.** Em Manaus o dia vira às 20h e
 a tela abre no dia seguinte, vazia. Use `isoLocal()` de `lib/formato.ts`
 (existe nos dois projetos). Ver D-084.

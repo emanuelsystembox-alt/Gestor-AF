@@ -373,6 +373,20 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 14/10/2026 — cadastro de cidade por planilha (D-176)
+
+Migration **100**; Administração › **Importar planilha** (só ADMIN); web
+publicada e conferida.
+
+| O quê | Por quê |
+|---|---|
+| **Importar Manaus (55 técnicos)** | Planilha convertida e com prévia limpa (D-177): falta o Emanuel enviá-la em Administração › Importar planilha, logado, com a senha inicial. 3 e-mails parecem ter erro de digitação. |
+| **5 fotos órfãs no Storage** | Da limpeza de 17/10; o SQL não apaga arquivo. Painel do Supabase › Storage › evidencia. |
+| **Testar o lote inteiro logado, com acessos** | A criação de acessos em lote cria contas reais e não se desfaz sem a `service_role`. Sugestão: primeiro com 2 ou 3 pessoas de teste numa cidade de teste. |
+| **Abrir a planilha no Excel de verdade** | As listas e as notas foram conferidas lendo o arquivo; ninguém clicou numa lista suspensa no Excel. |
+| **Controlador chamando a importação** | Deve ser barrado (só ADMIN); não havia controlador sem ADMIN no banco para provar. |
+| **Mesmo login TOA em duas cidades** | `vincular_tecnico_ao_usuario` procura o técnico pelo login sem olhar a cidade (`limit 1`). A prévia avisa quando o login existe em outra cidade. |
+
 ## Pendente em 27/09/2026, noite — baixa coerente, app que diz onde fechou, entrada nova (D-172 a D-175)
 
 Migrations **098** e **099**; web publicada e conferida no ar; app em

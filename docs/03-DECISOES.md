@@ -6601,3 +6601,155 @@ ficou mais alto que o de 7 e tampava o "Esqueci minha senha" (medido: 577 ×
 **Conferido no navegador:** a abertura inteira, a tela em 1440×900 e em
 celular (sem rolagem lateral), a seção de indicadores. Publicado e
 conferido no ar (a foto responde 200).
+
+---
+
+### D-176 · A cidade nasce de uma planilha padrão
+
+> *"preciso que em nosso sistema tenha uma planilha de importação onde
+> podemos importar de uma única vez os dados que precisamos para povoar o
+> sistema, preciso que a planilha excel seja padrão ou seja, já defina o que
+> o usuário pode cadastrar, quero fazer isso em uma cidade […] atualize nosso
+> sistema para ter o download da planilha padrão, e para importar dados
+> depois que o usuário preencher"* — Emanuel, 14/10
+
+Migration **100**. Administração › **Importar planilha** (só ADMIN).
+
+**Perguntado e respondido (14/10):** quatro abas — **Áreas, Equipes,
+Pessoas, Veículos**; a cidade **já existe** como Operação; a senha de cada
+acesso é **gerada pelo servidor e devolvida uma vez**, numa planilha de
+resultado.
+
+**A planilha padrão** é gerada na hora, para a cidade escolhida, com as
+listas do cadastro **de hoje**: perfil de acesso, cargo, skill, tipo,
+propriedade e pernoite do veículo, SIM/NÃO — a célula **recusa** o que não
+está na lista. Área, equipe e condutor **sugerem** o que a outra aba
+cadastrou, mas aceitam com aviso (pode já existir no sistema). Coluna
+obrigatória em vermelho com `*`; a explicação de cada coluna fica no
+cabeçalho (nota) e no Leia-me, que também diz o que a cidade já tem e o
+aviso de LGPD. Texto nas colunas de código, para o Excel não comer o zero de
+"045" nem virar CPF em notação científica. A planilha guarda a cidade para
+a qual nasceu: importá-la em outra cidade pede confirmação.
+
+**Gerada com `exceljs`, só nesta tela.** O SheetJS livre não grava validação
+de célula. O `exceljs` entra por `import()` dinâmico (271 KB compactado),
+sem pesar o resto do sistema.
+
+**A importação** é uma função só no banco (`importar_cadastro_cidade`), na
+ordem em que uma coisa depende da outra: Áreas → Equipes → Técnicos (quem
+tem login TOA na aba Pessoas) → rotear o login para a equipe → skill →
+Veículos → condutor. Reaproveita as funções que a tela já usa
+(`cadastrar_tecnico_avulso`, `cadastrar_login_da_equipe`, `salvar_veiculo`,
+`definir_condutor`) em vez de copiar regra.
+
+- **A prévia é a importação de verdade, desfeita**: `p_simular` roda tudo —
+  restrições do banco e funções reaproveitadas inclusive — e levanta uma
+  exceção no fim que desfaz a transação. O relatório sobrevive porque
+  variável de plpgsql não é transacional. A prévia diz o que a importação
+  vai dizer, porque é o mesmo código.
+- **Reimportar atualiza, não duplica** (área por código, equipe por cidade +
+  código, técnico por cidade + login, veículo por placa), e **célula vazia
+  não apaga** o que está gravado (vazio é "não sei", regra 6). No veículo
+  isso exigiu mesclar com o registro existente: `salvar_veiculo` grava
+  todos os campos, e uma célula vazia apagaria o chassi.
+- **Linha com problema fica de fora, o resto entra.** A tela recusa antes o
+  que é formato (CPF com dígito verificador, e-mail, telefone, data que
+  existe, valor fora da lista) — com a mesma `conferirCadastro` da tela de
+  usuário; o banco recusa o que é relação (equipe que não existe, área de
+  outra cidade, e-mail repetido, técnico já ligado a outro acesso, condutor
+  que não é técnico da cidade).
+- Grava na **cidade escolhida** — a importação de equipes antiga grava
+  sempre em Manaus (D-141).
+
+**Os acessos** não são criados pela função do banco: criar login exige a
+`service_role`, que só a função `admin-usuarios` tem (a mesma do cadastro um
+a um). Depois da importação, a tela chama `admin-usuarios` pessoa a pessoa
+(com a cidade da planilha), liga o acesso ao técnico
+(`vincular_tecnico_ao_usuario`) e o supervisor às equipes que levam o nome
+dele (`definir_supervisor_das_equipes`). E-mail que **já tem acesso não é
+alterado**. No fim, **"Baixar resultado com as senhas"** — as senhas só
+existem nessa tela; sair antes de baixar pede confirmação.
+
+**O código de área é único no sistema INTEIRO**, não por cidade (a
+restrição já existia). A planilha orienta o prefixo da cidade
+(`BEL-AREA01`), e a prévia acusa conflito com outra cidade.
+
+**Testado como `authenticated` (desfeito):** prévia com 21 equipes antes e
+21 depois; erros acusados — área de outra cidade, área que não existe,
+e-mail repetido, equipe que não existe, placa inválida, condutor de fora;
+avisos — supervisor que não está em lugar nenhum, e-mail que já tem acesso;
+importação real: área → equipe com área → técnico com skill e equipe →
+login roteado com autor → veículo com condutor. Técnico chamando a função:
+barrado (42501). Na web (sem login, na própria página): planilha gerada com
+as 6 abas (94 KB), listas certas, preenchida e relida — CPF e WhatsApp só
+dígitos, data no padrão do banco, rótulo do veículo virando código.
+**Defeito pego no teste:** "31/02/1990" passava como data válida (o
+JavaScript vira 03/03 sem reclamar) — agora é recusado; 29/02/1992 passa.
+Baterias 16/16 e 23/23; nada DEFINER aberto ao `anon`; web publicada e
+conferida.
+
+**Não verificado:** o fluxo inteiro logado na tela (a sessão do navegador
+de teste tinha caído, e a senha do admin não passa pelo assistente) — em
+especial a **criação de acessos em lote**, que cria contas reais e não tem
+como ser desfeita sem a `service_role`. Ela usa a mesma função do cadastro
+um a um, que já funciona; o lote em si (dezenas de chamadas seguidas) não
+foi exercitado. Controlador chamando a função: não havia controlador sem
+ADMIN no banco para testar. A planilha aberta no Excel de verdade (as
+listas foram conferidas lendo o arquivo, não clicando no Excel).
+
+---
+
+### D-177 · Manaus zerada para a operação real, e a senha inicial do lote
+
+> *"Vamos apagar os dados que já criamos, deixar somente o Emanuel que é o
+> ADMIN […] vamos cadastrar todas essas equipes que te mandei na planilha,
+> o apelido pegue o primeiro nome de cada técnico […] e a senha coloque um
+> padrão só"* — Emanuel, 17/10
+
+**A limpeza** (escolha do Emanuel entre três: "tudo de teste"). Numa
+transação só — três tentativas desfeitas inteiras antes da que passou
+(romaneio preso a movimento de miscelânea; perfil de teste com CPF/data que
+a CHECK recusa a qualquer `update`; técnico apontando o supervisor de
+teste):
+
+- 4 usuários de teste (fica só `admin@afline.com.br`); 3 técnicos; equipes
+  001/002/003 de Manaus (a abrigo SEM-LOGIN fica);
+- os 269 contratos de Manaus (10/09 a 14/10) e tudo deles: O.S., eventos,
+  avisos, contato, reincidências; 20 sinais; 11 mensagens; 36 pontos de
+  rastro; 23 importações; 733 registros de contrato apagado;
+- 2 romaneios e os 4 movimentos de miscelânea deles (entrega e devolução
+  de 30 unidades, em partida dobrada: o saldo do almoxarifado foi conferido
+  igual antes e depois, e a transação recusaria se mudasse);
+- 2 equipamentos reais (Atlas) que testes de romaneio tinham posto na mão
+  de técnico de teste voltaram a **sem posse declarada** (D-152).
+
+Conferido antes: nenhuma configuração real (meta, faixa, parâmetro,
+catálogo, login roteado de outra equipe) tinha autoria de usuário de teste.
+**Não apagado:** 5 arquivos de foto no bucket `evidencia` — o Supabase
+recusa apagar arquivo por SQL ("use the Storage API"), e a API exige a
+`service_role`. Órfãos, sem contrato; saem pelo painel (Storage).
+
+> A regra "usuário não se apaga, se desativa" continua valendo para dado
+> REAL. Isto foi apagar dado de TESTE, a pedido, antes da operação começar.
+
+**A senha inicial do lote.** A importação ganhou o campo opcional "senha
+inicial para todos" (mínimo 8, com letra e número). Vazio = o servidor gera
+uma por pessoa, como na D-176. Preenchido = vai para `admin-usuarios` como
+`senha`. **Quem digita é quem importa**: a senha de conta real não passa
+pelo assistente, e não é gravada na planilha de resultado (a coluna diz "a
+senha padrão do lote"). A tela avisa: senha igual para todos é senha
+conhecida por todos — cada um deve trocar no primeiro acesso.
+
+**A planilha de Manaus** veio sem as abas Áreas/Equipes/Veículos e com duas
+colunas fora do padrão (`LOGIN`, `EQUIPE`) no lugar de "Login TOA" e
+"Equipe". Foi convertida para o formato padrão (fora do repositório, em
+Downloads): 55 equipes (uma por técnico), apelido = primeiro nome com só a
+inicial maiúscula, e os 5 sem e-mail ganharam `NNN_equipe@afline.com.br`
+pelo número da equipe (escolha do Emanuel). Passou pelo leitor da tela
+(zero problema) e pela prévia como ADMIN (55 equipes e 55 técnicos novos,
+55 acessos a criar, zero erro, zero aviso, nada gravado).
+
+**Três e-mails da planilha parecem ter erro de digitação**
+(`…@gmail.comc`, `…@gmal.com`, `…@gmail.com.br`): entram como login, mas
+"esqueci a senha" por e-mail não chegaria. Não foram corrigidos — não
+sabemos o certo.
