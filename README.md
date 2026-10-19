@@ -1,68 +1,92 @@
 # Gestor AF — AFLINE Manager
 
-Camada operacional de gestão de ordens de serviço da **AFLINE**, prestadora
-de serviços da **CLARO** em Manaus.
+Camada operacional da **AFLINE**, prestadora de serviços da **CLARO**:
+importar a rota do **TOA (Oracle Field Service)**, despachar para as
+equipes, executar em campo, medir e cobrar. Substitui o Alfa Gestor /
+ngestor, que é caro e cujo roadmap a AFLINE não controla.
 
-O sistema recebe a planilha de atividades exportada do **TOA (Oracle Field
-Service)** da CLARO, transforma em visitas e ordens de serviço, distribui
-para as equipes e recebe a execução do técnico em campo — tudo pelo
-navegador, sem aplicativo.
+**Assumindo o projeto? Comece por [`HANDOFF.md`](HANDOFF.md).**
+
+## As três peças
+
+| | o quê | onde roda |
+|---|---|---|
+| **`app/`** | web do controle (COP, controlador, supervisor, almoxarifado, frota, administração) — Vite 5 · React 18 · TypeScript · Tailwind 4 | **gestor-af.pages.dev** (Cloudflare Pages, deploy manual) |
+| **`campo/`** | aplicativo do técnico — Expo SDK 57 · React Native 0.86 | APK Android (EAS Build) com **atualização pelo ar** desde o 0.3.0; Expo Go para teste |
+| **banco** | Supabase — Postgres + PostgREST + Storage + Realtime | projeto `kqfflkxjijzdtnfshdlv` (plano Free) |
+
+As três se atualizam por caminhos diferentes: o banco muda quando a
+migration é aplicada, o site quando alguém roda o Wrangler, o aplicativo
+quando alguém publica a atualização ou gera o APK. **Commit não publica
+nada.**
 
 ## Como rodar
 
 ```bash
 cd app
 npm install
-cp .env.example .env      # já vem com o projeto Supabase preenchido
-npm run dev               # http://localhost:5173
+cp .env.example .env
+npm run dev
 ```
 
-## Estrutura
-
-```
-app/                 front-end (Vite + React + TypeScript + Tailwind v4)
-  src/lib/toa.ts     leitor da planilha do TOA
-  src/lib/supabase   cliente e domínios
-  src/pages/         Login · Controle · Importação · Campo · Visita
-docs/                mapeamento, modelo de domínio e log de decisões
-supabase/migrations/ schema do banco, em ordem
+```bash
+cd campo
+npm install
+cp .env.example .env
+npx expo start
 ```
 
-## Conceitos que o código assume
+O terminal da AFLINE é Windows PowerShell 5.1: **uma linha por comando**,
+sem `&&`. Publicar a web e o aplicativo: [`docs/09-PUBLICAR.md`](docs/09-PUBLICAR.md)
+e [`campo/README.md`](campo/README.md).
 
-**Uma visita carrega várias O.S.** No TOA, uma Atividade (ida a um endereço)
-contém de 1 a 10 ordens de serviço — e o caso mais comum são 2. Deslocamento e
-produtividade contam por *visita*; baixa e faturamento contam por *O.S.*
-Achatar isso em uma linha por O.S. faz o deslocamento ser contado em dobro.
+## O que já faz
 
-**A planilha do TOA tem cabeçalhos repetidos.** `Tipo de Atividade` aparece
-duas vezes: a primeira é a categoria (`Normal`), a segunda é o tipo real
-(`Instalacao`). Um leitor que monte objeto pela chave perde a primeira sem
-erro nenhum. Por isso `src/lib/toa.ts` lê **por posição** e sufixa as
-repetidas com `__2`.
+- **Importação do TOA** por cidade: o bucket sai do nome do arquivo e
+  arquivo de outra cidade é recusado; o dia de atuação é escolhido por quem
+  importa; baixa automática pelo **código**, não pelo status.
+- **Uma cidade por vez**: seletor no topo; o ADMIN vê todas, os demais só as
+  liberadas no cadastro. Quem separa é o banco (RLS).
+- **Serviços, Equipes, Rota do dia, Monitoramento** (rastro, cercas,
+  antifraude do GPS), **Meta técnica, Relatórios**.
+- **Aplicativo do técnico**: agenda, status, baixa com GPS, fotos e vídeo,
+  material, ticket de suporte, conversa, painel e ranking.
+- **Almoxarifado** (carga, romaneios, aceite pelo celular) e **Frota**
+  (condutor, abastecimento, consumo medido).
+- **Administração**: usuários, perfis de acesso, cidades que cada um acessa,
+  foto, data de contratação; cadastro de uma cidade inteira por planilha
+  padrão; códigos de baixa editáveis.
 
-**O campo vence o TOA.** A planilha sobe várias vezes ao dia. Depois que o
-técnico age numa visita, a importação só pode alterar dado cadastral
-(endereço, telefone, agendamento). Status, código de baixa, foto e material
-passam a ser exclusivos do campo, e toda divergência vira alerta em vez de
-sobrescrita.
+## Regras que o código assume
 
-**A permissão vive no banco.** Row Level Security no Postgres, não na tela.
-Se a interface for burlada, o banco não devolve a linha.
+- **Uma visita carrega de 1 a 10 O.S.** (o comum são 2). Deslocamento conta
+  por visita; baixa e faturamento, por O.S.
+- **Quem diz o resultado é o código de baixa**, não o status da operadora.
+  Código que o cadastro não conhece não trava a importação — trava o
+  contrato; a tela avisa.
+- **Zero e desconhecido não são a mesma coisa**: sem regra de pontuação, a
+  tela diz "sem regra", não `0,00`.
+- **A permissão vive no banco.** Se a interface for burlada, o Postgres não
+  devolve a linha.
 
-**Códigos de baixa são classificados.** Os 166 códigos oficiais da CLARO
-ganharam `natureza` (sucesso / improdutiva / cancelamento) e
-`responsabilidade` (cliente / rede / operadora / técnico / terceiro) — é o que
-permite responder quanto da improdutiva do dia é culpa nossa.
+As regras completas, com a frase de quem decidiu, estão em
+[`agent_docs/business-rules.md`](agent_docs/business-rules.md) e nas
+**186 decisões** de [`docs/03-DECISOES.md`](docs/03-DECISOES.md).
 
 ## Documentação
 
-- `docs/01-MAPEAMENTO-DADOS.md` — o que vem do TOA e do sistema atual
-- `docs/02-MODELO-DOMINIO.md` — entidades e máquina de estados
-- `docs/03-DECISOES.md` — **log de decisões**, com o porquê de cada uma
-- `supabase/README.md` — ordem das migrations e conferências
+| arquivo | para quê |
+|---|---|
+| [`HANDOFF.md`](HANDOFF.md) | passagem de bastão — comece por aqui |
+| [`docs/08-ESTADO-DO-PROJETO.md`](docs/08-ESTADO-DO-PROJETO.md) | inventário e pendências |
+| [`docs/03-DECISOES.md`](docs/03-DECISOES.md) | as decisões e o porquê de cada uma |
+| [`supabase/README.md`](supabase/README.md) | as migrations, em ordem (105 arquivos, até a 108) |
+| [`campo/README.md`](campo/README.md) | o aplicativo: rodar, gerar APK, publicar atualização |
+| [`agent_docs/`](agent_docs/) | regras de negócio, armadilhas, segurança, arquitetura |
 
-## Dados de cliente
+## Dados de cliente (LGPD)
 
-Planilhas (`*.xlsx`, `*.csv`) estão no `.gitignore`. Nome, telefone e endereço
-de assinante não entram no repositório.
+Planilhas (`*.xlsx`, `*.csv`) estão no `.gitignore`: nome, telefone e
+endereço de assinante não entram no repositório. A chave do Supabase que
+está nos arquivos é a **publishable** — sozinha não dá acesso a nada; a
+`service_role` nunca entra aqui.

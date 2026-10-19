@@ -7130,3 +7130,82 @@ sem cadastro no banco.
 ninguém — o contrato só fica parado. Seria "zero e desconhecido não são a
 mesma coisa" (D-117): a importação poderia apontar "código 425 sem
 cadastro" na prévia e no resultado.
+
+---
+
+### D-185 · O código de baixa se cadastra e se corrige pela tela; ARN-AFLINE é de Araguaína
+
+> *"preciso que me deixe editar ou adicionar algum codigo no menu dos codigos
+> ok?"* · *"De qual cidade é o ARN-AFLINE? — Araguaína"* — Emanuel, 19/10
+
+**Até aqui** a tela de códigos só trocava o DESTINO
+(`definir_situacao_do_codigo`). Código novo do TOA dependia de migration —
+e o 425 mostrou o custo: contrato preso em execução, calado (D-184).
+
+**Agora (migration 108), em Configurações › Baixa e situação:**
+- **Novo código** e **Editar** em cada linha: descrição, família (lista das
+  existentes ou nova), natureza e destino. `salvar_codigo_baixa` usa a
+  MESMA porta da edição de destino (gestão + permissão
+  "configuracoes.editar"). Quem salva fica carimbado; o código deixa de
+  estar "a revisar" (salvar é ter olhado). Natureza SUCESSO limpa a
+  responsabilidade (CHECK da tabela).
+- **"Códigos do TOA sem cadastro"** (`codigos_sem_cadastro`): o que o TOA
+  mandou nos últimos 30 dias e o cadastro não conhece, com quantos
+  contratos e quantos estão presos; o botão "Cadastrar" já vem com o número
+  e o texto do TOA. É o aviso que faltava, na tela onde se corrige.
+- **O resultado da importação** também avisa, na hora, qual código veio sem
+  cadastro e quantos contratos ficaram parados.
+- Filtros novos: "Só os a revisar"; a busca acha por família.
+- Vale **daqui para frente**, como o grupo de serviço (D-143): contrato já
+  importado muda quando a planilha do dia for importada de novo. A tela diz
+  isso.
+
+Testado como `authenticated` (desfeito): ADMIN cadastra e edita, duplicado
+e natureza inválida recusados, técnico barrado (42501); com o 425 "sumido"
+de propósito, a lista mostrou "425 - TROCA DE TECNOLOGIA, 3 contratos" em
+0,4 s.
+
+**ARN-AFLINE → Araguaína - TO** (`toa_bucket`, origem CADASTRO, autor o
+ADMIN). Ficara fora da semente da 103 porque as linhas dele diziam ARAGUAINA
+e ARACAJU.
+
+**Não verificado:** a tela logada — o navegador do assistente abriu na
+entrada e senha de conta real não passa pelo assistente. Compilada,
+publicada e conferida no ar; o banco por trás testado.
+
+---
+
+### D-186 · O aplicativo passa a se atualizar pelo ar (0.3.0, EAS Update)
+
+> *"não é um apk novo, é modificar o que já temos adicionando essas funções
+> entende?"* — Emanuel, 19/10. Entre duas opções, escolheu **atualização
+> pelo ar** (a outra era usar só o Expo Go).
+
+**O fato que obriga UM APK novo:** o 0.2.1 instalado foi gerado **sem
+`expo-updates`**, a peça nativa que deixa o app baixar código novo. Não há
+como mudá-lo por fora. O 0.3.0 é o último APK "obrigatório" para mudança de
+JavaScript.
+
+**Feito:**
+- `expo-updates ~57.0.26` (`npx expo install`, versão do SDK 57);
+- `eas update:configure`: `updates.url`, `runtimeVersion` com política
+  **`appVersion`** (a versão do app É a fronteira de compatibilidade) e um
+  canal por perfil no `eas.json` (development / preview / production);
+- `version` 0.2.1 → **0.3.0** (peça nativa nova = versão nova);
+- variáveis `EXPO_PUBLIC_SUPABASE_URL` e `_ANON_KEY` (a publishable) no
+  **ambiente `preview` da EAS** — o SDK 55+ publica atualização com
+  `--environment`, e as variáveis vêm de lá, não do `eas.json`; o ambiente
+  estava vazio, e a primeira atualização teria saído sem o endereço do
+  banco;
+- build do APK 0.3.0, perfil `preview`, canal `preview`, enviado à fila.
+
+**Desfeito do configurador:** ele reescreveu a lista de permissões do
+Android no `app.json` com duplicatas (USE_BIOMETRIC, FOREGROUND_SERVICE_
+LOCATION…). Inofensivo, mas ninguém pediu: a lista voltou à original.
+
+**Como publicar daqui para frente:** `campo/README.md`, seção "Atualizar o
+app instalado sem APK novo". Mudança nativa (biblioteca, permissão, SDK)
+continua pedindo APK, com versão nova.
+
+**Não verificado:** o APK 0.3.0 instalado recebendo uma atualização de
+verdade — depende do build terminar e de uma primeira publicação.

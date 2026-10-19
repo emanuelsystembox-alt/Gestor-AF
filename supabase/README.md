@@ -168,6 +168,7 @@ As três últimas, para não repetir o esquecimento:
 | 105 | **A importação que falhou diz que falhou** — `importacao.erro_mensagem`; a tela grava `status = ERRO` + a etapa e o motivo, e o histórico lê o status (Não entrou / Não terminou) (D-182) | ✓ |
 | 106 | **As cidades visíveis uma vez por requisição** — `bases_visiveis()` guarda a resposta na transação (`app.bases_visiveis`, chave = usuário; `trocar_cidade` e o gatilho do perfil apagam); `bases_permitidas()` sem `minha_empresa()` por linha; **106b** `tec1_da_os` DEFINER. Painel de Equipes 11,5 s → 0,66 s (D-183) | ✓ |
 | 107 | **Código 425 — TROCA DE TECNOLOGIA → Concluída** (natureza SUCESSO; família EQUIPAMENTO provisória, `revisar = true`); os 3 contratos presos reprocessados pela última importação do dia (D-184) | ✓ |
+| 108 | **Código de baixa pela tela** — `salvar_codigo_baixa` (novo/editar: descrição, família, natureza, destino; gestão + `configuracoes.editar`) e `codigos_sem_cadastro` (o que o TOA mandou e o cadastro não conhece); ARN-AFLINE → Araguaína (D-185) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

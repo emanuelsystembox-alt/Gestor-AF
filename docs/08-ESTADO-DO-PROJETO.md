@@ -373,6 +373,20 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 19/10/2026 — códigos editáveis e app 0.3.0 (D-184 a D-186)
+
+Migrations **107** e **108**; web publicada e conferida no ar; APK **0.3.0**
+(com `expo-updates`) enviado à fila do EAS. Baterias: `testar_policies()`
+19/19, `testar_campo()` 23/23.
+
+| O quê | Por quê |
+|---|---|
+| **Instalar o APK 0.3.0** nos celulares | O 0.2.1 não tem `expo-updates` e não recebe atualização. Depois do 0.3.0, mudança de JavaScript vai por `eas update` (`campo/README.md`). |
+| **Primeira atualização pelo ar** | Não testada: depende do 0.3.0 instalado. Conferir que chega em até duas aberturas do app. |
+| **Família do 425** | EQUIPAMENTO provisória, marcada "a revisar" (D-184). Pergunta ao Emanuel. |
+| **Tela de códigos logada** | Compilada e publicada; o banco por trás testado (D-185). Não vista logada pelo assistente. |
+| **Buckets que faltam** | 11 cadastrados (ARN-AFLINE → Araguaína em 19/10). Faltam MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ. |
+
 ## Pendente em 17/10/2026, tarde — cidade ativa, buckets e foto (D-180)
 
 Migrations **103 a 106**; web publicada e conferida no ar; app com a foto
@@ -382,8 +396,8 @@ importada): `testar_policies()` **19/19**, `testar_campo()` 23/23.
 | O quê | Por quê |
 |---|---|
 | **Cadastrar os buckets que faltam** | Só 10 foram semeados (os que os arquivos provaram). Faltam, entre outros, MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ — Configurações › Buckets do TOA, na cidade de cada um. |
-| **ARN-AFLINE: de qual cidade?** | As linhas misturam ARAGUAINA e ARACAJU. Aracaju não é cidade cadastrada. Pergunta ao Emanuel. |
-| **APK novo** | A foto no Painel do app (ranking) e o "Ticket de suporte" só aparecem no APK novo ou no Expo Go. |
+| ~~ARN-AFLINE: de qual cidade?~~ | **Resolvido em 19/10**: Araguaína (D-185). |
+| ~~APK novo~~ | **19/10**: APK 0.3.0 gerado, já com atualização pelo ar (D-186). |
 | **Testar a importação com o arquivo de hoje** | O cartão "Bucket do TOA" da tela de importação foi testado pela função por trás dele, não com um arquivo arrastado. |
 | **Seletor de cidade clicado** | A troca foi testada no banco como ADMIN; não foi clicada na conta do Emanuel para não mudar a cidade dele. |
 | **TEC1 calculado em dobro na importação** | ~0,5 s a ganhar tirando o cálculo por linha do `importar_toa_interno` (a reconciliação já recalcula). Não feito: mexe na função grande (D-181). |

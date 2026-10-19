@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gestor AF Campo",
     "slug": "afline-manager",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "gestoraf",
@@ -36,7 +36,10 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -73,6 +76,9 @@
       "eas": {
         "projectId": "24f5284f-5f83-4a9d-8e9c-f76ab94bc12d"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/24f5284f-5f83-4a9d-8e9c-f76ab94bc12d"
     }
   }
 }

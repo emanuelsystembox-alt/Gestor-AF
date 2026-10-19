@@ -106,6 +106,8 @@ export default function Importacao() {
    * os contratos já entraram — guarda o id para tentar de novo.
    */
   const [reconciliarPendente, setReconciliarPendente] = useState<string | null>(null)
+  /** Códigos que esta importação trouxe e o cadastro não conhece (108, D-185). */
+  const [codigosNovos, setCodigosNovos] = useState<{ codigo: number; texto: string; presos: number }[]>([])
   const [reconciliando, setReconciliando] = useState(false)
 
   async function reconciliar(id: string): Promise<boolean> {
@@ -246,6 +248,10 @@ export default function Importacao() {
       setEtapa(3)
       setProgresso('Ligando jornada, tipo de atividade e TEC1…')
       await reconciliar(imp.id)
+      // 108: o código que o cadastro não conhece não trava nada — o
+      // contrato só fica parado. A tela diz qual é, aqui, na hora.
+      const { data: novos } = await supabase.rpc('codigos_sem_cadastro', { p_importacao: imp.id })
+      setCodigosNovos((novos ?? []) as { codigo: number; texto: string; presos: number }[])
 
       setResumo(res as Resumo)
       setFase('pronto')
@@ -275,7 +281,7 @@ export default function Importacao() {
   function limpar() {
     setFase('ocioso'); setArquivo(null); setLeitura(null)
     setResumo(null); setErro(null); setProblemas([]); setOrigem(null)
-    setReconciliarPendente(null)
+    setReconciliarPendente(null); setCodigosNovos([])
     // A próxima importação volta a nascer em HOJE: o dia anterior é
     // escolha de uma importação, não um modo que fica ligado.
     setDia(isoLocal())
@@ -663,6 +669,24 @@ export default function Importacao() {
                 </div>
               ))}
             </div>
+
+            {codigosNovos.length > 0 && (
+              <Alerta tipo="aviso">
+                <p className="font-medium">
+                  {codigosNovos.length === 1 ? 'Um código' : `${codigosNovos.length} códigos`} do TOA
+                  sem cadastro: {codigosNovos.map(c => c.texto).join(' · ')}.
+                </p>
+                <p className="mt-1">
+                  A O.S. entrou sem código, e a baixa automática não fecha esse contrato
+                  ({codigosNovos.reduce((t, c) => t + c.presos, 0)} parado(s)). Cadastre em{' '}
+                  <button onClick={() => navegar('/controle/configuracoes')}
+                    className="font-medium underline underline-offset-2">
+                    Configurações › Baixa e situação
+                  </button>{' '}
+                  e importe esta planilha de novo.
+                </p>
+              </Alerta>
+            )}
 
             {reconciliarPendente && (
               <Alerta tipo="aviso">

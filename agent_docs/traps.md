@@ -367,6 +367,16 @@ versão pelo PowerShell. JSON com BOM pode quebrar o build do Expo. Edite JSON
 com a ferramenta de edição ou com Node; se passou pelo PowerShell, confira os
 3 primeiros bytes (`head -c 3 arquivo | od -An -tx1`). Ver D-171.
 
+**APK gerado sem `expo-updates` não se atualiza nunca.** Até o 0.2.1 era
+assim: qualquer mudança, mesmo de texto, pedia APK novo. Desde o 0.3.0 tem
+(D-186). E a atualização (`eas update`) lê as variáveis do **ambiente da
+EAS** (`--environment preview`), não do `env` do `eas.json`, que só vale
+no build: ambiente vazio = atualização sem o endereço do Supabase.
+
+**`eas update:configure` mexe além do que diz.** Reescreveu as permissões
+do Android no `app.json` com duplicatas. Guarde uma cópia do `app.json` e
+do `eas.json` antes, e confira o `diff` depois (D-186).
+
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`
 ou `campo/`.

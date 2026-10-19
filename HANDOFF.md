@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **17/10/2026**, por Claude (Opus 5.5).
+Última atualização: **19/10/2026**, por Claude (Opus 5.5).
 
 ---
 
@@ -223,33 +223,37 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
-> ### Comece por aqui (atualizado em 17/10)
+> ### Comece por aqui (atualizado em 19/10)
 >
-> **O banco foi ZERADO do teste em 17/10 (D-177)**: só existe o admin
-> (`admin@afline.com.br`), nenhum técnico, nenhum contrato; em Manaus, só a
-> equipe abrigo "Sem login definido". A regra "usuário não se apaga, se
-> desativa" continua valendo para dado real — isto foi apagar teste, a
-> pedido, antes da operação começar.
+> **A operação real começou em Manaus.** 55 técnicos com acesso (skill
+> ADESÃO), rotas do TOA importadas desde 17/10. O teste foi apagado em 17/10
+> (D-177); a regra "usuário não se apaga, se desativa" vale para dado real.
 >
-> **Novo (D-176, migration 100): o cadastro de uma cidade por planilha
-> padrão** — Administração › **Importar planilha** (só ADMIN). Baixa a
-> planilha da cidade (com listas suspensas do cadastro de hoje), envia
-> preenchida, vê a PRÉVIA (a importação de verdade, desfeita), importa
-> Áreas → Equipes → Técnicos → Veículos e cria os acessos; senha gerada por
-> pessoa ou uma senha inicial comum, que quem importa digita (D-177).
+> **Uma cidade por vez (103, D-180).** O seletor do topo grava
+> `perfil.base_ativa` e `bases_visiveis()` responde só ela — o RLS separa
+> tudo. ADMIN vê todas; os demais, a do cadastro + "Cidades que acessa". O
+> COP deixou de ser global. `bases_visiveis()` guarda a resposta na
+> transação (106, D-183): sem isso o painel de Equipes estourou os 8 s.
 >
-> **Manaus foi importada em 17/10**: 55 técnicos, 55 acessos, 55 logins
-> roteados, todos com skill ADESÃO; ainda **nenhum contrato** — por isso
-> `testar_policies()` está 16/17 até a primeira importação do TOA (D-178).
-> Também em 17/10: data de contratação no cadastro (101, D-178) e
-> `COM_IMPEDIMENTO` rotulado "Ticket de suporte" (102, D-179).
+> **Importação do TOA:** o bucket vem do NOME do arquivo e arquivo de outra
+> cidade é recusado (11 buckets cadastrados; os outros em Configurações ›
+> Buckets do TOA). A reconciliação é a 2ª chamada da tela, para caber nos
+> 8 s do `authenticated` (104, D-181). Falha fica gravada no histórico
+> (105, D-182).
 >
-> **E a cidade passou a ser escolhida no topo (103, D-180)**: `bases_visiveis()`
-> responde só a cidade ATIVA, o ADMIN vê todas e os demais só as marcadas no
-> cadastro (o COP deixou de ser global). A importação do TOA recusa arquivo de
-> bucket de outra cidade — o bucket sai do NOME do arquivo. Foto de perfil
-> (ADMIN põe; aparece na web e no app). Pendências em
-> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 17/10/2026, tarde".
+> **Códigos de baixa pela tela (108, D-185):** código que o TOA manda e o
+> cadastro não conhece deixa o contrato parado — a tela de códigos e o
+> resultado da importação avisam, e o código se cadastra ali. O 425 (TROCA
+> DE TECNOLOGIA → Concluída) foi o primeiro (D-184).
+>
+> **Aplicativo 0.3.0 com atualização pelo ar (D-186).** Instalado o 0.3.0,
+> mudança de JavaScript chega com `eas update` (ver `campo/README.md`). O
+> 0.2.1 não se atualiza: precisa ser trocado uma vez.
+>
+> Também: data de contratação (101), "Ticket de suporte" (102), foto de
+> perfil (103). Baterias: `testar_policies()` 19/19, `testar_campo()` 23/23.
+> Pendências em `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em
+> 19/10/2026".
 >
 > ---
 >

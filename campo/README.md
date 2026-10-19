@@ -114,6 +114,37 @@ O iPhone exige conta paga de desenvolvedor Apple; o Android não.
 
 ---
 
+## Atualizar o app instalado sem APK novo (0.3.0 · D-186)
+
+Desde o **0.3.0** o aplicativo tem `expo-updates`: o APK instalado baixa
+o código novo sozinho. **O 0.2.1 e anteriores não** — quem estiver nele
+precisa instalar o 0.3.0 uma vez.
+
+Mudou tela, texto, regra no aplicativo (JavaScript)? Publique:
+
+```bash
+npx tsc --noEmit
+npx eas-cli@latest update --channel preview --environment preview --platform android --message "o que mudou"
+```
+
+O técnico **fecha o app de vez e abre de novo** — na primeira abertura
+ele baixa, na segunda já roda a versão nova (até duas aberturas).
+
+**Quando NÃO serve, e precisa de APK novo:** biblioteca nativa nova,
+permissão nova no `app.json`, troca de SDK — qualquer coisa fora do
+JavaScript. Nesse caso suba a `version` no `app.json` (a política é
+`appVersion`: a versão É a fronteira de compatibilidade) e gere o APK.
+Atualização publicada para 0.3.0 não chega em quem está noutra versão — de
+propósito, para nunca mandar JavaScript para um app sem a peça nativa que
+ele usa.
+
+> **As variáveis do Supabase da atualização vêm do ambiente `preview` da
+> EAS** (`eas env:list --environment preview`), e não do `eas.json` — o
+> `env` do `eas.json` só vale no build. Sem elas a atualização sairia sem o
+> endereço do banco e o app pararia de conectar. Estão lá desde 19/10.
+
+---
+
 ## O que tem dentro
 
 ```

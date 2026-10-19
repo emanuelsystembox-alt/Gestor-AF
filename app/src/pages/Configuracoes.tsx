@@ -4,6 +4,7 @@ import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { EditorSubFalhas } from '../components/EditorSubFalhas'
 import { BucketsToa } from '../components/BucketsToa'
+import { CodigosDeBaixa, type CodigoBaixa } from '../components/CodigosDeBaixa'
 
 /**
  * Configurações da operação.
@@ -50,14 +51,6 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs '
 /** O que cada codigo de baixa significa para a situacao do contrato.
  *  ANALISE = derivado do analitico do ngestor; CADASTRO = alguem
  *  digitou aqui. A diferenca fica na tela porque importa (D-097). */
-interface CodigoBaixa {
-  id: string
-  codigo: number
-  descricao: string
-  natureza: string | null
-  situacao_destino: string | null
-  situacao_origem: 'ANALISE' | 'CADASTRO' | null
-}
 
 /** Um tipo de O.S. do catalogo e o grupo de servico que ele produz.
  *
@@ -111,8 +104,6 @@ export default function Configuracoes() {
   const [buscaTipo, setBuscaTipo] = useState('')
   const [soSemGrupo, setSoSemGrupo] = useState(false)
   const [codigos, setCodigos] = useState<CodigoBaixa[]>([])
-  const [buscaCodigo, setBuscaCodigo] = useState('')
-  const [soSemDestino, setSoSemDestino] = useState(false)
   const [baixaAuto, setBaixaAuto] = useState<boolean | null>(null)
   /** Prazo da carga do técnico, em dias (087-A). 0 = desligado. */
   const [prazoCarga, setPrazoCarga] = useState<number | null>(null)
@@ -143,7 +134,7 @@ export default function Configuracoes() {
       supabase.from('situacao_visita').select('*').order('ordem'),
       supabase.from('indicador_qualidade').select('*').order('ordem'),
       supabase.from('codigo_baixa')
-        .select('id, codigo, descricao, natureza, situacao_destino, situacao_origem')
+        .select('id, codigo, descricao, familia, natureza, revisar, situacao_destino, situacao_origem')
         .order('codigo'),
       supabase.rpc('ler_parametro', { p_chave: 'baixa_automatica' }),
       supabase.rpc('catalogo_tipo_os'),
@@ -187,21 +178,7 @@ export default function Configuracoes() {
 
   /** Declarar o que a baixa significa. Vira CADASTRO e deixa de ser
    *  analise -- o que a pessoa diz vale mais que o que eu deduzi. */
-  async function definirDestino(c: CodigoBaixa, situacao: string) {
-    setOcupado(true); setErro(null); setOk(null)
-    const { error } = await supabase.rpc('definir_situacao_do_codigo', {
-      p_codigo: c.codigo, p_situacao: situacao || null,
-    })
-    if (error) setErro(traduzir(error.message))
-    else {
-      setCodigos(l => l.map(x => x.codigo === c.codigo
-        ? { ...x, situacao_destino: situacao || null,
-            situacao_origem: situacao ? 'CADASTRO' : null }
-        : x))
-      setOk(`${c.codigo} · ${c.descricao} → ${situacao || 'sem destino'}.`)
-    }
-    setOcupado(false)
-  }
+
 
   /** Declarar a que grupo de servico um tipo de O.S. pertence.
    *
@@ -269,14 +246,6 @@ export default function Configuracoes() {
     setOcupado(false)
   }
 
-  const codigosFiltrados = useMemo(() => {
-    const t = buscaCodigo.trim().toLowerCase()
-    return codigos.filter(c => {
-      if (soSemDestino && c.situacao_destino) return false
-      if (!t) return true
-      return String(c.codigo).includes(t) || c.descricao.toLowerCase().includes(t)
-    })
-  }, [codigos, buscaCodigo, soSemDestino])
 
   const semDestino = codigos.filter(c => !c.situacao_destino).length
 
@@ -769,94 +738,8 @@ export default function Configuracoes() {
             {/* ---- o raio da baixa (096) ---- */}
             <RaioDaBaixa />
 
-            {/* ---- o de/para ---- */}
-            <section className="card-controle overflow-hidden">
-              <div className="border-b border-graf-800 px-4 py-3">
-                <h2 className="font-medium">O que cada código significa</h2>
-                <p className="mt-1 max-w-3xl text-sm text-graf-400">
-                  Derivado de <strong>67.485 linhas</strong> do analítico do sistema
-                  atual (meses 06 e 07/2026): 203 dos 206 códigos caem{' '}
-                  <strong>sempre</strong> na mesma situação. O que está marcado como
-                  <span className="mx-1 rounded bg-graf-800 px-1 text-[10px]
-                                   font-semibold uppercase text-graf-400">análise</span>
-                  veio daí; o que você mudar aqui vira{' '}
-                  <span className="mx-0.5 rounded bg-emerald-900/40 px-1 text-[10px]
-                                   font-semibold uppercase text-emerald-300">cadastro</span>
-                  e não é mais tocado.
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <input value={buscaCodigo} onChange={e => setBuscaCodigo(e.target.value)}
-                    placeholder="Buscar código ou descrição…"
-                    className={`${campo} min-w-64 flex-1`} />
-                  <label className="flex items-center gap-1.5 text-xs text-graf-300">
-                    <input type="checkbox" checked={soSemDestino}
-                      onChange={e => setSoSemDestino(e.target.checked)}
-                      className="accent-af-600" />
-                    Só os sem destino
-                  </label>
-                </div>
-              </div>
-
-              <div className="max-h-[32rem] overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 border-b border-graf-700 bg-graf-900
-                                    text-left text-[11px] uppercase tracking-wide text-graf-400">
-                    <tr className="[&>th]:border-r [&>th]:border-graf-500/20
-                                   [&>th:last-child]:border-r-0">
-                      <th className="px-3 py-2 font-medium">Código</th>
-                      <th className="px-3 py-2 font-medium">Descrição</th>
-                      <th className="px-3 py-2 font-medium">Natureza</th>
-                      <th className="px-3 py-2 font-medium">Leva a</th>
-                      <th className="px-3 py-2 font-medium">Origem</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {codigosFiltrados.map(c => (
-                      <tr key={c.id} className="border-b border-graf-500/25
-                                                [&>td]:border-r [&>td]:border-graf-500/15
-                                                [&>td:last-child]:border-r-0">
-                        <td className="tabular px-3 py-1.5 font-medium">{c.codigo}</td>
-                        <td className="px-3 py-1.5 text-graf-300">{c.descricao}</td>
-                        <td className="px-3 py-1.5 text-xs text-graf-500">
-                          {c.natureza ?? '—'}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <select value={c.situacao_destino ?? ''} disabled={ocupado}
-                            onChange={e => definirDestino(c, e.target.value)}
-                            className={`${campo} w-44`}>
-                            <option value="">— sem destino —</option>
-                            <option value="CONCLUIDA">Concluída</option>
-                            <option value="REAGENDAMENTO">Reagendamento</option>
-                            <option value="CANCELADA">Cancelada</option>
-                          </select>
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {c.situacao_origem === 'CADASTRO' ? (
-                            <span title="Alguém desta operação declarou"
-                              className="rounded bg-emerald-900/40 px-1.5 text-[10px]
-                                         font-semibold uppercase text-emerald-300">
-                              cadastro
-                            </span>
-                          ) : c.situacao_origem === 'ANALISE' ? (
-                            <span title="Derivado do analítico do sistema atual"
-                              className="rounded bg-graf-800 px-1.5 text-[10px]
-                                         font-semibold uppercase text-graf-400">
-                              análise
-                            </span>
-                          ) : <span className="text-xs text-graf-600">—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="border-t border-graf-800 px-4 py-2.5 text-xs text-graf-500">
-                {codigosFiltrados.length} de {codigos.length} códigos · o status da
-                operadora <strong>não</strong> decide a situação: no analítico,
-                EXECUTADA virou Reagendamento 1.075 vezes e Cancelado 657. Quem decide
-                é o código.
-              </p>
-            </section>
+            {/* ---- o de/para: o componente cadastra, edita e avisa (108, D-185) ---- */}
+            <CodigosDeBaixa codigos={codigos} onMudou={recarregar} />
           </div>
 
         ) : aba === 'atividade' ? (

@@ -391,12 +391,23 @@ em "Cidades que acessa" (`usuario_base`). O COP não é mais global.
 NOME do arquivo (`Atividades-<BUCKET>_DD_MM_AA.xlsx`); arquivo renomeado,
 bucket não cadastrado ou de outra cidade é **recusado** pelo banco, com o
 recado de qual é. Um bucket é de uma cidade só. Cadastro em Configurações ›
-Buckets do TOA (ADMIN). ARN-AFLINE não foi cadastrado: mistura Araguaína e
-Aracaju.
+Buckets do TOA (ADMIN). ARN-AFLINE é de **Araguaína** (Emanuel, 19/10),
+embora as linhas dele tragam também Aracaju.
 
 **A foto é da pessoa** (`perfil.foto_path`, bucket privado). Só o ADMIN
 põe, troca e tira; vê quem já vê a pessoa (inclusive o colega no ranking da
 mesma cidade). Não é evidência: se troca.
+
+---
+
+## Código de baixa (108, D-184, D-185)
+
+**Código que o cadastro não conhece não trava a importação — trava o
+contrato.** A O.S. entra sem código e a baixa automática não fecha. A tela
+de códigos e o resultado da importação mostram "sem cadastro"; o código se
+cadastra pela tela (gestão + "Editar" em configurações) e vale daqui para
+frente: contrato já importado fecha quando a planilha do dia for importada
+de novo. 425 = TROCA DE TECNOLOGIA → Concluída (família provisória).
 
 ---
 
