@@ -29,6 +29,31 @@ Conferência ou reescrita em cima desse texto precisa ignorar caixa
 (`~*`, flag `gi`) — senão acusa falso positivo e reescreve o que já
 estava certo. Aconteceu: 53 policies "com defeito" que estavam corretas.
 
+**`authenticated` tem `statement_timeout = 8s`, e importação grande passa disso.**
+Estourou a primeira vez numa rota inteira de Manaus (340 linhas, 337
+contratos novos): 4–6 s medidos, mais de 8 s no clique. O banco desfaz
+TUDO. Antes de juntar mais trabalho numa RPC que já processa a planilha,
+meça como `authenticated` com o arquivo do dia inteiro — e prefira
+dividir em chamadas (D-181: a reconciliação virou a segunda chamada). Para
+achar onde está o tempo, `set local track_functions = 'all'` e
+`pg_stat_xact_user_functions` na mesma transação: conta as chamadas de
+cada função, o que oscilação de cronômetro não mostra.
+
+**Função INVOKER chamada por linha = RLS avaliado por linha.**
+`tec1_da_os(o.id)` num SELECT de 1.808 O.S. roda 1.808 consultas, e cada
+uma avalia as policies de `ordem_servico`, `visita` e `tipo_servico` — que
+perguntam `bases_visiveis()`, `minha_empresa()`, `eh_gestor()`. O
+`(select f())` da D-118 vale por CONSULTA, não por chamada da função
+auxiliar. Deixar `bases_visiveis()` 1 ms mais cara (103) levou o painel de
+Equipes a 11,5 s. Por isso ela guarda a resposta na transação (106). Antes
+de engordar uma função de escopo, conte quantas vezes ela é chamada numa
+tela cheia (D-183).
+
+**`norm_txt(coluna) = norm_txt(x)` num subselect é normalização POR LINHA.**
+`norm_txt` tem `SET search_path`, então não é inlinada: 258 mil chamadas
+numa importação. Calcule o lado do parâmetro uma vez (lateral com
+`offset 0`) e dê índice de expressão à coluna (D-181).
+
 **Medir desempenho como owner mente igual a testar policy como owner.**
 `produtividade_periodo` fazia 402 ms como dono e **estourava o timeout**
 como `authenticated`, porque o RLS reavaliava as funções de escopo por
@@ -229,6 +254,15 @@ trinta pecas. E leitor de codigo de barras digita rapido: desabilitar no
 meio de uma leitura **come caractere**. Trave a reentrada num `ref` e
 devolva o foco num `requestAnimationFrame`, depois do render. Ver D-154.
 
+**`import('/src/lib/x.ts')` no console do Vite pode ser OUTRA instância do módulo.**
+Depois de HMR a página usa `x.ts?t=…`; o import do console carrega uma
+cópia nova. Trocar `supabase.rpc` nela não troca nada na página — e o
+"teste com dado falso" escreveu 250 contratos de verdade em produção
+(D-182). Para falsificar o banco numa verificação, intercepte
+**`window.fetch`** (é por onde todo módulo passa) e **trave toda escrita**
+que não for a falsificada. Dado fictício nunca com cara de real: prefixo
+óbvio e conferência no banco depois.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.
@@ -301,6 +335,13 @@ desduplica por posição e depois indexa por chave. Ver D-091.
 `(\d+)\|([^|]+?)\|([a-z]+)`. O id do item é o **Ponto**, que casa com
 `ordem_servico.ponto` (1.127 de 1.128) — **não** com o número da O.S.
 Ver D-107.
+
+**O bucket do TOA não está em coluna nenhuma: está no NOME do arquivo.**
+`Atividades-MAN-AFLINE_01_VT_02_10_26.xlsx` → bucket `MAN-AFLINE_01_VT`.
+Conferido em 31 arquivos. `Cidade` e `Área de Trabalho` dizem a cidade, mas
+vêm vazias na jornada (109 de 340 linhas). E o código do TOA não é o nosso
+(BLM = Belém/BEL, GUR = Gurupi/GRP). `bucket_do_arquivo()` lê o nome e
+aceita a cópia "(1)" do navegador. Ver D-180.
 
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { equipeRotulo } from '../lib/formato'
+import { equipeRotulo, tempoDeCasa } from '../lib/formato'
 import {
   conferirCadastro, formataCPF, formataTelefone, loginToaNoPadrao, soDigitos,
   type ErrosCadastro,
 } from '../lib/validacao'
-import { Alerta } from './ui'
+import { Alerta, Avatar } from './ui'
+import { enviarFoto, removerFoto, urlsDasFotos } from '../lib/foto'
 
 /**
  * Editar o cadastro inteiro de uma pessoa — só ADMIN.
@@ -42,6 +43,8 @@ export interface UsuarioCompleto {
   ativo: boolean
   whatsapp: string | null; cpf: string | null; rg: string | null
   data_nascimento: string | null; matricula_ponto: string | null
+  data_contratacao: string | null
+  foto_path: string | null
   cargo_id: string | null; perfil_acesso_id: string | null; base_id: string | null
   tecnico: { matricula: string; nome: string } | null
 }
@@ -82,7 +85,7 @@ function comoEsta(
 
 export function EditarUsuarioModal({
   usuario, papeisAtuais, cargos, perfis, operacoes, equipes, skills, supervisores,
-  papeisPossiveis, onFechar, onSalvo, onSenha,
+  papeisPossiveis, onFechar, onSalvo, onSenha, onFoto,
 }: {
   usuario: UsuarioCompleto
   papeisAtuais: string[]
@@ -96,6 +99,8 @@ export function EditarUsuarioModal({
   onFechar: () => void
   onSalvo: (recado: string) => void
   onSenha: (email: string, senha: string) => void
+  /** A foto sobe na hora (não espera o Salvar): a lista precisa saber. */
+  onFoto?: () => void
 }) {
   const [f, setF] = useState({
     nome: usuario.nome ?? '',
@@ -104,6 +109,7 @@ export function EditarUsuarioModal({
     cpf: comoEsta(usuario.cpf, formataCPF, [11]),
     rg: usuario.rg ?? '',
     data_nascimento: usuario.data_nascimento ?? '',
+    data_contratacao: usuario.data_contratacao ?? '',
     matricula_ponto: usuario.matricula_ponto ?? '',
     cargo_id: usuario.cargo_id ?? '',
     perfil_acesso_id: usuario.perfil_acesso_id ?? '',
@@ -166,6 +172,50 @@ export function EditarUsuarioModal({
     return tecnicos.filter(t =>
       [t.matricula, t.nome, t.equipe?.codigo].some(x => x?.toLowerCase().includes(q)))
   }, [tecnicos, buscaTec])
+  // ---- foto de perfil (103, D-180) ----
+  // Sobe NA HORA, e não no Salvar: é um arquivo, não um campo do
+  // formulário — e "salvei e a foto não foi" é o defeito mais fácil de
+  // ter com upload preso a outro botão.
+  const [fotoPath, setFotoPath] = useState<string | null>(usuario.foto_path)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [fotoOcupada, setFotoOcupada] = useState(false)
+  const [fotoErro, setFotoErro] = useState<string | null>(null)
+  useEffect(() => {
+    if (!fotoPath) { setFotoUrl(null); return }
+    urlsDasFotos([fotoPath]).then(m => setFotoUrl(m.get(fotoPath) ?? null))
+  }, [fotoPath])
+
+  async function trocarFoto(arquivo: File) {
+    setFotoOcupada(true); setFotoErro(null)
+    const r = await enviarFoto(usuario.id, arquivo, fotoPath)
+    setFotoOcupada(false)
+    if ('erro' in r) { setFotoErro(r.erro); return }
+    setFotoPath(r.path); onFoto?.()
+  }
+  async function tirarFoto() {
+    setFotoOcupada(true); setFotoErro(null)
+    const e2 = await removerFoto(usuario.id, fotoPath)
+    setFotoOcupada(false)
+    if (e2) { setFotoErro(e2); return }
+    setFotoPath(null); onFoto?.()
+  }
+
+  // ---- cidades que a pessoa acessa (103, D-180) ----
+  // > "nem todo mundo vai conseguir navegar em outras cidades isso precisa
+  // >  entrar na configurações de permissões" — Emanuel, 17/10
+  // A cidade do cadastro (perfil.base_id) vale sempre; as outras moram em
+  // `usuario_base`, que `bases_permitidas()` já lia (D-021). ADMIN vê
+  // todas por definição e não precisa de marca.
+  const [cidadesAntes, setCidadesAntes] = useState<Set<string>>(new Set())
+  const [cidades, setCidades] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    supabase.from('usuario_base').select('base_id').eq('usuario_id', usuario.id)
+      .then(({ data }) => {
+        const c = new Set(((data ?? []) as { base_id: string }[]).map(x => x.base_id))
+        setCidadesAntes(c); setCidades(new Set(c))
+      })
+  }, [usuario.id])
+
   const [trocarSenha, setTrocarSenha] = useState(false)
   const [senhaNova, setSenhaNova] = useState('')
 
@@ -232,6 +282,7 @@ export function EditarUsuarioModal({
       cpf: soDigitos(f.cpf) || null,
       rg: f.rg.trim() || null,
       data_nascimento: f.data_nascimento || null,
+      data_contratacao: f.data_contratacao || null,
       matricula_ponto: f.matricula_ponto.trim() || null,
       cargo_id: f.cargo_id || null,
       perfil_acesso_id: f.perfil_acesso_id || null,
@@ -245,6 +296,23 @@ export function EditarUsuarioModal({
         { p_usuario: usuario.id, p_papeis: papeis })
       if (error) { setErro(traduzir(error.message)); setOcupado(false); return }
       recados.push(`papéis: ${papeis.join(', ') || 'nenhum'}`)
+    }
+
+    // ---- 2a. as cidades que acessa ----
+    const entram = [...cidades].filter(id => !cidadesAntes.has(id) && id !== usuario.base_id)
+    const saem = [...cidadesAntes].filter(id => !cidades.has(id))
+    if (entram.length) {
+      const { error } = await supabase.from('usuario_base').insert(
+        entram.map(base_id => ({ usuario_id: usuario.id, base_id, motivo: 'cadastro (103)' })))
+      if (error) recados.push(`cidades não liberadas: ${traduzir(error.message)}`)
+    }
+    if (saem.length) {
+      const { error } = await supabase.from('usuario_base').delete()
+        .eq('usuario_id', usuario.id).in('base_id', saem)
+      if (error) recados.push(`cidades não retiradas: ${traduzir(error.message)}`)
+    }
+    if (entram.length || saem.length) {
+      recados.push(`acessa ${cidades.size + (usuario.base_id ? 1 : 0)} cidade(s)`)
     }
 
     // ---- 2b. supervisor da planilha ----
@@ -350,6 +418,7 @@ export function EditarUsuarioModal({
     if (/perfil_cpf_forma/.test(msg)) return 'O banco recusou o CPF: guarde só os 11 dígitos.'
     if (/perfil_whatsapp_forma/.test(msg)) return 'O banco recusou o telefone: DDD + 8 ou 9 dígitos.'
     if (/perfil_nascimento_plausivel/.test(msg)) return 'O banco recusou a data de nascimento.'
+    if (/perfil_contratacao_plausivel/.test(msg)) return 'O banco recusou a data de contratação.'
     if (/perfil_email_forma/.test(msg)) return 'O banco recusou o e-mail.'
     if (/row-level security|violates row|permission denied/i.test(msg))
       return 'O banco recusou: seu usuário não tem papel ADMIN. A barreira é do RLS, não da tela.'
@@ -398,6 +467,33 @@ export function EditarUsuarioModal({
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-graf-500">
               Pessoa
             </h3>
+            {/* A foto aparece aqui, na lista de usuários, no app do técnico,
+                no ranking e no monitoramento (Emanuel, 17/10). */}
+            <div className="mb-3 flex items-center gap-3">
+              <Avatar nome={f.nome} foto={fotoUrl} tamanho={64} />
+              <div className="text-xs text-graf-400">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className={`cursor-pointer rounded-md border border-graf-700 px-3 py-1.5
+                                    text-graf-200 hover:border-af-600 ${fotoOcupada ? 'opacity-50' : ''}`}>
+                    {fotoOcupada ? 'Enviando…' : fotoPath ? 'Trocar foto' : 'Colocar foto'}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                      disabled={fotoOcupada}
+                      onChange={e => { const a = e.target.files?.[0]; e.target.value = ''; if (a) trocarFoto(a) }} />
+                  </label>
+                  {fotoPath && (
+                    <button type="button" onClick={tirarFoto} disabled={fotoOcupada}
+                      className="text-graf-400 underline underline-offset-2 hover:text-af-400">
+                      tirar foto
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-graf-400">
+                  {fotoErro
+                    ? <span className="text-af-300">{fotoErro}</span>
+                    : 'A foto vale na hora, sem esperar o Salvar. Só o ADMIN troca.'}
+                </p>
+              </div>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Campo k="nome" rot="Nome completo *" />
               <Campo k="apelido" rot="Apelido" />
@@ -407,6 +503,12 @@ export function EditarUsuarioModal({
               <Campo k="cpf" rot="CPF" formata={formataCPF} dica="com dígito conferido" />
               <Campo k="rg" rot="RG" dica="sem padrão nacional — só o tamanho é conferido" />
               <Campo k="matricula_ponto" rot="Matrícula do ponto" dica="só números" />
+              {/* Opcional (Emanuel, 17/10): é para saber o tempo de casa, que
+                  é calculado aqui, na leitura — nunca guardado (101). */}
+              <Campo k="data_contratacao" rot="Data de contratação" tipo="date"
+                dica={tempoDeCasa(f.data_contratacao)
+                  ? `tempo de casa: ${tempoDeCasa(f.data_contratacao)}`
+                  : 'não informada'} />
             </div>
           </section>
 
@@ -556,6 +658,49 @@ export function EditarUsuarioModal({
                 })}
               </div>
             </div>
+          </section>
+
+          {/* ┌─ as cidades que acessa (103) ───────────────────────────┐
+              │ O ADMIN vê todas por definição; marcar não muda nada.  │
+              │ Para os outros, a cidade do cadastro vale sempre, e    │
+              │ cada marca libera mais uma no seletor do topo.         │
+              └────────────────────────────────────────────────────────┘ */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-graf-500">
+              Cidades que acessa
+            </h3>
+            {papeis.includes('ADMIN') ? (
+              <p className="text-xs text-graf-400">
+                ADMIN vê todas as cidades e troca pelo seletor do topo.
+              </p>
+            ) : (
+              <>
+                <p className="mb-2 text-xs text-graf-400">
+                  Sempre:{' '}
+                  <strong className="text-graf-200">
+                    {operacoes.find(o => o.id === usuario.base_id)?.nome ?? 'nenhuma cidade no cadastro'}
+                  </strong>
+                  . Marque as outras que esta pessoa pode abrir pelo seletor do topo — sem
+                  marca, ela não vê a cidade, nem pela tela nem pelo banco.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {operacoes.filter(o => o.id !== usuario.base_id).map(o => {
+                    const marcada = cidades.has(o.id)
+                    return (
+                      <button key={o.id} type="button" aria-pressed={marcada}
+                        onClick={() => setCidades(c => {
+                          const n = new Set(c); if (marcada) n.delete(o.id); else n.add(o.id); return n
+                        })}
+                        className={`rounded px-2 py-1 text-[11px] font-medium ring-1 ${marcada
+                          ? 'bg-af-600/20 text-af-300 ring-af-600/40'
+                          : 'bg-graf-900 text-graf-400 ring-graf-700'}`}>
+                        {o.nome}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </section>
 
           {/* O roteamento do login NÃO mora mais aqui: virou uma chave na

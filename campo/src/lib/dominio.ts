@@ -30,7 +30,7 @@ export const SITUACAO_INFO: Record<Situacao, { label: string; cor: string }> = {
   // `--st-cancelada` da web (D-011: a rampa e a mesma nos dois).
   CANCELADA:       { label: 'Cancelada',       cor: '#d9736e' },
   REAGENDAMENTO:   { label: 'Reagendamento',   cor: '#f59e0b' },
-  COM_IMPEDIMENTO: { label: 'Com impedimento', cor: '#ea580c' },
+  COM_IMPEDIMENTO: { label: 'Ticket de suporte', cor: '#ea580c' },
 }
 
 export function rotuloSituacao(s: string): string {

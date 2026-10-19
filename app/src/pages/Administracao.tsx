@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { equipeRotulo } from '../lib/formato'
 import { EditarUsuarioModal } from '../components/EditarUsuarioModal'
+import { enviarFoto, urlsDasFotos } from '../lib/foto'
 import { TabelaTecnicos, type TecnicoLinha } from '../components/TabelaTecnicos'
 import { MetasPorSkill } from '../components/MetasPorSkill'
 import {
@@ -10,7 +11,7 @@ import {
 } from '../lib/validacao'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Avatar, Vazio } from '../components/ui'
 import { ImportarCadastro } from '../components/ImportarCadastro'
 
 /**
@@ -116,6 +117,8 @@ interface Usuario {
    *  buscar de novo ao abrir faria a janela piscar vazia. */
   cpf: string | null; rg: string | null
   data_nascimento: string | null; matricula_ponto: string | null
+  data_contratacao: string | null
+  foto_path: string | null
   cargo_id: string | null; perfil_acesso_id: string | null; base_id: string | null
   cargo: { nome: string } | null
   perfil_acesso: { nome: string; papel: string | null } | null
@@ -142,6 +145,10 @@ export default function Administracao() {
   const [exclusoes, setExclusoes] = useState<Exclusao[]>([])
   const [buscaExc, setBuscaExc] = useState('')
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  /** foto_path → URL assinada (103). */
+  const [fotos, setFotos] = useState<Map<string, string>>(new Map())
+  /** A foto escolhida no "Novo usuário" — sobe depois que o acesso nasce. */
+  const [fotoNova, setFotoNova] = useState<File | null>(null)
   const [papeisPorUsuario, setPapeisPorUsuario] = useState<Map<string, string[]>>(new Map())
   const [cargos, setCargos] = useState<Cargo[]>([])
   const [perfis, setPerfis] = useState<PerfilAcesso[]>([])
@@ -159,7 +166,7 @@ export default function Administracao() {
   const [novo, setNovo] = useState({
     nome: '', email: '', apelido: '', whatsapp: '',
     cargo_id: '', perfil_acesso_id: '', cpf: '', rg: '', data_nascimento: '',
-    matricula_ponto: '', login_toa: '', skill: '', equipe_id: '', base_id: '',
+    data_contratacao: '', matricula_ponto: '', login_toa: '', skill: '', equipe_id: '', base_id: '',
     supervisor_nome: '',
   })
   const [skills, setSkills] = useState<Skill[]>([])
@@ -236,7 +243,7 @@ export default function Administracao() {
     const [u, up, c, pa, pm, pap, sk, fx, eq, op, rt, sup, eqs, tec, tl] = await Promise.all([
       supabase.from('perfil')
         .select(`id, nome, email, apelido, ativo, atualizado_em, whatsapp,
-                 cpf, rg, data_nascimento, matricula_ponto,
+                 cpf, rg, data_nascimento, matricula_ponto, data_contratacao, foto_path,
                  cargo_id, perfil_acesso_id, base_id,
                  cargo:cargo_id ( nome ),
                  perfil_acesso:perfil_acesso_id ( nome, papel ),
@@ -276,7 +283,12 @@ export default function Administracao() {
         .order('matricula'),
     ])
     if (u.error) setErro(u.error.message)
-    else setUsuarios((u.data ?? []) as unknown as Usuario[])
+    else {
+      const lista = (u.data ?? []) as unknown as Usuario[]
+      setUsuarios(lista)
+      // As fotos em UMA viagem (URLs assinadas em lote): o bucket é privado.
+      urlsDasFotos(lista.map(x => x.foto_path)).then(setFotos)
+    }
 
     const mp = new Map<string, string[]>()
     for (const r of (up.data ?? []) as { usuario_id: string; papel: string }[]) {
@@ -491,6 +503,23 @@ export default function Administracao() {
     else {
       let recado = `Acesso criado para ${novo.email.trim().toLowerCase()}.`
 
+      // A foto (103) só pode subir DEPOIS que o acesso existe: o caminho no
+      // Storage começa pelo id do usuário, e é por ele que a policy decide.
+      if (fotoNova && r?.usuario_id) {
+        const rf = await enviarFoto(r.usuario_id, fotoNova, null)
+        if ('erro' in rf) recado += ` A foto não foi: ${rf.erro}`
+      }
+
+      // A data de contratação (101) vai num UPDATE depois de criar, e não
+      // no corpo da `admin-usuarios`: a função de borda monta o perfil
+      // campo a campo e ignoraria o que não conhece. O ADMIN pode gravar
+      // pelo RLS — e só ele, pelo gatilho `perfil_protege_campos`.
+      if (novo.data_contratacao && r?.usuario_id) {
+        const { error: ed } = await supabase.from('perfil')
+          .update({ data_contratacao: novo.data_contratacao }).eq('id', r.usuario_id)
+        if (ed) recado += ` A data de contratação não foi gravada: ${traduzir(ed.message)}`
+      }
+
       // O login do TOA é o que liga o acesso ao TÉCNICO — e é
       // `tecnico.usuario_id` que o RLS consulta para saber qual agenda a
       // pessoa enxerga. Sem isto o técnico entra e vê a tela vazia.
@@ -614,9 +643,10 @@ export default function Administracao() {
       setOk(recado)
       if (r?.senha_gerada) setSenhaGerada({ email: r.email!, senha: r.senha_gerada })
       setCriando(false)
+      setFotoNova(null)
       setNovo({ nome: '', email: '', apelido: '', whatsapp: '',
                 cargo_id: '', perfil_acesso_id: '', cpf: '', rg: '',
-                data_nascimento: '', matricula_ponto: '', login_toa: '',
+                data_nascimento: '', data_contratacao: '', matricula_ponto: '', login_toa: '',
                 skill: '', equipe_id: '', base_id: '', supervisor_nome: '' })
       setErrosNovo({})
       equipeVeioDaConsulta.current = true
@@ -868,6 +898,7 @@ export default function Administracao() {
                        ['rg', 'RG', 'text', undefined],
                        ['data_nascimento', 'Nascimento', 'date', undefined],
                        ['matricula_ponto', 'Matrícula do ponto', 'text', undefined],
+                       ['data_contratacao', 'Data de contratação', 'date', undefined],
                        ['login_toa', 'Login TOA (matrícula do técnico)', 'text', undefined],
                       ] as [keyof typeof novo, string, string,
                             ((v: string) => string) | undefined][]).map(([k, rot, tipo, mascara]) => (
@@ -894,6 +925,19 @@ export default function Administracao() {
                         )}
                       </label>
                     ))}
+                    {/* 103: a foto sobe depois que o acesso nasce — o caminho
+                        no Storage é o id do usuário. */}
+                    <label className="text-xs text-graf-400">
+                      <span className="mb-1 block">Foto de perfil</span>
+                      <input type="file" accept="image/jpeg,image/png,image/webp"
+                        onChange={e => setFotoNova(e.target.files?.[0] ?? null)}
+                        className="block w-full text-[11px] text-graf-300 file:mr-2 file:rounded-md
+                                   file:border file:border-graf-700 file:bg-graf-900 file:px-2.5
+                                   file:py-1 file:text-graf-200" />
+                      <span className="mt-1 block text-[11px] text-graf-400">
+                        {fotoNova ? fotoNova.name : 'opcional — JPG, PNG ou WEBP'}
+                      </span>
+                    </label>
                     {/* Skill é do TÉCNICO, não do acesso: sem login do
                         TOA não há em quem gravar. */}
                     <label className="text-xs text-graf-400">
@@ -1148,6 +1192,10 @@ export default function Administracao() {
                         return (
                           <tr key={u.id} className="border-b border-graf-800 align-top">
                             <td className="px-3 py-2">
+                              <div className="flex items-start gap-2.5">
+                              <Avatar nome={u.nome} tamanho={32}
+                                foto={u.foto_path ? fotos.get(u.foto_path) : null} />
+                              <div className="min-w-0">
                               <div className="font-medium">
                                 {u.nome}
                                 {euMesmo && (
@@ -1240,6 +1288,8 @@ export default function Administracao() {
                                   </div>
                                 )
                               })()}
+                              </div>
+                              </div>
                             </td>
                             <td className="px-3 py-2 text-xs">
                               {ed ? (
@@ -1673,6 +1723,7 @@ export default function Administracao() {
           supervisores={supervisores}
           papeisPossiveis={PAPEIS}
           onFechar={() => setEditandoJanela(null)}
+          onFoto={() => { recarregar() }}
           onSenha={(email, senha) => setSenhaGerada({ email, senha })}
           onSalvo={async recado => {
             setEditandoJanela(null)

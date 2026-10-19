@@ -373,6 +373,37 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 17/10/2026, tarde — cidade ativa, buckets e foto (D-180)
+
+Migrations **103 a 106**; web publicada e conferida no ar; app com a foto
+no código, **sem APK novo**. Baterias (depois da 106, com a rota de 17/10
+importada): `testar_policies()` **19/19**, `testar_campo()` 23/23.
+
+| O quê | Por quê |
+|---|---|
+| **Cadastrar os buckets que faltam** | Só 10 foram semeados (os que os arquivos provaram). Faltam, entre outros, MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ — Configurações › Buckets do TOA, na cidade de cada um. |
+| **ARN-AFLINE: de qual cidade?** | As linhas misturam ARAGUAINA e ARACAJU. Aracaju não é cidade cadastrada. Pergunta ao Emanuel. |
+| **APK novo** | A foto no Painel do app (ranking) e o "Ticket de suporte" só aparecem no APK novo ou no Expo Go. |
+| **Testar a importação com o arquivo de hoje** | O cartão "Bucket do TOA" da tela de importação foi testado pela função por trás dele, não com um arquivo arrastado. |
+| **Seletor de cidade clicado** | A troca foi testada no banco como ADMIN; não foi clicada na conta do Emanuel para não mudar a cidade dele. |
+| **TEC1 calculado em dobro na importação** | ~0,5 s a ganhar tirando o cálculo por linha do `importar_toa_interno` (a reconciliação já recalcula). Não feito: mexe na função grande (D-181). |
+| **`tecnico.foto_url` sem uso** | Substituída por `perfil.foto_path`. Pode sair numa migration futura. |
+
+## Pendente em 17/10/2026 — Manaus importada, contratação e Ticket de suporte (D-178, D-179)
+
+Manaus importada pelo Emanuel: **55 técnicos, 55 acessos, 55 logins roteados**,
+todos com skill **ADESÃO** (a planilha veio sem skill; gravado a pedido). Migrations
+**101** (data de contratação) e **102** (rótulo "Ticket de suporte"); web publicada e
+conferida no ar. Baterias: `testar_policies()` **16/17**, `testar_campo()` 23/23.
+
+| O quê | Por quê |
+|---|---|
+| **`testar_policies` 16/17 sem contrato no banco** | "CONTROLADOR exclui contrato" falha porque não há contrato desde a limpeza (D-177); "TECNICO exclui contrato" passa pelo motivo errado. Fica verde com a primeira importação do TOA; o certo é a bateria criar o próprio contrato. |
+| **Botões "Impedimento" / "Registrar impedimento"** | O status virou "Ticket de suporte", os botões de ação não. Pergunta ao Emanuel: renomear também? (D-179) |
+| **APK com o nome novo** | O rótulo do app está no código: só aparece num APK novo (ou no Expo Go). |
+| **Data de contratação dos 55** | Opcional, um a um em Editar cadastro. A planilha não serve para quem já tem acesso (D-178). |
+| **Salvar a data pela tela** | Conferido o campo e o tempo de casa na janela, sem salvar (dado real); a gravação foi testada no banco como ADMIN e como técnico. |
+
 ## Pendente em 14/10/2026 — cadastro de cidade por planilha (D-176)
 
 Migration **100**; Administração › **Importar planilha** (só ADMIN); web

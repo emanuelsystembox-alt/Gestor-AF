@@ -131,6 +131,10 @@ até alguém dizer de quem é.
 null`: "estava lá antes" não é prova de nada — a 039 preservou 9 seeds
 de migration achando que eram declaração, e eles rotearam 121 contratos.
 
+**A data de contratação é da pessoa** (`perfil.data_contratacao`, 101),
+opcional, e só o ADMIN altera. O tempo de casa é calculado na leitura,
+nunca guardado; vazio é "não informada", não "0 dias" (D-178).
+
 **Técnico se desliga, não se apaga.** DELETE em `tecnico`/`equipe` é só
 para ADMIN (policy), e trigger recusa quem tem histórico — inclusive
 para o ADMIN. A tela só oferece Desligar/Reativar. Ver D-090.
@@ -199,6 +203,8 @@ alimenta o painel do técnico, o ranking e a central; não some de outro jeito.
 
 - **Suporte técnico (pedido de ajuda) = o Impedimento feito pelo campo.**
   O botão "Suporte" do app grava `COM_IMPEDIMENTO` com a observação (D-169).
+  Desde a 102 o status se chama **"Ticket de suporte"** na tela — só o rótulo;
+  o código continua `COM_IMPEDIMENTO` (D-179).
 - **Mudar só o status não exige código de baixa** — encerrar continua
   exigindo (D-169).
 - **Sinal limpo é por usuário, e volta se acontecer DE NOVO** (chave nova);
@@ -371,6 +377,26 @@ nenhum além da conta. E-mail que já tem acesso não é alterado.
 
 **O código de área é único no sistema inteiro**: use o prefixo da cidade
 (`BEL-AREA01`).
+
+---
+
+## Cidade ativa, buckets do TOA e foto (103, D-180)
+
+**Uma cidade por vez, separada pelo banco.** O seletor do topo grava
+`perfil.base_ativa`, e `bases_visiveis()` responde só ela — as telas não
+filtram cidade. **ADMIN vê todas; os demais, a do cadastro + as marcadas**
+em "Cidades que acessa" (`usuario_base`). O COP não é mais global.
+
+**O arquivo do TOA só entra na cidade do bucket dele.** O bucket vem do
+NOME do arquivo (`Atividades-<BUCKET>_DD_MM_AA.xlsx`); arquivo renomeado,
+bucket não cadastrado ou de outra cidade é **recusado** pelo banco, com o
+recado de qual é. Um bucket é de uma cidade só. Cadastro em Configurações ›
+Buckets do TOA (ADMIN). ARN-AFLINE não foi cadastrado: mistura Araguaína e
+Aracaju.
+
+**A foto é da pessoa** (`perfil.foto_path`, bucket privado). Só o ADMIN
+põe, troca e tira; vê quem já vê a pessoa (inclusive o colega no ranking da
+mesma cidade). Não é evidência: se troca.
 
 ---
 

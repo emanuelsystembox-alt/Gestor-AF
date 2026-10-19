@@ -9,6 +9,7 @@ import { Icone, type NomeIcone } from './icones'
 import { useCentral } from '../lib/central'
 import { PainelCentral } from './PainelCentral'
 import { ChatControle } from './ChatControle'
+import { useCidades, trocarCidade } from '../lib/cidade'
 
 interface Item {
   para: string; rotulo: string; icone: NomeIcone
@@ -304,6 +305,44 @@ function BuscaDeTelas({ modulos, fechar }: { modulos: Modulo[]; fechar: () => vo
   )
 }
 
+/**
+ * A cidade do topo (103, D-180). Era um "MANAUS · AM" escrito à mão.
+ *
+ * Com UMA cidade, é só a etiqueta — não há o que escolher, e um seletor
+ * de uma opção parece defeito. Com mais de uma, vira seletor; trocar
+ * recarrega a página (ver `lib/cidade.ts`). Quem decide quais cidades
+ * aparecem é o banco (`bases_permitidas`): o ADMIN vê todas, os demais
+ * só as marcadas no cadastro.
+ */
+function SeletorCidade() {
+  const { cidades, ativa } = useCidades()
+  const [trocando, setTrocando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const etiqueta = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs font-medium text-graf-300'
+  if (!cidades || cidades.length === 0) return null
+  if (cidades.length === 1) {
+    return <span className={`hidden md:inline ${etiqueta}`}>{cidades[0].nome.toUpperCase()}</span>
+  }
+  return (
+    <label className="hidden items-center gap-1.5 md:flex" title={erro ?? 'Cidade (operação) que você está vendo'}>
+      <span className="sr-only">Cidade</span>
+      <select value={ativa?.id ?? ''} disabled={trocando}
+        aria-invalid={!!erro}
+        onChange={async e => {
+          setTrocando(true); setErro(null)
+          const msg = await trocarCidade(e.target.value)
+          if (msg) { setErro(msg); setTrocando(false) }
+        }}
+        className={`${etiqueta} cursor-pointer outline-none hover:border-af-600 focus:border-af-500
+                    ${erro ? 'border-af-500' : ''}`}>
+        {!ativa && <option value="">Escolha a cidade…</option>}
+        {cidades.map(c => <option key={c.id} value={c.id}>{c.nome.toUpperCase()}</option>)}
+      </select>
+      {trocando && <span className="text-[11px] text-graf-400">trocando…</span>}
+    </label>
+  )
+}
+
 export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactNode }) {
   const { perfil, papeis, sair, ehGestor, temPapel } = useAuth()
   const [tema, setTema] = useTema()
@@ -472,10 +511,7 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
               </> : null}
             </nav>
 
-            <span className="hidden rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1
-                             text-xs font-medium text-graf-300 md:inline">
-              MANAUS · AM
-            </span>
+            <SeletorCidade />
 
             <div className="ml-auto flex items-center gap-3">
               {acoes}

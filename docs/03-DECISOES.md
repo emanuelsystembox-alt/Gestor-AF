@@ -6753,3 +6753,380 @@ pelo número da equipe (escolha do Emanuel). Passou pelo leitor da tela
 (`…@gmail.comc`, `…@gmal.com`, `…@gmail.com.br`): entram como login, mas
 "esqueci a senha" por e-mail não chegaria. Não foram corrigidos — não
 sabemos o certo.
+
+---
+
+### D-178 · A data de contratação, e o tempo de casa calculado na leitura
+
+> *"nessa tela não é obrigatorio é bom cadastrar data de contratação, para
+> saber quanto tempo o técnico tem de casa"* — Emanuel, 17/10
+
+**`perfil.data_contratacao`** (migration 101), opcional, ao lado do
+nascimento e da matrícula do ponto: é dado da **pessoa** (o empregado), não
+do técnico do TOA — o login e a equipe mudam, a data em que entrou na
+AFLINE não. CHECK `perfil_contratacao_plausivel` (depois de 1950, antes de
+2100), a mesma faixa que a tela confere.
+
+**O tempo de casa não é guardado.** `tempoDeCasa()` (`lib/formato.ts`)
+calcula na leitura contra o dia local (`isoLocal`, D-084), com as partes da
+data em inteiros. Guardado, seria um número que envelhece calado — a mesma
+lição do cache do TEC1 (D-150). Vazio é **"não informada"**, nunca "0 dias"
+(D-117). Data futura passa e aparece como "começa em DD/MM/AAAA": é quem já
+foi contratado e ainda não começou.
+
+**Só o ADMIN altera.** A policy `perfil_autoedicao` libera a pessoa a editar
+o próprio perfil, e RLS não restringe coluna (D-050): a data entrou na lista
+de `perfil_protege_campos`. Cenário novo em `testar_policies()` — **17
+cenários** — "TECNICO muda propria data de contratacao", barrado. Testado
+também à mão como `authenticated` (desfeito): técnico recusado com 42501,
+o técnico ainda muda o próprio apelido, ADMIN grava, 1900 recusado pelo
+CHECK.
+
+**No "Novo usuário"** a data vai num `update` depois de criar o acesso, e
+não no corpo da `admin-usuarios`: a função de borda monta o perfil campo a
+campo e ignoraria o que não conhece. Mexer nela seria redeploy de função
+que roda com a `service_role` por um campo opcional.
+
+**Recusado por enquanto:** a coluna na planilha padrão (D-176). A
+importação não altera acesso que já existe, então ela não serviria para os
+55 de Manaus que já entraram — quando for pedido, é coluna nova + regra de
+"preencher se estiver vazio".
+
+**A bateria `testar_policies` está 16/17, e não por esta mudança.** Desde
+a limpeza da D-177 não há contrato no banco, e "CONTROLADOR exclui
+contrato" falha com *Contrato nao encontrado*. Pior: "TECNICO exclui
+contrato" passa pelo motivo errado (barrado porque não há o que excluir).
+Fica verde com a primeira importação do TOA; o certo é a bateria criar o
+próprio contrato de teste.
+
+---
+
+### D-179 · COM_IMPEDIMENTO passa a se chamar "Ticket de suporte"
+
+> *"opção COM_IMPEDIMENTO vamos trocar o nome para Ticket de suporte"* —
+> Emanuel, 17/10
+
+**Muda o rótulo, não o código** (migration 102). `COM_IMPEDIMENTO` está no
+CHECK de `visita.situacao`, nas travas do campo, no gatilho do status ativo
+(095), nos eventos e no histórico; trocar o código reescreveria o passado.
+Desde a D-169 o pedido de ajuda do campo **é** este status — o nome novo diz
+o que ele virou.
+
+O rótulo é cadastro (`situacao_visita.label`, 025) e a web lê do banco. Os
+padrões de partida no código mudaram junto — `SITUACAO_INFO`
+(`app/src/lib/supabase.ts`) e `campo/src/lib/dominio.ts`, que o aplicativo
+usa sem consultar o cadastro —, para o nome antigo não voltar quando o banco
+não responder. O texto da folha de suporte na Agenda também.
+
+**Não mudou (pergunta aberta ao Emanuel):** os botões de AÇÃO que levam a
+este status — "Impedimento" / "Registrar impedimento" na tela da visita (app
+e web), o evento "Registrou impedimento", a coluna "Impedimento" do CSV por
+tipo. O exemplo do campo é *"no local, sem contato com o cliente"*, que é
+impedimento do cliente, não pedido de suporte; renomear o botão muda o que o
+técnico entende que deve fazer.
+
+**O aplicativo só mostra o nome novo depois de um APK novo** (ou no Expo Go):
+o rótulo do app está no código.
+
+---
+
+### D-180 · A cidade ativa, os buckets do TOA por cidade e a foto do técnico
+
+> *"é bom ter um filtro de bucket da cidade ok quando importar tem que ter um
+> filtro para esses nomes […] caso o gestor que tiver o acesso de mais de uma
+> cidade trocar de operação ok? o sistema precisa saber dividir os bucket de
+> quais cidades são para não misturar, nem todo mundo vai conseguir navegador
+> em outras cidades isso precisa entrar na configurações de permissões"* ·
+> *"é bom ter um campo quem for cadastrar manual campo para colocar a foto de
+> perfil do técnico"* — Emanuel, 17/10
+
+Migration **103** (+ 103b bateria, 103c autor do bucket). As quatro escolhas
+foram do Emanuel, entre opções oferecidas:
+
+| pergunta | escolha |
+|---|---|
+| como o sistema sabe de qual cidade é o bucket | **cadastro na tela**, por cidade, já semeado com o que os arquivos provaram |
+| arquivo de outra cidade | **a importação recusa e explica**, e oferece trocar a cidade |
+| quem troca de cidade | **ADMIN vê todas; o resto, só as marcadas** no cadastro |
+| foto | **no cadastro (ADMIN) e no app**, ranking e monitoramento |
+
+#### 1. O bucket está no nome do arquivo, e só lá
+
+Conferido em **31 arquivos / 11 buckets** do TOA (Downloads do Emanuel,
+17/10): nenhuma das 120 colunas traz o bucket. Ele vem em
+`Atividades-<BUCKET>_DD_MM_AA.xlsx`. As colunas `Cidade` e `Área de
+Trabalho` dizem a cidade, mas vêm **vazias na jornada** (109 de 340 linhas
+em Manaus, 17/10: Na Base, Refeição, Apoio). E os códigos do TOA não são os
+nossos: **BLM** é Belém (BEL), **GUR** é Gurupi (GRP). Por isso é cadastro
+(`toa_bucket`, um bucket = uma cidade, `unique`), e não regra de prefixo.
+
+**Semeado só o que os arquivos provaram** (bucket do nome × coluna Cidade ×
+prefixo da área): MAN-AFLINE, MAN-AFLINE_01_VT → Manaus; BLM-AFLINE, _02_VT,
+_03_VT → Belém; BSB-AFLINE, _13_VT → Brasília; GUR-AFLINE → Gurupi;
+SLS-AFLINE_02, _02_VT → São Luís. `origem = ARQUIVOS_DO_TOA`, sem autor.
+
+**ARN-AFLINE ficou de fora de propósito**: as linhas dele dizem ARAGUAINA
+**e ARACAJU** (prefixos de área ARN e AJU) — Aracaju não é cidade
+cadastrada, e escolher seria palpite. Também de fora: os buckets que só
+aparecem no print da árvore do TOA (MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT,
+CWL, CXS, ITZ, JIP, MBA, PIT, PMJ) — o ADMIN cadastra em Configurações ›
+**Buckets do TOA**.
+
+**A recusa mora no banco** (`importar_toa`): sem bucket reconhecível no
+nome, bucket não cadastrado, desligado, ou de outra cidade — e diz qual. A
+tela pergunta antes de subir as linhas (`cidade_do_arquivo`) e, se a pessoa
+tem acesso à outra cidade, oferece a troca. Testado com 5 nomes reais
+(dois de Manaus com e sem "(1)", um de Brasília, o ARN e "rota de
+hoje.xlsx"). `importacao.bucket` guarda o que foi lido.
+
+**O defeito que isto fecha:** a tela gravava toda importação em `MAN`
+(`.eq('codigo','MAN')` escrito à mão). Em 26/09 o único arquivo do dia foi
+`Atividades-ARN-AFLINE`, e entrou em Manaus.
+
+#### 2. A cidade ativa mora no banco, não em cada tela
+
+`perfil.base_ativa` + `trocar_cidade()`. **`bases_visiveis()` passou a
+responder só a cidade ativa** (sem escolha válida, a do perfil; sem
+nenhuma, todas as permitidas), e `bases_permitidas()` é o que a pessoa
+**pode** ver. Como 13 policies e 31 funções já perguntavam
+`bases_visiveis()`, o RLS separa tudo de uma vez — nenhuma tela ganhou
+filtro de cidade, e a que esquecesse não teria como misturar.
+
+- **O COP perdeu o "todas as cidades".** Antes, escopo `GLOBAL` (ADMIN e
+  COP) via tudo; agora só o **ADMIN** (`tem_papel('ADMIN')`). Escolha do
+  Emanuel. `eh_global()` continua existindo, mas não é mais lido por
+  `bases_visiveis`. Não havia COP no banco.
+- **As cidades a mais** são `usuario_base` (já existia desde a D-021), e a
+  janela de **Editar cadastro** ganhou "Cidades que acessa". A cidade do
+  cadastro vale sempre.
+- O seletor do topo some quando há uma cidade só; trocar **recarrega a
+  página** (nenhuma tela fica com dado da cidade anterior na memória).
+- **Custo aceito:** a escolha é por pessoa, não por aba — duas abas em
+  cidades diferentes passam a mostrar a última escolhida.
+- **Consequência:** o ADMIN cadastra técnico, importa planilha de cadastro
+  e cadastra bucket **na cidade ativa**. A importação de cadastro (D-176)
+  perdeu o seletor de cidade e usa a do topo.
+- O gatilho `perfil_protege_campos` recusa gravar `base_ativa` de cidade
+  não permitida.
+
+#### 3. A foto é da pessoa
+
+`perfil.foto_path`, bucket **privado** `foto_perfil` (5 MB; jpg/png/webp),
+caminho `<usuario_id>/<arquivo>`. **Só o ADMIN envia, troca e remove**
+(policies de INSERT/UPDATE/DELETE + gatilho). **Vê** quem já vê a pessoa:
+ela mesma, o ADMIN e quem enxerga a cidade dela — o que inclui o técnico no
+ranking da própria cidade, que já mostra nome e pontos (D-167). Diferente
+da evidência (D-115), foto de perfil **se troca**: não é prova.
+
+- A imagem é **reduzida no navegador** (lado maior 512 px, JPEG): medido,
+  900×600 PNG → 512×341, **2 KB**.
+- `usuario_do_path()` usa `CASE` pela mesma razão do `visita_do_path`
+  (D-116): nome que não começa com uuid não pode derrubar a policy.
+- `fotos_dos_tecnicos(uuid[])`: o técnico só lê o próprio perfil e não
+  acharia a foto dos colegas no ranking. Aparece em Administração (lista e
+  janela), Equipes (a bolinha), Monitoramento e no **Painel do app**
+  (ranking e a posição dele).
+- **`tecnico.foto_url` (034) foi substituída**: nunca foi preenchida (0 de
+  55) e a tela de Equipes a lia como URL pública, o que com bucket privado
+  não abriria. A coluna fica, sem uso.
+
+**Bateria:** `testar_policies()` com **19 cenários** (técnico troca para
+cidade que não é dele; técnico troca a própria foto — os dois barrados).
+Testado à mão como `authenticated`: ADMIN em Manaus vê 2 buckets e 55
+técnicos; trocando para Belém, 3 buckets e 0 técnicos; o técnico vê 1
+cidade e é barrado em trocar cidade, gravar `base_ativa`, mexer na foto e
+cadastrar bucket. Foto testada pela tela de verdade no próprio ADMIN:
+subiu, a URL assinada abriu (200), saiu do perfil e do Storage.
+
+**Não verificado:** um técnico real vendo a foto dos colegas no app (exige
+APK novo ou Expo Go, e foto cadastrada); o cartão de bucket da importação
+com o arquivo de verdade (só a função por trás dele); a troca de cidade
+pelo seletor na conta do Emanuel (testada no banco, não clicada, para não
+mudar a cidade dele).
+
+---
+
+### D-181 · A importação do dia inteiro estourou os 8 s — e a reconciliação vira a segunda chamada
+
+> *"fui importar de forma comum e deu erro"* (print: "canceling statement due
+> to statement timeout") — Emanuel, 17/10
+
+**O limite:** o papel `authenticated` tem `statement_timeout = 8s`
+(`pg_roles.rolconfig`). A rota de Manaus de 17/10 — 340 linhas, 337
+contratos novos, 452 O.S., a primeira importação do dia depois da limpeza —
+mediu **4,2 a 6,0 s** como `authenticated`, numa chamada só. No clique, com
+rede e cache frio, passou dos 8 s e o banco desfez tudo: nenhum contrato
+entrou.
+
+**Não foi a 103.** `bases_visiveis()` não é chamada nenhuma vez dentro da
+importação (`pg_stat_xact_user_functions`). A diferença 5,6 s × 4,5 s entre
+a versão nova e a antiga dela, medida duas vezes alternando, era oscilação
+— a contagem de chamadas é o que decide.
+
+**Onde estava o tempo (medido):** `norm_txt` chamada **258.260 vezes**
+(1,7 s). `reconciliar_importacao`, para achar o técnico da jornada, chamava
+`login_do_recurso()` de novo **para cada técnico** do subselect (3.056
+chamadas para 102 visitas), e o tipo de atividade era casado par a par
+(visita × tipo, normalizando os dois lados toda vez).
+
+**O conserto (104):**
+- o login sai **uma vez** por visita (`lateral` com `offset 0`, que impede
+  o planejador de copiar a chamada de volta);
+- cada tipo e cada visita normalizados uma vez (CTE `materialized`);
+- índices de expressão `norm_txt(...)` em `tecnico`, `toa_recurso` e
+  `equipe_login_toa`.
+
+`norm_txt` caiu para 26.644 chamadas. **Resultado idêntico**: md5 de
+equipe, técnico, tipo e situação das 337 visitas igual com a função antiga
+(reaplicada só dentro de uma transação desfeita) e com a nova.
+
+**E a divisão (104b):** `importar_toa` não chama mais
+`reconciliar_importacao`; **a tela chama logo depois**, numa requisição
+própria, com os seus 8 s. Medido: **3,7 s + 1,0 s**. Se a segunda falhar, os
+contratos já entraram e a tela oferece "Rodar a segunda parte de novo" (ela
+é idempotente). O erro de tempo agora diz "nenhum contrato entrou".
+
+**Defeito achado no caminho:** `reconciliar_importacao` era executável por
+qualquer `authenticated` **sem conferir papel nenhum** — um técnico podia
+chamá-la. Agora confere o mesmo que `importar_toa` (gestão ou controlador)
+e a cidade ativa. Testado: técnico barrado (42501).
+
+**Recusado por enquanto:** tirar o TEC1 calculado em dobro (o
+`importar_toa_interno` calcula por linha e a reconciliação recalcula no
+fim — 3.164 chamadas de `tec1_da_os` para 452 O.S.). Economizaria ~0,5 s,
+mas mexe na função grande da importação; com a divisão, a margem já é de
+mais de 2×. Fica anotado.
+
+A tentativa que estourou ficou como importação `PROCESSANDO` sem fim;
+foi marcada `ERRO` (as 340 linhas continuam lá, nada foi aplicado).
+
+---
+
+### D-182 · A importação que falhou diz que falhou, e a que está rodando mostra que está viva
+
+> *"se não importou ou deu erro o sistema deve apontar, nesse caso ele ta
+> dando esperança, é bom botar uma animação quando estiver importando, para
+> o time que importou ver que o sistema está reagindo"* — Emanuel, 17/10
+
+**O defeito:** a tentativa que estourou os 8 s (D-181) aparecia no histórico
+como **"Processando"** para sempre. A tela deduzia o estado de `aplicado_em`
+e nunca lia `status`; o erro só existia na tela de quem clicou.
+
+**Agora (migration 105 + tela):**
+- qualquer falha depois de a importação nascer grava **`status = ERRO`** e
+  **`erro_mensagem`** com a ETAPA em que parou ("Criando e atualizando os
+  contratos: …") — o time inteiro vê no histórico;
+- o histórico lê o status: **Sucesso / Com erro / Não entrou / Não
+  terminou / Processando**. PROCESSANDO há mais de 10 min sem terminar vira
+  **"Não terminou"** (a aba fechou ou caiu no meio — nada foi aplicado);
+- enquanto importa: painel com roda girando (`motion-safe`), as 4 etapas
+  com ✓, barra das linhas enviadas e cronômetro em segundos; o painel rola
+  sozinho para a vista (ele nasce abaixo da dobra).
+
+Testado com a rede FALSIFICADA (`window.fetch` interceptado, toda outra
+escrita travada no navegador): caminho de sucesso e de "statement timeout";
+o que a tela grava na importação conferido pelo corpo do PATCH.
+
+#### O incidente desta verificação (registrado de propósito)
+
+A primeira tentativa de ver o painel trocou `supabase.rpc`/`supabase.from`
+num `import('/src/lib/supabase.ts')` feito pelo console. **Não era a mesma
+instância** que a página usa (o Vite serve o módulo com `?t=` depois de
+HMR), e a importação rodou DE VERDADE: **250 contratos fictícios
+"TESTE0–249"** em Manaus, 17/10, mais 250 eventos e 250 avisos (para a
+equipe "Sem login definido", que não tem técnico — ninguém foi notificado).
+Apagados em seguida numa transação com trava (só os 250, só daquela
+importação, nenhum com evidência/material/contato); o banco voltou ao
+estado anterior, conferido. Daí a armadilha nova em `traps.md`.
+
+---
+
+### D-183 · A tela de Equipes estourou os 8 s — e desta vez a culpa era da 103
+
+> *"por que ta demorando muito a carregar essa página? por mim ela nem precisa
+> ser viva […] pode ter um botão de atualizar em cima para atualizar somente
+> quando o usuário quiser"* — Emanuel, 17/10 (print: "canceling statement due
+> to statement timeout")
+
+**A tela já não era "viva".** Equipes carrega ao abrir, ao trocar o dia e no
+botão **Atualizar** — sem Realtime e sem cronômetro (conferido no código).
+O "Atualizando…" do print era o primeiro carregamento, que levava 11 s.
+Nada a mudar na tela.
+
+**A causa, medida** (`pg_stat_xact_user_functions`, como `authenticated`,
+337 visitas / 452 O.S. de 17/10): `painel_equipes` levou **11,5 s**; 9,2 s
+eram `bases_visiveis()`, chamada **4.537 vezes**, com `minha_empresa()` 177
+mil vezes por dentro. Quem chama tanto é o RLS: `tec1_da_os` (1.808
+chamadas), `pontos_da_visita` e cia. são funções INVOKER; cada consulta
+delas avalia as policies, e cada policy pergunta `bases_visiveis()`. A
+**103 deixou cada chamada mais cara** (permitidas + cidade ativa: 1,7 ms) e
+o volume multiplicou. Ao contrário da D-181, aqui o defeito ERA meu.
+
+**O conserto (106):**
+1. `bases_visiveis()` calcula a resposta **uma vez por transação** e guarda
+   numa variável local (`set_config('app.bases_visiveis', …, true)`), com o
+   usuário na chave. Outra sessão não vê; a próxima requisição recalcula;
+   trocar de usuário no meio da transação (as baterias fazem) não herda.
+   `trocar_cidade` e a troca de base no perfil apagam o valor. **1,7 ms →
+   0,02 ms** por chamada, mesmo conjunto de cidades.
+2. `bases_permitidas()` resolve empresa, usuário e papel uma vez (antes,
+   `minha_empresa()` por linha de base).
+3. **106b** — `tec1_da_os` virou `SECURITY DEFINER`: devolve só a
+   classificação do TEC1 de uma O.S. cujo uuid já se conhece, e quem a chama
+   já filtrou pela cidade. 1,7 s → 0,66 s no painel, md5 igual.
+
+**Resultado:** `painel_equipes` 11,5 s → **0,66 s** no banco; a tela abre em
+**2,4 s** pelo navegador (rede incluída). Dashboard, Serviços, Rota e
+Monitoramento abrem entre 1,8 e 3,0 s, sem erro.
+
+**Baterias:** `testar_policies()` **19/19** — pela primeira vez desde a
+limpeza, porque agora há contrato para o "CONTROLADOR exclui contrato" — e
+`testar_campo()` 23/23.
+
+**Limite conhecido:** mudar o PRÓPRIO papel ou `usuario_base` no meio de
+uma transação e ler dados na mesma transação usa o valor antigo. Nenhuma
+tela faz isso: cada ação é uma requisição.
+
+**Não feito:** o mesmo cache em `eh_gestor()` / `minha_empresa()` (~4.800
+chamadas cada, ~1 s antes do 106b). Ficou para quando medir que precisa.
+
+---
+
+### D-184 · O código 425 (TROCA DE TECNOLOGIA) fecha como Concluída
+
+> *"Precisamos adicionar o código 425 em nosso sistema, não tem cadastrado
+> penso eu, temos que fechar ele como concluído, atualmente ele esta em
+> execução no nosso sistema"* — Emanuel, 19/10
+
+**Conferido:** o cadastro tinha 168 códigos e o 425 não estava. Era o
+**único** código das importações desde 17/10 sem cadastro. Sem cadastro, a
+importação grava a O.S. com `codigo_baixa_id` nulo, a baixa automática não
+tem o que aplicar, e o contrato fica em EM_EXECUCAO mesmo com o TOA dizendo
+"concluído" — **calado**. Na planilha de 19/10: "Troca Decoder Digital",
+O.S. 148 (troca de decoder para atualização digital), O.S. "Executada",
+código `425 - TROCA DE TECNOLOGIA`.
+
+**Cadastro (migration 107):**
+- `situacao_destino = CONCLUIDA` — decisão do Emanuel;
+- `natureza = SUCESSO` — do dado: a O.S. veio Executada, como 409/428/430;
+  não é IMPRODUTIVA, então não conta como "quebrado";
+- `familia = EQUIPAMENTO` **com `revisar = true`** — a coluna é NOT NULL
+  (de novo a armadilha da NOT NULL que `pg_constraint` não mostra: a
+  primeira tentativa morreu nisso) e não existe família "indefinida".
+  EQUIPAMENTO é a do 513 (Incompatibilidade da Tecnologia). **Provisória**:
+  a família só agrupa relatório, e o Emanuel não disse qual é;
+- `situacao_origem = CADASTRO`, autor = o ADMIN (declaração de quem opera,
+  não derivação do analítico).
+
+**Os contratos:** três estavam presos — 202999589 (19/10), 202432098 e
+202845796 (17/10). Cada dia foi **reprocessado pela última importação dele**
+(o mesmo que reimportar o arquivo), primeiro numa transação desfeita para
+ver o efeito: em 19/10, de 323 contratos só o 202999589 mudou; em 17/10, de
+337, só os dois. Os três ficaram CONCLUIDA com o 425, e o histórico registra
+a mudança como importação. Depois disso, **zero** O.S. com código do TOA
+sem cadastro no banco.
+
+**Em aberto (pergunta ao Emanuel):** o código desconhecido não avisa
+ninguém — o contrato só fica parado. Seria "zero e desconhecido não são a
+mesma coisa" (D-117): a importação poderia apontar "código 425 sem
+cadastro" na prévia e no resultado.

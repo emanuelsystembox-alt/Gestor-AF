@@ -71,6 +71,34 @@ export const diaMes = (iso: string) =>
 export const dataBR = (iso: string) =>
   new Date(iso + 'T12:00').toLocaleDateString('pt-BR')
 
+/**
+ * Tempo de casa a partir da data de contratação: `2 anos e 3 meses`.
+ *
+ * Calculado na leitura, contra o dia LOCAL de hoje (`isoLocal`), e com
+ * as partes da data em inteiros — `Date` com fuso mudaria o dia em
+ * Manaus depois das 20h (D-084). Sem data devolve `null`: quem chama
+ * escreve "não informada", e não "0 dias" (D-117). Data futura é
+ * contratação marcada que ainda não começou, e a frase diz isso.
+ */
+export function tempoDeCasa(iso: string | null | undefined, hoje = isoLocal()): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso ?? '').trim())
+  if (!m) return null
+  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const [ha, hm, hd] = hoje.split('-').map(Number)
+  if (iso! > hoje) return `começa em ${dataBR(iso!)}`
+  let meses = (ha - a) * 12 + (hm - b)
+  if (hd < c) meses--
+  const anos = Math.floor(meses / 12)
+  const resto = meses % 12
+  if (anos === 0 && resto === 0) {
+    const dias = Math.round((Date.UTC(ha, hm - 1, hd) - Date.UTC(a, b - 1, c)) / 86_400_000)
+    return dias === 0 ? 'entrou hoje' : `${dias} dia${dias > 1 ? 's' : ''}`
+  }
+  const pa = anos ? `${anos} ano${anos > 1 ? 's' : ''}` : ''
+  const pm = resto ? `${resto} ${resto > 1 ? 'meses' : 'mês'}` : ''
+  return [pa, pm].filter(Boolean).join(' e ')
+}
+
 /** `seg`, `ter`… — ajuda a ler a lista de um contrato dia a dia. */
 export const diaSemana = (iso: string) =>
   new Date(iso + 'T12:00')

@@ -5,6 +5,7 @@ import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Pill, Vazio } from '../components/ui'
+import { fotosDosTecnicos } from '../lib/foto'
 import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { SeloLocal } from '../components/TabelaContratos'
 import { useTema } from '../lib/tema'
@@ -294,6 +295,15 @@ export default function Monitor() {
 
   useEffect(() => { carregar() }, [carregar, versao])
 
+  // As fotos (103) só quando muda QUEM está na lista: a central recarrega
+  // a cada minuto, e reassinar 50 URLs por minuto não compra nada.
+  const [fotos, setFotos] = useState<Map<string, string>>(new Map())
+  const idsDaLista = tecnicos.map(t => t.tecnico_id).sort().join(',')
+  useEffect(() => {
+    if (!idsDaLista) return
+    fotosDosTecnicos(idsDaLista.split(',')).then(setFotos)
+  }, [idsDaLista])
+
   // Hoje, a central se atualiza sozinha a cada minuto: o ponto do
   // celular chega de 2 em 2 min, e olhar um mapa de 10 min atrás é
   // olhar o passado achando que é o presente.
@@ -558,7 +568,7 @@ export default function Monitor() {
                       className={`flex w-full items-start gap-2.5 border-b border-graf-800/70 px-3 py-2.5
                                   text-left transition hover:bg-graf-800/40 ${ativo ? 'bg-af-900/20' : ''}`}>
                       <div className="relative">
-                        <Avatar nome={t.nome} tamanho={32} />
+                        <Avatar nome={t.nome} tamanho={32} foto={fotos.get(t.tecnico_id)} />
                         <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-graf-900 ${
                           e === 'VIVO' ? 'ponto-vivo' : ''}`}
                           style={{ background: COR_ESTADO[e] }} title={ROTULO_ESTADO[e]} />

@@ -6,6 +6,13 @@ import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from
 import { Alerta } from '../components/ui'
 import { Shell } from '../components/Shell'
 import { isoLocal, dataBR } from '../lib/formato'
+import { useCidades, trocarCidade } from '../lib/cidade'
+
+/** De que cidade é o arquivo, pelo bucket do nome (103, D-180). */
+interface Origem {
+  bucket: string | null; base_id: string | null; cidade: string | null
+  acessa: boolean | null; ativo: boolean | null
+}
 
 type Fase = 'ocioso' | 'lendo' | 'lida' | 'enviando' | 'pronto'
 
@@ -47,8 +54,38 @@ interface Historico {
   criado_em: string
   aplicado_em: string | null
   data_atuacao: string | null
+  erro_mensagem: string | null
   usuario: { nome: string | null; email: string | null } | null
 }
+
+/**
+ * O estado de uma importação, lido do STATUS (105, D-182) — antes a tela
+ * deduzia de `aplicado_em`, e a que falhou ficava "Processando" para sempre.
+ * PROCESSANDO há mais de 10 min sem terminar não está processando: a aba de
+ * quem importou fechou ou caiu no meio. A tela diz isso.
+ */
+type EstadoImp = 'sucesso' | 'com_erro' | 'nao_entrou' | 'nao_terminou' | 'processando'
+function estadoDa(h: Historico, agora: number): EstadoImp {
+  if (h.status === 'ERRO') return 'nao_entrou'
+  if (h.aplicado_em || h.status === 'APLICADA') return (h.qtd_erro ?? 0) > 0 ? 'com_erro' : 'sucesso'
+  if (agora - new Date(h.criado_em).getTime() > 10 * 60_000) return 'nao_terminou'
+  return 'processando'
+}
+const ROTULO_ESTADO: Record<EstadoImp, { texto: string; classe: string }> = {
+  sucesso:      { texto: 'Sucesso',       classe: 'bg-emerald-900/40 text-emerald-300' },
+  com_erro:     { texto: 'Com erro',      classe: 'bg-af-900/40 text-af-300' },
+  nao_entrou:   { texto: 'Não entrou',    classe: 'bg-af-900/40 text-af-300' },
+  nao_terminou: { texto: 'Não terminou',  classe: 'bg-af-900/40 text-af-300' },
+  processando:  { texto: 'Processando',   classe: 'bg-amber-900/40 text-amber-300' },
+}
+
+/** As etapas que a tela mostra enquanto importa. */
+const ETAPAS = [
+  'Registrando a importação',
+  'Enviando as linhas',
+  'Criando e atualizando os contratos',
+  'Ligando jornada, tipo de atividade e TEC1',
+] as const
 
 const quando = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }) : '—'
@@ -56,6 +93,29 @@ const quando = (ts: string | null) =>
 export default function Importacao() {
   const { perfil } = useAuth()
   const navegar = useNavigate()
+  /**
+   * A importação vai para a CIDADE ATIVA do topo — era `'MAN'` escrito à
+   * mão, e qualquer arquivo entrava em Manaus. Em 26/09 o único arquivo
+   * do dia foi `Atividades-ARN-AFLINE`, e entrou em Manaus (D-180).
+   */
+  const { ativa } = useCidades()
+  const [origem, setOrigem] = useState<Origem | null>(null)
+  /**
+   * A reconciliação (jornada sem login, tipo de atividade, TEC1) é a
+   * SEGUNDA chamada, com os seus próprios 8 s (104b, D-181). Se ela falhar,
+   * os contratos já entraram — guarda o id para tentar de novo.
+   */
+  const [reconciliarPendente, setReconciliarPendente] = useState<string | null>(null)
+  const [reconciliando, setReconciliando] = useState(false)
+
+  async function reconciliar(id: string): Promise<boolean> {
+    setReconciliando(true)
+    const { error } = await supabase.rpc('reconciliar_importacao', { p_importacao_id: id })
+    setReconciliando(false)
+    if (error) { setReconciliarPendente(id); return false }
+    setReconciliarPendente(null)
+    return true
+  }
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [fase, setFase] = useState<Fase>('ocioso')
@@ -65,6 +125,23 @@ export default function Importacao() {
   const [erro, setErro] = useState<string | null>(null)
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [progresso, setProgresso] = useState('')
+  /** Andamento visível (D-182): etapa atual, linhas enviadas, cronômetro. */
+  const [etapa, setEtapaEstado] = useState(0)
+  const etapaRef = useRef(0)
+  const setEtapa = (n: number) => { etapaRef.current = n; setEtapaEstado(n) }
+  const [enviadas, setEnviadas] = useState(0)
+  const [inicio, setInicio] = useState<number | null>(null)
+  const [agora, setAgora] = useState(Date.now())
+  useEffect(() => {
+    if (fase !== 'enviando') return
+    const t = setInterval(() => setAgora(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [fase])
+  // O painel nasce abaixo da dobra: sem isto, quem clicou não via nada mexer.
+  const painelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (fase === 'enviando') painelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [fase])
   const [arrastando, setArrastando] = useState(false)
   const [historico, setHistorico] = useState<Historico[]>([])
   /**
@@ -84,7 +161,7 @@ export default function Importacao() {
   async function carregarHistorico() {
     const { data } = await supabase.from('importacao')
       .select(`id, arquivo_nome, status, total_linhas, qtd_criadas, qtd_atualizadas,
-               qtd_erro, qtd_conflito, criado_em, aplicado_em, data_atuacao,
+               qtd_erro, qtd_conflito, criado_em, aplicado_em, data_atuacao, erro_mensagem,
                usuario:usuario_id ( nome, email )`)
       .order('criado_em', { ascending: false }).limit(30)
     setHistorico((data ?? []) as unknown as Historico[])
@@ -92,8 +169,15 @@ export default function Importacao() {
   useEffect(() => { carregarHistorico() }, [])
 
   async function receber(f: File) {
-    setErro(null); setResumo(null); setProblemas([])
+    setErro(null); setResumo(null); setProblemas([]); setOrigem(null)
     setArquivo(f); setFase('lendo')
+    // O bucket sai do NOME do arquivo — nenhuma coluna da planilha o traz.
+    // A tela pergunta antes de subir as linhas; quem barra é o banco
+    // (`importar_toa` confere de novo).
+    supabase.rpc('cidade_do_arquivo', { p_arquivo: f.name }).then(({ data }) => {
+      const o = ((data ?? []) as Origem[])[0]
+      setOrigem(o ?? { bucket: null, base_id: null, cidade: null, acessa: null, ativo: null })
+    })
     try {
       const r = await lerPlanilhaTOA(f)
       setLeitura(r)
@@ -108,10 +192,12 @@ export default function Importacao() {
   async function enviar() {
     if (!leitura || !arquivo) return
     setFase('enviando'); setErro(null)
+    setEtapa(0); setEnviadas(0); setInicio(Date.now()); setAgora(Date.now())
+    // O id da importação, para gravar a falha nela se der errado depois.
+    let impId: string | null = null
     try {
-      const { data: base, error: eb } = await supabase
-        .from('base').select('id').eq('codigo', 'MAN').single()
-      if (eb || !base) throw new Error('Base MAN não encontrada.')
+      if (!ativa) throw new Error('Escolha a cidade no topo da tela antes de importar.')
+      const base = { id: ativa.id }
 
       setProgresso('Registrando a importação…')
       const { data: imp, error: ei } = await supabase
@@ -127,6 +213,8 @@ export default function Importacao() {
         })
         .select('id').single()
       if (ei || !imp) throw new Error(ei?.message ?? 'Falha ao registrar a importação.')
+      impId = imp.id
+      setEtapa(1)
 
       // Em lotes: 349 linhas num único insert estoura o limite da requisição.
       const LOTE = 100
@@ -140,8 +228,10 @@ export default function Importacao() {
         setProgresso(`Enviando linhas ${i + 1}–${Math.min(i + LOTE, linhas.length)} de ${linhas.length}…`)
         const { error } = await supabase.from('importacao_linha').insert(fatia)
         if (error) throw new Error(`Linha ${i + 1}: ${error.message}`)
+        setEnviadas(Math.min(i + LOTE, linhas.length))
       }
 
+      setEtapa(2)
       setProgresso('Processando no banco…')
       const { data: res, error: er } = await supabase.rpc('importar_toa', {
         p_importacao_id: imp.id,
@@ -151,12 +241,32 @@ export default function Importacao() {
       await supabase.from('importacao')
         .update({ total_linhas: linhas.length }).eq('id', imp.id)
 
+      // 104b: a segunda parte, numa chamada própria. Os contratos já estão
+      // gravados; se esta falhar, a tela oferece rodar de novo.
+      setEtapa(3)
+      setProgresso('Ligando jornada, tipo de atividade e TEC1…')
+      await reconciliar(imp.id)
+
       setResumo(res as Resumo)
       setFase('pronto')
       await carregarHistorico()
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Falha na importação.')
+      const msg = e instanceof Error ? e.message : 'Falha na importação.'
+      // O banco desfaz a transação inteira quando estoura o tempo: dizer
+      // "nada entrou" evita alguém procurar contrato pela metade.
+      const texto = /statement timeout/i.test(msg)
+        ? 'O banco demorou mais que o limite e desfez a importação inteira — nenhum contrato entrou. Tente de novo; se repetir, avise.'
+        : msg
+      setErro(texto)
       setFase('lida')
+      // 105: a falha fica GRAVADA na importação, para o histórico de todo
+      // mundo dizer "não entrou" — e não "Processando" para sempre.
+      if (impId) {
+        await supabase.from('importacao')
+          .update({ status: 'ERRO', erro_mensagem: `${ETAPAS[etapaRef.current]}: ${texto}` })
+          .eq('id', impId)
+      }
+      await carregarHistorico()
     } finally {
       setProgresso('')
     }
@@ -164,7 +274,8 @@ export default function Importacao() {
 
   function limpar() {
     setFase('ocioso'); setArquivo(null); setLeitura(null)
-    setResumo(null); setErro(null); setProblemas([])
+    setResumo(null); setErro(null); setProblemas([]); setOrigem(null)
+    setReconciliarPendente(null)
     // A próxima importação volta a nascer em HOJE: o dia anterior é
     // escolha de uma importação, não um modo que fica ligado.
     setDia(isoLocal())
@@ -191,14 +302,21 @@ export default function Importacao() {
   const nomeDoDia = (iso: string) =>
     iso === hoje ? 'hoje' : iso === ontem() ? 'ontem' : dataBR(iso)
 
+  /** O arquivo é desta cidade? Nulo enquanto a conferência não voltou. */
+  const origemOk = !!origem && !!origem.bucket && !!origem.base_id && !!origem.ativo
+    && !!ativa && origem.base_id === ativa.id
+
   return (
     <Shell>
       <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
         <div>
           <h1 className="text-xl font-semibold">Importar planilha do TOA</h1>
           <p className="mt-1 text-sm text-graf-400">
-            O arquivo <code className="text-graf-300">Atividades-MAN-AFLINE_*.xlsx</code> exportado
-            do sistema da CLARO. Pode subir a mesma planilha várias vezes ao dia:
+            O arquivo <code className="text-graf-300">Atividades-&lt;BUCKET&gt;_DD_MM_AA.xlsx</code> exportado
+            do sistema da CLARO, com o nome que o TOA dá — é pelo nome que o sistema sabe
+            de qual cidade ele é. Entra em{' '}
+            <strong className="text-graf-200">{ativa?.nome ?? 'nenhuma cidade escolhida'}</strong>,
+            a cidade do topo. Pode subir a mesma planilha várias vezes ao dia:
             a importação atualiza sem duplicar. As visitas entram no <strong
             className="text-graf-200">dia de atuação</strong> que você escolher —
             hoje, a menos que você troque.
@@ -323,6 +441,56 @@ export default function Importacao() {
               </div>
             </div>
 
+            {/* ---------- de que cidade é o arquivo (103) ---------- */}
+            <div className={`card-controle p-4 ${origem && !origemOk ? 'ring-1 ring-af-500/60' : ''}`}>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-graf-400">
+                Bucket do TOA
+              </p>
+              {!origem ? (
+                <p className="text-sm text-graf-400">Conferindo de qual cidade é o arquivo…</p>
+              ) : origemOk ? (
+                <p className="text-sm text-emerald-400">
+                  <strong>{origem.bucket}</strong> — {origem.cidade}. É a cidade do topo: pode importar.
+                </p>
+              ) : !origem.bucket ? (
+                <p className="text-sm text-af-300">
+                  Não reconheci o bucket no nome do arquivo. Use o arquivo com o nome que o
+                  TOA gera — <code>Atividades-MAN-AFLINE_17_10_26.xlsx</code>, por exemplo —
+                  sem renomear.
+                </p>
+              ) : !origem.base_id ? (
+                <p className="text-sm text-af-300">
+                  O bucket <strong>{origem.bucket}</strong> não está cadastrado em nenhuma cidade.
+                  O ADMIN cadastra em Configurações › Buckets do TOA.
+                </p>
+              ) : !origem.ativo ? (
+                <p className="text-sm text-af-300">
+                  O bucket <strong>{origem.bucket}</strong> está desligado em {origem.cidade}.
+                  O ADMIN religa em Configurações › Buckets do TOA.
+                </p>
+              ) : (
+                <div className="text-sm text-af-300">
+                  <p>
+                    Este arquivo é do bucket <strong>{origem.bucket}</strong>, de{' '}
+                    <strong>{origem.cidade}</strong> — e você está em{' '}
+                    <strong>{ativa?.nome ?? 'nenhuma cidade'}</strong>. Para não misturar as
+                    cidades, ele não entra aqui.
+                  </p>
+                  {origem.acessa ? (
+                    <button onClick={() => trocarCidade(origem.base_id!)}
+                      className="mt-2 rounded-md border border-af-600 px-3 py-1.5 text-xs
+                                 font-medium text-af-200 hover:bg-af-600/15">
+                      Trocar para {origem.cidade} (depois escolha o arquivo de novo)
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-xs text-graf-400">
+                      Você não tem acesso a {origem.cidade}. Quem libera é o ADMIN, no cadastro.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* ---------- dia de atuação (090) ---------- */}
             <div className={`card-controle p-4 ${dia !== hoje ? 'ring-1 ring-amber-500/50' : ''}`}>
               <div className="flex flex-wrap items-end gap-3">
@@ -405,15 +573,65 @@ export default function Importacao() {
             <div className="flex items-center gap-3">
               <button
                 onClick={enviar}
-                disabled={fase === 'enviando' || leitura.linhas.length === 0 || !dia}
+                disabled={fase === 'enviando' || leitura.linhas.length === 0 || !dia || !origemOk}
                 className="toque rounded-lg bg-af-600 px-6 font-semibold text-white
                            hover:bg-af-500 disabled:opacity-50"
               >
                 {fase === 'enviando' ? 'Importando…'
                   : `Importar ${leitura.linhas.length} visitas em ${dataBR(dia).slice(0, 5)}`}
               </button>
-              {progresso && <span className="text-sm text-graf-400">{progresso}</span>}
+              {fase !== 'enviando' && progresso && <span className="text-sm text-graf-400">{progresso}</span>}
             </div>
+
+            {/* ┌─ o andamento, À VISTA (D-182) ───────────────────────────┐
+                │ > "é bom botar uma animação quando estiver importando, │
+                │ >  para o time que importou ver que o sistema está     │
+                │ >  reagindo" — Emanuel                                 │
+                │ Uma frase cinza ao lado do botão não dizia se a tela   │
+                │ estava viva. Agora: a roda gira, a etapa da vez está   │
+                │ marcada, as linhas têm barra, e o cronômetro corre.    │
+                └────────────────────────────────────────────────────────┘ */}
+            {fase === 'enviando' && (
+              <div ref={painelRef} role="status" aria-live="polite" className="card-controle p-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <span aria-hidden
+                    className="h-6 w-6 shrink-0 rounded-full border-[3px] border-af-600/25 border-t-af-500
+                               motion-safe:animate-spin" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-graf-100">Importando — não feche esta aba</p>
+                    <p className="text-xs text-graf-400">
+                      {ETAPAS[etapa]}… · <span className="tabular">
+                        {inicio ? Math.max(0, Math.floor((agora - inicio) / 1000)) : 0} s
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <ol className="space-y-1.5 text-sm">
+                  {ETAPAS.map((rot, k) => (
+                    <li key={rot} className="flex items-center gap-2">
+                      <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                        k < etapa ? 'bg-emerald-600 text-white'
+                        : k === etapa ? 'bg-af-600 text-white motion-safe:animate-pulse'
+                        : 'bg-graf-800 text-graf-500'}`}>
+                        {k < etapa ? '✓' : k + 1}
+                      </span>
+                      <span className={k === etapa ? 'text-graf-100' : k < etapa ? 'text-graf-300' : 'text-graf-500'}>
+                        {rot}
+                        {k === 1 && leitura && (
+                          <span className="tabular text-graf-400"> — {enviadas} de {leitura.linhas.length}</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                {etapa === 1 && leitura && leitura.linhas.length > 0 && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-graf-800">
+                    <div className="h-full rounded-full bg-af-500 transition-all"
+                      style={{ width: `${Math.round((enviadas / leitura.linhas.length) * 100)}%` }} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -445,6 +663,23 @@ export default function Importacao() {
                 </div>
               ))}
             </div>
+
+            {reconciliarPendente && (
+              <Alerta tipo="aviso">
+                <p className="font-medium">
+                  Os contratos entraram, mas a segunda parte não terminou.
+                </p>
+                <p className="mt-1">
+                  Falta ligar a jornada sem login ao técnico e calcular o TEC1. Pode rodar de
+                  novo sem medo: não duplica nada.
+                </p>
+                <button onClick={() => reconciliar(reconciliarPendente)} disabled={reconciliando}
+                  className="mt-2 rounded-md border border-amber-500 px-3 py-1.5 text-xs font-medium
+                             hover:bg-amber-500/15 disabled:opacity-50">
+                  {reconciliando ? 'Rodando…' : 'Rodar a segunda parte de novo'}
+                </button>
+              </Alerta>
+            )}
 
             {resumo.conflitos > 0 && (
               <Alerta tipo="aviso">
@@ -508,7 +743,7 @@ export default function Importacao() {
                 </thead>
                 <tbody>
                   {historico.map(h => {
-                    const concluida = !!h.aplicado_em
+                    const est = estadoDa(h, Date.now())
                     const comErro = (h.qtd_erro ?? 0) > 0
                     return (
                       <tr key={h.id} className="border-b border-graf-800">
@@ -537,7 +772,13 @@ export default function Importacao() {
                                   <> · <span className="tabular text-af-400">{h.qtd_erro}</span> erros</>
                                 )}
                               </>
-                            : <span className="text-graf-600">sem contagem gravada</span>}
+                            : est === 'nao_entrou' || est === 'nao_terminou'
+                              ? <span className="text-af-300">
+                                  {h.erro_mensagem ?? (est === 'nao_terminou'
+                                    ? 'Começou e não terminou — a aba fechou ou caiu no meio. Nada foi aplicado; importe de novo.'
+                                    : 'Não entrou.')}
+                                </span>
+                              : <span className="text-graf-400">sem contagem gravada</span>}
                         </td>
                         <td className="tabular px-3 py-2 text-xs text-graf-400">{quando(h.criado_em)}</td>
                         <td className="tabular px-3 py-2 text-xs text-graf-400">{quando(h.aplicado_em)}</td>
@@ -545,11 +786,8 @@ export default function Importacao() {
                           {h.usuario?.nome ?? h.usuario?.email ?? '—'}
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${
-                            comErro ? 'bg-af-900/40 text-af-300'
-                            : concluida ? 'bg-emerald-900/40 text-emerald-300'
-                            : 'bg-amber-900/40 text-amber-300'}`}>
-                            {comErro ? 'Com erro' : concluida ? 'Sucesso' : 'Processando'}
+                          <span className={`whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-medium ${ROTULO_ESTADO[est].classe}`}>
+                            {ROTULO_ESTADO[est].texto}
                           </span>
                         </td>
                       </tr>

@@ -17,6 +17,7 @@ import {
 } from '../components/TabelaContratos'
 import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { textoDistancia, useLocaisDaBaixa } from '../lib/localBaixa'
+import { fotosDosTecnicos } from '../lib/foto'
 import {
   FILTRO_VAZIO, SEM_JANELA, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
   type FiltroContrato,
@@ -290,6 +291,8 @@ export default function Equipes() {
   const [data, setData] = useState<string>(isoLocal())
   const [painel, setPainel] = useState<EquipePainel[]>([])
   const [tecnicos, setTecnicos] = useState<Tec[]>([])
+  /** tecnico_id → URL assinada da foto (103). */
+  const [fotosTec, setFotosTec] = useState<Map<string, string>>(new Map())
   const [orfaos, setOrfaos] = useState<Orfao[]>([])
   const [logins, setLogins] = useState<LoginEquipe[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -467,7 +470,11 @@ export default function Equipes() {
       const linhas = (p.data ?? []) as EquipePainel[]
       setPainel(linhas.filter(e => e.codigo !== 'SEM-LOGIN' || e.visitas > 0))
     }
-    if (t.data) setTecnicos(t.data as unknown as Tec[])
+    if (t.data) {
+      const ts = t.data as unknown as Tec[]
+      setTecnicos(ts)
+      fotosDosTecnicos(ts.map(x => x.id)).then(setFotosTec)
+    }
     if (o.data) setOrfaos(o.data as Orfao[])
     setLogins((lg.data ?? []) as LoginEquipe[])
     setCarregando(false)
@@ -1023,7 +1030,7 @@ export default function Equipes() {
                                     return (
                                       <Avatar
                                         nome={t?.nome ?? e.codigo}
-                                        foto={t?.foto_url}
+                                        foto={t ? fotosTec.get(t.id) : null}
                                         tamanho={32}
                                         titulo={ts.length
                                           ? `${ts.map(x => x.nome).join(' · ')}`

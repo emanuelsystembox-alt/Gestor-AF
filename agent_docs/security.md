@@ -26,7 +26,7 @@ custo por linha não compensava.
 ## As duas baterias — rode antes de commitar
 
 ```sql
-select * from testar_policies();   -- 16 cenários
+select * from testar_policies();   -- 19 cenários
 select * from testar_campo();      -- 23 cenários
 ```
 
@@ -73,6 +73,15 @@ preserva a ACL, mas função criada do zero **nasce aberta de novo** —
 inclusive função de **gatilho** (foi assim que `aviso_do_evento` escapou
 na 059 e precisou da 061). Confira com `has_function_privilege`, **não
 com o lint**, que demora a atualizar.
+
+**`bases_visiveis()` é a cidade ATIVA, não todas as que a pessoa pode ver**
+(103, D-180). O que ela PODE ver é `bases_permitidas()`: ADMIN todas;
+os demais, `perfil.base_id` + `usuario_base`. O COP **não** é mais global.
+Função que precise de "todas as cidades do usuário" usa `bases_permitidas()`;
+a que filtra o que aparece na tela usa `bases_visiveis()`, como sempre.
+`bases_visiveis()` **guarda a resposta na transação** (106, D-183), com o
+usuário na chave; quem mudar base ou cidade ativa por fora de `trocar_cidade`
+/ do gatilho do perfil tem de apagar `app.bases_visiveis`.
 
 **`SECURITY DEFINER` ignora o RLS.** Se a função faz algo privilegiado,
 cheque o papel **dentro** dela. Ver `importar_toa`, `baixar_os`.

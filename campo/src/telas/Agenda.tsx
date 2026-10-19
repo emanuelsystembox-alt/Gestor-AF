@@ -467,7 +467,7 @@ export default function Agenda({ navigation }: Props) {
           <View style={e.folha}>
             <Text style={e.folhaTitulo}>Solicitar suporte técnico</Text>
             <Text style={e.folhaMiudo}>
-              O contrato fica "com impedimento" e o controlador recebe o aviso na hora.
+              O contrato vira "Ticket de suporte" e o controlador recebe o aviso na hora.
             </Text>
             {[...andamento, ...abertas.filter(l => l.situacao !== 'COM_IMPEDIMENTO')].length === 0 ? (
               <Aviso tipo="atencao">Nenhum contrato aberto hoje para pedir suporte. Use a Conversa.</Aviso>

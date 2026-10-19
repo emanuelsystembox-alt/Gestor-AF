@@ -121,6 +121,18 @@ export function nascimentoValido(iso: string | null | undefined): boolean {
   return anos >= 16 && anos <= 90
 }
 
+/**
+ * Data de contratação: opcional, e com a mesma faixa que o banco aceita
+ * (101: depois de 1950, antes de 2100). Data futura passa — é quem já foi
+ * contratado e começa na semana que vem; a tela diz "começa em".
+ */
+export function contratacaoValida(iso: string | null | undefined): boolean {
+  const t = (iso ?? '').trim()
+  if (!t) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return false
+  return t > '1950-01-01' && t < '2100-01-01'
+}
+
 /** RG: sem padrão nacional. Confere tamanho e caracteres, e só. */
 export function rgValido(v: string | null | undefined): boolean {
   const t = (v ?? '').trim()
@@ -165,7 +177,7 @@ export interface ErrosCadastro { [campo: string]: string }
 export function conferirCadastro(c: {
   nome?: string; email?: string; cpf?: string; rg?: string
   whatsapp?: string; data_nascimento?: string; matricula_ponto?: string
-  apelido?: string
+  apelido?: string; data_contratacao?: string
 }, opcoes: { exigeEmail?: boolean } = {}): ErrosCadastro {
   const e: ErrosCadastro = {}
 
@@ -188,6 +200,9 @@ export function conferirCadastro(c: {
   }
   if (!nascimentoValido(c.data_nascimento)) {
     e.data_nascimento = 'Data de nascimento improvável — a pessoa teria menos de 16 ou mais de 90 anos.'
+  }
+  if (!contratacaoValida(c.data_contratacao)) {
+    e.data_contratacao = 'Data de contratação fora do possível — confira o ano.'
   }
   if (!matriculaPontoValida(c.matricula_ponto)) {
     e.matricula_ponto = 'A matrícula do ponto é só números.'

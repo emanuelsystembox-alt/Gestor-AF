@@ -238,11 +238,18 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 > Áreas → Equipes → Técnicos → Veículos e cria os acessos; senha gerada por
 > pessoa ou uma senha inicial comum, que quem importa digita (D-177).
 >
-> **Próximo passo, do Emanuel:** importar Manaus — 55 técnicos e 55 equipes,
-> planilha já convertida para o padrão e com prévia limpa (está nos
-> Downloads dele, fora do Git). Depois, conferir no banco os 55 acessos, o
-> vínculo acesso↔técnico e os logins roteados. Pendências em
-> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 14/10/2026".
+> **Manaus foi importada em 17/10**: 55 técnicos, 55 acessos, 55 logins
+> roteados, todos com skill ADESÃO; ainda **nenhum contrato** — por isso
+> `testar_policies()` está 16/17 até a primeira importação do TOA (D-178).
+> Também em 17/10: data de contratação no cadastro (101, D-178) e
+> `COM_IMPEDIMENTO` rotulado "Ticket de suporte" (102, D-179).
+>
+> **E a cidade passou a ser escolhida no topo (103, D-180)**: `bases_visiveis()`
+> responde só a cidade ATIVA, o ADMIN vê todas e os demais só as marcadas no
+> cadastro (o COP deixou de ser global). A importação do TOA recusa arquivo de
+> bucket de outra cidade — o bucket sai do NOME do arquivo. Foto de perfil
+> (ADMIN põe; aparece na web e no app). Pendências em
+> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 17/10/2026, tarde".
 >
 > ---
 >

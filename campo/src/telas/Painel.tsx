@@ -3,7 +3,8 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isoLocal, num2, reais } from '../lib/formato'
-import { Aviso, Carregando, Cartao, TituloSecao, Vazio } from '../ui/componentes'
+import { Avatar, Aviso, Carregando, Cartao, TituloSecao, Vazio } from '../ui/componentes'
+import { fotosDosTecnicos } from '../lib/foto'
 import { CabecalhoAba } from '../ui/CabecalhoAba'
 import { BarraInferior } from '../ui/BarraInferior'
 import { cor, raio } from '../ui/tema'
@@ -66,6 +67,8 @@ export default function Painel() {
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
   const [rankingAberto, setRankingAberto] = useState(false)
+  /** tecnico_id → URL da foto (103). Sem foto, o avatar mostra as iniciais. */
+  const [fotos, setFotos] = useState<Map<string, string>>(new Map())
 
   const carregar = useCallback(async (p: Periodo) => {
     const { de, ate } = intervalo(p)
@@ -76,7 +79,11 @@ export default function Painel() {
     ])
     if (a.error) { setErro(a.error.message); return }
     setPainel(a.data as Painel)
-    setRanking(((b.data ?? []) as LinhaRanking[]))
+    const lista = (b.data ?? []) as LinhaRanking[]
+    setRanking(lista)
+    // A foto não segura o painel: chega depois, e quem estiver sem sinal
+    // vê as iniciais — o número é o que importa.
+    fotosDosTecnicos(lista.map(r => r.tecnico_id)).then(setFotos).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -229,6 +236,7 @@ export default function Painel() {
           <Cartao style={{ overflow: 'hidden' }}>
             {eu ? (
               <View style={e.minhaPosicao}>
+                <Avatar nome={eu.nome} foto={fotos.get(eu.tecnico_id)} tamanho={48} />
                 <Text style={e.posicaoGrande}>{eu.posicao}º</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={e.posicaoTexto}>
@@ -255,6 +263,7 @@ export default function Painel() {
                   {pulou && <Text style={e.reticencias}>⋯</Text>}
                   <View style={[e.linhaRanking, r.eu && e.linhaEu]}>
                     <Text style={[e.rkPos, r.posicao <= 3 && e.rkPodio]}>{r.posicao}º</Text>
+                    <Avatar nome={r.nome} foto={fotos.get(r.tecnico_id)} tamanho={34} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[e.rkNome, r.eu && { color: cor.af700 }]} numberOfLines={1}>
                         {r.eu ? `${r.nome} (você)` : r.nome}

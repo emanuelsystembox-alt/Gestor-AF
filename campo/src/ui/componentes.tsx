@@ -18,6 +18,26 @@ export function Marca({ tamanho = 38 }: { tamanho?: number }) {
   )
 }
 
+/**
+ * A foto da pessoa, ou as iniciais quando não há foto (103, D-180). A URL
+ * é assinada (o bucket é privado) e vem de `lib/foto.ts`.
+ */
+export function Avatar({ nome, foto, tamanho = 36 }: {
+  nome: string; foto?: string | null; tamanho?: number
+}) {
+  const iniciais = nome.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map(p => p[0]?.toUpperCase() ?? '').join('') || '?'
+  const forma = { width: tamanho, height: tamanho, borderRadius: tamanho / 2 }
+  if (foto) {
+    return <Image source={{ uri: foto }} style={[forma, e.avatarBorda]} accessibilityLabel={`Foto de ${nome}`} />
+  }
+  return (
+    <View style={[forma, e.avatarBorda, e.avatarVazio]} accessibilityLabel={nome}>
+      <Text style={[e.avatarTexto, { fontSize: tamanho * 0.36 }]}>{iniciais}</Text>
+    </View>
+  )
+}
+
 /** Cabeçalho de seção: título forte e, à direita, o complemento miúdo. */
 export function TituloSecao({ titulo, extra }: { titulo: string; extra?: string }) {
   return (
@@ -129,6 +149,9 @@ export function Carregando({ texto = 'Carregando…' }: { texto?: string }) {
 }
 
 const e = StyleSheet.create({
+  avatarBorda: { borderWidth: 1, borderColor: cor.graf200 },
+  avatarVazio: { alignItems: 'center', justifyContent: 'center', backgroundColor: cor.graf50 },
+  avatarTexto: { fontWeight: '700', color: cor.graf600 },
   secao: {
     flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
     paddingHorizontal: 2, marginTop: 6,

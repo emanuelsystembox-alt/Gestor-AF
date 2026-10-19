@@ -50,7 +50,7 @@ export const SITUACAO_INFO: Record<Situacao, { label: string; cor: string }> = {
   CONCLUIDA:       { label: 'Concluída',      cor: 'var(--st-concluida)' },
   CANCELADA:       { label: 'Cancelada',      cor: 'var(--st-cancelada)' },
   REAGENDAMENTO:   { label: 'Reagendamento',  cor: 'var(--st-reagendamento)' },
-  COM_IMPEDIMENTO: { label: 'Com impedimento',cor: 'var(--st-impedimento)' },
+  COM_IMPEDIMENTO: { label: 'Ticket de suporte', cor: 'var(--st-impedimento)' },
 }
 
 /** Situações que ainda exigem ação — o que o COP precisa olhar. */

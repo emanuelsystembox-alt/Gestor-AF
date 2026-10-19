@@ -3,6 +3,7 @@ import { supabase, SITUACOES } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { EditorSubFalhas } from '../components/EditorSubFalhas'
+import { BucketsToa } from '../components/BucketsToa'
 
 /**
  * Configurações da operação.
@@ -102,7 +103,8 @@ interface TipoAtividade {
 
 export default function Configuracoes() {
   const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao'
-                                | 'baixa' | 'atividade' | 'subfalhas' | 'almox'>('status')
+                                | 'baixa' | 'atividade' | 'subfalhas' | 'almox'
+                                | 'buckets'>('status')
   const [atividades, setAtividades] = useState<TipoAtividade[]>([])
   const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
   const [grupos, setGrupos] = useState<string[]>([])
@@ -395,7 +397,7 @@ export default function Configuracoes() {
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
-        <div className="flex rounded-lg bg-graf-900 p-0.5">
+        <div className="flex flex-wrap gap-y-0.5 rounded-lg bg-graf-900 p-0.5">
           {([['status', 'Status', situacoes.length],
              ['servico', 'Tipo de serviço', tiposOS.length],
              ['baixa', 'Baixa e situação', codigos.length],
@@ -405,10 +407,12 @@ export default function Configuracoes() {
              ['indicadores', 'Indicadores de qualidade', indicadores.length],
              ['atividade', 'Tipo de atividade', atividades.length],
              ['pontuacao', 'Pontuação', totalRegras],
-             ['almox', 'Almoxarifado', null]] as const).map(
+             ['almox', 'Almoxarifado', null],
+             // 103: de qual cidade é cada arquivo do TOA (D-180).
+             ['buckets', 'Buckets do TOA', null]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
                   aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
                 {rot}{n != null && <span className="tabular ml-1.5 opacity-60">{n}</span>}
               </button>
@@ -417,6 +421,8 @@ export default function Configuracoes() {
 
         {aba === 'subfalhas' ? (
           <EditorSubFalhas />
+        ) : aba === 'buckets' ? (
+          <BucketsToa />
         ) : aba === 'almox' ? (
           /* ┌─ o prazo da carga, como no concorrente ─────────────────────┐
              │ Lá: "<equipe> não pode receber equipamentos, pois existem N │

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCidades } from '../lib/cidade'
 import { Alerta } from './ui'
 import { equipeRotulo } from '../lib/formato'
 import {
@@ -37,7 +38,14 @@ interface Relatorio { simulado: boolean; cidade: string; linhas: LinhaRel[]; err
 
 export function ImportarCadastro() {
   const [bases, setBases] = useState<{ id: string; codigo: string; nome: string }[]>([])
+  /**
+   * A cidade é a ATIVA do topo (103, D-180): desde que `bases_visiveis()`
+   * responde só a cidade ativa, `importar_cadastro_cidade` recusa as outras.
+   * Um seletor aqui ofereceria cidade que o banco ia recusar no fim.
+   */
+  const { ativa } = useCidades()
   const [baseId, setBaseId] = useState('')
+  useEffect(() => { if (ativa) setBaseId(ativa.id) }, [ativa])
   const [cat, setCat] = useState<Catalogos | null>(null)
   const [lida, setLida] = useState<PlanilhaLida | null>(null)
   const [nomeArquivo, setNomeArquivo] = useState('')
@@ -297,13 +305,11 @@ export function ImportarCadastro() {
       {/* 1 · a cidade */}
       <div className="flex flex-wrap items-center gap-3">
         <span className={passo}>1</span>
-        <label className="text-sm text-graf-200" htmlFor="cidade-import">Cidade (Operação)</label>
-        <select id="cidade-import" value={baseId} disabled={!!ocupado}
-          onChange={e => setBaseId(e.target.value)}
-          className="min-w-64 rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
-          <option value="">— escolha a cidade —</option>
-          {bases.map(b => <option key={b.id} value={b.id}>{b.nome} ({b.codigo})</option>)}
-        </select>
+        <span className="text-sm text-graf-200">Cidade (Operação):</span>
+        <strong className="text-sm text-graf-100">
+          {ativa ? `${ativa.nome} (${ativa.codigo})` : 'escolha a cidade no topo da tela'}
+        </strong>
+        <span className="text-xs text-graf-400">— para outra cidade, troque no seletor do topo.</span>
       </div>
 
       {/* 2 · a planilha padrão */}
