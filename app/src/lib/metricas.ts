@@ -11,6 +11,9 @@ export interface OS {
   sequencia: number
   numero_os: string
   status_operadora: string | null
+  /** TEC1 desta O.S., calculado AO VIVO pelo banco (109, D-187): PADRAO,
+   *  SEM_PADRAO, EXPURGADA, ou nulo = ainda em aberto / sem hora. */
+  tec1_ao_vivo?: 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA' | null
   tipo_os: { codigo: number; descricao: string } | null
   codigo_baixa: {
     codigo: number; descricao: string
@@ -203,6 +206,22 @@ export function calcular(visitas: Visita[]) {
   const comJanela = produtivas.filter(v => v.inicio && v.janela_inicio && v.janela_fim).length
   const pctNaJanela = comJanela ? (dentroDaJanela / comJanela) * 100 : 0
 
+  /*
+   * ┌─ TEC1 · Atendimento no Prazo (D-187) ───────────────────────────┐
+   * │ A conta oficial da CLARO: COM PADRÃO / (COM PADRÃO + SEM        │
+   * │ PADRÃO), POR O.S. — expurgada não entra, e o que ainda está em  │
+   * │ aberto também não ("o cálculo é pra fazer em tudo que foi       │
+   * │ encerrado", Emanuel, 19/10). A classe de cada O.S. vem do banco │
+   * │ (tec1_da_os, pelo livro "Indicadores COP - TEC1").              │
+   * └─────────────────────────────────────────────────────────────────┘
+   */
+  const tec1Padrao = os.filter(o => o.tec1_ao_vivo === 'PADRAO').length
+  const tec1SemPadrao = os.filter(o => o.tec1_ao_vivo === 'SEM_PADRAO').length
+  const tec1Expurgadas = os.filter(o => o.tec1_ao_vivo === 'EXPURGADA').length
+  const tec1EmAberto = os.filter(o => o.tec1_ao_vivo == null).length
+  const tec1Medidas = tec1Padrao + tec1SemPadrao
+  const pctTec1 = tec1Medidas ? (tec1Padrao / tec1Medidas) * 100 : 0
+
   const desloc = produtivas.map(v => intervParaMin(v.tempo_deslocamento)).filter((x): x is number => x !== null)
   const exec = produtivas.map(v => minEntre(v.inicio, v.fim)).filter((x): x is number => x !== null)
   // O atraso é escrito em HORAS -- "eu quero em horas o atraso sobre a
@@ -302,6 +321,7 @@ export function calcular(visitas: Visita[]) {
     horas, hConcluida, hCancelada, hReagendamento,
     porGrupo,
     etapas, gargalo, pctNaJanela, dentroDaJanela, comJanela,
+    tec1Padrao, tec1SemPadrao, tec1Expurgadas, tec1EmAberto, tec1Medidas, pctTec1,
     equipes, concluidasSemDono,
     porTipo,
     listaProdutivas: produtivas,

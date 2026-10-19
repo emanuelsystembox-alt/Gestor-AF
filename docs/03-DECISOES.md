@@ -7209,3 +7209,103 @@ continua pedindo APK, com versão nova.
 
 **Não verificado:** o APK 0.3.0 instalado recebendo uma atualização de
 verdade — depende do build terminar e de uma primeira publicação.
+
+---
+
+### D-187 · TEC1 pelo livro oficial da CLARO, e o card "TEC1 - Atendimento no Prazo"
+
+> *"corrija essa tela no card […] 'chegou dentro da janela', tire essa frase
+> e coloque - TEC1 - Atendimento no Prazo, e coloque todos os status exceto o
+> que esta pendente ainda, o cálculo é pra fazer em tudo que foi encerrado"* ·
+> *"Estou te mandando um pdf também para você aprimorar mais ainda a regra do
+> TEC1"* — Emanuel, 19/10. O PDF: "Indicadores COP - TEC1", Inteligência COP
+> da CLARO, v1.0 de 05/07/2021.
+
+**O card estava medindo outra coisa.** "Chegou dentro da janela" era a
+CHEGADA do técnico dentro da janela, por VISITA. O TEC1 é por **O.S.**, conta
+início **e** baixa com a tolerância do grupo, e é a conta oficial:
+**TEC1 = COM PADRÃO / (COM PADRÃO + SEM PADRÃO)**, meta **94%** (item 4).
+Expurgada não entra; em aberto também não. O Dashboard lê a classe de cada
+O.S. AO VIVO (`tec1_ao_vivo`, coluna calculada), não o cache (D-150).
+
+**A regra (`tec1_da_os`, migration 109), do livro:**
+- só o que foi **encerrado no TOA** (concluído / não concluído);
+- expurgos: cancelado no NETSMS (já existia), O.S. **imediata** e **janela
+  vazia** (item 9), **janela 08:00–22:00** e os tipos MANUTENCAO CORRETIVA -
+  MDU, MANUTENCAO PREVENTIVA - MDU / INDOOR, VARREDURA DE REDE EXTERNA,
+  DESCONEXAO POR OPCAO EBT (item 6);
+- cancelada/reagendada **antes da janela**: reagendada expurga sempre
+  (11.7); cancelada só se não houve início (11.1); dentro da janela = com
+  padrão, depois = sem padrão;
+- executada sem início e antes da janela = expurgada (script, 11.1);
+  executada antes da janela = com padrão (11.4); senão, início até o fim da
+  janela **e** baixa **menor que** fim + tolerância (11.5/11.6);
+- **tolerância 2 h / 1 h** (Instalação e Serviços / Manutenção, item 10.3):
+  era 119/59 com "até" — alinhada ao livro (escolha do Emanuel).
+
+**"Sem tratamento" (11.10) fica de fora**, como pendente — escolha do
+Emanuel: se a última importação do dia foi ao meio-dia, a tarde contaria
+contra sem ser. O card mostra à parte quantas estão em aberto.
+
+**Medido:** a regra nova contra a anterior, O.S. a O.S., nos 909 O.S. de 17
+e 19/10: **as 909 deram a mesma classe** (os casos novos do livro não
+aconteceram nesses dois dias). TEC1 de 19/10: **95,3%** (326 com padrão, 16
+sem, 19 expurgadas, 98 em aberto). 0,3 s para os dois dias, como
+`authenticated`.
+
+---
+
+### D-188 · Migração pelo produto novo, GPON pela skill do TOA
+
+> *"fazer a analise da migração, e melhorar nossa detecção de serviço
+> migração […] acredito eu que é no produto"* · *"analise como identificar
+> […] se é uma adesão, ou uma adesão gpon […] subir o marcador no contrato"* —
+> Emanuel, 19/10, com dois analíticos da CLARO (fora do Git: LGPD).
+
+**Os analíticos** (CLARO/NETSMS, não TOA): 1.132 O.S. de **migração** e 708
+de **adesão GPON**, de 01 a 10/10/2026. Cruzados com os arquivos do TOA dos
+Downloads pela O.S.: só 3 casaram (os arquivos são de outros dias) — então a
+regra saiu dos analíticos **e** da linha do TOA já no banco (17 e 19/10).
+
+**Migração** (escolha do Emanuel: vai para o grupo MIGRACAO GPON):
+- no analítico, `TIPO_OS` = MUDANCA DE PACOTE em 100%, o produto NOVO traz
+  **MIG, PON ou FIBRA em 100%** (MIG ou PON sozinhos: 66%), e o produto
+  ANTERIOR **nunca** traz PON nem FIBRA (0 de 1.132);
+- no TOA, o produto novo é o item **"pendente"** da coluna Produto; o
+  "instalado" é o que o cliente já tem. O "MIG" aparece muito no
+  INSTALADO (produto antigo "ADQ MIG") — olhar qualquer produto daria
+  falso positivo;
+- regra (`eh_migracao`): O.S. "MUDANCA DE PACOTE" (só o tipo 24) + pendente com MIG/PON/FIBRA + nenhum
+  instalado com PON/FIBRA (quem já é fibra e troca de plano não migra);
+- `grupo_da_visita` passa a considerar MIGRACAO GPON quando é migração; a
+  prioridade de sempre vale (adesão continua na frente);
+- conferido: dos 39 contratos que já eram MIGRACAO GPON pelo tipo de O.S., a
+  regra reconhece 34; **8 que estavam em SERVICO foram para MIGRACAO GPON**
+  (39 → 47). O grupo não mexe em pontos (vêm do tipo de O.S.) e a tolerância
+  do TEC1 é a mesma (2 h).
+
+**GPON** (escolha do Emanuel: etiqueta no contrato, o grupo não muda):
+- no analítico, o tipo de O.S. é o mesmo da adesão comum e o produto falha
+  (211 de 708 só "ACESSO VIRTUA"); o que separa é `TECNOLOGIA` = GPON — que
+  o TOA **não** traz;
+- no TOA, o sinal é a skill exigida **"PON(1/100)"** em Habilidade de
+  Trabalho; nos dados de 17 e 19/10 ela contém todos os outros sinais
+  (produto pendente PON, workzone GPON, tipo "INST GPON");
+- `visita.tecnologia` = 'GPON' quando há sinal; **nulo = não identificada,
+  não HFC** (D-117). Etiqueta "GPON" na linha do contrato (Serviços e
+  Equipes). Resultado: 60 de 250 adesões, 44 de 47 migrações, 9 mudanças de
+  endereço, 11 retornos, 4 serviços.
+
+**O tipo 57 (MUDANCA DE PACOTE DIGITAL) NÃO é migração** — *"se não tem no
+analítico teste que te mandei não vamos considerar como migração"* (Emanuel,
+19/10). Só o que o dado mostrou entra na regra.
+
+**Quando roda:** na reconciliação (2ª chamada da importação, D-181), antes
+do TEC1 — o grupo dá a tolerância. Os contratos desde 17/10 foram
+reclassificados na 109 (sem tocar situação: nada de aviso, nada de
+"mexido depois da importação").
+
+**Não verificado:** a regra de GPON contra um conjunto rotulado do TOA (não
+há: o analítico de GPON não tem Manaus e nenhuma O.S. dele casou com os
+arquivos do TOA). A skill PON é o requisito que o próprio TOA grava para
+mandar técnico de fibra — é o melhor sinal disponível na linha.

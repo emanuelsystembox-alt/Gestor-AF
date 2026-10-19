@@ -42,6 +42,8 @@ const num = (n: number, casas = 0) =>
 
 /** A meta de conclusão que a tela já cobrava antes desta reforma. */
 const META = 85
+/** Meta do TEC1 no livro oficial da CLARO ("Indicadores COP - TEC1", item 4). */
+const META_TEC1 = 94
 
 // ================================================================== //
 //  A RÉGUA
@@ -122,19 +124,32 @@ export function ReguaDoDia({ m, de, ate }: {
           </>}
         />
 
+        {/* TEC1 (D-187) — era "Chegou dentro da janela", que media só a
+            chegada, por visita. O TEC1 é por O.S., conta início E baixa
+            com a tolerância do grupo, e só sobre o que foi encerrado. */}
         <Celula
-          valor={m.comJanela ? m.pctNaJanela.toFixed(1).replace('.', ',') : '—'}
-          sufixo={m.comJanela ? '%' : undefined}
-          rotulo="Chegou dentro da janela"
-          cor={!m.comJanela ? 'var(--color-graf-500)'
-            : m.pctNaJanela >= 90 ? 'var(--st-concluida)'
-            : m.pctNaJanela >= 75 ? undefined : 'var(--st-reagendamento)'}
-          apoio={m.comJanela
-            ? <><span className="tabular">{num(m.dentroDaJanela)}</span> de{' '}
-                <span className="tabular">{num(m.comJanela)}</span> com hora medida</>
-            // Zero e desconhecido não são a mesma coisa: sem hora de
-            // início não há aderência a calcular, e isso sai escrito.
-            : 'nenhuma visita com hora de início registrada'}
+          valor={m.tec1Medidas ? m.pctTec1.toFixed(1).replace('.', ',') : '—'}
+          sufixo={m.tec1Medidas ? '%' : undefined}
+          rotulo="TEC1 - Atendimento no Prazo"
+          cor={!m.tec1Medidas ? 'var(--color-graf-500)'
+            : m.pctTec1 >= META_TEC1 ? 'var(--st-concluida)' : 'var(--st-reagendamento)'}
+          apoio={m.tec1Medidas
+            ? <>
+                <span className="tabular">{num(m.tec1Padrao)}</span> de{' '}
+                <span className="tabular">{num(m.tec1Medidas)}</span> O.S. no prazo · meta {META_TEC1}%
+                {(m.tec1Expurgadas > 0 || m.tec1EmAberto > 0) && (
+                  <span className="block">
+                    {m.tec1Expurgadas > 0 && <><span className="tabular">{num(m.tec1Expurgadas)}</span> expurgada(s)</>}
+                    {m.tec1Expurgadas > 0 && m.tec1EmAberto > 0 && ' · '}
+                    {m.tec1EmAberto > 0 && <><span className="tabular">{num(m.tec1EmAberto)}</span> em aberto, fora da conta</>}
+                  </span>
+                )}
+              </>
+            // Zero e desconhecido não são a mesma coisa: nada encerrado
+            // ainda não é TEC1 de 0%.
+            : m.tec1EmAberto > 0
+              ? <><span className="tabular">{num(m.tec1EmAberto)}</span> O.S. em aberto — nada encerrado para medir ainda</>
+              : 'nenhuma O.S. no período'}
         />
 
         <Celula

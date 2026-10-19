@@ -38,7 +38,7 @@ const SELECT = `
   equipe:equipe_id ( codigo, nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula ),
   ordem_servico (
-    id, sequencia, numero_os, status_operadora,
+    id, sequencia, numero_os, status_operadora, tec1_ao_vivo,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade )
   )

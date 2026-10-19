@@ -411,6 +411,24 @@ de novo. 425 = TROCA DE TECNOLOGIA → Concluída (família provisória).
 
 ---
 
+## TEC1, migração e GPON (109, D-187, D-188)
+
+**TEC1 = COM PADRÃO / (COM PADRÃO + SEM PADRÃO), por O.S., meta 94%** — o
+livro da CLARO ("Indicadores COP - TEC1"). Só o que foi encerrado no TOA;
+expurgada e em aberto ficam fora (inclusive o "sem tratamento" de dia
+passado, por decisão do Emanuel). Tolerância 2 h (instalação e serviços) /
+1 h (manutenção), baixa **menor que** fim da janela + tolerância.
+
+**Migração = MUDANCA DE PACOTE (tipo 24; o 57 "DIGITAL" não) cujo produto PENDENTE tem MIG, PON ou FIBRA,
+e nenhum produto INSTALADO tem PON ou FIBRA.** Vai para o grupo MIGRACAO
+GPON. "MIG" no produto instalado não é migração (é o produto antigo).
+
+**GPON = skill "PON" no TOA** (ou workzone GPON, tipo INST GPON, produto
+pendente PON, migração). É etiqueta, não grupo; sem etiqueta não quer dizer
+HFC.
+
+---
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

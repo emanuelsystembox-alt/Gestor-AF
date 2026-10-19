@@ -373,6 +373,17 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendente em 19/10/2026, tarde — TEC1, migração e GPON (D-187, D-188)
+
+Migration **109**; web publicada e conferida no ar. Baterias 19/19 e 23/23.
+
+| O quê | Por quê |
+|---|---|
+| **GPON sem conjunto rotulado do TOA** | A regra (skill PON) não pôde ser conferida contra um gabarito: o analítico de GPON não tem Manaus e nenhuma O.S. dele casou com os arquivos do TOA. Quando houver um analítico de GPON de Manaus, cruzar pela O.S. |
+| ~~Migração: tipo 57 (MUDANCA DE PACOTE DIGITAL)~~ | **Decidido em 19/10**: não é migração — não aparece no analítico (D-188). |
+| **TEC1 "Sem tratamento"** | Fora da conta por decisão (D-187). Se um dia a importação do fim do dia for garantida, dá para seguir o livro e contar como sem padrão. |
+| **Card do TEC1 na tela logada** | Publicado e conferido no ar; a conta testada no banco. Não visto logado pelo assistente. |
+
 ## Pendente em 19/10/2026 — códigos editáveis e app 0.3.0 (D-184 a D-186)
 
 Migrations **107** e **108**; web publicada e conferida no ar; APK **0.3.0**

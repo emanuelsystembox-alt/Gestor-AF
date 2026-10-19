@@ -38,7 +38,7 @@ export const SELECT_CONTRATO = `
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
-  finalizado_toa, produtos_pendentes,
+  finalizado_toa, produtos_pendentes, tecnologia,
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
@@ -90,6 +90,9 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
    *  NETSMS". Vazio na maioria das linhas. */
   motivo_fechamento_toa?: string | null
   node: string | null
+  /** 'GPON' quando a linha do TOA tem sinal de GPON (109, D-188). Nulo =
+   *  não identificada — NÃO quer dizer HFC. */
+  tecnologia?: 'GPON' | null
   complemento: string | null
   /** Rota decidida por gente: a importação não remaneja este (066). */
   rota_fixada_em?: string | null
@@ -468,7 +471,7 @@ export function TabelaContratos({
                                text-af-300">TEC1 · sem padrão</span>
                 )}
                 {v.tec1 === 'EXPURGADA' && (
-                  <span title="Fora do cálculo: janela Imediata ou cancelamento no NETSMS"
+                  <span title="Fora do cálculo do TEC1 (livro da CLARO): janela imediata, vazia ou 08–22, cancelado no NETSMS, tipo de O.S. fora do indicador, ou encerrada/reagendada antes da janela"
                     className="mt-1 inline-block rounded bg-graf-800 px-1.5 py-0.5
                                text-[9px] font-semibold uppercase tracking-wide
                                text-graf-400">TEC1 · expurgada</span>
@@ -479,6 +482,13 @@ export function TabelaContratos({
                 {v.tipo_servico?.nome
                   ?? (jornada ? <span className="text-graf-400">Jornada</span>
                               : <span className="text-graf-600">—</span>)}
+                {/* 109, D-188: GPON vem da skill PON do TOA (e dos outros
+                    sinais). Sem etiqueta não quer dizer HFC. */}
+                {v.tecnologia === 'GPON' && (
+                  <span title="Contrato GPON — skill PON, workzone GPON, tipo INST GPON, produto PON ou migração, na linha do TOA"
+                    className="ml-1.5 inline-block rounded bg-sky-900/40 px-1.5 py-0.5 align-middle
+                               text-[9px] font-semibold uppercase tracking-wide text-sky-300">GPON</span>
+                )}
                 <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
                   ? 'italic text-graf-600' : 'text-graf-500'}`}>
                   {v.tipo_atividade?.nome}
