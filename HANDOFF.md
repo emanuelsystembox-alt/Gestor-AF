@@ -252,8 +252,11 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 >
 > Também: data de contratação (101), "Ticket de suporte" (102), foto de
 > perfil (103). Baterias: `testar_policies()` 19/19, `testar_campo()` 23/23.
-> Pendências em `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em
-> 19/10/2026".
+> **O que está aberto, por quem tem de agir:** `docs/08-ESTADO-DO-PROJETO.md`,
+> seção **"Pendências abertas — consolidado em 19/10/2026"**. Também em 19/10:
+> TEC1 pelo livro da CLARO, migração pelo produto novo e etiqueta GPON (109,
+> D-187, D-188), com coluna e filtro de Tecnologia nos relatórios; APK 0.3.0
+> pronto para instalar.
 >
 > ---
 >

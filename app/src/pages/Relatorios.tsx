@@ -37,6 +37,8 @@ export default function Relatorios() {
   const [situacoes, setSituacoes] = useState<Situacao[]>([])
   const [supervisores, setSupervisores] = useState<string[]>([])
   const [semJornada, setSemJornada] = useState(true)
+  /** 109: separar as adesões GPON (Emanuel, 19/10). */
+  const [tecnologia, setTecnologia] = useState<'TODAS' | 'GPON' | 'SEM'>('TODAS')
 
   useEffect(() => {
     // O período abre em HOJE (ver lib/dia.ts). Antes vinha do último dia
@@ -91,8 +93,10 @@ export default function Relatorios() {
     if (grupos.length && !grupos.includes(l.tipo_servico?.nome ?? '')) return false
     if (supervisores.length && !supervisores.includes(l.equipe?.supervisor_nome ?? '')) return false
     if (situacoes.length && !situacoes.includes(l.situacao)) return false
+    if (tecnologia === 'GPON' && l.tecnologia !== 'GPON') return false
+    if (tecnologia === 'SEM' && l.tecnologia === 'GPON') return false
     return true
-  }), [linhas, semJornada, equipes, grupos, supervisores, situacoes])
+  }), [linhas, semJornada, equipes, grupos, supervisores, situacoes, tecnologia])
 
   const totalOS = filtradas.reduce((s, l) => s + l.ordem_servico.length, 0)
 
@@ -224,6 +228,13 @@ export default function Relatorios() {
             <div className="text-xs text-graf-400">
               <span className="mb-1 block">Tipo de serviço ({grupos.length || 'todos'})</span>
               {multi(grupos, setGrupos, opcoes.grupos)}
+              <span className="mb-1 mt-2 block">Tecnologia</span>
+              <select value={tecnologia} onChange={e => setTecnologia(e.target.value as 'TODAS' | 'GPON' | 'SEM')}
+                className="w-full rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs outline-none focus:border-af-500">
+                <option value="TODAS">Toda tecnologia</option>
+                <option value="GPON">Só GPON</option>
+                <option value="SEM">Sem GPON identificado</option>
+              </select>
             </div>
             <div className="text-xs text-graf-400">
               <span className="mb-1 block">Supervisor ({supervisores.length || 'todos'})</span>

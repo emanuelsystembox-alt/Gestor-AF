@@ -63,6 +63,8 @@ interface BaixaRef {
 
 export interface VisitaLinha {
   id: string
+  /** 'GPON' pela linha do TOA (109, D-188); nulo = não identificada. */
+  tecnologia?: string | null
   toa_atividade_id: string | null
   wo_numero: string | null
   contrato: string | null
@@ -151,7 +153,7 @@ export const SELECT_RELATORIO = `
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim,
   situacao, situacao_em, inicio, fim, tempo_deslocamento, tec1,
-  produtos_pendentes,
+  produtos_pendentes, tecnologia,
   observacao, bloqueado_em, criado_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
@@ -262,6 +264,10 @@ const listaOS = (v: VisitaLinha, f: (o: OSLinha) => string | null | undefined) =
 
 const baixaTxt = (b: BaixaRef | null) => (b ? `${b.codigo} - ${b.descricao}` : '')
 
+/** GPON, ou NÃO IDENTIFICADA — sem GPON não quer dizer HFC (D-188). */
+export const tecnologiaTxt = (t: string | null | undefined) =>
+  t === 'GPON' ? 'GPON' : 'NÃO IDENTIFICADA'
+
 // ------------------------------------------------------- bloco comum
 
 /**
@@ -270,7 +276,7 @@ const baixaTxt = (b: BaixaRef | null) => (b ? `${b.codigo} - ${b.descricao}` : '
  */
 const CAB_VISITA = [
   'Operação', 'ID Atividade', 'Origem', 'Situação', 'Data situação', 'Hora situação',
-  'WO', 'Contrato', 'Grupo de serviço', 'Tipo de atividade', 'Natureza',
+  'WO', 'Contrato', 'Grupo de serviço', 'Tecnologia', 'Tipo de atividade', 'Natureza',
   'Data', 'Janela início', 'Janela fim',
   'Supervisor', 'Equipe', 'Nome da equipe', 'Login TOA da equipe',
   'Técnico', 'Matrícula', 'Login',
@@ -327,7 +333,11 @@ function linhaVisita(v: VisitaLinha, locais?: Map<string, LocalBaixa>): string[]
     SITUACAO_INFO[v.situacao]?.label ?? v.situacao,
     soData(v.situacao_em), soHora(v.situacao_em),
     v.wo_numero ?? '', v.contrato ?? '',
-    v.tipo_servico?.nome ?? '', v.tipo_atividade?.nome ?? '',
+    v.tipo_servico?.nome ?? '',
+    // 109: escrito, nunca em branco — vazio pareceria "HFC", e não é isso
+    // que o sistema sabe (D-117, D-188).
+    tecnologiaTxt(v.tecnologia),
+    v.tipo_atividade?.nome ?? '',
     v.tipo_atividade?.natureza ?? '',
     dia(v.data_agendada), hhmm(v.janela_inicio), hhmm(v.janela_fim),
     v.equipe?.supervisor_nome ?? '', v.equipe?.codigo ?? '', v.equipe?.nome ?? '',

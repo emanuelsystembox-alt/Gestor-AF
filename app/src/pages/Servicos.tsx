@@ -13,6 +13,7 @@ import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
 import { FILTRO_VAZIO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
+import { tecnologiaTxt } from '../lib/relatorio'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
 // Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
 import {
@@ -108,6 +109,8 @@ export default function Servicos() {
   const [supervisor, setSupervisor] = useState('TODOS')
   const [equipe, setEquipe] = useState('TODAS')
   const [grupo, setGrupo] = useState(params.get('grupo') ?? 'TODOS')
+  /** 109: separar GPON (Emanuel, 19/10). SEM = sem GPON identificado. */
+  const [tecnologia, setTecnologia] = useState<'TODAS' | 'GPON' | 'SEM'>('TODAS')
   const [origem, setOrigem] = useState('TODAS')
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
@@ -342,6 +345,8 @@ export default function Servicos() {
       if (area !== 'TODAS' && v.area?.apelido !== area && v.area?.codigo !== area) return false
       if (supervisor !== 'TODOS' && supervisorDo(v) !== supervisor) return false
       if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
+      if (tecnologia === 'GPON' && v.tecnologia !== 'GPON') return false
+      if (tecnologia === 'SEM' && v.tecnologia === 'GPON') return false
 
       if (!t) return true
       return [
@@ -406,21 +411,22 @@ export default function Servicos() {
   const abertas = base.filter(v => EM_ABERTO.includes(v.situacao)).length
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
     equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
-    culpa !== 'TODAS', busca.trim() !== ''].filter(Boolean).length
+    culpa !== 'TODAS', tecnologia !== 'TODAS', busca.trim() !== ''].filter(Boolean).length
 
   function limpar() {
     setSituacao('TODAS'); setArea('TODAS'); setSupervisor('TODOS'); setEquipe('TODAS')
     setGrupo('TODOS'); setOrigem('TODAS'); setResultado('TODOS'); setCulpa('TODAS'); setBusca('')
+    setTecnologia('TODAS')
   }
 
   function exportar() {
-    const cab = ['Data', 'Janela', 'Situação', 'Grupo', 'Tipo atividade', 'Equipe',
+    const cab = ['Data', 'Janela', 'Situação', 'Grupo', 'Tecnologia', 'Tipo atividade', 'Equipe',
       'Supervisor', 'Área', 'Contrato', 'Endereço', 'Bairro', 'O.S.', 'Baixas']
     const linhasCsv = visiveis.map(v => [
       new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR'),
       `${v.janela_inicio?.slice(0, 5) ?? ''}${v.janela_fim ? '-' + v.janela_fim.slice(0, 5) : ''}`,
       SITUACAO_INFO[v.situacao]?.label ?? v.situacao,
-      v.tipo_servico?.nome ?? '', v.tipo_atividade?.nome ?? '',
+      v.tipo_servico?.nome ?? '', tecnologiaTxt(v.tecnologia), v.tipo_atividade?.nome ?? '',
       v.equipe?.codigo ?? '', supervisorDo(v) ?? '', v.area?.apelido ?? '',
       v.contrato ?? '', v.logradouro ?? '', v.bairro ?? '',
       v.ordem_servico.map(o => o.numero_os).join(' '),
@@ -516,6 +522,12 @@ export default function Servicos() {
             <select value={grupo} onChange={e => setGrupo(e.target.value)} className={sel}>
               <option value="TODOS">Todo grupo de serviço</option>
               {op.grupos.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <select value={tecnologia} onChange={e => setTecnologia(e.target.value as 'TODAS' | 'GPON' | 'SEM')}
+              className={sel} aria-label="Tecnologia">
+              <option value="TODAS">Toda tecnologia</option>
+              <option value="GPON">Só GPON</option>
+              <option value="SEM">Sem GPON identificado</option>
             </select>
             <select value={area} onChange={e => setArea(e.target.value)} className={sel}>
               <option value="TODAS">Toda área</option>
