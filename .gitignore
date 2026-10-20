@@ -35,3 +35,7 @@ app/.wrangler/
 
 # arquivo temporario que o Vite cria ao recarregar a config
 vite.config.ts.timestamp-*
+
+# Código de terceiros só para estudo (ex.: a extensão do concorrente).
+# É deles por direito autoral: não entra no nosso repositório.
+referencia/
