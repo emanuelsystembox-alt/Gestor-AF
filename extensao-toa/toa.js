@@ -8,7 +8,8 @@
 // │                                                                    │
 // │ NÃO pede nada ao servidor por conta própria, NÃO copia ficha de    │
 // │ segurança, NÃO clica em nada que grave (só "Detalhes",             │
-// │ "Equipamento" e "voltar"). Ver docs/11-EXTENSAO-TOA.md.            │
+// │ "Equipamento", "voltar" e o bucket na árvore — 0.5.0). Ver         │
+// │ docs/11-EXTENSAO-TOA.md.                                           │
 // │                                                                    │
 // │ "Recurso" (a carga do técnico) não é lido — Emanuel, 19/10.        │
 // └────────────────────────────────────────────────────────────────────┘
@@ -60,12 +61,60 @@ const noConsole = () => /^Console de Aloca/.test(document.title)
 const nosDetalhes = () => /^Detalhes da atividade/.test(document.title)
 const naLista = () => /^Lista de equipamento/.test(document.title)
 
-/** O bucket aberto no Console (o subtítulo do título), para a tela avisar. */
-function bucketAberto() {
+/** O cabeçalho "Console de Alocação" + subtítulo (o bucket aberto). */
+function cabecalhoDoConsole() {
   const h = [...document.querySelectorAll('h1, h2, div, span')]
     .find((e) => e.children.length === 0 && e.textContent.trim() === 'Console de Alocação')
-  const linhas = (h && h.parentElement ? h.parentElement.innerText : '').split('\n').map((s) => s.trim()).filter(Boolean)
+  return h ? h.parentElement : null
+}
+
+/** O bucket aberto no Console (o subtítulo do título). */
+function bucketAberto() {
+  const c = cabecalhoDoConsole()
+  const linhas = (c ? c.innerText : '').split('\n').map((s) => s.trim()).filter(Boolean)
   return linhas[1] || null
+}
+
+const normalizar = (s) => String(s || '').trim().replace(/\s+/g, ' ').toUpperCase()
+const consoleEm = (bucket) => noConsole() && normalizar(bucketAberto()) === normalizar(bucket)
+
+/**
+ * Abre um bucket no Console clicando nele na ÁRVORE de recursos (0.5.0).
+ *
+ * ┌─ por que ───────────────────────────────────────────────────────────┐
+ * │ > "nosso sistema de varrer não pegou dados de nenhum vt" — Emanuel  │
+ * │                                                                     │
+ * │ O Console mostra UM bucket. A varredura achava o contrato pelo      │
+ * │ bloco na tela — com MAN-AFLINE aberto, os 56 da VT                  │
+ * │ (MAN-AFLINE_01_VT) eram todos "fora do Console". Agora cada         │
+ * │ contrato vem com o bucket dele (120) e o bucket é aberto como uma   │
+ * │ pessoa faria: um clique no nome, na árvore à esquerda. Só           │
+ * │ navegação — nada se grava. Confere pelo subtítulo do Console que    │
+ * │ abriu o certo; se não abrir, avisa e segue (os contratos daquele    │
+ * │ bucket ficam pendentes para a próxima varredura).                   │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+async function abrirBucket(bucket) {
+  if (consoleEm(bucket)) return true
+  if (!(await voltarAoConsole())) return false
+  if (consoleEm(bucket)) return true
+  const alvo = normalizar(bucket)
+  const cab = cabecalhoDoConsole()
+  // o nome na árvore: uma folha com exatamente esse texto, à vista, que não é o subtítulo do Console
+  const item = [...document.querySelectorAll('body *')].find((e) =>
+    e.children.length === 0 && normalizar(e.textContent) === alvo
+    && !(cab && cab.contains(e)) && e.getClientRects().length > 0)
+  if (!item) return false
+  item.scrollIntoView({ block: 'center' })
+  item.click()
+  let ok = await ate(() => consoleEm(bucket), 8000)
+  if (!ok) {
+    // há árvores que escutam o clique na LINHA, não no texto
+    const linha = item.closest('[role="treeitem"], li, a, button')
+    if (linha && linha !== item) { linha.click(); ok = await ate(() => consoleEm(bucket), 8000) }
+  }
+  if (ok) await espera(2000)   // o gráfico do bucket novo termina de montar
+  return !!ok
 }
 
 /** O botão "voltar" do cabeçalho do TOA (Detalhes ← Lista; Console ← Detalhes). */
@@ -175,6 +224,11 @@ async function abrirDetalhes(aid) {
 
 /** Um contrato: Console → bloco → Detalhes (nome) → Equipamento (lista). */
 async function processar(it) {
+  // bucket que não abriu nesta varredura não é tentado de novo a cada contrato (16 s cada)
+  if (it.bucket && (bucketsQueNaoAbriram.has(it.bucket) || !(await abrirBucket(it.bucket)))) {
+    bucketsQueNaoAbriram.add(it.bucket)
+    return { ok: false, motivo: 'SEM_BUCKET', mensagem: `Não consegui abrir o bucket ${it.bucket} na árvore do TOA. Deixe a lista de buckets (à esquerda) à vista na janela da varredura.` }
+  }
   const aberto = await abrirDetalhes(it.aid)
   if (aberto === 'FORA') return { ok: false, motivo: 'FORA_DO_CONSOLE' }
   const nome = valor('Nome')
@@ -193,14 +247,17 @@ async function processar(it) {
 }
 
 let rodando = false
+const bucketsQueNaoAbriram = new Set()
 
 async function varrer(pedido) {
   rodando = true; cancelado = false
+  bucketsQueNaoAbriram.clear()
   const total = pedido.itens.length
   const avisar = (evento) => chrome.runtime.sendMessage({
     tipo: 'varredura-evento', idPedido: pedido.idPedido, abaGestor: pedido.abaGestor, total, ...evento,
   }).catch(() => {})
   let feitos = 0
+  const bucketInicial = noConsole() ? bucketAberto() : null
   // escondida → 'pausa'; à vista de novo → 'retoma' (a janelinha mostra)
   avisarPausa = (sim) => avisar({ evento: sim ? 'pausa' : 'retoma', feitos })
   try {
@@ -220,6 +277,8 @@ async function varrer(pedido) {
       await espera(400)
     }
     await voltarAoConsole()
+    // deixa o Console no bucket em que estava (quem olha a janela não se perde)
+    if (bucketInicial && !consoleEm(bucketInicial)) await abrirBucket(bucketInicial).catch(() => {})
     await avisar({ evento: 'fim', feitos })
   } finally {
     rodando = false

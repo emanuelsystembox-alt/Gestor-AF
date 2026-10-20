@@ -1,4 +1,4 @@
-# AFLINE — ponte com o TOA (0.4.0)
+# AFLINE — ponte com o TOA (0.5.0)
 
 Extensão do Chrome que **sincroniza o Gestor AF com o TOA sozinha**
 (D-189, D-192, D-193):
@@ -40,8 +40,11 @@ TOA. **Ela não altera nada no TOA** e não guarda a sua senha.
    rodada, com sucesso ou falha).
 
 **Para a varredura:** clique em **"Abrir a janela da varredura"** no painel.
-Abre o TOA numa **janela só dela**; deixe-a no **Console de Alocação**, no
-bucket e no dia de hoje. A extensão abre cada contrato por ela (uns 9 s cada),
+Abre o TOA numa **janela só dela**; deixe-a no **Console de Alocação**, no dia
+de hoje, com a **lista de buckets (a árvore à esquerda) à vista**: desde a 0.5.0
+a varredura **troca de bucket sozinha** — abre MAN-AFLINE, depois
+MAN-AFLINE_01_VT, e no fim volta ao que estava. A extensão abre cada contrato
+por ela (uns 9 s cada),
 e **você navega à vontade na outra janela**. Use **"Varrer o TOA agora"**, ou a
 rodada automática configurada no Gestor AF. A % aparece no ícone.
 

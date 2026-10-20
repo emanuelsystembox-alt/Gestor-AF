@@ -7721,3 +7721,38 @@ Equipes, a equipe aparece se tiver ao menos um contrato do bucket marcado.
 De passagem: em Serviços, trocar o filtro de tecnologia (GPON) não refiltrava a
 lista até mexer em outro filtro — faltava `tecnologia` nas dependências do
 `useMemo`. Corrigido.
+
+### D-196 · A varredura troca de bucket sozinha (120, extensão 0.5.0)
+
+*"nosso sistema de varrer não pegou dados de nenhum vt entenda o que houve"* —
+Emanuel, 20/10, com o print dos contratos da VT sem nome nem equipamento.
+
+**O que houve (do banco, `sincronismo_rodada`).** Hoje, MAN-AFLINE: 230
+contratos, 153 com nome, 40 com equipamento lido; MAN-AFLINE_01_VT: 56, **zero**
+com nome, zero varridos. A varredura das 10:51 deu "153 nomes, 40 listas; 8 fora
+do Console aberto; 64 com erro"; a das 12:42, "0 nomes; **192 fora do Console
+aberto**". A varredura acha cada contrato pelo **bloco dele no Console de
+Alocação** — e o Console mostra **um bucket só**, o marcado na árvore do TOA.
+Com MAN-AFLINE aberto, os da VT nunca estão na tela; às 12:42 o Console estava
+em outro bucket (no print da árvore, de hoje, o marcado era BSB-AFLINE) e nem os
+de MAN-AFLINE foram achados. A baixa da planilha não tem esse problema: ela pede
+cada bucket pelo número (D-189).
+
+**A correção.** `varredura_pendentes` (120) devolve o bucket de cada contrato
+(`visita.toa_bucket`, 119) e ordena por ele. O `toa.js` (0.5.0), antes do
+primeiro contrato de cada bucket, **clica no nome do bucket na árvore** — o
+mesmo clique de quem opera, só navegação — e confere pelo subtítulo do Console
+que abriu o certo. No fim, volta ao bucket que estava aberto. Bucket que não
+abre (árvore escondida, nome diferente) vira **um** aviso no painel e os
+contratos dele ficam pendentes para a próxima varredura — não 56 tentativas de
+16 s.
+
+Testado numa página que imita o Console (cabeçalho, árvore com clique na linha
+e atraso de 0,7 s): abre MAN-AFLINE_01_VT, o bloco do contrato aparece, volta a
+MAN-AFLINE; bucket inexistente recusado na hora. **Não testado no TOA de
+verdade** — o navegador do assistente não entra no TOA (derrubaria a sessão do
+Emanuel). Se a árvore do TOA não reagir ao clique no texto, o recado no painel
+diz qual bucket não abriu.
+
+Os 64 erros das 10:51 são outra coisa e o detalhe deles está só no registro
+local da extensão (painel), não no banco.

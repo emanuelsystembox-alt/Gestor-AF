@@ -271,7 +271,8 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
 }
 
 // ── a varredura: a aba do TOA lê, o fundo grava ────────────────────────
-interface Pendente { aid: string; contrato: string | null; precisa_nome: boolean; precisa_equipamento: boolean }
+// `bucket` (120): a aba do TOA abre o bucket na árvore antes de procurar o contrato (0.5.0)
+interface Pendente { aid: string; contrato: string | null; precisa_nome: boolean; precisa_equipamento: boolean; bucket: string | null }
 
 /**
  * A aba do TOA que a varredura usa. Prefere a da JANELA DA VARREDURA
@@ -321,7 +322,7 @@ async function varrer() {
     return
   }
   const aba = await abaDoToa()
-  if (!aba?.id) { await anotar('Varredura: abra o TOA no Console de Alocação (bucket e dia de hoje) numa aba deste Chrome.', 'erro'); return }
+  if (!aba?.id) { await anotar('Varredura: abra o TOA no Console de Alocação (dia de hoje) numa aba deste Chrome — a varredura troca de bucket sozinha.', 'erro'); return }
 
   const idPedido = crypto.randomUUID()
   await chrome.storage.session.set({ varredura_contratos: Object.fromEntries(pend.map(p => [p.aid, p.contrato ?? p.aid])) })
@@ -329,7 +330,7 @@ async function varrer() {
   try {
     r = await chrome.tabs.sendMessage(aba.id, {
       tipo: 'varrer', idPedido,
-      itens: pend.map(p => ({ aid: p.aid, precisa_equipamento: p.precisa_equipamento })),
+      itens: pend.map(p => ({ aid: p.aid, precisa_equipamento: p.precisa_equipamento, bucket: p.bucket })),
     })
   } catch {
     r = { aceito: false, mensagem: 'A aba do TOA não respondeu. Recarregue a aba do TOA (F5) depois de instalar ou atualizar a extensão.' }
@@ -341,7 +342,9 @@ async function varrer() {
                     ultimaEm: x.varredura.ultimaEm, ultima: x.varredura.ultima }
   })
   selo('0%', '#c81a23', `AFLINE — varrendo o TOA: 0 de ${pend.length}`)
-  await anotar(`Varredura começou: ${pend.length} contratos${r.bucket ? ` (Console em ${r.bucket})` : ''}.`)
+  const porBucket = new Map<string, number>()
+  for (const p of pend) porBucket.set(p.bucket ?? 'sem bucket', (porBucket.get(p.bucket ?? 'sem bucket') ?? 0) + 1)
+  await anotar(`Varredura começou: ${pend.length} contratos (${[...porBucket].map(([b, n]) => `${b}: ${n}`).join(', ')}).`)
 }
 
 interface EventoVarredura {
@@ -349,6 +352,8 @@ interface EventoVarredura {
   aid?: string; feitos: number; total: number; cancelado?: boolean
   resultado?: { ok: boolean; motivo?: string; mensagem?: string; nome?: string | null; leuEquipamento?: boolean; itens?: Record<string, string>[] }
 }
+
+const avisosDeBucket = new Set<string>()
 
 async function aoEventoDaVarredura(ev: EventoVarredura) {
   const e = await lerEstado()
@@ -372,7 +377,12 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
     let delta = { nomes: 0, listas: 0, fora: 0, erros: 0 }
     if (!lido.ok) {
       if (lido.motivo === 'FORA_DO_CONSOLE') delta.fora = 1
-      else { delta.erros = 1; await anotar(`Varredura, ${contrato}: ${lido.mensagem ?? 'erro'}`, 'erro') }
+      else if (lido.motivo === 'SEM_BUCKET') {
+        // o mesmo recado para todos os contratos do bucket: anota uma vez só
+        delta.erros = 1
+        const chave = `${ev.idPedido}|${lido.mensagem}`
+        if (!avisosDeBucket.has(chave)) { avisosDeBucket.add(chave); await anotar(`Varredura: ${lido.mensagem}`, 'erro') }
+      } else { delta.erros = 1; await anotar(`Varredura, ${contrato}: ${lido.mensagem ?? 'erro'}`, 'erro') }
     } else {
       const { error } = await sb.rpc('registrar_varredura', {
         p_base: base, p_aid: ev.aid, p_nome: lido.nome ?? null,

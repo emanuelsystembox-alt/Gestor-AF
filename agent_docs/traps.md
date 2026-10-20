@@ -165,6 +165,12 @@ numa tela. Ver D-193.
 relógios. Script que pilota a tela de outro sistema (a varredura do TOA, D-193) erra
 por tempo esgotado em tudo. Detecte `document.visibilityState` e pause.
 
+**O Console de Alocação do TOA mostra UM bucket.** A varredura acha o contrato
+pelo bloco na tela; com MAN-AFLINE aberto, os 56 contratos da VT
+(MAN-AFLINE_01_VT) foram todos "fora do Console" — e às 12:42 de 20/10, com o
+Console em outro bucket, 192 de 192. Script que pilota o TOA tem de saber o
+bucket de cada contrato e abri-lo antes (0.5.0, D-196).
+
 ## PostgREST
 
 **Tem cache de schema.** Depois de `ALTER TABLE`, o front recebe

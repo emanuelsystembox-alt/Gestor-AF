@@ -37,6 +37,12 @@ crescer: cada coisa nova que quisermos tirar do TOA entra aqui como uma
 | `ponte.js` | `extensao-toa/ponte.js` (à mão) | só o "ping" para a tela Sincronismo |
 | `app/extensao/estado.ts` | — | o formato do estado guardado e dos pedidos da janelinha |
 
+- **A varredura troca de bucket (0.5.0, D-196).** O Console de Alocação
+  mostra UM bucket, e o contrato é achado pelo bloco dele na tela. Cada
+  pendente vem com o bucket (`varredura_pendentes`, 120, de
+  `visita.toa_bucket`, 119), agrupado; o `toa.js` clica no nome do bucket
+  na árvore, confere pelo subtítulo do Console e só então procura os blocos.
+  Bucket que não abre vira um aviso só e os contratos dele ficam pendentes.
 - **Uma regra só:** a extensão importa com `src/lib/importarToaNucleo.ts` —
   o mesmo da tela de Importação (`importarToa.ts` só passa o cliente da web).
   Mudou a importação? Mude no núcleo, rode `npm run extensao` e atualize.
