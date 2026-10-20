@@ -96,6 +96,7 @@ async function iniciar() {
     if (!r?.ok) alert(r?.mensagem ?? 'Não consegui começar a varredura.')
   })
   $('parar').addEventListener('click', () => pedir({ tipo: 'parar-varredura' }))
+  $('janela-toa').addEventListener('click', () => pedir({ tipo: 'abrir-janela-toa' }))
   $('sair').addEventListener('click', () => pedir({ tipo: 'sair' }))
   $('abrir').addEventListener('click', () => chrome.tabs.create({ url: 'https://gestor-af.pages.dev/controle/sincronismo' }))
 }

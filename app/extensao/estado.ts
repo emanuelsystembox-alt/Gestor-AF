@@ -63,3 +63,4 @@ export type Pedido =
   | { tipo: 'assumir' }
   | { tipo: 'varrer-agora' }
   | { tipo: 'parar-varredura' }
+  | { tipo: 'abrir-janela-toa' }

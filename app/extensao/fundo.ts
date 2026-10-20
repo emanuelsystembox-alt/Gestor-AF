@@ -72,10 +72,17 @@ function selo(texto: string, cor = '#c81a23', titulo?: string) {
 async function garantirAlarme() {
   if (!(await chrome.alarms.get(ALARME))) chrome.alarms.create(ALARME, { periodInMinutes: 1, delayInMinutes: 0.1 })
 }
-chrome.runtime.onInstalled.addListener(() => { garantirAlarme() })
-chrome.runtime.onStartup.addListener(() => { garantirAlarme() })
+// 0.4.0: o ícone abre o PAINEL LATERAL, fixo ao lado da página enquanto se
+// navega — como o do concorrente (Emanuel, 19/10: "a nossa precisa chegar
+// nesse nível"). O mesmo popup.html, agora como painel.
+function painelNoIcone() {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+}
+chrome.runtime.onInstalled.addListener(() => { garantirAlarme(); painelNoIcone() })
+chrome.runtime.onStartup.addListener(() => { garantirAlarme(); painelNoIcone() })
 chrome.alarms.onAlarm.addListener(a => { if (a.name === ALARME) ciclo(false) })
 garantirAlarme()
+painelNoIcone()
 
 // ── o TOA: exportar a planilha (a mesma chamada do botão Exportar) ─────
 type Exportacao = { ok: true; nome: string | null; bytes: ArrayBuffer }
@@ -266,10 +273,34 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
 // ── a varredura: a aba do TOA lê, o fundo grava ────────────────────────
 interface Pendente { aid: string; contrato: string | null; precisa_nome: boolean; precisa_equipamento: boolean }
 
+/**
+ * A aba do TOA que a varredura usa. Prefere a da JANELA DA VARREDURA
+ * (0.3.2): uma janela só dela, para quem opera navegar à vontade na outra
+ * sem esconder a tela que a varredura pilota (o Chrome não desenha aba
+ * escondida). Sem ela, a que está no Console.
+ */
 async function abaDoToa(): Promise<chrome.tabs.Tab | null> {
   const abas = await chrome.tabs.query({ url: TOA + '/*' })
-  return abas.find(a => /^Console de Aloca/.test(a.title || '')) ?? abas[0] ?? null
+  const janela = (await chrome.storage.local.get('janela_varredura')).janela_varredura as number | undefined
+  return abas.find(a => a.windowId === janela)
+    ?? abas.find(a => /^Console de Aloca/.test(a.title || '')) ?? abas[0] ?? null
 }
+
+async function abrirJanelaDaVarredura(): Promise<{ ok: boolean; mensagem?: string }> {
+  const atual = (await chrome.storage.local.get('janela_varredura')).janela_varredura as number | undefined
+  if (atual) {
+    try { await chrome.windows.update(atual, { focused: true, state: 'normal' }); return { ok: true } } catch { /* fechada: abre outra */ }
+  }
+  const j = await chrome.windows.create({ url: TOA + '/', type: 'normal', width: 1280, height: 860, focused: true })
+  await chrome.storage.local.set({ janela_varredura: j?.id })
+  await anotar('Janela da varredura aberta: deixe o TOA nela, no Console de Alocação. Pode cobri-la; não minimize.', 'ok')
+  return { ok: true }
+}
+
+chrome.windows.onRemoved.addListener(async id => {
+  const atual = (await chrome.storage.local.get('janela_varredura')).janela_varredura
+  if (atual === id) await chrome.storage.local.remove('janela_varredura')
+})
 
 async function varrer() {
   const e = await lerEstado()
@@ -422,6 +453,7 @@ async function tratar(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
       if (!(await carregarQuemSou())) return { ok: false, mensagem: 'Entre no Gestor AF primeiro.' }
       varrer(); return { ok: true }
     }
+    case 'abrir-janela-toa': return abrirJanelaDaVarredura()
     case 'parar-varredura': {
       const aba = await abaDoToa()
       if (aba?.id) await chrome.tabs.sendMessage(aba.id, { tipo: 'cancelar-varredura' }).catch(() => {})

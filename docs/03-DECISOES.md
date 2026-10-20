@@ -7650,3 +7650,15 @@ com a aba à vista; 15 s para os detalhes e 25 s para a lista (a seção Recurso
 linhas); uma segunda tentativa antes de anotar erro. Contrato com erro continua pendente
 e entra na próxima varredura. **Para usar:** o TOA numa janela só dele, à vista (outro
 monitor, ou lado a lado), não minimizada.
+
+**0.4.0 — painel lateral e janela da varredura (19/10, noite).** *"eu so queria que
+quando a extesão fosse habilitada, e saisse da tela do toa para navegar em outras
+paginas, o processo não parasse"* · *"a extensão deles fica meio que fixa ao lado da
+tela, a nossa precisa chegar nesse nivel"* — Emanuel. O ícone abre o **painel lateral**
+do Chrome (`side_panel`, o mesmo popup.html), fixo ao lado da página enquanto se navega.
+E **"Abrir a janela da varredura"**: o TOA numa janela só dela, que a varredura prefere
+(`janela_varredura` no armazenamento) — a pessoa navega na outra. O limite é do Chrome:
+aba/janela escondida não é desenhada; minimizada pausa, coberta pausa no Windows a menos
+que o atalho tenha `--disable-backgrounding-occluded-windows` (opção do próprio Chrome,
+documentada no README). Forçar o desenho por baixo ou abrir o TOA dentro da extensão
+(o TOA proíbe ser embutido) foi recusado: seria contornar proteção.

@@ -2,15 +2,21 @@
   "manifest_version": 3,
   "name": "AFLINE — ponte com o TOA",
   "description": "Sincronismo do Gestor AF com o TOA: baixa a planilha de Atividades e varre, pelas telas do TOA, nome do cliente e equipamentos. Não altera nada no TOA.",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "minimum_chrome_version": "116",
-  "permissions": ["alarms", "storage"],
+  "permissions": [
+    "alarms",
+    "storage",
+    "sidePanel"
+  ],
   "host_permissions": [
     "https://clarobrasil.fs.ocs.oraclecloud.com/*"
   ],
   "action": {
-    "default_title": "AFLINE — ponte com o TOA",
-    "default_popup": "popup.html"
+    "default_title": "AFLINE — ponte com o TOA"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
   },
   "background": {
     "service_worker": "fundo.js"
@@ -22,12 +28,18 @@
         "https://*.gestor-af.pages.dev/*",
         "http://localhost:5173/*"
       ],
-      "js": ["ponte.js"],
+      "js": [
+        "ponte.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["https://clarobrasil.fs.ocs.oraclecloud.com/*"],
-      "js": ["toa.js"],
+      "matches": [
+        "https://clarobrasil.fs.ocs.oraclecloud.com/*"
+      ],
+      "js": [
+        "toa.js"
+      ],
       "run_at": "document_idle"
     }
   ]

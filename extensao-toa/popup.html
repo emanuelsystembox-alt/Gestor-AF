@@ -10,7 +10,8 @@
             --borda: #d8dce3; --fundo: #ffffff; --cinza: #f3f4f6;
             --ok: #047857; --aviso: #b45309; --erro: #b01e25; }
     * { box-sizing: border-box; }
-    body { width: 360px; margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* 0.4.0: mora no painel lateral (largura do painel); mínimo para não espremer */
+    body { min-width: 300px; margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
            color: var(--texto); background: var(--fundo); }
     header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
     header b { color: var(--af); font-size: 15px; }
@@ -70,7 +71,8 @@
       </div>
 
       <h2>Varredura (nome, equipamento, miscelânea)</h2>
-      <p class="pequeno">Deixe uma aba do TOA no Console de Alocação (bucket e dia de hoje) e não mexa nela durante a varredura.</p>
+      <p class="pequeno">A varredura usa uma <strong>janela só dela</strong> com o TOA no Console de Alocação (bucket e dia de hoje). Você navega à vontade na outra janela; a dela pode ficar coberta, mas <strong>não minimizada</strong>.</p>
+      <div class="linha" style="margin-bottom:6px"><button id="janela-toa">Abrir a janela da varredura</button></div>
       <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
       <p id="var-texto" class="pequeno"></p>
       <div class="linha">

@@ -1,4 +1,4 @@
-# AFLINE — ponte com o TOA (0.3.0)
+# AFLINE — ponte com o TOA (0.4.0)
 
 Extensão do Chrome que **sincroniza o Gestor AF com o TOA sozinha**
 (D-189, D-192, D-193):
@@ -24,11 +24,13 @@ TOA. **Ela não altera nada no TOA** e não guarda a sua senha.
    superior direito).
 2. **Carregar sem compactação** → escolha esta pasta `extensao-toa`.
 3. Fixe o ícone (o quebra-cabeça da barra do Chrome → alfinete em "AFLINE").
+   Clicar nele abre o **painel lateral**, que fica fixo ao lado da página
+   enquanto você navega.
 
 ## Usar
 
 1. **Entre no TOA** neste Chrome, com o seu login.
-2. **Clique no ícone da extensão** → entre com o seu **e-mail e senha do
+2. **Clique no ícone da extensão** (abre o painel lateral) → entre com o seu **e-mail e senha do
    Gestor AF**. A extensão guarda só a sessão, como o navegador faz no site.
 3. Marque **"Sincronizar por este computador"**. A janelinha diz em uma frase
    como está: sincronizando, de reserva (outro computador está com a vez), a
@@ -37,10 +39,22 @@ TOA. **Ela não altera nada no TOA** e não guarda a sua senha.
    **Gestor AF › Operação › Sincronismo** (lá também fica o histórico de cada
    rodada, com sucesso ou falha).
 
-**Para a varredura:** deixe uma aba do TOA no **Console de Alocação**, no
-bucket e no dia de hoje, e não mexa nela enquanto varre (a extensão abre cada
-contrato por ela, uns 9 s cada). Use **"Varrer o TOA agora"** na janelinha, ou
-a rodada automática configurada no Gestor AF. A % aparece no ícone.
+**Para a varredura:** clique em **"Abrir a janela da varredura"** no painel.
+Abre o TOA numa **janela só dela**; deixe-a no **Console de Alocação**, no
+bucket e no dia de hoje. A extensão abre cada contrato por ela (uns 9 s cada),
+e **você navega à vontade na outra janela**. Use **"Varrer o TOA agora"**, ou a
+rodada automática configurada no Gestor AF. A % aparece no ícone.
+
+O Chrome não desenha uma tela escondida, e a varredura pilota as telas do TOA:
+a janela da varredura **não pode ser minimizada**. Se ela ficar escondida, a
+varredura **pausa** (ícone "II") e continua sozinha quando a janela aparece.
+
+**Para poder cobrir a janela da varredura com outras (opcional, uma vez):** no
+Windows, o Chrome também trata como escondida uma janela totalmente coberta.
+Para desligar isso no computador que sincroniza: botão direito no atalho do
+Chrome → **Propriedades** → em **Destino**, depois de , acrescente
+um espaço e  → OK. Feche **todas** as
+janelas do Chrome e abra pelo atalho. (Minimizar continua pausando.)
 
 **Um computador sincroniza por vez** — dois importariam em dobro. Se outro já
 estiver, este fica de reserva e assume sozinho se o outro parar por 3 minutos
