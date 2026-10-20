@@ -52,8 +52,8 @@ varredura **pausa** (ícone "II") e continua sozinha quando a janela aparece.
 **Para poder cobrir a janela da varredura com outras (opcional, uma vez):** no
 Windows, o Chrome também trata como escondida uma janela totalmente coberta.
 Para desligar isso no computador que sincroniza: botão direito no atalho do
-Chrome → **Propriedades** → em **Destino**, depois de , acrescente
-um espaço e  → OK. Feche **todas** as
+Chrome → **Propriedades** → em **Destino**, depois de `chrome.exe"`, acrescente
+um espaço e `--disable-backgrounding-occluded-windows` → OK. Feche **todas** as
 janelas do Chrome e abra pelo atalho. (Minimizar continua pausando.)
 
 **Um computador sincroniza por vez** — dois importariam em dobro. Se outro já
