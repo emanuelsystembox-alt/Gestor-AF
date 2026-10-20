@@ -286,7 +286,8 @@ export function NovoContratoModal({
                   <option value="">—</option>
                   <option value="CASA">Casa</option>
                   <option value="APTO">Apartamento</option>
-                  <option value="COMERCIAL">Comercial</option>
+                  <option value="BECO">Beco</option>
+                  <option value="LOJA">Loja</option>
                   <option value="OUTRO">Outro</option>
                 </select>
               </label>

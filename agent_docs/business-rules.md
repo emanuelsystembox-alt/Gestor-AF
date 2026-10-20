@@ -429,6 +429,18 @@ HFC.
 
 ---
 
+## Edificação (122, D-198)
+
+**Toda visita com endereço tem edificação; QUALQUER é só para quem não tem
+endereço** (a jornada). A ordem: cadastro → complemento de LOJA (LJ, SALA,
+ACAD…) → de APTO (AP, BL, BLC, COBERTURA…) → BECO (logradouro TV ou BC, ou a
+palavra BECO) → CASA. "Nome normal", sem sinal nenhum, é CASA (Emanuel, 20/10).
+Calculada na leitura (`edificacao_de`), nunca gravada: mudar a regra muda todos
+os contratos. **Na pontuação, BECO paga como CASA** (a CLARO só separa casa de
+apartamento); LOJA cai na coringa.
+
+---
+
 ## O que sumiu do TOA é desatribuído (116, D-191)
 
 **Contrato que estava na planilha do bucket e não veio na importação nova

@@ -1041,7 +1041,8 @@ export default function Configuracoes() {
                               {ed ? (
                                 <select defaultValue={r.edificacao} className={campo}
                                   onChange={e => setRascunho(x => ({ ...x, edificacao: e.target.value }))}>
-                                  {['CASA', 'APTO', 'COMERCIAL', 'QUALQUER'].map(o =>
+                                  {/* 122: BECO e LOJA; sem regra própria, o BECO paga como CASA */}
+                                  {['CASA', 'APTO', 'BECO', 'LOJA', 'QUALQUER'].map(o =>
                                     <option key={o} value={o}>{o}</option>)}
                                 </select>
                               ) : (

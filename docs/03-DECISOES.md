@@ -7785,3 +7785,55 @@ o nome / só equipamento e material dos encerrados.
 Conferido o painel numa cópia com o `chrome` de mentira (caixinhas, contagem,
 "Ler", pedidos ao clicar). **Não conferido no Chrome com o TOA**: a primeira
 varredura de verdade é do Emanuel.
+
+### D-198 · Toda visita com endereço tem edificação: BECO, LOJA, APTO ou CASA (122)
+
+*"o que começa com TV é Beco ok, o que tiver LJ no complemento é Loja, e o que tiver
+somente nome normal é casa (...) tem que corrigir o nosso banco pra isso, para
+preencher todas as edificações agora. use a sua inteligencia para identificar se for o
+caso"* — Emanuel, 20/10, com a lista dos contratos da última importação sem edificação.
+
+**O que havia.** A edificação não é gravada: `edificacao_de()` calcula na leitura, do
+cadastro (`tipo_residencia`) e do complemento (D-045). Sem complemento, ou com um que a
+regra não entendia, caía em **QUALQUER** — 668 visitas, 315 delas com endereço (o resto
+é jornada, sem endereço). A pontuação delas vinha da regra coringa.
+
+**A regra nova** (a primeira que casa vale; corrigir a função corrigiu todos os
+contratos de uma vez, antigos e novos):
+
+1. **cadastro** (`tipo_residencia`) — quem digitou manda;
+2. **sem logradouro e sem complemento → QUALQUER**, origem "SEM ENDERECO" (a jornada:
+   não há o que saber — zero e desconhecido não são a mesma coisa);
+3. complemento de **LOJA**: LJ, LOJA, SALA, SL, BOX, GALP, ACAD, CJ — vem antes do
+   apartamento porque "ED ALEGRO MALL, LJ 7" é loja;
+4. complemento de **APTO**: APT, AP, BL, **BLC**, BLOCO, TOR, COND, ED, EDF, EDIF,
+   **COB/COBERTURA** (os dois em negrito a regra antiga não lia);
+5. **BECO**: logradouro que começa com **TV** (a regra do Emanuel) ou **BC** (a sigla do
+   próprio beco: "BC CRAVARI", "BC POSEIDON"), ou com a palavra BECO no logradouro ("R
+   BECO SAO MARÇAL") ou no complemento ("BECOZURIQUE");
+6. o resto é **CASA** — com sinal de casa no complemento (CASA, FD, FT, F1, QD, LT…,
+   origem "DERIVADA DO COMPLEMENTO") ou sem sinal nenhum, que é o "nome normal" (origem
+   "SEM INDICACAO (CASA)"). A origem fica visível na dica do contrato e no Exportar, para
+   quem quiser conferir.
+
+Leituras de julgamento, ditas para poderem ser revistas: "PORT", "BSD 1", "ME", "SN" e
+"COND JD ENCONTRO DAS AGUAS" (condomínio sem bloco nem apto) ficaram CASA; "TV DO
+COMERCIO, LJ 5" ficou LOJA (o complemento é mais específico que a rua); "GAL" no
+logradouro não é galeria comercial em Manaus ("GAL CALAMERDE (N ESP II)") e ficou CASA.
+
+**COMERCIAL virou LOJA** — nenhum cadastro nem regra de pontuação usava COMERCIAL. As
+listas da tela (cadastro do contrato, contrato novo, regras de pontuação) trocam
+"Comercial" por **Beco** e **Loja**.
+
+**Na pontuação, BECO é CASA.** A CLARO só separa casa de apartamento no preço (D-045) e
+beco é casa. Medido antes de aplicar: sem isso, 13 visitas que já eram CASA (rua TV/BC
+com "casa" no complemento) cairiam na coringa e 3 perderiam ponto. Uma regra própria de
+BECO, se um dia existir, ganha da de CASA. LOJA segue na coringa, como o COMERCIAL
+seguia.
+
+**Medido.** Pontos CLARO de todas as visitas: 909,10 → **909,58** (+0,48: os que saem
+da coringa para a regra de CASA); 734 com regra antes e depois. Hoje: APTO 175, CASA 534
+(252 pelo complemento, 282 sem indicação), BECO 35, LOJA 21, QUALQUER 353 — todos
+jornada. Como `authenticated`: `pontos_por_periodo` de 30 dias em 163 ms. A versão de 2
+argumentos das duas funções foi derrubada (ninguém mais a chama — conferido em
+`pg_proc`).

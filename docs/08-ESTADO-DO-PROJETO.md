@@ -433,7 +433,7 @@ falta o olho de quem usa.
 
 ## Pendente em 20/10/2026 — VT de Manaus, filtros e varredura por bucket (D-194 a D-197)
 
-Migrations **119 a 121**; web publicada e conferida no ar (o pedaço de cada tela
+Migrations **119 a 122**; web publicada e conferida no ar (o pedaço de cada tela
 baixado do ar tem a mudança); extensão **0.6.0** no repositório. Baterias 26/26 e
 23/23; nenhuma `SECURITY DEFINER` para o `anon`.
 
@@ -448,6 +448,8 @@ baixado do ar tem a mudança); extensão **0.6.0** no repositório. Baterias 26/
 - **Matriz Grupo × situação do Dashboard** passou a obedecer aos filtros — recebia
   a lista sem filtro desde que foi criada.
 - **Varredura por bucket** (0.5.0, D-196) e **escolhida** (0.6.0, D-197).
+- **Toda visita com endereço tem edificação** (122, D-198): BECO, LOJA, APTO ou
+  CASA; QUALQUER só na jornada. Pontos de todas as visitas 909,10 → 909,58.
 
 ### Depende do Emanuel
 
@@ -456,6 +458,7 @@ baixado do ar tem a mudança); extensão **0.6.0** no repositório. Baterias 26/
 | **Meta e faixas da skill MANUTENÇÃO** | Os 12 técnicos da VT têm skill MANUTENÇÃO, e a meta/faixa dela continua em aberto (`business-rules.md` › Em aberto). Sem faixa, o "a receber" deles fica zerado — a skill é a chave do dinheiro (D-094). Configurar em Administração › Metas quando houver o número. |
 | **Matrícula do ponto dos 12 da VT** | Ficou vazia: na planilha era igual ao login TOA (D-194). Quando houver a matrícula real, editar ou reimportar. |
 | **Varrer só os encerrados?** | Hoje a varredura lê o nome de TODO contrato sem nome (qualquer situação) e o equipamento só dos encerrados. A 0.6.0 deixa escolher por vez; se o padrão deve mudar, é decisão. |
+| **Edificações de julgamento** | "PORT", "BSD 1", "ME", "SN" e condomínio sem bloco ficaram CASA; TV com LJ ficou LOJA (D-198). Se alguma estiver errada, é uma linha na regra. |
 | **Recarregar a extensão 0.6.0** | `chrome://extensions` → recarregar a AFLINE, e F5 na aba do TOA. |
 
 ### Verificação que ninguém fez ainda
