@@ -430,7 +430,7 @@ falta o olho de quem usa.
 ## Pendente em 19/10/2026, noite — Sincronismo com o TOA (D-189)
 
 Migrations **110 a 113**; tela Sincronismo e extensão `extensao-toa/`. Sincroniza com o login de quem opera (113).
-Baterias 26/26 e 23/23. **Web ainda não publicada** (ver abaixo).
+Baterias 26/26 e 23/23. Web publicada em 19/10 e conferida no ar (o arquivo da tela igual ao local).
 
 | O quê | Por quê |
 |---|---|
