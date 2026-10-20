@@ -50,7 +50,9 @@ function desenhar(e: Estado) {
   const pct = v.total ? Math.floor((v.feitos / v.total) * 100) : 0
   $('var-barra').hidden = !v.rodando
   ;($('var-preenche') as HTMLDivElement).style.width = `${pct}%`
-  $('var-texto').textContent = v.rodando
+  $('var-texto').textContent = v.rodando && v.pausada
+    ? `PAUSADA (${v.feitos} de ${v.total}): a aba do TOA está escondida — o Chrome para a tela dela. Deixe a aba do TOA à vista (de preferência numa janela só dela) e a varredura continua sozinha.`
+    : v.rodando
     ? `Varrendo o TOA… ${v.feitos} de ${v.total} (${pct}%) — ${v.nomes} nome(s), ${v.listas} lista(s)${v.erros ? `, ${v.erros} erro(s)` : ''}`
     : v.ultima ? `Última (${hora(v.ultimaEm)}): ${v.ultima}` : 'Nenhuma varredura ainda.'
   ;($('varrer') as HTMLButtonElement).hidden = v.rodando

@@ -160,6 +160,11 @@ a primeira varredura gravou 5 contratos e se perdeu, e a extensão ficou
 **fundo da extensão** (alarme do Chrome, estado em `chrome.storage`), não
 numa tela. Ver D-193.
 
+**Aba escondida não desenha.** O Chrome quase para uma aba que não está à vista
+(e uma janela totalmente coberta, no Windows): não desenha a tela e atrasa os
+relógios. Script que pilota a tela de outro sistema (a varredura do TOA, D-193) erra
+por tempo esgotado em tudo. Detecte `document.visibilityState` e pause.
+
 ## PostgREST
 
 **Tem cache de schema.** Depois de `ALTER TABLE`, o front recebe

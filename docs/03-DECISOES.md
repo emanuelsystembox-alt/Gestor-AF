@@ -7639,3 +7639,14 @@ tipos do Chrome), build; o `fundo.js` montado carrega num Chrome simulado
 pacote é a publishable. **Não verificado:** a 0.3.0 instalada rodando
 (login, alarme, baixa e varredura de ponta a ponta) — o navegador da sessão
 não carrega extensão.
+
+**0.3.1 — aba do TOA escondida pausa, não erra (19/10, noite).** No primeiro uso da
+0.3.0 a varredura leu 11 de 16 e anotou 5 erros ("Não consegui voltar ao Console",
+"A lista de equipamento não carregou") quando o Emanuel saiu da aba do TOA: o Chrome
+quase para uma aba que não está à vista — não desenha a tela e atrasa os relógios —, e
+a varredura pilota as telas de verdade do TOA. Agora: escondida, a varredura **pausa**
+(janelinha e ícone "II" avisam) e volta sozinha quando a aba aparece; o prazo só corre
+com a aba à vista; 15 s para os detalhes e 25 s para a lista (a seção Recurso tem 80–140
+linhas); uma segunda tentativa antes de anotar erro. Contrato com erro continua pendente
+e entra na próxima varredura. **Para usar:** o TOA numa janela só dele, à vista (outro
+monitor, ou lado a lado), não minimizada.

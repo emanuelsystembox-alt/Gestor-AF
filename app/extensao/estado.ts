@@ -25,6 +25,8 @@ export interface Estado {
   baixa: { rodando: boolean; atual: string | null; ultimaEm: number | null; ultima: string | null }
   varredura: {
     rodando: boolean; idPedido: string | null; inicio: number | null
+    /** A aba do TOA ficou escondida: o Chrome para a tela, a varredura espera. */
+    pausada: boolean
     feitos: number; total: number; nomes: number; listas: number; fora: number; erros: number
     ultimaEm: number | null; ultima: string | null
   }
@@ -38,7 +40,7 @@ export const ESTADO_VAZIO: Estado = {
   servidorLigado: null, intervalo: null, toaSessao: null, pulsoEm: null,
   baixa: { rodando: false, atual: null, ultimaEm: null, ultima: null },
   varredura: {
-    rodando: false, idPedido: null, inicio: null,
+    rodando: false, idPedido: null, inicio: null, pausada: false,
     feitos: 0, total: 0, nomes: 0, listas: 0, fora: 0, erros: 0, ultimaEm: null, ultima: null,
   },
   log: [],

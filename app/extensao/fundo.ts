@@ -311,7 +311,7 @@ async function varrer() {
 }
 
 interface EventoVarredura {
-  tipo: 'varredura-evento'; idPedido: string; evento: 'item' | 'fim'
+  tipo: 'varredura-evento'; idPedido: string; evento: 'item' | 'fim' | 'pausa' | 'retoma'
   aid?: string; feitos: number; total: number; cancelado?: boolean
   resultado?: { ok: boolean; motivo?: string; mensagem?: string; nome?: string | null; leuEquipamento?: boolean; itens?: Record<string, string>[] }
 }
@@ -320,6 +320,16 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
   const e = await lerEstado()
   if (!e.cidade || ev.idPedido !== e.varredura.idPedido) return   // evento de uma varredura antiga
   const base = e.cidade.id
+
+  // A aba do TOA escondida: o Chrome para a tela, e a varredura espera ela voltar.
+  if (ev.evento === 'pausa' || ev.evento === 'retoma') {
+    const pausada = ev.evento === 'pausa'
+    await mudar(s => { s.varredura.pausada = pausada })
+    if (pausada) selo('II', '#b45309', 'AFLINE — varredura pausada: deixe a aba do TOA à vista')
+    else selo(e.varredura.total ? `${Math.floor((e.varredura.feitos / e.varredura.total) * 100)}%` : '', '#c81a23')
+    await anotar(pausada ? 'Varredura pausada: a aba do TOA ficou escondida. Deixe-a à vista para continuar.' : 'Varredura retomada.')
+    return
+  }
 
   if (ev.evento === 'item' && ev.aid && ev.resultado) {
     const contratos = (await chrome.storage.session.get('varredura_contratos')).varredura_contratos as Record<string, string> | undefined
@@ -354,7 +364,7 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
       + (v.erros ? `; ${v.erros} com erro` : '')
       + (ev.cancelado ? '; parada no meio' : '')
     await sb.rpc('varredura_estado', { p_base: base, p_terminou: resumo, p_contratos: ev.feitos })
-    await mudar(s => { s.varredura.rodando = false; s.varredura.ultimaEm = Date.now(); s.varredura.ultima = resumo })
+    await mudar(s => { s.varredura.rodando = false; s.varredura.pausada = false; s.varredura.ultimaEm = Date.now(); s.varredura.ultima = resumo })
     await anotar(`Varredura terminou: ${resumo}.`, v.erros ? 'erro' : 'ok')
     selo('', '#c81a23', 'AFLINE — ponte com o TOA')
   }

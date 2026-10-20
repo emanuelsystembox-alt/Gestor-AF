@@ -15,12 +15,43 @@
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** Espera a condição virar verdadeira (devolve o valor), ou nulo no prazo. */
+// ┌─ aba escondida = tela parada ──────────────────────────────────────┐
+// │ O Chrome quase para uma aba que não está à vista: não desenha a    │
+// │ tela e atrasa os relógios. A varredura pilota as telas de verdade  │
+// │ do TOA — escondida, o TOA não termina de montar nada, e cada passo │
+// │ estourava o prazo ("Não consegui voltar ao Console", "a lista não  │
+// │ carregou"). Visto no 1º uso da 0.3.0 (19/10): 5 erros em 16.       │
+// │ Por isso: escondida, a varredura PAUSA e avisa; volta sozinha quando│
+// │ a aba aparece. E o prazo só corre com a aba à vista.               │
+// └────────────────────────────────────────────────────────────────────┘
+let avisarPausa = null   // definido pela varredura em andamento
+let cancelado = false
+
+async function esperarVisivel() {
+  if (document.visibilityState === 'visible' || cancelado) return
+  if (avisarPausa) await avisarPausa(true)
+  await new Promise((r) => {
+    const ver = () => {
+      if (document.visibilityState === 'visible' || cancelado) {
+        document.removeEventListener('visibilitychange', ver); clearInterval(t); r()
+      }
+    }
+    document.addEventListener('visibilitychange', ver)
+    const t = setInterval(ver, 2000)   // e a cada 2 s, para o "Parar" não ficar preso aqui
+  })
+  if (avisarPausa) await avisarPausa(false)
+  await espera(800)   // a tela volta a desenhar
+}
+
+/** Espera a condição virar verdadeira (devolve o valor), ou nulo no prazo.
+ *  O prazo só corre com a aba à vista: escondida, pausa (ver acima). */
 async function ate(cond, max = 10000, passo = 200) {
-  const t0 = Date.now()
-  while (Date.now() - t0 < max) {
+  let gasto = 0
+  while (gasto < max) {
+    if (document.visibilityState !== 'visible') await esperarVisivel()
     try { const v = cond(); if (v) return v } catch { /* a tela ainda está montando */ }
     await espera(passo)
+    gasto += passo
   }
   return null
 }
@@ -136,7 +167,7 @@ async function abrirDetalhes(aid) {
     link.click()
 
     // Confere que abriu a atividade CERTA antes de ler qualquer coisa.
-    const id = await ate(() => nosDetalhes() && valor('ID da Atividade'), 12000)
+    const id = await ate(() => nosDetalhes() && valor('ID da Atividade'), 15000)
     if (id === aid) return 'OK'
   }
   throw new Error('A tela de detalhes abriu outra atividade (duas tentativas).')
@@ -153,7 +184,8 @@ async function processar(it) {
     const btn = await ate(() => document.querySelector('button[data-ofsc-id="list_inventories"]'), 6000)
     if (!btn) throw new Error('O botão Equipamento não apareceu.')
     btn.click()
-    const pronto = await ate(() => naLista() && document.querySelector('table.table tr.section-header'), 12000)
+    // listas grandes (a seção Recurso tem 80–140 linhas) levam vários segundos no próprio TOA
+    const pronto = await ate(() => naLista() && document.querySelector('table.table tr.section-header'), 25000)
     if (!pronto) throw new Error('A lista de equipamento não carregou.')
     itens = lerEquipamento()
   }
@@ -161,7 +193,6 @@ async function processar(it) {
 }
 
 let rodando = false
-let cancelado = false
 
 async function varrer(pedido) {
   rodando = true; cancelado = false
@@ -170,11 +201,19 @@ async function varrer(pedido) {
     tipo: 'varredura-evento', idPedido: pedido.idPedido, abaGestor: pedido.abaGestor, total, ...evento,
   }).catch(() => {})
   let feitos = 0
+  // escondida → 'pausa'; à vista de novo → 'retoma' (a janelinha mostra)
+  avisarPausa = (sim) => avisar({ evento: sim ? 'pausa' : 'retoma', feitos })
   try {
     for (const it of pedido.itens) {
       if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
       let r
-      try { r = await processar(it) } catch (e) { r = { ok: false, motivo: 'ERRO', mensagem: String((e && e.message) || e) } }
+      await esperarVisivel()
+      if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
+      // Uma segunda tentativa antes de anotar erro: o TOA às vezes só está lento.
+      try { r = await processar(it) } catch (e1) {
+        try { await espera(1500); r = await processar(it) }
+        catch (e) { r = { ok: false, motivo: 'ERRO', mensagem: String((e && e.message) || e) } }
+      }
       feitos++
       await avisar({ evento: 'item', aid: it.aid, feitos, resultado: r })
       // Fôlego entre um contrato e outro: o TOA é usado por gente também.
@@ -184,6 +223,7 @@ async function varrer(pedido) {
     await avisar({ evento: 'fim', feitos })
   } finally {
     rodando = false
+    avisarPausa = null
   }
 }
 
