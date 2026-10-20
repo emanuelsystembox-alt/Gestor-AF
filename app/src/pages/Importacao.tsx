@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from '../lib/toa'
 import {
-  ETAPAS, importarLinhasToa, reconciliarImportacao, type Resumo,
+  ETAPAS, importarLinhasToa, reconciliarImportacao, type Resumo, type Desatribuicao,
 } from '../lib/importarToa'
 import { Alerta } from '../components/ui'
 import { Shell } from '../components/Shell'
@@ -110,6 +110,8 @@ export default function Importacao() {
   const [problemas, setProblemas] = useState<string[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [resumo, setResumo] = useState<Resumo | null>(null)
+  /** 116: undefined = ainda não importou; null = a conferência falhou. */
+  const [desatrib, setDesatrib] = useState<Desatribuicao | null | undefined>(undefined)
   /** Andamento visível (D-182): etapa atual, linhas enviadas, cronômetro. */
   const [etapa, setEtapa] = useState(0)
   const [enviadas, setEnviadas] = useState(0)
@@ -196,6 +198,7 @@ export default function Importacao() {
       const { data: novos } = await supabase.rpc('codigos_sem_cadastro', { p_importacao: r.importacaoId })
       setCodigosNovos((novos ?? []) as { codigo: number; texto: string; presos: number }[])
 
+      setDesatrib(r.desatribuicao)
       setResumo(r.resumo)
       setFase('pronto')
       await carregarHistorico()
@@ -597,6 +600,30 @@ export default function Importacao() {
                 </div>
               ))}
             </div>
+
+            {/* 116 (D-191): o que saiu do TOA e o que voltou. Nulo = a
+                conferência não rodou — não é "nenhum". */}
+            {desatrib === null ? (
+              <Alerta tipo="aviso">
+                A conferência do que saiu do TOA não terminou. Os contratos entraram; a próxima
+                importação deste bucket confere de novo.
+              </Alerta>
+            ) : desatrib && (desatrib.desatribuidos > 0 || desatrib.devolvidos > 0) && (
+              <Alerta tipo="info">
+                {desatrib.desatribuidos > 0 && (
+                  <p>
+                    <strong>{desatrib.desatribuidos}</strong> contrato(s) Na entrada sumiram desta planilha
+                    do TOA e foram <strong>desatribuídos</strong> (cód. 800 → Cancelada). O técnico foi avisado.
+                  </p>
+                )}
+                {desatrib.devolvidos > 0 && (
+                  <p>
+                    <strong>{desatrib.devolvidos}</strong> contrato(s) desatribuído(s) voltaram na planilha
+                    e estão <strong>de volta Na entrada</strong>, com quem o TOA mostra agora.
+                  </p>
+                )}
+              </Alerta>
+            )}
 
             {codigosNovos.length > 0 && (
               <Alerta tipo="aviso">

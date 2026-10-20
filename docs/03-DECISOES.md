@@ -7469,3 +7469,61 @@ mediu 0,4–0,7 s. Intervalos agora: 5, 10, 15, 30 e 60 min.
   da linha, e a etiqueta "Informativo" é roxa (`violet`), com tom escuro no
   tema claro (`#6d28d9`, tokens em `styles.css`). Nenhuma situação usa roxo:
   bateu o olho, é jornada.
+
+### D-191 · O que sumiu da planilha do TOA é desatribuído (cód. 800), e volta se reaparecer
+
+> *"se a primeira vez que o contrato foi importado, e depois quando
+> importarem de novo e o contrato não apareceu no relatorio, o sistema deve
+> baixar automaticamente o contrato para desatribuido cod baixa 800, agora na
+> prixima importação se ele aparecer de novo no relatorio, vamos devolver em
+> entrada para o técnico que esta o contrato"* · *"so pode desatribuir
+> contratos que tiverem em entrada, em outro status não pode ok"* — Emanuel,
+> 19/10.
+
+**Respostas do Emanuel (19/10, no popup):** só o que o campo não mexeu, e só
+**Na entrada**; ao voltar, vai para **quem o TOA mostra agora**; **avisa** o
+técnico; **sem trava** de quantidade ("desatribuir mesmo assim").
+
+**A regra** (`desatribuir_ausentes`, migration 116) — a **terceira chamada**
+da importação, depois de `importar_toa` e `reconciliar_importacao`, cada uma
+com os seus 8 s (D-181). Vale para a importação manual e para o Sincronismo
+(`lib/importarToa.ts`, o caminho único).
+
+- **Sumiu** = mesmo dia de atuação e mesma cidade da importação, veio do TOA
+  (`toa_atividade_id`), a **última importação que o viu é do mesmo bucket**,
+  e o ID da Atividade não está em nenhuma linha desta importação — nem nas
+  que deram erro (linha com erro não é contrato que sumiu). Jornada não conta.
+- **Só desatribui** `ENTRADA` sem `bloqueado_em`. Qualquer outra situação,
+  ou contrato que o campo tocou, fica como está.
+- **Desatribuir** = cód. **800 na baixa da AFLINE** de toda O.S. sem baixa
+  AFLINE (a da operadora vem do TOA e não se edita, D-042), situação
+  **Cancelada** (o destino do 800 no cadastro), evento no histórico e aviso
+  ao técnico (o aviso de cancelamento pela importação que já existia).
+  Marca `visita.desatribuido_em`.
+- **Voltou** = marcado e presente de novo numa linha da importação: sai o 800
+  que **nós** pusemos (baixa AFLINE dada por gente fica) e, se continua
+  Cancelada, volta **Na entrada** — com a equipe que a importação já roteou
+  pelo login da linha nova. Se o próprio TOA mandou outra situação pelo
+  código, vale a do TOA.
+- Tudo com `app.origem = IMPORTACAO`: mudança feita pelo importador não
+  marca o contrato como "mexido pelo campo" (`marca_bloqueio`) — senão a
+  próxima importação não o reconheceria.
+- Por que "a última importação que o viu é do mesmo bucket": um contrato
+  que o TOA passou do MAN-AFLINE para o MAN-AFLINE_01_VT não pode ser
+  desatribuído pela importação do MAN-AFLINE, onde de fato não está mais.
+- Índice novo `importacao_linha (visita_id)` para essa pergunta.
+
+**Testado** (como controlador, transação desfeita): importação sem um
+contrato Na entrada → Cancelada, 800 nas 2 O.S., 1 aviso, `bloqueado_em`
+nulo; importação com ele de volta → Na entrada, sem 800. 136 ms.
+
+**Medido no dado real (19/10, 21h):** rodada sobre a última importação do
+MAN-AFLINE (21:02), a regra desatribuiria **6** contratos Na entrada que o
+TOA mostrou pela última vez entre 12:10 e 17:33 — os mesmos 6 da tela "Na
+entrada" que o Emanuel mandou. É o caso que a regra existe para tratar: a
+próxima importação do bucket os desatribui.
+
+**Não verificado:** uma importação real passando pela regra (só em
+transação desfeita); o texto do aviso que o técnico recebe é o do
+cancelamento pela importação ("A operadora cancelou — não vá"), com a
+observação "Saiu da sua rota no TOA: desatribuído automaticamente (cód. 800)".

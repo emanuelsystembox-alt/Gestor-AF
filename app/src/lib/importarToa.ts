@@ -21,7 +21,11 @@ export const ETAPAS = [
   'Enviando as linhas',
   'Criando e atualizando os contratos',
   'Ligando jornada, tipo de atividade e TEC1',
+  'Conferindo o que saiu do TOA',
 ] as const
+
+/** O que a 3ª chamada fez (116, D-191). */
+export interface Desatribuicao { desatribuidos: number; devolvidos: number }
 
 export interface Resumo {
   criadas: number; atualizadas: number; ignoradas: number
@@ -53,6 +57,9 @@ export interface ResultadoImportacao {
   resumo: Resumo
   /** Falso quando a segunda parte falhou: os contratos entraram, falta reconciliar. */
   reconciliou: boolean
+  /** Nulo quando a 3ª chamada falhou: os contratos entraram, a conferência do
+   *  que sumiu fica para a próxima importação (não é "zero desatribuídos"). */
+  desatribuicao: Desatribuicao | null
 }
 
 /** Erro com a importação já registrada (ou não), para quem chamou mostrar e decidir. */
@@ -113,7 +120,16 @@ export async function importarLinhasToa(p: PedidoImportacao): Promise<ResultadoI
     avancar(3, p.linhas.length)
     const reconciliou = await reconciliarImportacao(imp.id)
 
-    return { importacaoId: imp.id, resumo: res as Resumo, reconciliou }
+    // 116: a TERCEIRA chamada, com o seu próprio orçamento (D-181). O que
+    // sumiu desta planilha e está Na entrada vira Desatribuído (cód. 800);
+    // o desatribuído que voltou, volta Na entrada (D-191).
+    avancar(4, p.linhas.length)
+    const { data: des, error: ed } = await supabase.rpc('desatribuir_ausentes', { p_importacao_id: imp.id })
+
+    return {
+      importacaoId: imp.id, resumo: res as Resumo, reconciliou,
+      desatribuicao: ed ? null : (des as Desatribuicao),
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Falha na importação.'
     // O banco desfaz a transação inteira quando estoura o tempo: dizer

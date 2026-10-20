@@ -429,6 +429,27 @@ HFC.
 
 ---
 
+## O que sumiu do TOA é desatribuído (116, D-191)
+
+**Contrato que estava na planilha do bucket e não veio na importação nova
+cai em Desatribuído (cód. 800 → Cancelada); se reaparecer, volta Na
+entrada** (Emanuel, 19/10).
+
+- **Só Na entrada, e só o que o campo não mexeu** (`bloqueado_em` nulo).
+  Em qualquer outra situação o sistema não desatribui — *"em outro status
+  não pode"* (Emanuel).
+- Compara só com o **mesmo bucket** (a última importação que viu o
+  contrato) e o **mesmo dia de atuação**. Jornada não conta. Linha que deu
+  erro na importação não é contrato que sumiu.
+- O 800 vai na **baixa da AFLINE**, nunca na da operadora (D-042).
+- Ao voltar, vai para **quem o TOA mostra agora**; tira só o 800 que o
+  sistema pôs.
+- O técnico é **avisado**. **Sem trava** de quantidade, por decisão do
+  Emanuel: planilha que veio cortada desatribui de verdade — confira o
+  arquivo antes de importar à mão.
+
+---
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

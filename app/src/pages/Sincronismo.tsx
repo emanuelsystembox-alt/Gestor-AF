@@ -476,7 +476,11 @@ function Executor({ baseId, dedicado, aoRodar }: {
                       { importacao: res.importacaoId, impressao, linhas: linhas.length })
       return fim(`${b.nome}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, `
         + `${s.atualizadas} atualizadas` + (s.erros ? `, ${s.erros} com erro` : '')
-        + (res.reconciliou ? '.' : '. A segunda parte (TEC1, jornada) não terminou; a próxima rodada refaz.'),
+        + (res.reconciliou ? '.' : '. A segunda parte (TEC1, jornada) não terminou; a próxima rodada refaz.')
+        // 116 (D-191): o que saiu do TOA e o que voltou.
+        + (res.desatribuicao?.desatribuidos ? ` ${res.desatribuicao.desatribuidos} saíram do TOA e foram desatribuídos (cód. 800).` : '')
+        + (res.desatribuicao?.devolvidos ? ` ${res.desatribuicao.devolvidos} voltaram e estão de novo Na entrada.` : '')
+        + (res.desatribuicao === null ? ' A conferência do que saiu do TOA não terminou; a próxima rodada confere.' : ''),
         s.erros ? 'erro' : 'ok')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Falha na importação.'
