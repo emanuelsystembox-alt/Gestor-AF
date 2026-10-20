@@ -299,7 +299,10 @@ export default function Controle() {
             <ReguaDoDia m={m} de={dtInicio} ate={dtFim} />
 
             {/* ===== 4. onde está o volume ===== */}
-            <MatrizGrupos linhas={linhas} de={dtInicio} ate={dtFim} onCSV={baixarCSV} />
+            {/* As FILTRADAS, como a régua e os gráficos. Recebia `linhas` (o
+                período inteiro) e ignorava bucket, origem, tipo e equipe —
+                volume e pontos não mudavam com o filtro (Emanuel, 20/10). */}
+            <MatrizGrupos linhas={filtradas} de={dtInicio} ate={dtFim} onCSV={baixarCSV} />
 
             {/* ===== 5. por que o dia não fechou ===== */}
             <div className="sobe sobe-2 grid gap-3 xl:grid-cols-2">
