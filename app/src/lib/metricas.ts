@@ -31,6 +31,8 @@ export interface Visita {
   data_agendada: string
   janela_inicio: string | null
   janela_fim: string | null
+  /** O TOA mandou "Imediata" no Intervalo de Tempo: sem faixa, mas não "sem janela" (115). */
+  janela_imediata?: boolean | null
   situacao: Situacao
   bloqueado_em: string | null
   origem: string

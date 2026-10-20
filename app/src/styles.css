@@ -153,6 +153,11 @@ body {
   --color-sky-400: #0369a1;
   --color-sky-300: #0369a1;
 
+  /* roxo da jornada (informativo, D-190): tinta clara, texto escuro */
+  --color-violet-900: #ede9fe;
+  --color-violet-700: #c4b5fd;
+  --color-violet-300: #6d28d9;
+
   color-scheme: light;
 }
 

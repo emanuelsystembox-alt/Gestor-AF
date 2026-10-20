@@ -36,7 +36,7 @@ import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBa
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
-  data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em, rota_fixada_em,
+  data_agendada, janela_inicio, janela_fim, janela_imediata, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
   finalizado_toa, produtos_pendentes, tecnologia,
   status_toa:dados_origem->>"Status da Atividade",
@@ -317,7 +317,10 @@ export function TabelaContratos({
           // │ sem etiqueta de situação e sem pulso. Ver D-173.           │
           // └────────────────────────────────────────────────────────────┘
           const jornada = v.tipo_atividade?.natureza === 'JORNADA'
-          const cor = jornada ? '#94a3b8' : SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
+          // Roxo claro, e não cinza: o cinza confundia com "Na entrada"
+          // (Emanuel, 19/10: "é bom mudar para não confundir com o cinza do
+          // entrada"). Nenhuma situação usa roxo — bateu o olho, é jornada.
+          const cor = jornada ? '#a78bfa' : SITUACAO_INFO[v.situacao]?.cor ?? '#64748b'
           // O que está acontecendo AGORA respira: o trilho e a bolinha
           // da etiqueta pulsam. Só estas duas situações — se a lista
           // inteira pulsasse, o pulso não separaria nada.
@@ -386,7 +389,12 @@ export function TabelaContratos({
                         <span className="text-graf-500">–{v.janela_fim.slice(0, 5)}</span>
                       )}
                     </>
-                  : <span className="text-graf-600">sem janela</span>}
+                  // 115: "Imediata" é o que o TOA disse — atendimento para já.
+                  // "sem janela" é só quando ele não disse nada (D-117).
+                  : v.janela_imediata
+                    ? <span className="font-medium text-amber-400"
+                            title="O TOA marcou como Imediata: atendimento para já, sem faixa de horário">Imediata</span>
+                    : <span className="text-graf-600">sem janela</span>}
                 {detalhada && v.fim && v.finalizado_toa && (
                   <div className="text-[10px] text-graf-500">encerrou {hora(v.fim)}</div>
                 )}
@@ -404,8 +412,8 @@ export function TabelaContratos({
                 <div className="flex flex-wrap items-center gap-1.5">
                   {jornada ? (
                     <span title="Atividade de jornada: só informa onde o técnico estava. Não entra em volume, produtividade nem pontos."
-                      className="rounded-full bg-graf-800 px-2 py-0.5 text-[10px] font-semibold
-                                 uppercase tracking-wide text-graf-300">
+                      className="rounded-full bg-violet-900/40 px-2 py-0.5 text-[10px] font-semibold
+                                 uppercase tracking-wide text-violet-300 ring-1 ring-violet-700/40">
                       Informativo
                     </span>
                   ) : <Pill situacao={v.situacao} vivo={vivo} />}

@@ -7435,3 +7435,37 @@ importar; pular o igual ficou só para as rodadas sozinhas.
 pra ter mais opções"* — Emanuel, 19/10, depois da primeira rodada real. O que
 pesava era reimportar o igual, e isso não acontece: a conferência sem mudança
 mediu 0,4–0,7 s. Intervalos agora: 5, 10, 15, 30 e 60 min.
+
+### D-190 · "Imediata" não é "sem janela", e a jornada é roxa
+
+**"Imediata"** (migration 115).
+
+> *"ultimo contrato escritio, sem janela - ele esta com horário - imediata -
+> então nesse caso por favor colocar o nome imediata, e não seme janela."* —
+> Emanuel, 19/10 (contrato 227080444).
+
+- O TOA manda a coluna **"Intervalo de Tempo" = "Imediata"** no lugar da
+  faixa (`08:00 - 12:00`): atendimento para já, não agendado. A janela vem
+  vazia, e a lista dizia "sem janela" — como se o TOA não tivesse dito nada.
+- Medido: **25 de 701** visitas são Imediata, **todas** sem janela; os
+  outros 121 "sem janela" são jornada, sem Intervalo de Tempo.
+- `visita.janela_imediata` é coluna **gerada** da linha do TOA
+  (`dados_origem`): a importação não mudou, e a reimportação acompanha.
+  A lista de contratos (Serviços, Equipes) escreve **"Imediata"** em âmbar;
+  "sem janela" ficou só para quando o TOA não disse nada (D-117).
+- **Não mexe no TEC1.** Imediata continua sem regra de janela; se o livro
+  da CLARO der um prazo para ela, é outra decisão.
+- **Fora desta leva:** a Rota do dia (`rota_do_dia`) e a barra de períodos
+  de Equipes ainda escrevem "sem janela" para Imediata — vêm de RPC que não
+  traz a coluna.
+
+**A jornada é roxa.**
+
+> *"para os contratos informativos vamos da outra cor para ficar diferente,
+> vamos aplicar um roxo claro suave"* · *"ele esta na cor cinza é bom mudar
+> para não confundir com o cinza do entrada"* — Emanuel, 19/10.
+
+- A linha de jornada (Refeição, Na Base…) usa `#a78bfa` na faixa e na tinta
+  da linha, e a etiqueta "Informativo" é roxa (`violet`), com tom escuro no
+  tema claro (`#6d28d9`, tokens em `styles.css`). Nenhuma situação usa roxo:
+  bateu o olho, é jornada.
