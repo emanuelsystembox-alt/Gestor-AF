@@ -34,6 +34,12 @@ import { ImportarCadastro } from '../components/ImportarCadastro'
 const PAPEIS = ['ADMIN', 'COP', 'CONTROLADOR', 'SUPERVISOR',
                 'TECNICO', 'ALMOXARIFE', 'FROTA', 'ROBO'] as const
 
+/** Como o filtro da aba Usuários chama cada papel. */
+const ROTULO_PAPEL: Record<(typeof PAPEIS)[number], string> = {
+  ADMIN: 'Admin', COP: 'COP', CONTROLADOR: 'Controlador', SUPERVISOR: 'Supervisor',
+  TECNICO: 'Técnico', ALMOXARIFE: 'Almoxarife', FROTA: 'Frota', ROBO: 'Robô',
+}
+
 interface Cargo { id: string; nome: string; descricao: string | null; ordem: number; ativo: boolean }
 interface PerfilAcesso {
   id: string; nome: string; descricao: string | null
@@ -161,6 +167,12 @@ export default function Administracao() {
   const [ok, setOk] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [busca, setBusca] = useState('')
+  // Filtro por tipo de login (Emanuel, 20/10: "filtrar tipo de login, cop,
+  // gerente, técnico"). O tipo é o PAPEL — é ele que o banco lê. '' = todos;
+  // 'SEM' = quem não tem papel nenhum (não entra em tela nenhuma). O cargo vem
+  // à parte: "gerente" é cargo (COORDENADOR, SUPERVISOR), não papel.
+  const [filtroPapel, setFiltroPapel] = useState('')
+  const [filtroCargo, setFiltroCargo] = useState('')
 
   // criação
   const [criando, setCriando] = useState(false)
@@ -813,12 +825,20 @@ export default function Administracao() {
     setOcupado(false)
   }
 
+  const doTipo = (u: Usuario, p: string) => {
+    const ps = papeisPorUsuario.get(u.id) ?? []
+    return p === 'SEM' ? ps.length === 0 : ps.includes(p)
+  }
+
   const visiveis = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    if (!t) return usuarios
-    return usuarios.filter(u => [u.nome, u.email, u.apelido, u.cargo?.nome,
-      u.perfil_acesso?.nome].some(x => x?.toLowerCase().includes(t)))
-  }, [usuarios, busca])
+    return usuarios.filter(u =>
+      (!filtroPapel || doTipo(u, filtroPapel)) &&
+      (!filtroCargo || (filtroCargo === 'SEM' ? !u.cargo_id : u.cargo_id === filtroCargo)) &&
+      (!t || [u.nome, u.email, u.apelido, u.cargo?.nome,
+        u.perfil_acesso?.nome].some(x => x?.toLowerCase().includes(t))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarios, busca, filtroPapel, filtroCargo, papeisPorUsuario])
 
   const [nomeCargo, setNomeCargo] = useState('')
 
@@ -872,11 +892,45 @@ export default function Administracao() {
                 <input value={busca} onChange={e => setBusca(e.target.value)}
                   placeholder="Buscar nome, e-mail, cargo, perfil…"
                   className={`${campo} min-w-64 flex-1`} />
+                <select value={filtroCargo} onChange={e => setFiltroCargo(e.target.value)}
+                  aria-label="Filtrar por cargo" className={campo}>
+                  <option value="">Todos os cargos</option>
+                  {cargos.map(c => {
+                    const n = usuarios.filter(u => u.cargo_id === c.id).length
+                    return <option key={c.id} value={c.id}>{c.nome} ({n})</option>
+                  })}
+                  <option value="SEM">Sem cargo ({usuarios.filter(u => !u.cargo_id).length})</option>
+                </select>
                 <button onClick={() => { setCriando(!criando); setSenhaGerada(null) }}
                   className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
                              hover:bg-af-500">
                   {criando ? 'Cancelar' : 'Novo usuário'}
                 </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group"
+                aria-label="Filtrar por tipo de login">
+                <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">Tipo de login</span>
+                {([['', 'Todos', usuarios.length],
+                   ...PAPEIS.map(p => [p, ROTULO_PAPEL[p], usuarios.filter(u => doTipo(u, p)).length] as const),
+                   ['SEM', 'Sem papel', usuarios.filter(u => doTipo(u, 'SEM')).length]] as const).map(([v, rot, n]) => (
+                  <button key={v || 'todos'} onClick={() => setFiltroPapel(v)}
+                    aria-pressed={filtroPapel === v}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                      filtroPapel === v
+                        ? 'border-af-500 bg-af-600 text-white'
+                        : n === 0
+                          ? 'border-graf-800 text-graf-400 hover:bg-graf-800'
+                          : 'border-graf-700 text-graf-200 hover:bg-graf-800'}`}>
+                    {rot}<span className="tabular ml-1 opacity-70">{n}</span>
+                  </button>
+                ))}
+                {(filtroPapel || filtroCargo || busca) && (
+                  <button onClick={() => { setFiltroPapel(''); setFiltroCargo(''); setBusca('') }}
+                    className="ml-1 text-xs text-af-400 underline-offset-2 hover:underline">
+                    Limpar filtros
+                  </button>
+                )}
               </div>
 
               {criando && (
@@ -1169,7 +1223,9 @@ export default function Administracao() {
 
             <div className="card-controle overflow-hidden">
               {visiveis.length === 0 ? (
-                <Vazio titulo="Nenhum usuário" descricao="Crie o primeiro acesso acima." />
+                (filtroPapel || filtroCargo || busca.trim())
+                  ? <Vazio titulo="Ninguém com esse filtro" descricao="Troque o tipo de login, o cargo ou a busca." />
+                  : <Vazio titulo="Nenhum usuário" descricao="Crie o primeiro acesso acima." />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

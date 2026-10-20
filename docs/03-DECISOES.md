@@ -7662,3 +7662,30 @@ aba/janela escondida não é desenhada; minimizada pausa, coberta pausa no Windo
 que o atalho tenha `--disable-backgrounding-occluded-windows` (opção do próprio Chrome,
 documentada no README). Forçar o desenho por baixo ou abrir o TOA dentro da extensão
 (o TOA proíbe ser embutido) foi recusado: seria contornar proteção.
+
+### D-194 · Os técnicos da manutenção de Manaus (VT) e o filtro por tipo de login
+
+**A planilha da VT (20/10).** *"cadastre esses técnicos… eles são da manutenção de
+Manaus, cadastre todos igual como fez da instalação"* — Emanuel. 12 técnicos e 12
+equipes do bucket MAN-AFLINE_01_VT, pela planilha padrão (D-176/D-177), com as
+escolhas dele: skill **MANUTENÇÃO**, cargo **TECNICO** (não se criou "TECNICO VT"),
+área MA1 → **MAN-AREA01** e MA5 → **MAN-AREA05**, equipe "**NNN - EQUIPE**". O resto
+igual à instalação: criar acesso SIM, perfil Tecnico de Campo, apelido = primeiro
+nome, rotear SIM; quem veio sem e-mail ganhou `NNN_equipe@afline.com.br`.
+
+A "matrícula do ponto" veio **igual ao login TOA nas 12 linhas** (Z447807…), e a tela
+só aceita número — os 55 técnicos de Manaus já cadastrados têm matrícula numérica.
+Foi **deixada vazia**: o login já está na coluna dele, e célula vazia não apaga nada
+(D-176) — quando a matrícula real aparecer, reimportar ou editar preenche. A prévia
+no banco (como ADMIN, desfeita): 12 equipes novas, 12 pessoas novas com acesso, zero
+erro. Os dois supervisores da planilha ainda não têm cadastro em Manaus: o nome fica
+na equipe. Quem cria os acessos é a tela, com a sessão do ADMIN e a senha que ele
+digita — não o assistente.
+
+**O filtro (Administração › Usuários).** *"é bom ter um filtro em nosso painel para
+filtrar tipo de login, cop, gerente, técnico e etc."* — Emanuel. O **tipo de login é
+o papel** (ADMIN, COP, Controlador, Supervisor, Técnico, Almoxarife, Frota, Robô),
+porque é ele que o banco lê; chips com a contagem, mais "Sem papel" (quem não entra
+em tela nenhuma). **"Gerente" não é papel**: é cargo (COORDENADOR, SUPERVISOR), por
+isso o cargo é um seletor à parte. Os dois se somam à busca. Filtro de tela, só
+leitura — não muda o que ninguém enxerga.
