@@ -14,6 +14,7 @@ import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
 import { FILTRO_VAZIO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
 import { tecnologiaTxt } from '../lib/relatorio'
+import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
 // Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
 import {
@@ -112,6 +113,7 @@ export default function Servicos() {
   /** 109: separar GPON (Emanuel, 19/10). SEM = sem GPON identificado. */
   const [tecnologia, setTecnologia] = useState<'TODAS' | 'GPON' | 'SEM'>('TODAS')
   const [origem, setOrigem] = useState('TODAS')
+  const [buckets, setBuckets] = useState<string[]>([])
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
   const [soProdutivas, setSoProdutivas] = useState(true)
@@ -332,9 +334,12 @@ export default function Servicos() {
     ? linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
     : linhas, [linhas, soProdutivas])
 
+  // As opções saem do que a lista carregada TEM, com a contagem.
+  const opBuckets = useMemo(() => opcoesDeBucket(base), [base])
+
   const filtro = useMemo<FiltroContrato>(() => ({
-    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa,
-  }), [situacao, grupo, origem, resultado, culpa])
+    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets,
+  }), [situacao, grupo, origem, resultado, culpa, buckets])
 
   const visiveis = useMemo(() => {
     const t = busca.trim().toLowerCase()
@@ -357,7 +362,7 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, filtro, busca, area, supervisor, equipe])
+  }, [base, filtro, busca, area, supervisor, equipe, tecnologia])
 
   // ---- paginação ----
   const [pagina, setPagina] = useState(1)
@@ -411,12 +416,13 @@ export default function Servicos() {
   const abertas = base.filter(v => EM_ABERTO.includes(v.situacao)).length
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
     equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
-    culpa !== 'TODAS', tecnologia !== 'TODAS', busca.trim() !== ''].filter(Boolean).length
+    culpa !== 'TODAS', tecnologia !== 'TODAS', buckets.length > 0,
+    busca.trim() !== ''].filter(Boolean).length
 
   function limpar() {
     setSituacao('TODAS'); setArea('TODAS'); setSupervisor('TODOS'); setEquipe('TODAS')
     setGrupo('TODOS'); setOrigem('TODAS'); setResultado('TODOS'); setCulpa('TODAS'); setBusca('')
-    setTecnologia('TODAS')
+    setTecnologia('TODAS'); setBuckets([])
   }
 
   function exportar() {
@@ -558,6 +564,8 @@ export default function Servicos() {
               <option value="OPERADORA">Improdutiva da operadora</option>
               <option value="TERCEIRO">Improdutiva de terceiro</option>
             </select>
+            <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
+              valor={buckets} onChange={setBuckets} className={sel} />
             <select value={origem} onChange={e => setOrigem(e.target.value)} className={sel}>
               <option value="TODAS">Toda origem</option>
               <option value="TOA">TOA</option>

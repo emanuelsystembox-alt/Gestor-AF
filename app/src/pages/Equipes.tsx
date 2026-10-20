@@ -18,6 +18,7 @@ import {
 import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { textoDistancia, useLocaisDaBaixa } from '../lib/localBaixa'
 import { fotosDosTecnicos } from '../lib/foto'
+import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import {
   FILTRO_VAZIO, SEM_JANELA, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
   type FiltroContrato,
@@ -633,6 +634,7 @@ export default function Equipes() {
       status: uniq(cs.map(v => v.status_toa?.trim())),
       semStatus: cs.some(v => !v.status_toa?.trim()),
       grupos: uniq(cs.map(v => v.tipo_servico?.nome)),
+      ...opcoesDeBucket(cs),
       situacoes: SITUACOES.filter(s => cs.some(v => v.situacao === s)),
     }
   }, [contratosDia])
@@ -860,6 +862,8 @@ export default function Equipes() {
                 <span className="text-[11px] uppercase tracking-wide text-graf-400">
                   Contratos
                 </span>
+                <SeletorBuckets opcoes={opContrato.buckets} semBucket={opContrato.semBucket}
+                  valor={filtro.buckets} onChange={b => mudaFiltro('buckets', b)} className={sel} />
                 <select value={filtro.janela} aria-label="Janela"
                   onChange={e => mudaFiltro('janela', e.target.value)} className={sel}>
                   <option value="TODAS">Toda janela</option>

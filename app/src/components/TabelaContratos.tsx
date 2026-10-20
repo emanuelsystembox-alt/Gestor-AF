@@ -38,7 +38,7 @@ export const SELECT_CONTRATO = `
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, janela_imediata, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
-  finalizado_toa, produtos_pendentes, tecnologia,
+  finalizado_toa, produtos_pendentes, tecnologia, toa_bucket,
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
@@ -86,6 +86,9 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   /** "Status da Atividade" da planilha do TOA, como veio (concluído,
    *  não concluído, iniciado…). Nulo em contrato que não veio do TOA. */
   status_toa?: string | null
+  /** O bucket do TOA da última importação que trouxe o contrato (119).
+   *  Nulo = manual. */
+  toa_bucket?: string | null
   /** "Motivo de Fechamento Externo" do TOA — ex.: "Liberado no Sistema
    *  NETSMS". Vazio na maioria das linhas. */
   motivo_fechamento_toa?: string | null

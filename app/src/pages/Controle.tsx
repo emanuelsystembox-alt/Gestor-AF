@@ -9,6 +9,8 @@ import {
   BarrasHorizontais, ColunasPorHora, Painel, TabelaSimples,
 } from '../components/graficos'
 import { isoLocal, equipeRotulo } from '../lib/formato'
+import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
+import { SEM_BUCKET } from '../lib/filtroContratos'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -31,7 +33,7 @@ import { isoLocal, equipeRotulo } from '../lib/formato'
 const SELECT = `
   id, toa_atividade_id, wo_numero, cliente_nome, logradouro, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
-  origem, criado_em, inicio, fim, tempo_deslocamento,
+  origem, criado_em, inicio, fim, tempo_deslocamento, toa_bucket,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo ),
@@ -84,6 +86,8 @@ export default function Controle() {
   const [equipe, setEquipe] = useState('TODAS')
   const [tipo, setTipo] = useState('TODOS')
   const [semEquipe, setSemEquipe] = useState(false)
+  // 119 (D-195): mais de um bucket marcado; vazio = todos.
+  const [buckets, setBuckets] = useState<string[]>([])
 
   const [linhas, setLinhas] = useState<Visita[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -114,8 +118,13 @@ export default function Controle() {
     if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
     if (tipo !== 'TODOS' && v.tipo_atividade?.nome !== tipo) return false
     if (semEquipe && v.equipe) return false
+    if (buckets.length && !buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
     return true
-  }), [linhas, origem, equipe, tipo, semEquipe])
+  }), [linhas, origem, equipe, tipo, semEquipe, buckets])
+
+  // Contadas sobre as PRODUTIVAS, o mesmo universo do número grande.
+  const opBuckets = useMemo(() => opcoesDeBucket(
+    linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')), [linhas])
 
   const m = useMemo(() => calcular(filtradas), [filtradas])
 
@@ -134,8 +143,9 @@ export default function Controle() {
     linhas.map(v => v.tipo_atividade?.nome).filter(Boolean) as string[])].sort(), [linhas])
 
   const temFiltro = origem !== 'TODAS' || equipe !== 'TODAS' || tipo !== 'TODOS' || semEquipe
+    || buckets.length > 0
   function limparFiltros() {
-    setOrigem('TODAS'); setEquipe('TODAS'); setTipo('TODOS'); setSemEquipe(false)
+    setOrigem('TODAS'); setEquipe('TODAS'); setTipo('TODOS'); setSemEquipe(false); setBuckets([])
   }
 
   function baixarCSV() {
@@ -188,6 +198,9 @@ export default function Controle() {
               </div>
             )}
 
+            <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
+              valor={buckets} onChange={setBuckets} className={sel} />
+
             <select value={origem} onChange={e => setOrigem(e.target.value)}
               aria-label="Origem" className={sel}>
               <option value="TODAS">Todas as origens</option>
@@ -226,6 +239,7 @@ export default function Controle() {
                 {tipo !== 'TODOS' && ` · ${tipo}`}
                 {equipe !== 'TODAS' && ` · ${equipesDisp.find(([c]) => c === equipe)?.[1] ?? equipe}`}
                 {semEquipe && ' · sem equipe'}
+                {buckets.length > 0 && ` · ${buckets.map(b => b === SEM_BUCKET ? 'sem bucket' : b).join(', ')}`}
                 <button onClick={limparFiltros}
                   className="ml-2 text-af-400 underline underline-offset-2">limpar</button>
               </>}

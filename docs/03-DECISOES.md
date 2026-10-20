@@ -7689,3 +7689,35 @@ porque é ele que o banco lê; chips com a contagem, mais "Sem papel" (quem não
 em tela nenhuma). **"Gerente" não é papel**: é cargo (COORDENADOR, SUPERVISOR), por
 isso o cargo é um seletor à parte. Os dois se somam à busca. Filtro de tela, só
 leitura — não muda o que ninguém enxerga.
+
+### D-195 · Filtro de bucket do TOA, com mais de um marcado (119)
+
+*"é bom ter um filtro de bucket ou seja dessa pasta (...) é bom o usuario também ter
+possibildiade de selecionar mais de um bucket"* — Emanuel, 20/10, com o print da
+árvore de buckets do TOA.
+
+**O contrato não sabia de qual bucket veio.** O bucket morava só na importação
+(`importacao.bucket`, 103). A 119 cria `visita.toa_bucket` = o bucket da **última**
+importação que trouxe o contrato. Os 1.112 que já existiam foram preenchidos pelo
+`importacao_linha` (1.021 MAN-AFLINE, 91 MAN-AFLINE_01_VT — hoje 339 e 72), sem
+carimbar `atualizado_em` (o gatilho ficou desligado só nesse UPDATE: preencher a
+coluna não é mudança no contrato). Daqui para frente quem carimba é
+`reconciliar_importacao` (a 2ª chamada, D-181), **no mesmo UPDATE que já recalcula
+o TEC1** — nenhuma linha a mais, e nada a mais na 1ª chamada, que anda perto dos
+8 s. Medido como `authenticated` sobre a importação da VT (desfeita): 216 ms, 72
+contratos carimbados.
+
+Recusado: ler o bucket por `visita.importacao_id` — só marca quem CRIOU o contrato
+(traps.md). E guardar só o bucket do primeiro arquivo: um contrato que muda de
+bucket no TOA tem de aparecer no bucket de agora.
+
+**A tela.** Um botão "Todos os buckets" que abre caixinhas (um `<select multiple>`
+pede Ctrl+clique, que ninguém descobre). Nada marcado = todos. As opções saem do
+que o dia/lista TEM, com a contagem, como o status do TOA; contrato manual aparece
+como "Sem bucket (manual)". Mora no filtro de contrato compartilhado
+(`lib/filtroContratos`), então vale igual em **Serviços** e **Equipes**; e no **Dashboard** (*"filtro do bucket na tela principal também"*), onde os números, a régua e as tabelas passam a ser só dos buckets marcados — em
+Equipes, a equipe aparece se tiver ao menos um contrato do bucket marcado.
+
+De passagem: em Serviços, trocar o filtro de tecnologia (GPON) não refiltrava a
+lista até mexer em outro filtro — faltava `tecnologia` nas dependências do
+`useMemo`. Corrigido.

@@ -28,6 +28,8 @@ export interface Visita {
   cliente_nome: string | null
   logradouro: string | null
   bairro: string | null
+  /** Bucket do TOA da última importação que trouxe o contrato (119). Nulo = manual. */
+  toa_bucket?: string | null
   data_agendada: string
   janela_inicio: string | null
   janela_fim: string | null

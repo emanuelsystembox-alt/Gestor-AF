@@ -28,14 +28,17 @@ export interface FiltroContrato {
   janela: string
   /** 'TODOS', o "Status da Atividade" como veio do TOA, ou SEM_STATUS. */
   statusToa: string
+  /** Os buckets do TOA marcados (119). Vazio = todos; SEM_BUCKET = manual. */
+  buckets: string[]
 }
 
 export const SEM_JANELA = '__sem_janela__'
 export const SEM_STATUS = '__sem_status__'
+export const SEM_BUCKET = '__sem_bucket__'
 
 export const FILTRO_VAZIO: FiltroContrato = {
   situacao: 'TODAS', grupo: 'TODOS', origem: 'TODAS', resultado: 'TODOS',
-  culpa: 'TODAS', janela: 'TODAS', statusToa: 'TODOS',
+  culpa: 'TODAS', janela: 'TODAS', statusToa: 'TODOS', buckets: [],
 }
 
 /** `08:00–12:00` — a janela como a coluna Janela escreve. Nula quando o
@@ -48,7 +51,8 @@ export function janelaDe(v: Pick<ContratoLinha, 'janela_inicio' | 'janela_fim'>)
 /** Quantos campos do filtro estão ligados — para o "limpar N filtro(s)". */
 export function quantosLigados(f: FiltroContrato): number {
   return (Object.keys(FILTRO_VAZIO) as (keyof FiltroContrato)[])
-    .filter(k => f[k] !== FILTRO_VAZIO[k]).length
+    // lista compara pelo tamanho: [] novo não é "ligado"
+    .filter(k => Array.isArray(f[k]) ? (f[k] as string[]).length > 0 : f[k] !== FILTRO_VAZIO[k]).length
 }
 
 export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
@@ -56,6 +60,7 @@ export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
   if (f.situacao !== 'TODAS' && f.situacao !== 'ABERTAS' && v.situacao !== f.situacao) return false
   if (f.grupo !== 'TODOS' && v.tipo_servico?.nome !== f.grupo) return false
   if (f.origem !== 'TODAS' && v.origem !== f.origem) return false
+  if (f.buckets.length && !f.buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
 
   if (f.janela !== 'TODAS') {
     const j = janelaDe(v)
