@@ -7,6 +7,8 @@
  * sumiria entre um alarme e outro.
  */
 
+export type OQueVarrer = 'TUDO' | 'NOME' | 'EQUIPAMENTO'
+
 export interface LinhaLog { em: number; texto: string; tom: 'ok' | 'erro' | 'info' }
 
 export interface Estado {
@@ -30,6 +32,14 @@ export interface Estado {
     feitos: number; total: number; nomes: number; listas: number; fora: number; erros: number
     ultimaEm: number | null; ultima: string | null
   }
+  /**
+   * O que a varredura lê, escolhido por quem opera (121, 0.6.0) — vale para o
+   * "Varrer agora" e para a rodada automática deste computador. `fora` são os
+   * buckets DESMARCADOS: bucket que aparece depois entra marcado, como sempre foi.
+   */
+  escolha: { fora: string[]; oQue: OQueVarrer }
+  /** Quanto falta por bucket (contado agora há pouco), para as caixinhas. */
+  pendentes: { em: number; porBucket: { bucket: string; nomes: number; listas: number }[] } | null
   log: LinhaLog[]
 }
 
@@ -43,6 +53,8 @@ export const ESTADO_VAZIO: Estado = {
     rodando: false, idPedido: null, inicio: null, pausada: false,
     feitos: 0, total: 0, nomes: 0, listas: 0, fora: 0, erros: 0, ultimaEm: null, ultima: null,
   },
+  escolha: { fora: [], oQue: 'TUDO' },
+  pendentes: null,
   log: [],
 }
 
@@ -51,7 +63,8 @@ export async function lerEstado(): Promise<Estado> {
   const e = r[CHAVE] as Partial<Estado> | undefined
   return { ...ESTADO_VAZIO, ...(e ?? {}),
     baixa: { ...ESTADO_VAZIO.baixa, ...(e?.baixa ?? {}) },
-    varredura: { ...ESTADO_VAZIO.varredura, ...(e?.varredura ?? {}) } }
+    varredura: { ...ESTADO_VAZIO.varredura, ...(e?.varredura ?? {}) },
+    escolha: { ...ESTADO_VAZIO.escolha, ...(e?.escolha ?? {}) } }
 }
 
 /** Mensagens da janelinha para o fundo. */
@@ -62,5 +75,7 @@ export type Pedido =
   | { tipo: 'sincronizar-agora' }
   | { tipo: 'assumir' }
   | { tipo: 'varrer-agora' }
+  | { tipo: 'escolher-varredura'; fora: string[]; oQue: OQueVarrer }
+  | { tipo: 'contar-pendentes' }
   | { tipo: 'parar-varredura' }
   | { tipo: 'abrir-janela-toa' }

@@ -43,6 +43,12 @@ crescer: cada coisa nova que quisermos tirar do TOA entra aqui como uma
   `visita.toa_bucket`, 119), agrupado; o `toa.js` clica no nome do bucket
   na árvore, confere pelo subtítulo do Console e só então procura os blocos.
   Bucket que não abre vira um aviso só e os contratos dele ficam pendentes.
+- **Quem opera escolhe o que varrer (0.6.0, D-197).** No painel: uma caixinha
+  por bucket, com quanto falta (sem nome · equipamento), e "Ler": nome e
+  equipamento / só o nome / só equipamento e material. Fica em
+  `af_estado.escolha` (`fora` = os buckets desmarcados; bucket novo entra
+  marcado) e vale também para a rodada automática deste computador. A
+  varredura começa pelo bucket que já está aberto no Console.
 - **Uma regra só:** a extensão importa com `src/lib/importarToaNucleo.ts` —
   o mesmo da tela de Importação (`importarToa.ts` só passa o cliente da web).
   Mudou a importação? Mude no núcleo, rode `npm run extensao` e atualize.

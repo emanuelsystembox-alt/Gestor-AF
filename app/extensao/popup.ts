@@ -1,4 +1,4 @@
-import { CHAVE, lerEstado, type Estado, type Pedido } from './estado'
+import { CHAVE, lerEstado, type Estado, type OQueVarrer, type Pedido } from './estado'
 
 /**
  * A janelinha da extensão (clique no ícone) — D-193.
@@ -58,6 +58,8 @@ function desenhar(e: Estado) {
   ;($('varrer') as HTMLButtonElement).hidden = v.rodando
   ;($('parar') as HTMLButtonElement).hidden = !v.rodando
 
+  desenharEscolha(e)
+
   const log = $('log')
   log.replaceChildren(...e.log.slice(0, 12).map(l => {
     const li = document.createElement('li')
@@ -65,6 +67,42 @@ function desenhar(e: Estado) {
     li.textContent = `${new Date(l.em).toLocaleTimeString('pt-BR')} ${l.texto}`
     return li
   }))
+}
+
+/**
+ * O que varrer (121, 0.6.0): uma caixinha por bucket, com quanto falta, e
+ * o que ler. Desmarcar grava na hora; vale para o "Varrer agora" e para a
+ * rodada automática. Durante a varredura fica travado — a lista já foi.
+ */
+function desenharEscolha(e: Estado) {
+  const caixa = $('var-buckets')
+  const contagem = new Map((e.pendentes?.porBucket ?? []).map(p => [p.bucket, p]))
+  const nomes = [...new Set([...contagem.keys(), ...e.escolha.fora])].sort((a, b) => a.localeCompare(b))
+  const travado = e.varredura.rodando
+  if (!e.pendentes) {
+    caixa.innerHTML = '<p class="pequeno">Contando o que falta…</p>'
+  } else if (!nomes.length) {
+    caixa.innerHTML = '<p class="pequeno">Nada pendente hoje.</p>'
+  } else {
+    caixa.replaceChildren(...nomes.map(b => {
+      const c = contagem.get(b)
+      const label = document.createElement('label')
+      const cx = document.createElement('input')
+      cx.type = 'checkbox'; cx.checked = !e.escolha.fora.includes(b); cx.disabled = travado
+      cx.addEventListener('change', () => {
+        const fora = cx.checked ? e.escolha.fora.filter(x => x !== b) : [...e.escolha.fora, b]
+        pedir({ tipo: 'escolher-varredura', fora, oQue: e.escolha.oQue })
+      })
+      const nome = document.createElement('span'); nome.textContent = b || 'sem bucket'
+      const conta = document.createElement('span'); conta.className = 'conta'
+      conta.textContent = c ? `${c.nomes} sem nome · ${c.listas} equip.` : 'nada pendente'
+      label.append(cx, nome, conta)
+      return label
+    }))
+  }
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name=oque]')) {
+    r.checked = r.value === e.escolha.oQue; r.disabled = travado
+  }
 }
 
 async function iniciar() {
@@ -96,6 +134,15 @@ async function iniciar() {
     if (!r?.ok) alert(r?.mensagem ?? 'Não consegui começar a varredura.')
   })
   $('parar').addEventListener('click', () => pedir({ tipo: 'parar-varredura' }))
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name=oque]')) {
+    r.addEventListener('change', async () => {
+      const e = await lerEstado()
+      pedir({ tipo: 'escolher-varredura', fora: e.escolha.fora, oQue: r.value as OQueVarrer })
+    })
+  }
+  // quanto falta por bucket: ao abrir o painel, e a cada 2 min com ele aberto
+  pedir({ tipo: 'contar-pendentes' })
+  setInterval(() => pedir({ tipo: 'contar-pendentes' }), 120_000)
   $('janela-toa').addEventListener('click', () => pedir({ tipo: 'abrir-janela-toa' }))
   $('sair').addEventListener('click', () => pedir({ tipo: 'sair' }))
   $('abrir').addEventListener('click', () => chrome.tabs.create({ url: 'https://gestor-af.pages.dev/controle/sincronismo' }))

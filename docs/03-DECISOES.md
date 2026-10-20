@@ -7756,3 +7756,32 @@ diz qual bucket não abriu.
 
 Os 64 erros das 10:51 são outra coisa e o detalhe deles está só no registro
 local da extensão (painel), não no banco.
+
+### D-197 · Quem opera escolhe o que a varredura lê (121, extensão 0.6.0)
+
+*"seria interessante eu escolher também o que eu vou varrer, coloquei para começar
+primeiro na VT e não vai, ele segue o padrão dos dois"* — Emanuel, 20/10.
+
+**Duas coisas.** (1) A 0.5.0 seguia a ordem do banco (bucket em ordem alfabética):
+MAN-AFLINE antes de MAN-AFLINE_01_VT, mesmo com a VT aberta no Console. Agora a
+varredura **começa pelo bucket que já está aberto** — abrir a VT é o jeito de
+começar por ela. (2) No painel da extensão, **uma caixinha por bucket**, com quanto
+falta (sem nome · equipamento), e **"Ler"**: nome e equipamento (o de sempre) / só
+o nome / só equipamento e material dos encerrados.
+
+- A escolha é **deste computador** (`af_estado.escolha`), e vale para o "Varrer
+  agora" **e** para a rodada automática — quem varre é a extensão, uma máquina por
+  vez (D-190). Guarda os buckets **desmarcados**: bucket que aparece depois entra
+  marcado, como sempre foi, em vez de ficar de fora calado.
+- "Só o nome" não abre a lista de equipamento, e `registrar_varredura` só carimba
+  `toa_varrido_em` quando a lista foi lida: o encerrado continua pendente para a
+  próxima. Nada se perde por escolher.
+- `varredura_pendentes(p_base, p_buckets, p_o_que)` (121): os dois filtros com
+  default; a de 1 argumento foi derrubada (assinatura com default não convive com
+  a antiga — traps.md), e a 0.5.0 continua chamando sem os novos. Testado como
+  `authenticated`: tudo 67, só VT 47, VT só equipamento 10 (sem pedir nome), só
+  nome 67 (sem pedir equipamento).
+
+Conferido o painel numa cópia com o `chrome` de mentira (caixinhas, contagem,
+"Ler", pedidos ao clicar). **Não conferido no Chrome com o TOA**: a primeira
+varredura de verdade é do Emanuel.

@@ -1,4 +1,4 @@
-# AFLINE — ponte com o TOA (0.5.0)
+# AFLINE — ponte com o TOA (0.6.0)
 
 Extensão do Chrome que **sincroniza o Gestor AF com o TOA sozinha**
 (D-189, D-192, D-193):
@@ -47,6 +47,12 @@ MAN-AFLINE_01_VT, e no fim volta ao que estava. A extensão abre cada contrato
 por ela (uns 9 s cada),
 e **você navega à vontade na outra janela**. Use **"Varrer o TOA agora"**, ou a
 rodada automática configurada no Gestor AF. A % aparece no ícone.
+
+**O que varrer (0.6.0):** no painel, marque os **buckets** (cada um mostra quanto
+falta: sem nome · equipamento) e o que **ler** — nome e equipamento, só o nome,
+ou só equipamento e material dos encerrados. A escolha vale para o "Varrer
+agora" e para a rodada automática deste computador. A varredura **começa pelo
+bucket que estiver aberto no Console**: abra a VT para começar por ela.
 
 O Chrome não desenha uma tela escondida, e a varredura pilota as telas do TOA:
 a janela da varredura **não pode ser minimizada**. Se ela ficar escondida, a

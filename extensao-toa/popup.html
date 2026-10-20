@@ -41,6 +41,11 @@
     footer { display: flex; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--borda); }
     footer button { border: 0; padding: 2px 0; color: var(--suave); background: none; }
     footer button:hover { color: var(--af); }
+    /* 0.6.0: o que varrer */
+    .escolha { margin: 6px 0 8px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; }
+    .escolha label { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; cursor: pointer; }
+    .escolha .conta { margin-left: auto; color: var(--suave); font-variant-numeric: tabular-nums; }
+    .escolha .titulo { font-size: 11px; color: var(--suave); margin: 2px 0; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -73,6 +78,14 @@
       <h2>Varredura (nome, equipamento, miscelânea)</h2>
       <p class="pequeno">A varredura usa uma <strong>janela só dela</strong> com o TOA no Console de Alocação, no dia de hoje — ela troca de bucket sozinha, então deixe a <strong>lista de buckets</strong> (à esquerda) à vista. Você navega à vontade na outra janela; a dela pode ficar coberta, mas <strong>não minimizada</strong>.</p>
       <div class="linha" style="margin-bottom:6px"><button id="janela-toa">Abrir a janela da varredura</button></div>
+      <div class="escolha" id="var-escolha">
+        <p class="titulo">Buckets (começa pelo que estiver aberto no Console)</p>
+        <div id="var-buckets"><p class="pequeno">Contando o que falta…</p></div>
+        <p class="titulo" style="margin-top:6px">Ler</p>
+        <label><input type="radio" name="oque" value="TUDO"> Nome e equipamento</label>
+        <label><input type="radio" name="oque" value="NOME"> Só o nome do cliente</label>
+        <label><input type="radio" name="oque" value="EQUIPAMENTO"> Só equipamento e material (encerrados)</label>
+      </div>
       <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
       <p id="var-texto" class="pequeno"></p>
       <div class="linha">

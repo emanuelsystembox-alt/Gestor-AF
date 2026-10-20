@@ -181,6 +181,7 @@ As três últimas, para não repetir o esquecimento:
 | 118 | **A varredura no histórico** — `sincronismo_rodada.resultado` aceita VARREDURA; `varredura_estado(base, terminou, contratos)` grava uma linha por varredura terminada (D-193) | ✓ |
 | 119 | **O bucket do contrato** — `visita.toa_bucket` (bucket da última importação que trouxe o contrato; nulo = manual), preenchido para o que já existia e carimbado por `reconciliar_importacao` no UPDATE do TEC1. Alimenta o filtro de bucket do Dashboard, Serviços e Equipes (D-195) | ✓ |
 | 120 | **A varredura por bucket** — `varredura_pendentes` devolve o `bucket` de cada contrato e ordena por ele; a extensão 0.5.0 abre o bucket na árvore do TOA antes de procurar (D-196) | ✓ |
+| 121 | **A varredura escolhida** — `varredura_pendentes(base, buckets[], o_que)`: só estes buckets e TUDO / NOME / EQUIPAMENTO; a de 1 argumento foi derrubada (assinatura com default não convive) (D-197) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

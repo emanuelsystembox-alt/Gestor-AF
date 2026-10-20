@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { lerPlanilhaTOA, validarPlanilha, type LinhaTOA } from '../src/lib/toa'
 import { importarLinhasToa, impressaoDasLinhas, ErroImportacao } from '../src/lib/importarToaNucleo'
 import { bucketDoNome, nomePadrao } from '../src/lib/toaNomes'
-import { CHAVE, ESTADO_VAZIO, lerEstado, type Estado, type LinhaLog, type Pedido } from './estado'
+import { CHAVE, ESTADO_VAZIO, lerEstado, type Estado, type LinhaLog, type OQueVarrer, type Pedido } from './estado'
 
 /**
  * O fundo da extensão "AFLINE — ponte com o TOA" (0.3.0, D-193).
@@ -271,6 +271,27 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
 }
 
 // ── a varredura: a aba do TOA lê, o fundo grava ────────────────────────
+const ROTULO_O_QUE: Record<OQueVarrer, string> = {
+  TUDO: 'nome e equipamento', NOME: 'só nome', EQUIPAMENTO: 'só equipamento',
+}
+
+/** Quanto falta por bucket, para as caixinhas da janelinha. Sem filtro:
+ *  a pessoa precisa ver também o bucket que desmarcou. */
+async function contarPendentes() {
+  const e = await lerEstado()
+  if (!e.cidade) return
+  const { data, error } = await sb.rpc('varredura_pendentes', { p_base: e.cidade.id })
+  if (error) return
+  const m = new Map<string, { bucket: string; nomes: number; listas: number }>()
+  for (const p of (data ?? []) as Pendente[]) {
+    const b = p.bucket ?? ''
+    const x = m.get(b) ?? { bucket: b, nomes: 0, listas: 0 }
+    if (p.precisa_nome) x.nomes++
+    if (p.precisa_equipamento) x.listas++
+    m.set(b, x)
+  }
+  await mudar(s => { s.pendentes = { em: Date.now(), porBucket: [...m.values()].sort((a, b) => a.bucket.localeCompare(b.bucket)) } })
+}
 // `bucket` (120): a aba do TOA abre o bucket na árvore antes de procurar o contrato (0.5.0)
 interface Pendente { aid: string; contrato: string | null; precisa_nome: boolean; precisa_equipamento: boolean; bucket: string | null }
 
@@ -313,12 +334,20 @@ async function varrer() {
   if (e.varredura.rodando && e.varredura.inicio && Date.now() - e.varredura.inicio < 3 * 3600_000) {
     await anotar('Já há uma varredura em andamento.'); return
   }
-  const { data, error } = await sb.rpc('varredura_pendentes', { p_base: e.cidade.id })
+  // 121 (0.6.0): o que ler vai ao banco; os buckets desmarcados saem aqui —
+  // bucket novo entra marcado, como sempre foi.
+  const { data, error } = await sb.rpc('varredura_pendentes', { p_base: e.cidade.id, p_o_que: e.escolha.oQue })
   if (error) { await anotar(`Varredura: ${error.message}`, 'erro'); return }
-  const pend = (data ?? []) as Pendente[]
+  const todos = (data ?? []) as Pendente[]
+  const pend = todos.filter(p => !e.escolha.fora.includes(p.bucket ?? ''))
   if (!pend.length) {
+    const deFora = todos.length - pend.length
     await sb.rpc('varredura_estado', { p_base: e.cidade.id, p_terminou: 'nada pendente', p_contratos: 0 })
-    await anotar('Varredura: nada a varrer — todos os contratos de hoje já têm nome, e os encerrados já têm o equipamento lido.', 'ok')
+    await anotar(deFora
+      ? `Varredura: nada a varrer nos buckets marcados (${deFora} pendente(s) nos desmarcados).`
+      : e.escolha.oQue === 'TUDO'
+        ? 'Varredura: nada a varrer — todos os contratos de hoje já têm nome, e os encerrados já têm o equipamento lido.'
+        : `Varredura: nada a varrer em "${ROTULO_O_QUE[e.escolha.oQue]}".`, 'ok')
     return
   }
   const aba = await abaDoToa()
@@ -344,7 +373,7 @@ async function varrer() {
   selo('0%', '#c81a23', `AFLINE — varrendo o TOA: 0 de ${pend.length}`)
   const porBucket = new Map<string, number>()
   for (const p of pend) porBucket.set(p.bucket ?? 'sem bucket', (porBucket.get(p.bucket ?? 'sem bucket') ?? 0) + 1)
-  await anotar(`Varredura começou: ${pend.length} contratos (${[...porBucket].map(([b, n]) => `${b}: ${n}`).join(', ')}).`)
+  await anotar(`Varredura começou (${ROTULO_O_QUE[e.escolha.oQue]}): ${pend.length} contratos (${[...porBucket].map(([b, n]) => `${b}: ${n}`).join(', ')}).`)
 }
 
 interface EventoVarredura {
@@ -411,6 +440,7 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
     await mudar(s => { s.varredura.rodando = false; s.varredura.pausada = false; s.varredura.ultimaEm = Date.now(); s.varredura.ultima = resumo })
     await anotar(`Varredura terminou: ${resumo}.`, v.erros ? 'erro' : 'ok')
     selo('', '#c81a23', 'AFLINE — ponte com o TOA')
+    await contarPendentes()   // as caixinhas mostram o que sobrou
   }
 }
 
@@ -466,6 +496,11 @@ async function tratar(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
       if (!(await carregarQuemSou())) return { ok: false, mensagem: 'Entre no Gestor AF primeiro.' }
       varrer(); return { ok: true }
     }
+    case 'escolher-varredura': {
+      await mudar(x => { x.escolha = { fora: p.fora, oQue: p.oQue } })
+      return { ok: true }
+    }
+    case 'contar-pendentes': await contarPendentes(); return { ok: true }
     case 'abrir-janela-toa': return abrirJanelaDaVarredura()
     case 'parar-varredura': {
       const aba = await abaDoToa()

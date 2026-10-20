@@ -252,7 +252,14 @@ const bucketsQueNaoAbriram = new Set()
 async function varrer(pedido) {
   rodando = true; cancelado = false
   bucketsQueNaoAbriram.clear()
-  const total = pedido.itens.length
+  // 0.6.0: começa pelo bucket que JÁ está aberto no Console — "coloquei para
+  // começar primeiro na VT e não vai" (Emanuel). Os outros seguem na ordem do banco.
+  const aberto = noConsole() ? normalizar(bucketAberto()) : null
+  const itens = aberto
+    ? [...pedido.itens.filter((i) => normalizar(i.bucket) === aberto),
+       ...pedido.itens.filter((i) => normalizar(i.bucket) !== aberto)]
+    : pedido.itens
+  const total = itens.length
   const avisar = (evento) => chrome.runtime.sendMessage({
     tipo: 'varredura-evento', idPedido: pedido.idPedido, abaGestor: pedido.abaGestor, total, ...evento,
   }).catch(() => {})
@@ -261,7 +268,7 @@ async function varrer(pedido) {
   // escondida → 'pausa'; à vista de novo → 'retoma' (a janelinha mostra)
   avisarPausa = (sim) => avisar({ evento: sim ? 'pausa' : 'retoma', feitos })
   try {
-    for (const it of pedido.itens) {
+    for (const it of itens) {
       if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
       let r
       await esperarVisivel()
