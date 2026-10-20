@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **19/10/2026**, por Claude (Opus 5.5).
+Última atualização: **20/10/2026**, por Claude (Opus 5.5).
 
 ---
 
@@ -27,7 +27,7 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
-| **Extensão do Chrome (TOA)** | `extensao-toa/` — a ponte que baixa a planilha do TOA para o **Sincronismo** (D-189). Usar: `extensao-toa/README.md` · mexer: `docs/11-EXTENSAO-TOA.md` |
+| **Extensão do Chrome (TOA)** | `extensao-toa/` (**0.6.0**) — baixa a planilha do TOA sozinha e **varre** nome, equipamento e material pelas telas (D-189 a D-197). Instalada sem compactação no Chrome de quem opera. Usar: `extensao-toa/README.md` · mexer: `docs/11-EXTENSAO-TOA.md` |
 
 O `.env` já está preenchido e **não** vai para o Git.
 
@@ -43,7 +43,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 0. **`docs/11-EXTENSAO-TOA.md`** — se você veio pela extensão do TOA / Sincronismo, é aqui
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — o inventário, com números do banco
-3. **`docs/03-DECISOES.md`** — as 56 decisões e o porquê de cada uma
+3. **`docs/03-DECISOES.md`** — as 197 decisões e o porquê de cada uma
 4. **`supabase/README.md`** — banco, conferências e dívida de migrations
 5. **`docs/06-PONTUACAO.md`** — como a pontuação foi destravada, e o que sobrou
 
@@ -225,7 +225,26 @@ traria 147 pares em vez de 938 — e a conta fecharia sozinha, sem erro.
 
 ## O que está parado, e por quê
 
-> ### Comece por aqui (atualizado em 19/10)
+> ### Comece por aqui (atualizado em 20/10)
+>
+> **20/10 — o que mudou hoje** (banco até a **121**, web publicada, extensão
+> **0.6.0**; o que ficou aberto: `docs/08-ESTADO-DO-PROJETO.md`, seção
+> "Pendente em 20/10/2026"):
+>
+> - **Manutenção de Manaus (VT) cadastrada** — 12 técnicos (skill
+>   MANUTENÇÃO, cargo TECNICO), 12 equipes "NNN - EQUIPE" em MAN-AREA01/05,
+>   12 logins roteados; os 74 contratos da VT de hoje caíram nas equipes
+>   certas. Matrícula do ponto ficou vazia (veio igual ao login) — D-194.
+> - **Administração › Usuários filtra por tipo de login** (o papel) e por
+>   cargo ("gerente" é cargo) — D-194.
+> - **Filtro de bucket** com mais de um marcado no **Dashboard, Serviços e
+>   Equipes**. O contrato agora sabe o bucket dele (`visita.toa_bucket`, 119,
+>   carimbado na reconciliação) — D-195. De passagem: a matriz Grupo × situação
+>   do Dashboard ignorava TODOS os filtros (recebia a lista sem filtro); corrigido.
+> - **A varredura não achava a VT**: o Console do TOA mostra um bucket só. A
+>   0.5.0 abre o bucket de cada contrato na árvore (120, D-196); a 0.6.0 deixa
+>   escolher os buckets e o que ler (tudo / só nome / só equipamento) e começa
+>   pelo bucket aberto (121, D-197).
 >
 > **A operação real começou em Manaus.** 55 técnicos com acesso (skill
 > ADESÃO), rotas do TOA importadas desde 17/10. O teste foi apagado em 17/10

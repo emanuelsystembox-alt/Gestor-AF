@@ -1,4 +1,4 @@
-# Estado do projeto — 08/09/2026
+# Estado do projeto — 08/09/2026 (pendências atualizadas em 20/10/2026)
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -162,6 +162,10 @@ empresa ─── base (praça) ─── equipe ─── tecnico
 | 059 | **O aviso chega ao campo** — tabela `aviso`, gatilho em `visita_evento`, Realtime por equipe (D-119) |
 | 060 | **O controle vê ao vivo** — `visita_evento` publicado no Realtime |
 | 061 | Fecha `aviso_do_evento` para o `anon` — regressão da 059, pega pela conferência |
+
+> **Da 062 em diante** (até a **121**, em 20/10/2026) a lista completa, com o que
+> cada uma faz, está em **`supabase/README.md`** — esta tabela parou de ser
+> mantida aqui para não haver duas listas divergindo.
 
 ---
 
@@ -373,7 +377,7 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
-## Pendências abertas — consolidado em 19/10/2026
+## Pendências abertas — consolidado em 19/10/2026 (somar a seção de 20/10 logo abaixo)
 
 **Comece por aqui.** As seções datadas abaixo são o histórico de cada leva;
 esta é a lista do que AINDA está aberto, juntando todas, por quem tem de agir.
@@ -424,6 +428,43 @@ falta o olho de quem usa.
 | **`tecnico.foto_url` sem uso** | Substituída por `perfil.foto_path` (D-180); pode sair numa migration. |
 | **TEC1 "Sem tratamento"** | Fora da conta por decisão (D-187). Se a importação do fim do dia virar garantida, dá para seguir o livro. |
 | Página **`/campo`** da web; **"Esqueci minha senha"** por e-mail | D-172: alinhar ou aposentar a página; e-mail exige SMTP. |
+
+---
+
+## Pendente em 20/10/2026 — VT de Manaus, filtros e varredura por bucket (D-194 a D-197)
+
+Migrations **119 a 121**; web publicada e conferida no ar (o pedaço de cada tela
+baixado do ar tem a mudança); extensão **0.6.0** no repositório. Baterias 26/26 e
+23/23; nenhuma `SECURITY DEFINER` para o `anon`.
+
+### Resolvido nesta leva
+
+- **Técnicos da manutenção (VT)** cadastrados pelo Emanuel com a planilha ajustada
+  (D-194): 12 técnicos MANUTENÇÃO com acesso, 12 equipes, 12 logins roteados; os
+  74 contratos da VT de hoje estão nas equipes deles (conferido no banco).
+- **Filtro por tipo de login** em Administração › Usuários (D-194).
+- **Filtro de bucket** (mais de um) no Dashboard, Serviços e Equipes; a lista abre
+  por portal porque o cartão de baixo a cobria (D-195).
+- **Matriz Grupo × situação do Dashboard** passou a obedecer aos filtros — recebia
+  a lista sem filtro desde que foi criada.
+- **Varredura por bucket** (0.5.0, D-196) e **escolhida** (0.6.0, D-197).
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Meta e faixas da skill MANUTENÇÃO** | Os 12 técnicos da VT têm skill MANUTENÇÃO, e a meta/faixa dela continua em aberto (`business-rules.md` › Em aberto). Sem faixa, o "a receber" deles fica zerado — a skill é a chave do dinheiro (D-094). Configurar em Administração › Metas quando houver o número. |
+| **Matrícula do ponto dos 12 da VT** | Ficou vazia: na planilha era igual ao login TOA (D-194). Quando houver a matrícula real, editar ou reimportar. |
+| **Varrer só os encerrados?** | Hoje a varredura lê o nome de TODO contrato sem nome (qualquer situação) e o equipamento só dos encerrados. A 0.6.0 deixa escolher por vez; se o padrão deve mudar, é decisão. |
+| **Recarregar a extensão 0.6.0** | `chrome://extensions` → recarregar a AFLINE, e F5 na aba do TOA. |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **Varredura 0.6.0 no TOA de verdade** | Troca de bucket e painel de escolha testados numa página que imita o Console e numa cópia do painel; o navegador do assistente não entra no TOA. Às 13:06 de 20/10 a 0.5.0 já tinha varrido 6 da VT — sinal de que o clique na árvore funciona. |
+| **Os 64 erros da varredura das 10:51** | O motivo de cada um só fica no registro local da extensão (painel), não no banco. Se repetir, ler "Últimos acontecimentos" e, se for o caso, gravar o motivo no banco. |
+| **Filtros novos logados** (tipo de login, bucket, matriz do Dashboard) | Publicados e conferidos no código do ar; ninguém clicou com login além do Emanuel. |
 
 ---
 
