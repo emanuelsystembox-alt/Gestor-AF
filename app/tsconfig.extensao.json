@@ -1,0 +1,19 @@
+{
+  // A extensão do TOA (D-193): o fundo e a janelinha, em TypeScript, com os
+  // tipos do Chrome. Separado do tsconfig da web porque "types" é lista
+  // FECHADA (traps.md) e os tipos do Chrome não devem vazar para o site.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker.ImportScripts"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["chrome"]
+  },
+  "include": ["extensao"]
+}

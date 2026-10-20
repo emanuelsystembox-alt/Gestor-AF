@@ -10,6 +10,46 @@ crescer: cada coisa nova que quisermos tirar do TOA entra aqui como uma
 
 ---
 
+## Desde a 0.3.0: a extensão faz tudo sozinha (D-193)
+
+> Até a 0.2.0 quem trabalhava era a tela Sincronismo — a extensão só buscava,
+> e tudo parava quando a pessoa saía da tela. **As seções abaixo sobre o
+> protocolo com a página descrevem a 0.1/0.2**; o que vale hoje é isto:
+
+```
+┌──────────────────────── Chrome do computador que sincroniza ─────────────────────┐
+│  janelinha (popup.html/popup.js)          fundo (fundo.js — service worker)      │
+│  entrar, ligar, botões, %   ──pedidos──►  sessão do Gestor AF (chrome.storage)   │
+│  lê o estado em chrome.storage ◄─estado─  alarme 1 min → pulso → baixa → import  │──► Supabase
+│                                           exportar (cookie do TOA)               │──► TOA
+│  aba do TOA (toa.js)  ◄──── varrer ─────  varredura: manda a lista              │
+│  Console → Detalhes → Equipamento ─evento─► grava cada contrato (registrar_…)   │──► Supabase
+│                                                                                  │
+│  aba do Gestor AF (ponte.js): só responde "ping" com a versão                    │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Peça | Onde mora o código | O que faz |
+|---|---|---|
+| `fundo.js` | **gerado** de `app/extensao/fundo.ts` (`npm run extensao`) | login (só a sessão), alarme, pulso/vez, exportar, importar pelo `importarToaNucleo`, comandar e gravar a varredura, selo no ícone |
+| `popup.html` / `popup.js` | `extensao-toa/popup.html` + **gerado** de `app/extensao/popup.ts` | a janelinha |
+| `toa.js` | `extensao-toa/toa.js` (à mão) | a varredura pelas telas, dentro da aba do TOA |
+| `ponte.js` | `extensao-toa/ponte.js` (à mão) | só o "ping" para a tela Sincronismo |
+| `app/extensao/estado.ts` | — | o formato do estado guardado e dos pedidos da janelinha |
+
+- **Uma regra só:** a extensão importa com `src/lib/importarToaNucleo.ts` —
+  o mesmo da tela de Importação (`importarToa.ts` só passa o cliente da web).
+  Mudou a importação? Mude no núcleo, rode `npm run extensao` e atualize.
+- **Permissões (0.3.0):** `alarms`, `storage`, host do TOA. O Supabase é
+  chamado por CORS, sem permissão de host.
+- **Estado em `chrome.storage.local`** (chave `af_estado`), não em memória: o
+  Chrome adormece o fundo entre alarmes. Travas em `chrome.storage.session`.
+- **A chave no pacote é a publishable** (sai do `app/.env` na montagem; o
+  script recusa se não for). O texto `sb_secret_` dentro do `fundo.js` é o
+  `supabase-js` conferindo prefixo, não um segredo.
+
+---
+
 ## Por que uma extensão
 
 O que se queria no começo (*"uma mascara que entra em um site, e loga nele

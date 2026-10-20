@@ -152,6 +152,14 @@ e sem espaços com o mesmo cálculo sobre o arquivo. Ver D-160.
 
 ---
 
+**Trabalho de fundo dentro de uma TELA para quando a pessoa sai dela.** O
+sincronismo rodava na página Sincronismo (um componente React com
+`setInterval`): trocar de tela desmontava o componente e o laço morria —
+a primeira varredura gravou 5 contratos e se perdeu, e a extensão ficou
+"já varrendo" para sempre. Trabalho que tem de continuar sozinho mora no
+**fundo da extensão** (alarme do Chrome, estado em `chrome.storage`), não
+numa tela. Ver D-193.
+
 ## PostgREST
 
 **Tem cache de schema.** Depois de `ALTER TABLE`, o front recebe

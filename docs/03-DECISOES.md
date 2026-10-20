@@ -7584,3 +7584,58 @@ foi lida (regra 6).
 varredura cobre o que está aberto e conta o resto como "fora do Console";
 trocar de bucket sozinho não foi feito. A aba do TOA fica ocupada durante a
 varredura. Se a Oracle mudar a tela, a varredura para (a baixa continua).
+
+### D-193 · A extensão faz tudo sozinha (0.3.0): login próprio, alarme, grava direto no banco
+
+> *"esta apresentando falhas, ele não diz o que importou (...) eu acredito que
+> o ideial era ter um botão na extesão que intalamos e ela ler direto os dados
+> do toa atravez do script e enviar os dados direnteo para o contrato certo e
+> banco o que acha? por que se eu sair da tela do afline manager, ela meio que
+> para de atualziar"* — Emanuel, 19/10.
+
+**O que estava errado (medido no banco):** até a 0.2.0 quem trabalhava era a
+TELA Sincronismo — a extensão só buscava. A primeira varredura gravou **5
+contratos** (nome + 16 itens) e parou: o Emanuel saiu da tela, a extensão
+seguiu percorrendo o TOA e ninguém gravava o que ela lia; como a varredura
+"antiga" nunca terminou, a extensão passou a responder "já está varrendo".
+Junto, "TOA deslogou" desde 21:38 — o login do mesmo usuário do TOA no
+navegador do assistente (estudo da tela) derrubou a sessão do Chrome dele.
+
+**Decisão do Emanuel (19/10):** a extensão faz tudo sozinha; entra no Gestor
+AF com **e-mail e senha** de quem opera.
+
+**Como ficou (extensão 0.3.0):**
+- **Fundo** (`app/extensao/fundo.ts` → `extensao-toa/fundo.js`, montado pelo
+  `npm run extensao`): login no Gestor AF guardando **só a sessão** (em
+  `chrome.storage.local`, como o navegador faz no site; a senha nunca);
+  **alarme do Chrome** a cada minuto; pulso e vez no servidor (113); baixa e
+  importação pelo **mesmo núcleo** da importação manual
+  (`src/lib/importarToaNucleo.ts`, que agora recebe o cliente do banco por
+  parâmetro — a web passa o dela, a extensão o seu); e a varredura comandando
+  a aba do TOA e **gravando direto** (`registrar_varredura`). Funciona com a
+  tela do Gestor AF fechada; basta o Chrome aberto e o TOA logado.
+- **Janelinha** (clique no ícone; `app/extensao/popup.ts`): entrar/sair,
+  "Sincronizar por este computador", situação em uma frase (sincronizando,
+  de reserva de Fulano, TOA caiu, desligado no servidor — nunca "tudo certo"
+  sem saber), "Sincronizar agora", "Assumir a vez", "Varrer o TOA agora",
+  "Parar", barra com a %, últimos acontecimentos.
+- O **estado** fica em `chrome.storage.local`, não na memória: o Chrome
+  adormece o fundo da extensão entre um alarme e outro.
+- A **tela Sincronismo** deixou de executar: configura e acompanha, e diz se
+  o Chrome dela tem a extensão (e se é a 0.3.0). A página só faz "ping".
+- **A varredura entra no histórico** (migration 118): cada uma terminada vira
+  uma linha em `sincronismo_rodada` (resultado VARREDURA), com o resumo
+  (nomes, listas, fora do Console, erros) e quantos contratos passaram.
+- A tela pegava "sessão caiu" só por HTML; o TOA também responde JSON
+  (`errorNo: SESSION_DESTROYED`) — o fundo trata os dois.
+
+**Recusado:** compartilhar a sessão da página com a extensão (as duas
+renovando o mesmo token derrubariam a sessão — rotação do Supabase);
+publicar na Chrome Web Store (o Emanuel prefere o modo desenvolvedor).
+
+**Verificado:** `tsc` da web e da extensão (`tsconfig.extensao.json`, com os
+tipos do Chrome), build; o `fundo.js` montado carrega num Chrome simulado
+(alarme de 1 min, ouvintes, nenhum pedido de rede ao carregar); a chave no
+pacote é a publishable. **Não verificado:** a 0.3.0 instalada rodando
+(login, alarme, baixa e varredura de ponta a ponta) — o navegador da sessão
+não carrega extensão.

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>AFLINE — ponte com o TOA</title>
+  <!-- A janelinha da extensão (D-193). O comportamento está em popup.js,
+       GERADO a partir de app/extensao/popup.ts — não edite o .js à mão. -->
+  <style>
+    :root { --af: #c81a23; --af-escuro: #9f141b; --texto: #14171c; --suave: #5b6577;
+            --borda: #d8dce3; --fundo: #ffffff; --cinza: #f3f4f6;
+            --ok: #047857; --aviso: #b45309; --erro: #b01e25; }
+    * { box-sizing: border-box; }
+    body { width: 360px; margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+           color: var(--texto); background: var(--fundo); }
+    header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
+    header b { color: var(--af); font-size: 15px; }
+    header span { color: var(--suave); font-size: 11px; }
+    main { padding: 12px; }
+    h2 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+    label.campo { display: block; margin-bottom: 8px; font-size: 12px; color: var(--suave); }
+    input[type=email], input[type=password] { width: 100%; margin-top: 3px; padding: 7px 9px; font: inherit;
+           border: 1px solid var(--borda); border-radius: 6px; }
+    button { font: inherit; cursor: pointer; border-radius: 6px; padding: 6px 10px; border: 1px solid var(--borda);
+             background: var(--fundo); color: var(--texto); }
+    button.forte { background: var(--af); border-color: var(--af); color: #fff; font-weight: 600; }
+    button.forte:hover { background: var(--af-escuro); }
+    button:disabled { opacity: .55; cursor: default; }
+    .linha { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .situacao { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--cinza); }
+    .situacao.ok { background: #ecfdf5; color: var(--ok); }
+    .situacao.aviso { background: #fffbeb; color: var(--aviso); }
+    .situacao.erro { background: #fef2f2; color: var(--erro); }
+    .pequeno { font-size: 12px; color: var(--suave); margin: 4px 0; }
+    .barra { height: 8px; border-radius: 99px; background: var(--cinza); overflow: hidden; margin: 6px 0 2px; }
+    .barra > div { height: 100%; background: var(--af); width: 0; transition: width .3s; }
+    #erro-entrar { color: var(--erro); min-height: 1em; }
+    ul#log { list-style: none; margin: 0; padding: 6px 8px; max-height: 160px; overflow-y: auto;
+             background: var(--cinza); border-radius: 6px; font-size: 11px; }
+    ul#log li { margin: 2px 0; } ul#log li.ok { color: var(--ok); } ul#log li.erro { color: var(--erro); }
+    footer { display: flex; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--borda); }
+    footer button { border: 0; padding: 2px 0; color: var(--suave); background: none; }
+    footer button:hover { color: var(--af); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header><b>AFLINE</b><span>ponte com o TOA</span></header>
+  <main>
+    <section id="entrar">
+      <p class="pequeno">Entre com o seu login do <strong>Gestor AF</strong>. A extensão guarda só a sessão, não a senha.</p>
+      <form id="form-entrar">
+        <label class="campo">E-mail<input id="email" type="email" autocomplete="username" required></label>
+        <label class="campo">Senha<input id="senha" type="password" autocomplete="current-password" required></label>
+        <p id="erro-entrar" class="pequeno"></p>
+        <button id="botao-entrar" class="forte" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <section id="painel" hidden>
+      <p id="quem" class="pequeno"></p>
+      <label class="linha"><input id="ligado" type="checkbox"> <strong>Sincronizar por este computador</strong></label>
+      <div id="situacao" class="situacao"></div>
+
+      <h2>Baixa (planilha do TOA)</h2>
+      <p id="baixa-atual" class="pequeno"></p>
+      <p id="baixa-ultima" class="pequeno"></p>
+      <div class="linha">
+        <button id="sincronizar" class="forte">Sincronizar agora</button>
+        <button id="assumir" hidden>Assumir a vez</button>
+      </div>
+
+      <h2>Varredura (nome, equipamento, miscelânea)</h2>
+      <p class="pequeno">Deixe uma aba do TOA no Console de Alocação (bucket e dia de hoje) e não mexa nela durante a varredura.</p>
+      <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
+      <p id="var-texto" class="pequeno"></p>
+      <div class="linha">
+        <button id="varrer" class="forte">Varrer o TOA agora</button>
+        <button id="parar" hidden>Parar a varredura</button>
+      </div>
+
+      <h2>Últimos acontecimentos</h2>
+      <ul id="log"></ul>
+    </section>
+  </main>
+  <footer>
+    <button id="abrir">Abrir o Gestor AF</button>
+    <button id="sair">Sair</button>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -4,17 +4,12 @@ import { useAuth } from '../lib/auth'
 import { useCidades } from '../lib/cidade'
 import { Shell } from '../components/Shell'
 import { Alerta } from '../components/ui'
-import { VarreduraToa } from '../components/VarreduraToa'
-import { lerPlanilhaTOA, validarPlanilha } from '../lib/toa'
-import { importarLinhasToa, impressaoDasLinhas, ErroImportacao } from '../lib/importarToa'
-import {
-  extensaoPresente, exportarDoToa, bucketDoNome, nomePadrao, type InfoExtensao,
-} from '../lib/ponteToa'
+import { extensaoPresente, extensaoAutonoma, type InfoExtensao } from '../lib/ponteToa'
 
 /**
  * Sincronismo com o TOA (111, D-189).
  *
- * ┌─ uma tela que configura E sincroniza ────────────────────────────┐
+ * ┌─ uma tela que CONFIGURA e ACOMPANHA ─────────────────────────────┐
  * │ > "seria bom ter um botão chamado sincronismo (...) conseguimos  │
  * │ >  escolher quanto e quanto tempo queremos que o sistema         │
  * │ >  importe" — Emanuel, 19/10                                     │
@@ -22,12 +17,13 @@ import {
  * │ Quem OPERA (gestão, controlador) liga, desliga, escolhe o        │
  * │ intervalo e os buckets.                                          │
  * │                                                                  │
- * │ E quem tem a extensão no Chrome e o TOA aberto pode clicar em    │
- * │ "Sincronizar por este computador": a tela passa a bater o pulso  │
- * │ a cada minuto, pede à extensão a planilha de cada bucket vencido │
- * │ e importa pelo MESMO caminho da importação manual, com o login   │
- * │ de quem está ali (113: "qual quer um que configurar sua maquina, │
- * │ vai conseguir importar com seu login" — Emanuel). Quem decide o  │
+ * │ Quem EXECUTA, desde a 0.3.0, é a extensão do Chrome, sozinha (o  │
+ * │ fundo dela, com o login de quem entrou na janelinha): bate o     │
+ * │ pulso, baixa, importa pelo MESMO núcleo da importação manual e   │
+ * │ varre — com esta tela aberta ou não (D-193). Até a 0.2.0 era     │
+ * │ esta tela que trabalhava, e parava quando a pessoa saía dela.    │
+ * │ (113: "qual quer um que configurar sua maquina, vai conseguir    │
+ * │ importar com seu login" — Emanuel.) Quem decide o               │
  * │ dia, o que está vencido e DE QUEM É A VEZ é o servidor           │
  * │ (`sincronismo_pulso`): um computador por vez, para não importar  │
  * │ em dobro; o segundo fica de reserva e assume se o primeiro parar.│
@@ -51,17 +47,9 @@ interface Bucket {
 }
 interface Rodada {
   id: string; bucket: string; dia: string; iniciada_em: string; terminada_em: string
-  resultado: 'IMPORTADA' | 'SEM_MUDANCA' | 'SEM_SESSAO' | 'ERRO'
+  resultado: 'IMPORTADA' | 'SEM_MUDANCA' | 'SEM_SESSAO' | 'ERRO' | 'VARREDURA'
   mensagem: string | null; linhas: number | null
   importacao: { qtd_criadas: number | null; qtd_atualizadas: number | null; qtd_erro: number | null } | null
-}
-
-/** O que o pulso devolve ao robô. */
-interface Ordem {
-  ligado: boolean; intervalo_min: number; hoje: string; agora: string
-  /** A vez é de outro computador, vivo: este espera (113). */
-  outro: { nome: string | null; visto_em: string } | null
-  buckets: { id: string; nome: string; numero_toa: number; vencido: boolean; impressao: string | null }[]
 }
 
 /** 5 e 10 entraram na 114 (Emanuel, 19/10): o igual não reimporta, e a conferência custa < 1 s. */
@@ -70,6 +58,8 @@ const INTERVALOS = [5, 10, 15, 30, 60] as const
 const SEM_SINAL_MS = 3 * 60_000
 
 const ROTULO: Record<Rodada['resultado'], { texto: string; classe: string }> = {
+  // 118: a varredura (nome, equipamento, miscelânea) também entra no histórico
+  VARREDURA:   { texto: 'Varredura',    classe: 'bg-violet-900/40 text-violet-300' },
   IMPORTADA:   { texto: 'Importou',     classe: 'bg-emerald-900/40 text-emerald-300' },
   SEM_MUDANCA: { texto: 'Conferido · sem mudança', classe: 'bg-sky-900/40 text-sky-300' },
   SEM_SESSAO:  { texto: 'TOA deslogou', classe: 'bg-amber-900/40 text-amber-300' },
@@ -151,9 +141,7 @@ export default function Sincronismo() {
 
         <Estado cfg={cfg} rodadas={rodadas} agora={agora} />
 
-        {(podeConfigurar || souRobo) && ativa && (
-          <Executor baseId={ativa.id} dedicado={souRobo && !podeConfigurar} aoRodar={carregar} />
-        )}
+        {(podeConfigurar || souRobo) && <PainelExtensao />}
 
         {podeConfigurar && ativa && buckets && (
           <Configuracao baseId={ativa.id} cfg={cfg} buckets={buckets}
@@ -376,373 +364,48 @@ function LinhaBucket({ b, marcado, alternar, souAdmin, aoMudarNumero }: {
   )
 }
 
-/* ─────────────────────── este computador sincroniza ─────────────────────── */
-
-interface LinhaLog { em: number; texto: string; tom: 'ok' | 'erro' | 'info' }
+/* ─────────────────────── quem sincroniza: a extensão ─────────────────────── */
 
 /**
- * "Este computador sincroniza" é escolha de quem está NESTE computador —
- * fica no navegador, como o tema (conforto de quem olha, não dado da
- * operação). Quem decide de quem é a VEZ é o servidor.
+ * Desde a 0.3.0 (D-193) quem sincroniza e varre é a EXTENSÃO, sozinha —
+ * com a tela do Gestor AF aberta ou não. Esta tela só diz se o Chrome
+ * daqui tem a extensão e como usar; a execução não mora mais aqui.
+ *
+ * > "se eu sair da tela do afline manager, ela meio que para de atualizar"
+ * > — Emanuel, 19/10. Era a tela que trabalhava; saiu dela, parou.
  */
-const chaveEstePc = (base: string) => `afline:sincronismo-este-pc:${base}`
-function lerEstePc(base: string): boolean {
-  try { return localStorage.getItem(chaveEstePc(base)) === '1' } catch { return false }
-}
-function gravarEstePc(base: string, sim: boolean) {
-  try {
-    if (sim) localStorage.setItem(chaveEstePc(base), '1')
-    else localStorage.removeItem(chaveEstePc(base))
-  } catch { /* sem storage: vale só enquanto a aba estiver aberta */ }
-}
-
-function Executor({ baseId, dedicado, aoRodar }: {
-  baseId: string
-  /** Login do papel ROBO (opcional): o computador dele só existe para isto. */
-  dedicado: boolean
-  aoRodar: () => void
-}) {
-  const { perfil } = useAuth()
+function PainelExtensao() {
   const [ext, setExt] = useState<InfoExtensao | null | undefined>(undefined)
-  const [estePc, setEstePc] = useState(() => dedicado || lerEstePc(baseId))
-  const [ordem, setOrdem] = useState<Ordem | null>(null)
-  const [log, setLog] = useState<LinhaLog[]>([])
-  const [ocupado, setOcupado] = useState<string | null>(null)
-  const [vigilia, setVigilia] = useState<boolean | null>(null)
-  /** O que a última rodada deste computador fez, bucket a bucket — à vista. */
-  const [resultado, setResultado] = useState<LinhaLog[] | null>(null)
-  const rodando = useRef(false)
-  const agora = Date.now()
-
-  const anotar = useCallback((texto: string, tom: LinhaLog['tom'] = 'info') =>
-    setLog(l => [{ em: Date.now(), texto, tom }, ...l].slice(0, 40)), [])
-
-  async function registrar(base: string, bucketId: string, dia: string, iniciada: string,
-                           resultado: Rodada['resultado'], extra: {
-                             mensagem?: string; importacao?: string | null; impressao?: string; linhas?: number
-                           } = {}) {
-    const { error } = await supabase.rpc('sincronismo_registrar_rodada', {
-      p_base: base, p_bucket: bucketId, p_dia: dia, p_iniciada_em: iniciada, p_resultado: resultado,
-      p_mensagem: extra.mensagem ?? null, p_importacao: extra.importacao ?? null,
-      p_impressao: extra.impressao ?? null, p_linhas: extra.linhas ?? null,
-    })
-    if (error) anotar(`Não consegui registrar a rodada: ${error.message}`, 'erro')
-  }
-
-  /**
-   * Uma rodada de um bucket: exporta, lê, compara, importa, registra.
-   * Devolve a frase do resultado, para a tela dizer o que aconteceu —
-   * "sem mudança" calado parecia que nada tinha rodado (Emanuel, 19/10).
-   * `forcar` (o botão "Importar agora") importa mesmo com a planilha igual:
-   * quem clica quer importar; pular o igual é economia das rodadas sozinhas.
-   */
-  async function rodarBucket(b: Ordem['buckets'][number], dia: string, forcar: boolean): Promise<LinhaLog> {
-    const fim = (texto: string, tom: LinhaLog['tom']): LinhaLog => {
-      anotar(texto, tom); return { em: Date.now(), texto, tom }
-    }
-    const iniciada = new Date().toISOString()
-    setOcupado(`${b.nome}: baixando do TOA…`)
-    const r = await exportarDoToa(b.numero_toa, dia)
-    if (!r.ok) {
-      await registrar(baseId, b.id, dia, iniciada, r.motivo === 'SEM_SESSAO' ? 'SEM_SESSAO' : 'ERRO',
-                      { mensagem: r.mensagem })
-      return fim(`${b.nome}: ${r.mensagem}`, 'erro')
-    }
-    const nome = r.nome ?? nomePadrao(b.nome, dia)
-    // O nome que o TOA deu diz de que bucket o arquivo é DE VERDADE: um
-    // número errado no cadastro apareceria aqui, e não como contratos de
-    // um bucket entrando no lugar de outro.
-    const doNome = bucketDoNome(nome)
-    if (doNome && doNome !== b.nome) {
-      const msg = `O número ${b.numero_toa} no TOA é do bucket ${doNome}, não de ${b.nome}. Corrija o número nesta tela.`
-      await registrar(baseId, b.id, dia, iniciada, 'ERRO', { mensagem: msg })
-      return fim(msg, 'erro')
-    }
-
-    setOcupado(`${b.nome}: lendo a planilha…`)
-    let linhas
-    try {
-      const leitura = await lerPlanilhaTOA(new File([r.bytes], nome))
-      const problemas = validarPlanilha(leitura)
-      if (leitura.linhas.length === 0) {
-        await registrar(baseId, b.id, dia, iniciada, 'SEM_MUDANCA',
-                        { mensagem: 'Planilha sem nenhuma atividade.', linhas: 0 })
-        return fim(`${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.`, 'info')
-      }
-      if (problemas.length) throw new Error(problemas.join(' '))
-      linhas = leitura.linhas
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Não consegui ler a planilha.'
-      // "A planilha está vazia" é o TOA sem atividade, não defeito.
-      const vazia = /vazia/i.test(msg)
-      await registrar(baseId, b.id, dia, iniciada, vazia ? 'SEM_MUDANCA' : 'ERRO',
-                      { mensagem: vazia ? 'Planilha sem nenhuma atividade.' : msg, linhas: vazia ? 0 : undefined })
-      return fim(vazia ? `${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.` : `${b.nome}: ${msg}`,
-                 vazia ? 'info' : 'erro')
-    }
-
-    const impressao = await impressaoDasLinhas(linhas)
-    if (!forcar && b.impressao && b.impressao === impressao) {
-      await registrar(baseId, b.id, dia, iniciada, 'SEM_MUDANCA', { impressao, linhas: linhas.length })
-      return fim(`${b.nome}: conferido no TOA — as ${linhas.length} atividades estão iguais às da última `
-        + 'importação. Os contratos já estão em dia.', 'ok')
-    }
-
-    try {
-      const res = await importarLinhasToa({
-        linhas, arquivoNome: nome, baseId, dia, usuarioId: perfil?.id ?? null,
-        origem: 'sincronismo', impressao,
-        aoAvancar: (_e, n) => setOcupado(`${b.nome}: importando (${n}/${linhas.length})…`),
-      })
-      const s = res.resumo
-      await registrar(baseId, b.id, dia, iniciada, 'IMPORTADA',
-                      { importacao: res.importacaoId, impressao, linhas: linhas.length })
-      return fim(`${b.nome}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, `
-        + `${s.atualizadas} atualizadas` + (s.erros ? `, ${s.erros} com erro` : '')
-        + (res.reconciliou ? '.' : '. A segunda parte (TEC1, jornada) não terminou; a próxima rodada refaz.')
-        // 116 (D-191): o que saiu do TOA e o que voltou.
-        + (res.desatribuicao?.desatribuidos ? ` ${res.desatribuicao.desatribuidos} saíram do TOA e foram desatribuídos (cód. 800).` : '')
-        + (res.desatribuicao?.devolvidos ? ` ${res.desatribuicao.devolvidos} voltaram e estão de novo Na entrada.` : '')
-        + (res.desatribuicao === null ? ' A conferência do que saiu do TOA não terminou; a próxima rodada confere.' : ''),
-        s.erros ? 'erro' : 'ok')
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Falha na importação.'
-      await registrar(baseId, b.id, dia, iniciada, 'ERRO', {
-        mensagem: msg, importacao: e instanceof ErroImportacao ? e.importacaoId : null, linhas: linhas.length,
-      })
-      return fim(`${b.nome}: ${msg}`, 'erro')
-    }
-  }
-
-  /**
-   * O ciclo: pulso → ordem do servidor → os buckets vencidos (ou todos, se
-   * `forcar`). Se a vez é de outro computador vivo, o servidor devolve
-   * `outro` e nenhum bucket: este fica de reserva (113).
-   */
-  const ciclo = useCallback(async (forcar = false, modo: 'PULSO' | 'ASSUMIR' = 'PULSO') => {
-    if (rodando.current) return
-    rodando.current = true
-    try {
-      const e = await extensaoPresente()
-      setExt(e)
-      // Sem extensão este computador não tem o que fazer: nem pega a vez,
-      // para não tirá-la de quem consegue sincronizar.
-      if (!e) return
-      const navegador = /Chrome\/(\d+)/.exec(navigator.userAgent)?.[0] ?? 'navegador'
-      const { data, error } = await supabase.rpc('sincronismo_pulso', {
-        p_base: baseId, p_info: `extensão ${e.versao} · ${navegador}`, p_modo: modo,
-      })
-      if (error) { anotar(`Pulso recusado: ${error.message}`, 'erro'); return }
-      const o = data as Ordem
-      setOrdem(o)
-      if (modo === 'ASSUMIR') anotar('Este computador assumiu o sincronismo.', 'ok')
-      // Desligado é desligado, inclusive para o "Importar agora": quem decide
-      // é quem configura, não quem está na frente do computador.
-      if (!o.ligado || o.outro) return
-      const fila = o.buckets.filter(b => forcar || b.vencido)
-      const feitos: LinhaLog[] = []
-      for (const b of fila) feitos.push(await rodarBucket(b, o.hoje, forcar))
-      if (fila.length) { setResultado(feitos); aoRodar() }
-    } finally {
-      rodando.current = false
-      setOcupado(null)
-    }
-    // rodarBucket lê só props estáveis (baseId, perfil) e setters
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseId, anotar, aoRodar])
-
-  // Fora do sincronismo, a tela só pergunta se a extensão está aqui — para
-  // oferecer o botão a quem pode usá-lo.
-  useEffect(() => {
-    if (!estePc) extensaoPresente().then(setExt)
-  }, [estePc])
-
-  // O relógio: um pulso por minuto, só neste computador e só se a pessoa
-  // escolheu. Aba em segundo plano o Chrome segura a no máximo um disparo
-  // por minuto — é por isso que o pulso é de 60 s, e não de 10.
-  useEffect(() => {
-    if (!estePc) return
-    ciclo()
-    const t = setInterval(() => ciclo(), 60_000)
-    return () => clearInterval(t)
-  }, [ciclo, estePc])
-
-  function comecar() {
-    gravarEstePc(baseId, true)
-    setEstePc(true)
-  }
-  async function parar() {
-    gravarEstePc(baseId, false)
-    setEstePc(false)
-    setOrdem(null)
-    // Devolve a vez já, para outro computador não esperar os 3 min.
-    await supabase.rpc('sincronismo_pulso', { p_base: baseId, p_modo: 'SOLTAR' })
-    anotar('Este computador parou de sincronizar.')
-    aoRodar()
-  }
-
-  // Pede ao sistema para não apagar a tela nem suspender enquanto esta aba
-  // estiver à frente. Não impede suspender por energia, e some se a aba sair
-  // da frente: por isso a tela avisa.
-  useEffect(() => {
-    if (!estePc) return
-    let trava: WakeLockSentinel | null = null
-    async function pedir() {
-      try {
-        if (document.visibilityState !== 'visible' || !('wakeLock' in navigator)) { setVigilia(false); return }
-        trava = await navigator.wakeLock.request('screen')
-        setVigilia(true)
-        trava.addEventListener('release', () => setVigilia(false))
-      } catch { setVigilia(false) }
-    }
-    pedir()
-    document.addEventListener('visibilitychange', pedir)
-    return () => { document.removeEventListener('visibilitychange', pedir); trava?.release().catch(() => {}) }
-  }, [estePc])
-
-  const instrucao = (
-    <>Instale pela pasta <code>extensao-toa</code> do projeto (Chrome › Extensões › Modo do
-      desenvolvedor › Carregar sem compactação), entre no TOA neste Chrome e recarregue esta página.</>
-  )
-
-  // Ainda não sincroniza por aqui: só o convite — ou a explicação de
-  // como chegar nele.
-  if (!estePc) {
-    if (ext === undefined) return null
-    return (
-      <section className="card-controle p-4">
-        <h2 className="text-sm font-semibold">Sincronizar por este computador</h2>
-        {ext ? (
-          <>
-            <p className="mt-1 text-sm text-graf-300">
-              A extensão está instalada neste Chrome ({ext.versao}). Com o TOA aberto aqui, este
-              computador pode baixar e importar sozinho, com o seu login. Um computador sincroniza
-              por vez; se outro já estiver, este fica de reserva e assume se o outro parar.
-            </p>
-            <button onClick={comecar}
-              className="mt-3 rounded-lg bg-af-600 px-4 py-2 text-sm font-semibold text-white hover:bg-af-500">
-              Sincronizar por este computador
-            </button>
-          </>
-        ) : (
-          <p className="mt-1 text-sm text-graf-400">
-            Para este computador sincronizar, ele precisa da extensão "AFLINE — ponte com o TOA". {instrucao}
-          </p>
-        )}
-      </section>
-    )
-  }
-
-  const espera = ordem?.outro ?? null
+  useEffect(() => { extensaoPresente().then(setExt) }, [])
+  const atual = ext && extensaoAutonoma(ext)
 
   return (
-    <section className="card-controle p-4 ring-1 ring-af-600/40">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">
-            {espera ? 'Este computador está de reserva' : 'Este computador sincroniza'}
-          </h2>
-          <p className="mt-0.5 text-xs text-graf-400">
-            {espera
-              ? <>A vez é de <strong className="text-graf-200">{espera.nome ?? 'outro computador'}</strong> (pulso {ha(espera.visto_em, agora)}).
-                  Se ele parar por 3 min, este assume sozinho.</>
-              : 'Deixe esta aba aberta. O computador não pode desligar nem suspender, e o TOA tem de estar aberto neste Chrome.'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {espera ? (
-            <button onClick={() => ciclo(false, 'ASSUMIR')} disabled={!!ocupado || !ext}
-              className="rounded-lg border border-af-600 px-3 py-1.5 text-xs font-medium text-af-200
-                         hover:bg-af-600/15 disabled:opacity-50">
-              Assumir agora
-            </button>
-          ) : (
-            <button onClick={() => ciclo(true)} disabled={!!ocupado || !ext || !ordem?.ligado}
-              title="Baixa do TOA e importa agora, mesmo que nada tenha mudado"
-              className="rounded-lg border border-af-600 px-3 py-1.5 text-xs font-medium text-af-200
-                         hover:bg-af-600/15 disabled:opacity-50">
-              Importar agora
-            </button>
-          )}
-          {!dedicado && (
-            <button onClick={parar} disabled={!!ocupado}
-              className="rounded-lg border border-graf-700 px-3 py-1.5 text-xs text-graf-300
-                         hover:border-af-600 hover:text-af-400 disabled:opacity-50">
-              Parar neste computador
-            </button>
-          )}
-        </div>
+    <section className="card-controle p-4">
+      <h2 className="text-sm font-semibold">Quem sincroniza: a extensão do Chrome</h2>
+      <p className="mt-1 text-sm text-graf-300">
+        A extensão "AFLINE — ponte com o TOA" faz tudo sozinha: baixa a planilha, importa e varre nome,
+        equipamento e miscelânea — <strong>com esta tela aberta ou não</strong>. Basta o Chrome aberto,
+        logado no TOA. Clique no <strong>ícone da extensão</strong> para entrar com o seu login do Gestor AF,
+        ligar "Sincronizar por este computador", ver a % e os resultados.
+      </p>
+      <div className="mt-3">
+        {ext === undefined ? (
+          <p className="text-xs text-graf-400">Procurando a extensão neste Chrome…</p>
+        ) : atual ? (
+          <Alerta tipo="ok">Este Chrome tem a extensão {ext!.versao}. Use o ícone dela.</Alerta>
+        ) : ext ? (
+          <Alerta tipo="aviso">
+            Este Chrome tem a extensão {ext.versao}, que ainda dependia desta tela. Atualize: em
+            chrome://extensions clique em recarregar na extensão e recarregue as abas do TOA e do Gestor AF.
+          </Alerta>
+        ) : (
+          <Alerta tipo="info">
+            Este Chrome não tem a extensão. Para sincronizar por este computador, instale pela pasta{' '}
+            <code>extensao-toa</code> do projeto (chrome://extensions › Modo do desenvolvedor › Carregar sem
+            compactação).
+          </Alerta>
+        )}
       </div>
-
-      <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-3">
-        <li className="rounded-lg bg-graf-900 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-graf-400">Extensão</p>
-          <p className={ext ? 'text-emerald-400' : ext === null ? 'text-af-300' : 'text-graf-400'}>
-            {ext ? `instalada (${ext.versao})` : ext === null ? 'não encontrada' : 'procurando…'}
-          </p>
-        </li>
-        <li className="rounded-lg bg-graf-900 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-graf-400">Ordem do servidor</p>
-          <p className="text-graf-200">
-            {!ordem ? 'aguardando o primeiro pulso…'
-              : !ordem.ligado ? 'desligado — esperando alguém ligar'
-              : ordem.outro ? 'de reserva'
-              : `${ordem.buckets.length} bucket(s), a cada ${ordem.intervalo_min} min`}
-          </p>
-        </li>
-        <li className="rounded-lg bg-graf-900 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-graf-400">Tela acesa</p>
-          <p className={vigilia ? 'text-emerald-400' : 'text-amber-300'}>
-            {vigilia ? 'sim, enquanto a aba estiver à frente' : vigilia === false ? 'não — deixe esta aba à frente' : '…'}
-          </p>
-        </li>
-      </ul>
-
-      {resultado && !ocupado && (
-        <div className="mt-3">
-          <Alerta tipo={resultado.some(r => r.tom === 'erro') ? 'erro' : 'ok'}>
-            <p className="font-medium">
-              Última rodada às {new Date(resultado[0]?.em ?? agora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <ul className="mt-0.5 space-y-0.5">
-              {resultado.map((r, k) => <li key={k}>{r.texto}</li>)}
-            </ul>
-          </Alerta>
-        </div>
-      )}
-
-      {ext === null && (
-        <div className="mt-3">
-          <Alerta tipo="erro">
-            A extensão "AFLINE — ponte com o TOA" não respondeu nesta aba. {instrucao}
-          </Alerta>
-        </div>
-      )}
-
-      {ocupado && (
-        <p role="status" aria-live="polite" className="mt-3 flex items-center gap-2 text-sm text-graf-200">
-          <span aria-hidden className="h-4 w-4 rounded-full border-2 border-af-600/25 border-t-af-500
-                                       motion-safe:animate-spin" />
-          {ocupado}
-        </p>
-      )}
-
-      {log.length > 0 && (
-        <ol className="mt-3 max-h-56 space-y-0.5 overflow-y-auto rounded-lg bg-graf-950/50 p-2 text-xs">
-          {log.map((l, k) => (
-            <li key={k} className={l.tom === 'erro' ? 'text-af-300' : l.tom === 'ok' ? 'text-emerald-300' : 'text-graf-300'}>
-              <span className="tabular text-graf-400">{new Date(l.em).toLocaleTimeString('pt-BR')}</span>{' '}
-              {l.texto}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {/* 117: a varredura mora no mesmo computador da vez — é ele que tem
-          a extensão e a aba do TOA. O de reserva não varre. */}
-      {!espera && ordem && (
-        <VarreduraToa baseId={baseId} ext={ext} aoTerminar={aoRodar} />
-      )}
     </section>
   )
 }

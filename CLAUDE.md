@@ -55,6 +55,8 @@ npx expo start
 npx tsc --noEmit
 npm run build                                    # só na web
 npx expo export --platform android --output-dir ../.tmp-export   # só no app
+npm run tsc:extensao                             # a extensão do TOA (em app/)
+npm run extensao                                 # monta extensao-toa/fundo.js e popup.js
 
 # Publicar a web
 cd app
@@ -81,13 +83,14 @@ app/                  web do controle (16 telas, com Almoxarifado, Frota e Monit
   src/pages/          Controle · Servicos · Equipes · Rota · Produtividade
                       Relatorios · Importacao · Administracao · Visita…
   scripts/            criar-usuarios-teste.mjs (exige service_role)
-extensao-toa/         EXTENSÃO do Chrome — a ponte com o TOA do Sincronismo (D-189)
+extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193)
+                      fundo.js/popup.js são GERADOS de app/extensao/ (npm run extensao)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
-docs/                 mapeamento, domínio, 192 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (114 arquivos, até a 117)
+docs/                 mapeamento, domínio, 193 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (115 arquivos, até a 118)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -123,7 +126,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 192 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 193 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
