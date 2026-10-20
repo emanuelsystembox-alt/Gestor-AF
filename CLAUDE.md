@@ -89,7 +89,7 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
-docs/                 mapeamento, domínio, 199 decisões, mapa do concorrente
+docs/                 mapeamento, domínio, 200 decisões, mapa do concorrente
 supabase/migrations/  schema, em ordem (120 arquivos, até a 123)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
@@ -126,7 +126,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 199 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 200 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |

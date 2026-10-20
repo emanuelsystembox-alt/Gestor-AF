@@ -58,6 +58,11 @@ npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-d
 > Uma linha por comando: o terminal aqui é PowerShell 5.1, que **não
 > tem `&&`** (CLAUDE.md). Encadeado com `&&` isto nem chega a rodar.
 
+**Commite antes do build.** A versão no pé da lateral (D-200) é carimbada
+no build: `v0.1.<nº de commits>` e o commit. Buildar com mudança não
+commitada sai com o commit anterior, e a dica da versão avisa "com
+alterações não commitadas".
+
 Cada envio gera também um endereço só daquela versão (tipo
 `https://874da8e7.gestor-af.pages.dev`), útil para comparar antes e
 depois. O endereço que se dá para as pessoas é sempre o principal.

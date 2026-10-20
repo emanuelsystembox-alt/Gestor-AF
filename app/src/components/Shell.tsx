@@ -454,6 +454,19 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
             </div>
           )}
         </div>
+        {/* A versão no ar e a assinatura — "de forma bem sutil" (Emanuel, 20/10).
+            Recolhida, some: a faixa de ícones não tem lugar para texto. */}
+        {!compacto && (
+          <div title={`Versão ${__VERSAO__.numero}`
+                 + (__VERSAO__.commit ? ` · commit ${__VERSAO__.commit}` : '')
+                 + ` · publicada em ${new Date(__VERSAO__.em).toLocaleString('pt-BR')}`
+                 + (__VERSAO__.sujo ? ' · com alterações não commitadas' : '')}
+            className="mt-2 flex items-baseline justify-between gap-2 text-[10px]
+                       leading-none text-graf-400">
+            <span className="tabular">v{__VERSAO__.numero}</span>
+            <span>Desenvolvido por E.C</span>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -7876,3 +7876,22 @@ PME PF 10, WHITE 8.
 Fica para depois, se o Emanuel quiser: a etiqueta no **aplicativo do técnico** (pede a
 `agenda_do_campo` devolver a ouvidoria e uma atualização pelo ar) e um número de
 ouvidoria no Dashboard.
+
+### D-200 · A versão no ar, no pé da lateral, e a assinatura "Desenvolvido por E.C"
+
+*"crie um controle de versão na lateral também (...) e adiciona a sigla desenvolvido
+por E.C"* · *"de forma bem sutil"* — Emanuel, 20/10.
+
+**Carimbada no build, nunca digitada.** O `vite.config.ts` grava `__VERSAO__`:
+`v<major.minor do package.json>.<nº de commits>` (hoje 0.1.12x), o commit curto, a hora
+do build e se havia mudança não commitada em `app/`. Número escrito à mão apodrece no
+primeiro deploy esquecido; o número de commits só sobe. Sem git (pasta copiada), diz
+"sem git" em vez de inventar.
+
+**Sutil:** uma linha de 10 px no pé da lateral, abaixo de quem está logado —
+`v0.1.N` à esquerda, "Desenvolvido por E.C" à direita, na cor de rótulo (`graf-400`; mais
+apagado que isso reprova contraste, traps.md). A dica (passar o mouse) mostra commit,
+data/hora da publicação e o aviso de alterações não commitadas. Lateral recolhida: some.
+
+Consequência: **commitar antes do build** (`docs/09-PUBLICAR.md`), senão a versão no ar
+aponta para o commit anterior.
