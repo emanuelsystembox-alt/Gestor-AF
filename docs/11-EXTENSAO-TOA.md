@@ -93,6 +93,16 @@ desligada, ou fora da lista de endereços do manifest).
 |---|---|---|---|
 | `ping` | — | `{ versao }` (do manifest) | nenhuma — responde o próprio `ponte.js` |
 | `exportar` | `numero` (inteiro, o providerId do bucket), `dia` (`AAAA-MM-DD`) | `{ ok, nome, base64 }` | `GET /?m=gridexport&a=download&itype=manage&providerId=<numero>&date=<dia>&panel=top&view=time&downloadId=<aleatório>&dates=<dia>&<timestamp>` |
+| `varrer` (0.2.0) | `itens: [{ aid, precisa_equipamento }]` | `{ aceito, bucket }` e depois eventos `canal: 'varredura'` (`item` com `resultado` `{ ok, nome, leuEquipamento, itens }`, e `fim`) | **nenhuma direta**: `toa.js`, na aba do TOA, navega pelas telas (Console → Detalhes → Equipamento) e lê o texto |
+| `cancelar-varredura` | — | `{ ok }` | — |
+
+**O caminho da varredura:** a página manda `varrer` → `ponte.js` → `fundo.js`
+acha a aba do TOA (`chrome.tabs.query` pelo host, preferindo a que está no
+Console) → `toa.js` aceita e percorre a lista → cada contrato vira um
+`varredura-evento` que `fundo.js` repassa à aba do Gestor AF (e põe a % no
+ícone) → `ponte.js` → a página grava (`registrar_varredura`) antes do próximo.
+`fundo.js` só aceita `varredura-evento` vindo de aba do TOA, e `varrer` vindo
+de aba que não é do TOA.
 
 **Como o `exportar` sabe que deu certo:** o `.xlsx` é um zip e começa com
 os bytes `PK\x03\x04`. Qualquer outra coisa não é a planilha. Se veio
@@ -175,6 +185,98 @@ estudou o que trazem** — antes de usar qualquer uma, siga o passo 1 acima.
 | `POST ?m=sync&a=write&ajax=1&window_id=…` | periodicamente (é do próprio TOA — **escreve**; não tocar) |
 | `POST index.php?m=partsCatalog&a=getCache` | ao abrir a tela |
 | `POST ?m=gridexport&a=getfilepreparationstatus&itype=manage&output=ajax` | junto do Exportar; devolve `{"state":"done","percent":100}`. O `download` já espera o arquivo ficar pronto, por isso a extensão não usa |
+
+---
+
+## Estudo da atividade por dentro (19/10/2026, noite)
+
+Para a "varredura" pedida pelo Emanuel (nome do cliente, equipamentos e
+miscelânea por contrato). Lido da aba de rede do TOA, logado, numa
+atividade concluída de MAN-AFLINE — **só nomes de campo e estrutura**, sem
+copiar dado de assinante.
+
+| O quê | O que se viu |
+|---|---|
+| **Identificador** | o `aid` interno do TOA **é** o "ID da Atividade" da planilha (`visita.toa_atividade_id`). Dá para pedir a atividade direto |
+| **Busca** | `POST index.php?m=search&a=search` acha por **contrato** (campo `customer_number`), não pelo ID; devolve `aid`, `pid` (recurso), status |
+| **Cartão (hint)** | `POST ?m=Hint&a=activity&itype=manage&output=ajax` com `id=<aid>` — traz "Nome" do cliente, endereço, janela, status |
+| **Página da atividade** | aplicação de página única; rota `#m=activity/a=details/aid=<aid>/__pid=<pid>/__date=<dia>`. Botão "Equipamento" = `list_inventories` |
+| **Os dados** | não vêm por URL própria: vêm pelo canal interno **`POST ?m=sync&a=write&ajax=1`** (FormData com `aids=["<aid>"]`, `pid`, `u` = login, `date`, `dv` = versões, e **`trust`** = assinatura da sessão). Sem ação na pilha, é leitura |
+| **Inventário** | `delta.Inventory`: por item, `invpool` (`install` = instalado; os outros valores — retirado, cliente — ainda não vistos), `invtype` (código do tipo: 6 = EMTA, 106 = HFC/cabo), `invsn` (serial), `quantity`, `inv_aid`, e campos numerados (`199`, `307`, `335`, `419`, `539`). **Miscelânea = item sem serial e com quantidade** (cabo coaxial, 10), na mesma lista |
+| **Atividade** | `delta.Activity.<aid>`: os campos vêm **por número** (`144`, `149`…); o nome do cliente é um deles (número ainda não identificado) |
+| **Formulários** | `delta.FormData`: `mobile_activity_inventory`, `DADOSOSDIGITAL`, `Foto OS Digital`, `mobile_activity_request` |
+| **API REST oficial** | `/rest/ofscCore/v1/activities/<aid>/installedInventories` etc. → **401**: exige credencial de aplicação, que a CLARO não fornece |
+
+**O que isso significa para a extensão:** `m=Hint` e `m=sync`, pedidos
+de fora da aplicação do TOA, respondem `errorNo: SESSION_DESTROYED` — **mesmo
+com a sessão viva**. O TOA só os aceita vindos da própria aplicação (com as
+fichas que ela gera). O `gridexport` é exceção (só cookie), e por isso o
+sincronismo de baixa funciona sem aba do TOA aberta. A varredura vai
+precisar de **uma aba do TOA aberta** e de um script da extensão **dentro
+dela**, pedindo pela aplicação do TOA. Os nomes de tipo/modelo
+(`invtype` 6 → "3 - EMTA") estão num dicionário que a aplicação carrega.
+
+**Caminho FECHADO (19/10, noite):** reenviar o `m=sync` (ou o `m=Hint`)
+por fora da aplicação exige copiar a ficha anti-falsificação do TOA
+(`X-OFS-CSRF-SECURE`, mandada em todo pedido interno) e reusá-la. Isso é
+contornar uma proteção de segurança do sistema da CLARO — **não se faz**,
+nem pelo assistente nem pela extensão. A varredura de equipamento, retirado,
+miscelânea e nome do cliente fica **parada** até haver um caminho que não
+dependa disso. Os caminhos possíveis:
+
+- **Um relatório/exportação do próprio TOA** que traga o inventário por
+  atividade (como o Exportar de Atividades traz a rota): a extensão baixaria
+  igual ao `gridexport`, só com o cookie. Precisa de alguém da operação dizer
+  se existe e onde fica.
+- **A CLARO incluir colunas na exportação de Atividades** (nome do cliente,
+  inventário) ou **fornecer credencial da API REST** — os dois resolvem sem
+  gambiarra.
+
+### O caminho pelas telas (o que já se sabe, 19/10 noite)
+
+Varredura **pelas telas do próprio TOA** — a aplicação dele faz os pedidos;
+o script só navega e lê o texto da página. Testado numa adesão e numa troca
+de decoder concluídas de MAN-AFLINE:
+
+| Passo | Como | Funciona por script? |
+|---|---|---|
+| Achar o contrato | caixa `input[placeholder^="Pesquisa em atividades"]` → resultado `.global-search-found-item .activity-title` | **Não**: texto posto por script (`value` + eventos, `insertText`, Enter sintético) não dispara a busca. Com digitação de verdade, sim. **Em aberto** |
+| Abrir a atividade | `.activity-title.click()` | **Sim** |
+| Nome do cliente | blocos `.form-text-field`: rótulo em `.form-label-group label` ("Nome"), valor em `.form-item` | **Sim** (conferido com "Contrato") |
+| Abrir o equipamento | `button[data-ofsc-id="list_inventories"].click()` (o `<button>`, não a moldura `div.toolbar-item`) | **Sim** |
+| Ler o equipamento | uma `table.table`; `tr.section-header` = seção ("Cliente", "Instalado", "Desinstalado", "Recurso" + quantidade); `tr.table-row--subheader` = colunas; `tr.table-row--desktop` = itens | **Sim** |
+| Voltar | `history.back()` não volta (a aplicação não usa o histórico) | — |
+
+Colunas (as mesmas em todas as seções): **ID do Equipamento · Tipo de
+Equipamento · Modelo Equipamento · Serial Equipamento Instalado · Ação ·
+Serial Equipamento Substituído · Ponto · Local do Ponto · Quantidade**.
+
+- **Instalado** = o que o técnico pôs. Numa troca, `Ação` = 2 e o "Serial
+  Equipamento Substituído" é o aparelho que saiu.
+- **Desinstalado** = o **retirado** (devolutiva), com serial.
+- **Cliente** = o que já estava na casa antes.
+- **Recurso** = a carga do técnico — **fora** (Emanuel, 19/10: "recursos não
+  precisa").
+- **Miscelânea** = linha sem serial e com quantidade (tipo "HFC", modelo
+  `22026219_CABO COAXIAL RG6…`, `22056543_FONTE ACDC 12V…`, quantidade 10/1).
+
+**Como o script chega a cada contrato (resolvido, 0.2.0):** pelo **Console
+de Alocação**, não pela busca. Cada atividade é um `div.toaGantt-tb` com o
+atributo **`aid`** (e `data-activity-status`). Clicar no bloco abre o cartão;
+o link "Detalhes" é `span.hint_link`. **O cartão é reaproveitado**: o link já
+existe antes do clique e, clicado cedo, abre a atividade anterior — o script
+espera o texto do cartão mudar, confere o "ID da Atividade" na tela de
+detalhes e tenta de novo uma vez. "Voltar" é o botão do cabeçalho
+(`aria-label` "Console de Alocação" / "Detalhes da atividade").
+
+Implementado em `extensao-toa/toa.js` (D-192). Testado com as funções reais
+em sequência: 202944209 → 3 itens, 203084123 → 4 itens (outro equipamento),
+ID inexistente → "fora do Console". ~9 s por contrato.
+
+**Sessão:** sem uso, o TOA desloga sozinho (`m=user&a=logout`) — visto
+após ~3h50 parado. O login é SSO da CLARO **com Duo** (aprovação no
+celular). E entrar com o mesmo usuário em outro navegador derruba o
+primeiro — inclusive o computador que sincroniza.
 
 ---
 

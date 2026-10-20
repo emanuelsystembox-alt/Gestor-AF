@@ -7,6 +7,7 @@ import { equipeRotulo, mascaraTelefone, pts } from '../lib/formato'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { SeloLocal } from './TabelaContratos'
 import type { AcaoContrato } from './MenuContrato'
+import { EquipamentoToa } from './EquipamentoToa'
 
 /** O código de baixa com o destino dele (D-097): é o destino que diz
  *  para qual situação final o código serve (098). */
@@ -52,6 +53,8 @@ interface Evento {
 interface Visita {
   id: string; contrato: string | null; wo_numero: string | null
   toa_atividade_id: string | null; cliente_nome: string | null
+  /** 117: quando a varredura leu o equipamento no TOA. */
+  toa_varrido_em: string | null
   tipo_pessoa: string | null; tipo_residencia: string | null; telefones: string[] | null
   logradouro: string | null; complemento: string | null; bairro: string | null
   cidade: string | null; uf: string | null; cep: string | null
@@ -78,7 +81,7 @@ interface Visita {
 }
 
 const SELECT = `
-  id, contrato, wo_numero, toa_atividade_id, cliente_nome,
+  id, contrato, wo_numero, toa_atividade_id, cliente_nome, toa_varrido_em,
   tipo_pessoa, tipo_residencia, telefones,
   contato_cliente ( telefone, login, atualizado_em ),
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
@@ -919,12 +922,17 @@ export function ContratoModal({
                         : null} />
                 </div>
                 {(!v.cliente_nome || !v.tipo_pessoa) && (
-                  <p className="mt-1.5 text-[11px] text-graf-600">
-                    Campos em branco vêm do export do ngestor, que ainda não é importado.
-                    Ficam visíveis de propósito: campo vazio que deveria ter valor é informação.
+                  <p className="mt-1.5 text-[11px] text-graf-400">
+                    {!v.cliente_nome
+                      ? 'O nome vem da varredura do TOA (Sincronismo); em branco = ainda não varrido. '
+                      : ''}
+                    Campo vazio que deveria ter valor fica visível de propósito: é informação.
                   </p>
                 )}
               </section>
+
+              {/* 117: o que o TOA mostra de equipamento e miscelânea. */}
+              <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
 
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-graf-500">

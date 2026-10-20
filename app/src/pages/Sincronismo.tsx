@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { useCidades } from '../lib/cidade'
 import { Shell } from '../components/Shell'
 import { Alerta } from '../components/ui'
+import { VarreduraToa } from '../components/VarreduraToa'
 import { lerPlanilhaTOA, validarPlanilha } from '../lib/toa'
 import { importarLinhasToa, impressaoDasLinhas, ErroImportacao } from '../lib/importarToa'
 import {
@@ -42,6 +43,8 @@ interface Config {
   executor_info: string | null; toa_sessao: 'OK' | 'CAIU' | null; toa_sessao_em: string | null
   configurador: { nome: string | null } | null
   executor: { nome: string | null } | null
+  /** 117: varredura sozinha a cada 30/60 min; nulo = só no botão. */
+  varredura_intervalo_min: number | null
 }
 interface Bucket {
   id: string; nome: string; ativo: boolean; numero_toa: number | null; sincronizar: boolean
@@ -106,7 +109,7 @@ export default function Sincronismo() {
       supabase.from('sincronismo')
         .select(`base_id, ligado, intervalo_min, configurado_em, executor_visto_em,
                  executor_info, toa_sessao, toa_sessao_em, configurador:configurado_por ( nome ),
-                 executor:executor_id ( nome )`)
+                 executor:executor_id ( nome ), varredura_intervalo_min`)
         .maybeSingle(),
       supabase.from('toa_bucket').select('id, nome, ativo, numero_toa, sincronizar').order('nome'),
       supabase.from('sincronismo_rodada')
@@ -220,6 +223,7 @@ function Configuracao({ baseId, cfg, buckets, souAdmin, aoSalvar }: {
   const [intervalo, setIntervalo] = useState<number>(cfg?.intervalo_min ?? 30)
   const [marcados, setMarcados] = useState<string[]>(buckets.filter(b => b.sincronizar).map(b => b.id))
   const [salvando, setSalvando] = useState(false)
+  const [varrendoCfg, setVarrendoCfg] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
@@ -272,6 +276,25 @@ function Configuracao({ baseId, cfg, buckets, souAdmin, aoSalvar }: {
             </button>
           ))}
         </fieldset>
+
+        {/* 117: a varredura do TOA tem o seu próprio ritmo — ela é lenta (uns
+            10 s por contrato) e não precisa acompanhar a baixa. Grava na hora. */}
+        <label className="flex items-center gap-1.5 text-xs text-graf-400">
+          Varredura do TOA
+          <select value={cfg?.varredura_intervalo_min ?? ''} disabled={varrendoCfg}
+            onChange={async e => {
+              setVarrendoCfg(true); setErro(null)
+              const v = e.target.value ? Number(e.target.value) : null
+              const { error } = await supabase.rpc('configurar_varredura', { p_base: baseId, p_intervalo: v })
+              setVarrendoCfg(false)
+              if (error) setErro(error.message); else aoSalvar()
+            }}
+            className="rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs text-graf-100 outline-none focus:border-af-500">
+            <option value="">só no botão</option>
+            <option value="30">a cada 30 min</option>
+            <option value="60">a cada 1 hora</option>
+          </select>
+        </label>
       </div>
 
       <p className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wide text-graf-400">
@@ -713,6 +736,12 @@ function Executor({ baseId, dedicado, aoRodar }: {
             </li>
           ))}
         </ol>
+      )}
+
+      {/* 117: a varredura mora no mesmo computador da vez — é ele que tem
+          a extensão e a aba do TOA. O de reserva não varre. */}
+      {!espera && ordem && (
+        <VarreduraToa baseId={baseId} ext={ext} aoTerminar={aoRodar} />
       )}
     </section>
   )

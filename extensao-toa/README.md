@@ -39,6 +39,21 @@ Cuidado com o login do TOA: entrar com o mesmo usuário do TOA em outro
 navegador **derruba** a sessão anterior (testado em 19/10). Se isso
 acontecer, a tela de todo mundo mostra "a sessão do TOA caiu".
 
+## A varredura do TOA (0.2.0): nome do cliente, equipamento e miscelânea
+
+No mesmo computador que sincroniza:
+
+1. Deixe uma aba do TOA no **Console de Alocação**, no bucket e no dia de
+   hoje. Não use essa aba durante a varredura: a extensão abre cada contrato
+   por ela (bloco → Detalhes → Equipamento), uns 9 segundos cada.
+2. Em **Sincronismo**, clique em **Varrer o TOA agora** — ou escolha na
+   Configuração "a cada 30 min" / "a cada 1 hora".
+3. A % aparece no ícone da extensão e na tela. O nome e a lista de
+   equipamento (instalado, retirado, miscelânea) aparecem no contrato.
+
+Só lê o que a tela do TOA mostra para o seu login; não grava nada no TOA e
+não mexe no estoque do Gestor AF.
+
 ## PC dedicado (opcional)
 
 Quem quiser um computador só para isso, sem o login de uma pessoa, pode
@@ -49,4 +64,5 @@ Não é obrigatório.
 ## Atualizar
 
 Depois de mudar um arquivo daqui, em `chrome://extensions` clique em
-**recarregar** na extensão e recarregue a aba do Gestor AF.
+**recarregar** na extensão e recarregue **as duas abas**: a do Gestor AF e
+a do TOA (F5). Sem recarregar a do TOA, o `toa.js` novo não entra nela.

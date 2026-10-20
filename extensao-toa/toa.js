@@ -1,0 +1,205 @@
+// A varredura pelas TELAS do TOA (117, D-192). Roda dentro da aba do TOA.
+//
+// ┌─ o que este script faz, e o que ele NÃO faz ───────────────────────┐
+// │ Faz o que uma pessoa faria com o mouse, contrato por contrato, no  │
+// │ Console de Alocação: clica no bloco da atividade, em "Detalhes",   │
+// │ lê o Nome; clica em "Equipamento" e lê a tabela. Quem conversa com │
+// │ o servidor é a própria aplicação do TOA, do jeito normal.          │
+// │                                                                    │
+// │ NÃO pede nada ao servidor por conta própria, NÃO copia ficha de    │
+// │ segurança, NÃO clica em nada que grave (só "Detalhes",             │
+// │ "Equipamento" e "voltar"). Ver docs/11-EXTENSAO-TOA.md.            │
+// │                                                                    │
+// │ "Recurso" (a carga do técnico) não é lido — Emanuel, 19/10.        │
+// └────────────────────────────────────────────────────────────────────┘
+
+const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/** Espera a condição virar verdadeira (devolve o valor), ou nulo no prazo. */
+async function ate(cond, max = 10000, passo = 200) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < max) {
+    try { const v = cond(); if (v) return v } catch { /* a tela ainda está montando */ }
+    await espera(passo)
+  }
+  return null
+}
+
+const noConsole = () => /^Console de Aloca/.test(document.title)
+const nosDetalhes = () => /^Detalhes da atividade/.test(document.title)
+const naLista = () => /^Lista de equipamento/.test(document.title)
+
+/** O bucket aberto no Console (o subtítulo do título), para a tela avisar. */
+function bucketAberto() {
+  const h = [...document.querySelectorAll('h1, h2, div, span')]
+    .find((e) => e.children.length === 0 && e.textContent.trim() === 'Console de Alocação')
+  const linhas = (h && h.parentElement ? h.parentElement.innerText : '').split('\n').map((s) => s.trim()).filter(Boolean)
+  return linhas[1] || null
+}
+
+/** O botão "voltar" do cabeçalho do TOA (Detalhes ← Lista; Console ← Detalhes). */
+function botaoVoltar() {
+  return [...document.querySelectorAll('button')].find((b) =>
+    /^(Console de Alocação|Detalhes da atividade)$/.test((b.getAttribute('aria-label') || b.textContent || '').trim()))
+}
+
+async function voltarAoConsole() {
+  for (let i = 0; i < 4 && !noConsole(); i++) {
+    const b = botaoVoltar()
+    if (!b) break
+    const antes = document.title
+    b.click()
+    await ate(() => document.title !== antes, 8000)
+  }
+  return noConsole()
+}
+
+/** O valor de um campo da tela "Detalhes da atividade", pelo rótulo. */
+function valor(rotulo) {
+  const l = [...document.querySelectorAll('.form-label-group label')].find((x) => x.textContent.trim() === rotulo)
+  const v = l && l.closest('.form-text-field') && l.closest('.form-text-field').querySelector('.form-item')
+  return v ? v.innerText.trim() : null
+}
+
+const SECOES = { CLIENTE: 'CLIENTE', INSTALADO: 'INSTALADO', DESINSTALADO: 'DESINSTALADO' }
+const COLUNAS = {
+  'ID do Equipamento': 'toa_item_id',
+  'Tipo de Equipamento': 'tipo',
+  'Modelo Equipamento': 'modelo',
+  'Serial Equipamento Instalado': 'serial',
+  'Ação': 'acao',
+  'Serial Equipamento Substituído': 'serial_substituido',
+  'Ponto': 'ponto',
+  'Local do Ponto': 'local_ponto',
+  'Quantidade': 'quantidade',
+}
+
+/** Lê a "Lista de equipamento": seções Cliente, Instalado, Desinstalado. */
+function lerEquipamento() {
+  const t = document.querySelector('table.table')
+  if (!t) return []
+  const itens = []
+  let secao = null, colunas = null
+  for (const tr of t.querySelectorAll('tr')) {
+    const c = String(tr.className || '')
+    if (c.includes('section-header')) {
+      // "Instalado3" → INSTALADO; "Recurso126" → fora
+      const nome = tr.innerText.trim().replace(/\s+/g, ' ').replace(/\s*\d+$/, '').toUpperCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      secao = SECOES[nome] || null
+      colunas = null
+    } else if (c.includes('table-row--subheader')) {
+      colunas = [...tr.querySelectorAll('td')].map((td) => td.innerText.trim())
+    } else if (secao && colunas && c.includes('table-row--desktop')) {
+      const celulas = [...tr.querySelectorAll('td')].map((td) => td.innerText.trim().replace(/\s+/g, ' '))
+      const item = { secao }
+      colunas.forEach((nome, i) => { const k = COLUNAS[nome]; if (k) item[k] = celulas[i] || '' })
+      itens.push(item)
+    }
+  }
+  return itens
+}
+
+/** O texto do cartão (hint) aberto agora — para saber quando ele trocou. */
+function textoDoCartao() {
+  const link = [...document.querySelectorAll('span.hint_link')].filter((e) => e.textContent.trim() === 'Detalhes').pop()
+  const cartao = link && (link.closest('[class*="hint"]:not(.hint_link):not(.hint_links_mobility)') || link.parentElement.parentElement)
+  return cartao ? cartao.innerText : ''
+}
+
+/**
+ * Console → bloco → cartão → Detalhes, até abrir a atividade CERTA.
+ *
+ * ┌─ o cartão é reaproveitado ───────────────────────────────────────┐
+ * │ O TOA não cria um cartão novo a cada clique: troca o conteúdo do │
+ * │ mesmo. O link "Detalhes" já existe ANTES do clique — e, clicado  │
+ * │ cedo demais, abre a atividade do cartão anterior. Aconteceu no   │
+ * │ teste de 19/10 (leu o equipamento de 202944209 pedindo           │
+ * │ 203084123). Por isso: espera o cartão mudar, confere o ID na     │
+ * │ tela de detalhes e tenta de novo uma vez, com mais calma.        │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
+async function abrirDetalhes(aid) {
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    if (!(await voltarAoConsole())) throw new Error('Não consegui voltar ao Console de Alocação.')
+    const bloco = await ate(() => document.querySelector(`div.toaGantt-tb[aid="${CSS.escape(aid)}"]`), 4000)
+    if (!bloco) return 'FORA'
+
+    const antes = textoDoCartao()
+    bloco.scrollIntoView({ block: 'center', inline: 'center' })
+    bloco.click()
+    // o cartão trocou (ou apareceu), e mais um fôlego para terminar de montar
+    await ate(() => { const t = textoDoCartao(); return t && t !== antes }, 6000)
+    await espera(tentativa ? 1500 : 600)
+    const link = [...document.querySelectorAll('span.hint_link')].filter((e) => e.textContent.trim() === 'Detalhes').pop()
+    if (!link) continue
+    link.click()
+
+    // Confere que abriu a atividade CERTA antes de ler qualquer coisa.
+    const id = await ate(() => nosDetalhes() && valor('ID da Atividade'), 12000)
+    if (id === aid) return 'OK'
+  }
+  throw new Error('A tela de detalhes abriu outra atividade (duas tentativas).')
+}
+
+/** Um contrato: Console → bloco → Detalhes (nome) → Equipamento (lista). */
+async function processar(it) {
+  const aberto = await abrirDetalhes(it.aid)
+  if (aberto === 'FORA') return { ok: false, motivo: 'FORA_DO_CONSOLE' }
+  const nome = valor('Nome')
+
+  let itens = null
+  if (it.precisa_equipamento) {
+    const btn = await ate(() => document.querySelector('button[data-ofsc-id="list_inventories"]'), 6000)
+    if (!btn) throw new Error('O botão Equipamento não apareceu.')
+    btn.click()
+    const pronto = await ate(() => naLista() && document.querySelector('table.table tr.section-header'), 12000)
+    if (!pronto) throw new Error('A lista de equipamento não carregou.')
+    itens = lerEquipamento()
+  }
+  return { ok: true, nome, leuEquipamento: it.precisa_equipamento && itens !== null, itens: itens || [] }
+}
+
+let rodando = false
+let cancelado = false
+
+async function varrer(pedido) {
+  rodando = true; cancelado = false
+  const total = pedido.itens.length
+  const avisar = (evento) => chrome.runtime.sendMessage({
+    tipo: 'varredura-evento', idPedido: pedido.idPedido, abaGestor: pedido.abaGestor, total, ...evento,
+  }).catch(() => {})
+  let feitos = 0
+  try {
+    for (const it of pedido.itens) {
+      if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
+      let r
+      try { r = await processar(it) } catch (e) { r = { ok: false, motivo: 'ERRO', mensagem: String((e && e.message) || e) } }
+      feitos++
+      await avisar({ evento: 'item', aid: it.aid, feitos, resultado: r })
+      // Fôlego entre um contrato e outro: o TOA é usado por gente também.
+      await espera(400)
+    }
+    await voltarAoConsole()
+    await avisar({ evento: 'fim', feitos })
+  } finally {
+    rodando = false
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, responder) => {
+  if (sender.id !== chrome.runtime.id || !msg) return false
+  if (msg.tipo === 'varrer') {
+    if (rodando) { responder({ aceito: false, mensagem: 'Esta aba do TOA já está varrendo.' }); return false }
+    if (!noConsole() && !nosDetalhes() && !naLista()) {
+      responder({ aceito: false, mensagem: 'Deixe a aba do TOA no Console de Alocação (bucket e dia de hoje) e tente de novo.' })
+      return false
+    }
+    responder({ aceito: true, bucket: noConsole() ? bucketAberto() : null })
+    varrer(msg)
+    return false
+  }
+  if (msg.tipo === 'cancelar-varredura') { cancelado = true; responder({ ok: true }); return false }
+  if (msg.tipo === 'toa-estado') { responder({ noConsole: noConsole(), bucket: noConsole() ? bucketAberto() : null, rodando }); return false }
+  return false
+})

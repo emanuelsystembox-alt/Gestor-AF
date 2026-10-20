@@ -177,6 +177,7 @@ As três últimas, para não repetir o esquecimento:
 | 114 | **Sincronismo de 5 e de 10 minutos** — o CHECK de `sincronismo.intervalo_min` e `configurar_sincronismo` aceitam 5, 10, 15, 30 e 60 (D-189) | ✓ |
 | 115 | **"Imediata" não é "sem janela"** — `visita.janela_imediata`, coluna gerada de `dados_origem->>'Intervalo de Tempo'` = IMEDIATA (25 de 701 visitas) (D-190) | ✓ |
 | 116 | **O que sumiu do TOA é desatribuído** — `desatribuir_ausentes(importação)`, a 3ª chamada da importação: Na entrada sem toque do campo, do mesmo bucket e dia, ausente da planilha → 800 na baixa AFLINE + Cancelada + aviso; desatribuído que reaparece → Na entrada. `visita.desatribuido_em`, índice `importacao_linha(visita_id)` (D-191) | ✓ |
+| 117 | **Varredura do TOA** — `visita_equipamento_toa` (Cliente/Instalado/Desinstalado, miscelânea = sem serial; só registro, não mexe em estoque), `visita.toa_varrido_em`, `sincronismo.varredura_*`; RPCs `varredura_pendentes`, `registrar_varredura`, `varredura_estado`, `configurar_varredura` (D-192) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

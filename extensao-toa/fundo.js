@@ -15,14 +15,69 @@
 
 const TOA = 'https://clarobrasil.fs.ocs.oraclecloud.com'
 
+const doToa = (url) => typeof url === 'string' && url.startsWith(TOA + '/')
+
 chrome.runtime.onMessage.addListener((msg, sender, responder) => {
-  // Só o nosso script de conteúdo fala com o fundo.
-  if (sender.id !== chrome.runtime.id || !msg || msg.tipo !== 'exportar') return false
-  exportar(msg.numero, msg.dia)
-    .then(responder)
-    .catch((e) => responder({ ok: false, motivo: 'ERRO', mensagem: String((e && e.message) || e) }))
-  return true // a resposta vem depois (assíncrona)
+  // Só os nossos scripts de conteúdo falam com o fundo.
+  if (sender.id !== chrome.runtime.id || !msg) return false
+
+  if (msg.tipo === 'exportar') {
+    exportar(msg.numero, msg.dia)
+      .then(responder)
+      .catch((e) => responder({ ok: false, motivo: 'ERRO', mensagem: String((e && e.message) || e) }))
+    return true // a resposta vem depois (assíncrona)
+  }
+
+  // ── a varredura (117): Gestor AF → aba do TOA → andamento de volta ──
+  if (msg.tipo === 'varrer' && sender.tab && !doToa(sender.url)) {
+    iniciarVarredura(msg, sender.tab.id).then(responder)
+    return true
+  }
+  if (msg.tipo === 'cancelar-varredura' && sender.tab && !doToa(sender.url)) {
+    abasDoToa().then((abas) => { for (const a of abas) chrome.tabs.sendMessage(a.id, { tipo: 'cancelar-varredura' }).catch(() => {}) })
+    responder({ ok: true })
+    return false
+  }
+  if (msg.tipo === 'varredura-evento' && doToa(sender.url) && Number.isInteger(msg.abaGestor)) {
+    // A porcentagem no ícone — visível de qualquer aba.
+    const pct = msg.total ? Math.floor((msg.feitos / msg.total) * 100) : 0
+    chrome.action.setBadgeBackgroundColor({ color: '#c81a23' })
+    chrome.action.setBadgeText({ text: msg.evento === 'fim' ? '' : `${pct}%` })
+    chrome.action.setTitle({ title: msg.evento === 'fim'
+      ? 'AFLINE — varredura terminada'
+      : `AFLINE — varrendo o TOA: ${msg.feitos} de ${msg.total}` })
+    chrome.tabs.sendMessage(msg.abaGestor, msg).catch(() => {})
+    return false
+  }
+  return false
 })
+
+async function abasDoToa() {
+  return chrome.tabs.query({ url: TOA + '/*' })
+}
+
+/** Acha a aba do TOA, entrega a lista e devolve se ela aceitou. */
+async function iniciarVarredura(msg, abaGestor) {
+  if (!Array.isArray(msg.itens) || !msg.itens.every((i) => i && /^\d{1,12}$/.test(String(i.aid)))) {
+    return { aceito: false, mensagem: 'Lista de contratos inválida.' }
+  }
+  const abas = await abasDoToa()
+  if (!abas.length) {
+    return { aceito: false, mensagem: 'Abra o TOA (Console de Alocação, bucket e dia de hoje) numa aba deste Chrome.' }
+  }
+  // Prefere a aba que já está no Console.
+  const aba = abas.find((a) => /^Console de Aloca/.test(a.title || '')) || abas[0]
+  try {
+    const r = await chrome.tabs.sendMessage(aba.id, {
+      tipo: 'varrer', idPedido: String(msg.idPedido), abaGestor,
+      itens: msg.itens.map((i) => ({ aid: String(i.aid), precisa_equipamento: !!i.precisa_equipamento })),
+    })
+    if (r && r.aceito) chrome.action.setBadgeText({ text: '0%' })
+    return r || { aceito: false, mensagem: 'A aba do TOA não respondeu.' }
+  } catch {
+    return { aceito: false, mensagem: 'A aba do TOA não respondeu. Recarregue a aba do TOA (F5) depois de instalar ou atualizar a extensão.' }
+  }
+}
 
 async function exportar(numero, dia) {
   if (!Number.isInteger(numero) || numero <= 0 || numero > 99999999) {

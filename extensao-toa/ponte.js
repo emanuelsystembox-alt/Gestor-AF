@@ -7,6 +7,13 @@ const DA_PAGINA = 'afline-gestor'
 const DA_EXTENSAO = 'afline-ponte-toa'
 const VERSAO = chrome.runtime.getManifest().version
 
+// O andamento da varredura (117), vindo da aba do TOA pelo fundo, vai para
+// a página — com a mesma marca e o id do pedido.
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (sender.id !== chrome.runtime.id || !msg || msg.tipo !== 'varredura-evento') return
+  window.postMessage({ origem: DA_EXTENSAO, canal: 'varredura', ...msg }, window.location.origin)
+})
+
 window.addEventListener('message', (ev) => {
   if (ev.source !== window) return
   const d = ev.data
@@ -17,6 +24,15 @@ window.addEventListener('message', (ev) => {
 
   if (d.tipo === 'ping') {
     responder({ versao: VERSAO })
+    return
+  }
+
+  // 117: a varredura — a lista vai ao fundo; o andamento volta abaixo.
+  if (d.tipo === 'varrer' || d.tipo === 'cancelar-varredura') {
+    chrome.runtime.sendMessage({ tipo: d.tipo, idPedido: d.id, itens: d.itens }, (r) => {
+      if (chrome.runtime.lastError) responder({ aceito: false, mensagem: chrome.runtime.lastError.message })
+      else responder(r || { aceito: false, mensagem: 'A extensão não respondeu.' })
+    })
     return
   }
 

@@ -5,6 +5,7 @@ import { useCentral } from '../lib/central'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Pill } from '../components/ui'
+import { EquipamentoToa } from '../components/EquipamentoToa'
 
 interface OS {
   id: string; sequencia: number; numero_os: string; ponto: string | null
@@ -36,6 +37,8 @@ interface Evidencia {
 interface Det {
   id: string; toa_atividade_id: string | null; wo_numero: string | null
   contrato: string | null; cliente_nome: string | null
+  /** 117: quando a varredura leu o equipamento no TOA. */
+  toa_varrido_em: string | null
   tipo_pessoa: string | null; tipo_residencia: string | null
   telefones: string[] | null
   logradouro: string | null; complemento: string | null; bairro: string | null
@@ -56,7 +59,7 @@ interface Det {
 }
 
 const SELECT = `
-  id, toa_atividade_id, wo_numero, contrato, cliente_nome, tipo_pessoa,
+  id, toa_atividade_id, wo_numero, contrato, cliente_nome, toa_varrido_em, tipo_pessoa,
   tipo_residencia, telefones, logradouro, complemento, bairro, cidade, uf, cep,
   lat, lng, node, data_agendada, janela_inicio, janela_fim, inicio, fim,
   tempo_deslocamento, situacao, bloqueado_em, origem, observacao, criado_em,
@@ -390,6 +393,9 @@ export default function VisitaDetalhe() {
                 </div>
               )}
             </section>
+
+            {/* 117: o que o TOA mostra de equipamento e miscelânea. */}
+            <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
 
             {/* ---------- ordens de serviço ---------- */}
             <section className="card-controle overflow-hidden">

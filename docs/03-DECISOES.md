@@ -7527,3 +7527,60 @@ próxima importação do bucket os desatribui.
 transação desfeita); o texto do aviso que o técnico recebe é o do
 cancelamento pela importação ("A operadora cancelou — não vá"), com a
 observação "Saiu da sua rota no TOA: desatribuído automaticamente (cód. 800)".
+
+### D-192 · A varredura do TOA: nome do cliente, equipamento e miscelânea, pelas telas
+
+> *"agora eu quero o sistem de sincronismo de equipamentos, e miscelanias que
+> tem no TOA e nome do cliente (...) importar para os contratos conforme o
+> codigo do contrato"* · *"não quero burla o sistema, so quero trazer os dados
+> que a minha senha ja acessa"* · *"recursos não precisa"* — Emanuel, 19/10.
+
+**Por que varredura:** a planilha de Atividades não traz nome (701 de 701
+vazios), equipamento nem miscelânea; não há relatório no TOA que traga
+(Emanuel); a API oficial recusa sem credencial da CLARO (401).
+
+**Por que pelas telas, e não pelo canal interno:** o canal interno do TOA
+(`m=sync`, `m=Hint`) só aceita pedidos com a ficha anti-falsificação que a
+aplicação gera (`X-OFS-CSRF-SECURE`). Copiá-la e reenviar por fora é contornar
+uma proteção do sistema da CLARO — recusado (o assistente foi barrado pelas
+regras de segurança ao tentar, e o caminho ficou registrado como FECHADO em
+`docs/11-EXTENSAO-TOA.md`). A extensão faz o que a pessoa faria com o mouse,
+e quem pede ao servidor é a própria aplicação do TOA.
+
+**O caminho (`extensao-toa/toa.js`, extensão 0.2.0):** numa aba do TOA no
+Console de Alocação — bloco `div.toaGantt-tb[aid]` → cartão → "Detalhes"
+(confere o **ID da Atividade** na tela antes de ler; lê o **Nome**) →
+"Equipamento" → lê a tabela: **Cliente**, **Instalado**, **Desinstalado**
+(retirado). **Recurso** (carga do técnico) fica de fora. Miscelânea = item sem
+serial e com quantidade. Uns **9 s por contrato** (medido).
+
+**Defeito achado no teste e corrigido antes de publicar:** o cartão do TOA é
+reaproveitado — o link "Detalhes" existe antes do clique e, clicado cedo
+demais, abriu a atividade anterior (leu o equipamento de 202944209 pedindo
+203084123). O script agora espera o cartão trocar, confere o ID e tenta de
+novo uma vez. Testado em sequência: 202944209 (3 itens), 203084123 (4 itens,
+outro equipamento), e um ID inexistente → "fora do Console", sem erro.
+
+**O banco (migration 117):**
+- `visita_equipamento_toa` — por contrato, a última leitura (retrato, não
+  razão: cada leitura substitui a anterior). Lê quem lê o contrato (o RLS de
+  `visita` por baixo). **Não mexe em saldo nem posse** (decisão do Emanuel).
+- `visita.cliente_nome` passa a ser preenchido; `visita.toa_varrido_em`.
+- `varredura_pendentes`: hoje, sem jornada, **sem nome** ou **encerrado no
+  TOA e ainda não varrido** (antes de encerrar a lista está incompleta).
+  Medido: 246 pendentes no primeiro dia em Manaus, 18 ms.
+- `registrar_varredura` grava contrato a contrato (parar no meio não perde o
+  que veio); ignora seção Recurso mesmo se vier.
+- `sincronismo.varredura_intervalo_min`: nulo = só no botão; 30 ou 60 min.
+
+**A tela:** Sincronismo › "Este computador sincroniza" ganhou o quadro da
+varredura (botão "Varrer o TOA agora", "Parar", barra com a %); a % também
+aparece no ícone da extensão. A configuração escolhe só no botão / 30 min /
+1 hora. O contrato (janela e página de detalhe) mostra "Equipamento e
+miscelânea no TOA" — ou "ainda não lido do TOA", nunca uma lista vazia que não
+foi lida (regra 6).
+
+**Limites conhecidos:** o Console mostra um bucket e um dia por vez — a
+varredura cobre o que está aberto e conta o resto como "fora do Console";
+trocar de bucket sozinho não foi feito. A aba do TOA fica ocupada durante a
+varredura. Se a Oracle mudar a tela, a varredura para (a baixa continua).
