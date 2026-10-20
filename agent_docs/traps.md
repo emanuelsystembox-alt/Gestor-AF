@@ -171,6 +171,12 @@ pelo bloco na tela; com MAN-AFLINE aberto, os 56 contratos da VT
 Console em outro bucket, 192 de 192. Script que pilota o TOA tem de saber o
 bucket de cada contrato e abri-lo antes (0.5.0, D-196).
 
+**Antes de criar coluna, procure o dado no SCHEMA, não só no `dados_origem`.**
+A segmentação "não tinha coluna" porque eu só olhei a linha crua do TOA — e ela
+existia desde o começo: tabela `segmentacao` + `visita.segmentacao_id`, que a
+importação preenche. Criei uma cópia gerada e tive de derrubar (123b, D-199).
+`information_schema.columns` com `ilike '%nome%'` antes de qualquer `add column`.
+
 ## PostgREST
 
 **Tem cache de schema.** Depois de `ALTER TABLE`, o front recebe

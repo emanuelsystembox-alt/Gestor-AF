@@ -7837,3 +7837,42 @@ da coringa para a regra de CASA); 734 com regra antes e depois. Hoje: APTO 175, 
 jornada. Como `authenticated`: `pontos_por_periodo` de 30 dias em 163 ms. A versão de 2
 argumentos das duas funções foi derrubada (ninguém mais a chama — conferido em
 `pg_proc`).
+
+### D-199 · Caso crítico (ouvidoria) e segmentação do cliente no contrato (123)
+
+*"adicione ao nosso banco a coluna Segmentação (...) e coluna Caso crítico (ouvidoria)
+preciso dizer se é ouvidoria ou não, se for ouvidoria, deve subir um marcador preto, se
+não for a vida segue normal, a segmentação do cliente é importante verifica a melhor
+área para essas sinalizações"* — Emanuel, 20/10.
+
+**Do dado.** As duas colunas já vinham na planilha do TOA. "Caso crítico (ouvidoria)"
+está em TODAS as 1.118 linhas: "não" 1.116, **"sim" 2** (hoje: 208150555, PURPLE, e
+208965109, PME). "Segmentação": PURPLE 399, SEM SEGMENTO 195, PME 61, BLACK 12, PURPLE
+PME PF 10, WHITE 8.
+
+- **Ouvidoria (nova):** `visita.ouvidoria`, coluna **gerada** da linha do TOA, como a
+  `janela_imediata` (115) — a importação não muda, a reimportação acompanha. Nula quando
+  a linha não traz a coluna: "não sei" não é "não".
+- **Segmentação: já existia.** Tabela `segmentacao` + `visita.segmentacao_id`,
+  preenchida pela importação (`importar_toa_interno`) — só aparecia na página do
+  contrato. **Erro meu, desfeito na hora (123b):** criei uma coluna gerada
+  `segmentacao` antes de procurar no schema; era cópia, foi derrubada, e as telas leem
+  `segmentacao:segmentacao_id ( nome )`.
+
+**Onde aparece** (o "verifica a melhor área" do pedido):
+
+- **Linha do contrato** (Serviços e a gaveta de Equipes — o mesmo componente): a
+  etiqueta **preta sólida "● OUVIDORIA"** ao lado do número do contrato, a coisa mais
+  escura da linha, e só quando é. Não-ouvidoria não desenha nada. O segmento vai
+  discreto, ao lado dos pontos, com uma bolinha de cor (PURPLE roxo, PME azul, BLACK
+  preto em contorno, WHITE branco); não usa o roxo de fundo das linhas, que já quer
+  dizer jornada (D-190), e o BLACK não se confunde com a etiqueta da ouvidoria.
+- **Contrato aberto** (janela e página): as duas etiquetas no cabeçalho, maiores.
+- **Filtros** de Serviços e Equipes: "Todo segmento" (e "Segmento não informado") e
+  **"Só ouvidoria (N)"** com a contagem do que está carregado.
+- **Exportar** de Serviços: colunas Segmento e Ouvidoria (SIM / NÃO / vazio = o TOA não
+  trouxe).
+
+Fica para depois, se o Emanuel quiser: a etiqueta no **aplicativo do técnico** (pede a
+`agenda_do_campo` devolver a ouvidoria e uma atualização pelo ar) e um número de
+ouvidoria no Dashboard.

@@ -20,7 +20,7 @@ import { textoDistancia, useLocaisDaBaixa } from '../lib/localBaixa'
 import { fotosDosTecnicos } from '../lib/foto'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import {
-  FILTRO_VAZIO, SEM_JANELA, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
+  FILTRO_VAZIO, SEM_JANELA, SEM_SEGMENTO, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
   type FiltroContrato,
 } from '../lib/filtroContratos'
 
@@ -635,6 +635,9 @@ export default function Equipes() {
       semStatus: cs.some(v => !v.status_toa?.trim()),
       grupos: uniq(cs.map(v => v.tipo_servico?.nome)),
       ...opcoesDeBucket(cs),
+      segmentos: uniq(cs.map(v => v.segmentacao?.nome)),
+      semSegmento: cs.some(v => !v.segmentacao?.nome),
+      ouvidorias: cs.filter(v => v.ouvidoria).length,
       situacoes: SITUACOES.filter(s => cs.some(v => v.situacao === s)),
     }
   }, [contratosDia])
@@ -906,6 +909,17 @@ export default function Equipes() {
                   <option value="OPERADORA">Improdutiva da operadora</option>
                   <option value="TERCEIRO">Improdutiva de terceiro</option>
                 </select>
+                <select value={filtro.segmento} aria-label="Segmentação do cliente"
+                  onChange={e => mudaFiltro('segmento', e.target.value)} className={sel}>
+                  <option value="TODOS">Todo segmento</option>
+                  {opContrato.segmentos.map(s => <option key={s} value={s}>{s}</option>)}
+                  {opContrato.semSegmento && <option value={SEM_SEGMENTO}>Segmento não informado</option>}
+                </select>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                  <input type="checkbox" checked={filtro.soOuvidoria} className="accent-af-600"
+                    onChange={e => mudaFiltro('soOuvidoria', e.target.checked)} />
+                  Só ouvidoria <span className="tabular text-graf-400">({opContrato.ouvidorias})</span>
+                </label>
                 <select value={filtro.origem} aria-label="Origem"
                   onChange={e => mudaFiltro('origem', e.target.value)} className={sel}>
                   <option value="TODAS">Toda origem</option>

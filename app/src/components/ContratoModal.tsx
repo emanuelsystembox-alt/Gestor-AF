@@ -8,6 +8,7 @@ import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { SeloLocal } from './TabelaContratos'
 import type { AcaoContrato } from './MenuContrato'
 import { EquipamentoToa } from './EquipamentoToa'
+import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 
 /** O código de baixa com o destino dele (D-097): é o destino que diz
  *  para qual situação final o código serve (098). */
@@ -55,6 +56,8 @@ interface Visita {
   toa_atividade_id: string | null; cliente_nome: string | null
   /** 117: quando a varredura leu o equipamento no TOA. */
   toa_varrido_em: string | null
+  /** 123: como o TOA mandou. */
+  segmentacao: { nome: string } | null; ouvidoria: boolean | null
   tipo_pessoa: string | null; tipo_residencia: string | null; telefones: string[] | null
   logradouro: string | null; complemento: string | null; bairro: string | null
   cidade: string | null; uf: string | null; cep: string | null
@@ -82,7 +85,7 @@ interface Visita {
 
 const SELECT = `
   id, contrato, wo_numero, toa_atividade_id, cliente_nome, toa_varrido_em,
-  tipo_pessoa, tipo_residencia, telefones,
+  ouvidoria, segmentacao:segmentacao_id ( nome ), tipo_pessoa, tipo_residencia, telefones,
   contato_cliente ( telefone, login, atualizado_em ),
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim, situacao, inicio, fim,
@@ -312,6 +315,8 @@ export function ContratoModal({
               <h2 className="truncate text-lg font-semibold">
                 Contrato {v?.contrato ?? '—'}
               </h2>
+              <SeloOuvidoria ouvidoria={v?.ouvidoria} grande />
+              <SeloSegmento segmentacao={v?.segmentacao?.nome} grande />
             </div>
             <p className="mt-0.5 text-xs text-graf-400">
               {v && new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}

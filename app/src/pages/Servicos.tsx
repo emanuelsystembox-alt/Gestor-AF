@@ -12,7 +12,7 @@ import { useLocaisDaBaixa } from '../lib/localBaixa'
 import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
-import { FILTRO_VAZIO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
+import { FILTRO_VAZIO, SEM_SEGMENTO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
 import { tecnologiaTxt } from '../lib/relatorio'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
@@ -114,6 +114,9 @@ export default function Servicos() {
   const [tecnologia, setTecnologia] = useState<'TODAS' | 'GPON' | 'SEM'>('TODAS')
   const [origem, setOrigem] = useState('TODAS')
   const [buckets, setBuckets] = useState<string[]>([])
+  // 123: segmento do cliente e caso crítico (ouvidoria)
+  const [segmento, setSegmento] = useState('TODOS')
+  const [soOuvidoria, setSoOuvidoria] = useState(false)
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
   const [soProdutivas, setSoProdutivas] = useState(true)
@@ -336,10 +339,15 @@ export default function Servicos() {
 
   // As opções saem do que a lista carregada TEM, com a contagem.
   const opBuckets = useMemo(() => opcoesDeBucket(base), [base])
+  const opCliente = useMemo(() => ({
+    segmentos: [...new Set(base.map(v => v.segmentacao?.nome).filter((x): x is string => !!x))].sort(),
+    semSegmento: base.some(v => v.tipo_atividade?.natureza !== 'JORNADA' && !v.segmentacao?.nome),
+    ouvidorias: base.filter(v => v.ouvidoria).length,
+  }), [base])
 
   const filtro = useMemo<FiltroContrato>(() => ({
-    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets,
-  }), [situacao, grupo, origem, resultado, culpa, buckets])
+    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria,
+  }), [situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria])
 
   const visiveis = useMemo(() => {
     const t = busca.trim().toLowerCase()
@@ -417,24 +425,28 @@ export default function Servicos() {
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
     equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
     culpa !== 'TODAS', tecnologia !== 'TODAS', buckets.length > 0,
+    segmento !== 'TODOS', soOuvidoria,
     busca.trim() !== ''].filter(Boolean).length
 
   function limpar() {
     setSituacao('TODAS'); setArea('TODAS'); setSupervisor('TODOS'); setEquipe('TODAS')
     setGrupo('TODOS'); setOrigem('TODAS'); setResultado('TODOS'); setCulpa('TODAS'); setBusca('')
-    setTecnologia('TODAS'); setBuckets([])
+    setTecnologia('TODAS'); setBuckets([]); setSegmento('TODOS'); setSoOuvidoria(false)
   }
 
   function exportar() {
     const cab = ['Data', 'Janela', 'Situação', 'Grupo', 'Tecnologia', 'Tipo atividade', 'Equipe',
-      'Supervisor', 'Área', 'Contrato', 'Endereço', 'Bairro', 'O.S.', 'Baixas']
+      'Supervisor', 'Área', 'Contrato', 'Segmento', 'Ouvidoria', 'Endereço', 'Bairro', 'O.S.', 'Baixas']
     const linhasCsv = visiveis.map(v => [
       new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR'),
       `${v.janela_inicio?.slice(0, 5) ?? ''}${v.janela_fim ? '-' + v.janela_fim.slice(0, 5) : ''}`,
       SITUACAO_INFO[v.situacao]?.label ?? v.situacao,
       v.tipo_servico?.nome ?? '', tecnologiaTxt(v.tecnologia), v.tipo_atividade?.nome ?? '',
       v.equipe?.codigo ?? '', supervisorDo(v) ?? '', v.area?.apelido ?? '',
-      v.contrato ?? '', v.logradouro ?? '', v.bairro ?? '',
+      v.contrato ?? '', v.segmentacao?.nome ?? '',
+      // 123: vazio quando a linha do TOA não trouxe — não é "não"
+      v.ouvidoria == null ? '' : v.ouvidoria ? 'SIM' : 'NÃO',
+      v.logradouro ?? '', v.bairro ?? '',
       v.ordem_servico.map(o => o.numero_os).join(' '),
       v.ordem_servico.map(o => o.codigo_baixa
         ? `${o.codigo_baixa.codigo}-${o.codigo_baixa.descricao}` : '').filter(Boolean).join(' | '),
@@ -566,6 +578,17 @@ export default function Servicos() {
             </select>
             <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
               valor={buckets} onChange={setBuckets} className={sel} />
+            <select value={segmento} onChange={e => setSegmento(e.target.value)} className={sel}
+              aria-label="Segmentação do cliente">
+              <option value="TODOS">Todo segmento</option>
+              {opCliente.segmentos.map(s => <option key={s} value={s}>{s}</option>)}
+              {opCliente.semSegmento && <option value={SEM_SEGMENTO}>Segmento não informado</option>}
+            </select>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+              <input type="checkbox" checked={soOuvidoria} className="accent-af-600"
+                onChange={e => setSoOuvidoria(e.target.checked)} />
+              Só ouvidoria <span className="tabular text-graf-400">({opCliente.ouvidorias})</span>
+            </label>
             <select value={origem} onChange={e => setOrigem(e.target.value)} className={sel}>
               <option value="TODAS">Toda origem</option>
               <option value="TOA">TOA</option>

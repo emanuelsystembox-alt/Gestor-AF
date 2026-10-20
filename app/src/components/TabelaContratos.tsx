@@ -5,6 +5,7 @@ import { Pill } from './ui'
 import { FaixaJanela } from './telemetria'
 import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
 import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
+import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -38,7 +39,8 @@ export const SELECT_CONTRATO = `
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, janela_imediata, situacao, bloqueado_em, rota_fixada_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
-  finalizado_toa, produtos_pendentes, tecnologia, toa_bucket,
+  finalizado_toa, produtos_pendentes, tecnologia, toa_bucket, ouvidoria,
+  segmentacao:segmentacao_id ( nome ),
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
@@ -89,6 +91,10 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   /** O bucket do TOA da última importação que trouxe o contrato (119).
    *  Nulo = manual. */
   toa_bucket?: string | null
+  /** Segmentação do cliente (a importação liga `segmentacao_id`) e caso
+   *  crítico de ouvidoria (123). `ouvidoria` nula = a linha não trouxe a coluna. */
+  segmentacao?: { nome: string } | null
+  ouvidoria?: boolean | null
   /** "Motivo de Fechamento Externo" do TOA — ex.: "Liberado no Sistema
    *  NETSMS". Vazio na maioria das linhas. */
   motivo_fechamento_toa?: string | null
@@ -363,22 +369,27 @@ export function TabelaContratos({
                     <div className="text-[10px] text-graf-400">jornada · não conta</div>
                   </>
                 ) : (
-                  <div className="font-medium text-graf-200">{v.contrato ?? '—'}</div>
+                  // 123: a ouvidoria sobe junto do número — é o que tem de ser visto primeiro
+                  <div className="flex items-center gap-1.5 font-medium text-graf-200">
+                    {v.contrato ?? '—'}
+                    <SeloOuvidoria ouvidoria={v.ouvidoria} />
+                  </div>
                 )}
                 {detalhada && v.wo_numero && (
                   <div className="text-[10px] text-graf-600">WO {v.wo_numero}</div>
                 )}
                 {(() => {
                   const p = pontos?.get(v.id)
-                  if (!p?.achou) return null
+                  if (!p?.achou && !v.segmentacao?.nome) return null
                   return (
-                    <div className="mt-1">
-                      <span
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {p?.achou && <span
                         title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
                         className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
                                    font-semibold text-emerald-300 ring-1 ring-emerald-700/40">
                         ★ {pts(p.pontos_claro)}
-                      </span>
+                      </span>}
+                      <SeloSegmento segmentacao={v.segmentacao?.nome} />
                     </div>
                   )
                 })()}

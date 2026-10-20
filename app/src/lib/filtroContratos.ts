@@ -30,15 +30,21 @@ export interface FiltroContrato {
   statusToa: string
   /** Os buckets do TOA marcados (119). Vazio = todos; SEM_BUCKET = manual. */
   buckets: string[]
+  /** Segmentação do cliente: 'TODOS', o nome, ou SEM_SEGMENTO (o TOA não disse). */
+  segmento: string
+  /** Só os casos críticos de ouvidoria (123). */
+  soOuvidoria: boolean
 }
 
 export const SEM_JANELA = '__sem_janela__'
 export const SEM_STATUS = '__sem_status__'
 export const SEM_BUCKET = '__sem_bucket__'
+export const SEM_SEGMENTO = '__sem_segmento__'
 
 export const FILTRO_VAZIO: FiltroContrato = {
   situacao: 'TODAS', grupo: 'TODOS', origem: 'TODAS', resultado: 'TODOS',
   culpa: 'TODAS', janela: 'TODAS', statusToa: 'TODOS', buckets: [],
+  segmento: 'TODOS', soOuvidoria: false,
 }
 
 /** `08:00–12:00` — a janela como a coluna Janela escreve. Nula quando o
@@ -61,6 +67,11 @@ export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
   if (f.grupo !== 'TODOS' && v.tipo_servico?.nome !== f.grupo) return false
   if (f.origem !== 'TODAS' && v.origem !== f.origem) return false
   if (f.buckets.length && !f.buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
+  if (f.soOuvidoria && !v.ouvidoria) return false
+  if (f.segmento !== 'TODOS') {
+    const s = v.segmentacao?.nome ?? null
+    if (f.segmento === SEM_SEGMENTO ? s !== null : s !== f.segmento) return false
+  }
 
   if (f.janela !== 'TODAS') {
     const j = janelaDe(v)

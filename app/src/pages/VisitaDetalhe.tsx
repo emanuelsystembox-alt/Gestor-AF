@@ -6,6 +6,7 @@ import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Pill } from '../components/ui'
 import { EquipamentoToa } from '../components/EquipamentoToa'
+import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 
 interface OS {
   id: string; sequencia: number; numero_os: string; ponto: string | null
@@ -39,6 +40,8 @@ interface Det {
   contrato: string | null; cliente_nome: string | null
   /** 117: quando a varredura leu o equipamento no TOA. */
   toa_varrido_em: string | null
+  /** 123: caso crítico (ouvidoria), como o TOA mandou. */
+  ouvidoria: boolean | null
   tipo_pessoa: string | null; tipo_residencia: string | null
   telefones: string[] | null
   logradouro: string | null; complemento: string | null; bairro: string | null
@@ -60,6 +63,7 @@ interface Det {
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome, toa_varrido_em, tipo_pessoa,
+  ouvidoria,
   tipo_residencia, telefones, logradouro, complemento, bairro, cidade, uf, cep,
   lat, lng, node, data_agendada, janela_inicio, janela_fim, inicio, fim,
   tempo_deslocamento, situacao, bloqueado_em, origem, observacao, criado_em,
@@ -295,6 +299,8 @@ export default function VisitaDetalhe() {
                 {v.tipo_servico?.nome ?? v.tipo_atividade?.nome ?? 'Visita'}
               </h1>
               <Pill situacao={v.situacao} />
+              <SeloOuvidoria ouvidoria={v.ouvidoria} grande />
+              <SeloSegmento segmentacao={v.segmentacao?.nome} grande />
               {v.bloqueado_em && (
                 <span title={`Campo tocou em ${dt(v.bloqueado_em)} — o TOA não sobrescreve mais`}
                   className="rounded bg-af-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-af-300">
