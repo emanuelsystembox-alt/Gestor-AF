@@ -19,6 +19,7 @@ const Visita = lazy(() => import('./pages/Visita'))
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'))
 const Frota = lazy(() => import('./pages/Frota'))
 const Monitor = lazy(() => import('./pages/Monitor'))
+const Sincronismo = lazy(() => import('./pages/Sincronismo'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -28,7 +29,7 @@ function Protegida({
   exige,
 }: {
   children: React.ReactNode
-  exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO' | 'FROTA'
+  exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO' | 'FROTA' | 'SINCRONISMO'
 }) {
   const { session, carregando, ehGestor, ehTecnico, temPapel } = useAuth()
   const local = useLocation()
@@ -48,6 +49,9 @@ function Protegida({
   // Frota é o quarto módulo (088), com o papel que já existia no enum.
   if (exige === 'FROTA' && !(ehGestor || temPapel('FROTA')))
     return <Navigate to="/" replace />
+  // 111: a gestão configura; o ROBO roda. O robô não entra em mais nada.
+  if (exige === 'SINCRONISMO' && !(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR', 'ROBO')))
+    return <Navigate to="/" replace />
 
   return <>{children}</>
 }
@@ -63,6 +67,8 @@ function Raiz() {
   // Almoxarife cai na casa dele, nao num /campo que ele nao usa.
   if (temPapel('ALMOXARIFE')) return <Navigate to="/almoxarifado" replace />
   if (temPapel('FROTA')) return <Navigate to="/frota" replace />
+  // O robô de sincronismo (111) só tem uma casa: a tela que ele roda.
+  if (temPapel('ROBO')) return <Navigate to="/controle/sincronismo" replace />
   return <Navigate to="/campo" replace />
 }
 
@@ -91,6 +97,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Equipes /></Protegida>} />
         <Route path="/controle/importar" element={
           <Protegida exige="GESTAO"><Importacao /></Protegida>} />
+        <Route path="/controle/sincronismo" element={
+          <Protegida exige="SINCRONISMO"><Sincronismo /></Protegida>} />
         <Route path="/controle/sub-falhas" element={
           <Protegida exige="GESTAO"><SubFalhas /></Protegida>} />
         <Route path="/controle/produtividade" element={

@@ -67,7 +67,7 @@ npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-d
 Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
-select * from testar_policies();   -- 19 cenários, todos têm que passar
+select * from testar_policies();   -- 26 cenários, todos têm que passar
 select * from testar_campo();      -- 23 cenários das travas do campo (e do antifraude)
 ```
 
@@ -85,8 +85,8 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
-docs/                 mapeamento, domínio, 188 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (106 arquivos, até a 109)
+docs/                 mapeamento, domínio, 189 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (110 arquivos, até a 113)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -122,7 +122,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 188 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 189 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |

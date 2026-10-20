@@ -30,8 +30,9 @@ import { ImportarCadastro } from '../components/ImportarCadastro'
  * banco — não no que o cliente mandou — se quem chamou é ADMIN.
  */
 
+// ROBO (110): o usuário do sincronismo com o TOA — só importa (D-189).
 const PAPEIS = ['ADMIN', 'COP', 'CONTROLADOR', 'SUPERVISOR',
-                'TECNICO', 'ALMOXARIFE', 'FROTA'] as const
+                'TECNICO', 'ALMOXARIFE', 'FROTA', 'ROBO'] as const
 
 interface Cargo { id: string; nome: string; descricao: string | null; ordem: number; ativo: boolean }
 interface PerfilAcesso {

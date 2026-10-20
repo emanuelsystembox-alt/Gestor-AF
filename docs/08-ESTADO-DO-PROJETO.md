@@ -373,6 +373,73 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
+## Pendências abertas — consolidado em 19/10/2026
+
+**Comece por aqui.** As seções datadas abaixo são o histórico de cada leva;
+esta é a lista do que AINDA está aberto, juntando todas, por quem tem de agir.
+Riscado nas seções de baixo = resolvido.
+
+### A · Decisão do Emanuel
+
+| O quê | Onde está | O que falta |
+|---|---|---|
+| **Família do código 425** (TROCA DE TECNOLOGIA) | D-184 | Ficou EQUIPAMENTO provisória, marcada "a revisar". Confirmar ou dizer a certa (dá para trocar em Configurações › Baixa e situação). |
+| **Botões "Impedimento" / "Registrar impedimento"** | D-179 | O status virou "Ticket de suporte"; os botões que levam a ele, não. O exemplo do campo é "cliente ausente", que é impedimento do cliente, não suporte. Renomear ou deixar? |
+| **3 e-mails com cara de erro** | D-177 | `…@gmail.comc` (062), `…@gmal.com` (036), `…@gmail.com.br` (015): entram como login, mas "esqueci a senha" não chegaria. |
+| **Entrada do site** | D-175 | Números ilustrativos; autorização de imagem da foto do time; foto de cliente vem do Unsplash. |
+| **Regras de dinheiro ainda não levantadas** | `business-rules.md` › Em aberto | `pontos_equipe`, metas/faixas de MANUTENÇÃO e DESCONEXÃO, a LPU, 34 regras `CONFERIR`, retenção de evidência. |
+
+### B · Ação na operação (não precisa de código)
+
+| O quê | Como |
+|---|---|
+| **Instalar o APK 0.3.0** nos celulares | Pronto desde 19/10, 14:35: https://expo.dev/artifacts/eas/4N1JoDaHtvbGgfupxyOAd2scG7Q3DNM47iR6meEIJi0.apk — instala por cima do 0.2.1 (mesmo pacote e assinatura). Só a partir dele o app recebe atualização pelo ar (D-186). |
+| **Cadastrar os buckets que faltam** | Configurações › Buckets do TOA, na cidade de cada um: MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ (11 já cadastrados). Arquivo de bucket não cadastrado é recusado na importação. |
+| **Data de contratação dos 55 técnicos** | Opcional, um a um em Administração › Editar cadastro (D-178). |
+| **5 fotos órfãs no Storage** | Da limpeza de 17/10; o SQL não apaga arquivo. Painel do Supabase › Storage › evidencia (D-177). |
+
+### C · Verificação que ninguém fez ainda
+
+O assistente não entra logado (senha de conta real não passa por ele) e não
+tem o celular. Tudo abaixo foi publicado e o banco por trás foi testado —
+falta o olho de quem usa.
+
+| O quê | Por quê |
+|---|---|
+| **Primeira atualização pelo ar** no 0.3.0 | Publicar uma (`campo/README.md`) e conferir que chega em até duas aberturas do app (D-186). |
+| Card **TEC1 - Atendimento no Prazo**, tela de **códigos de baixa**, coluna/filtro **Tecnologia** no Exportar e em Relatórios | D-185, D-187, D-188 — vistos só sem login. |
+| **Seletor de cidade** clicado; cartão "Bucket do TOA" com arquivo arrastado | D-180 — testados no banco, não na tela. |
+| **GPON contra um gabarito de Manaus** | A regra (skill PON) não foi conferida contra um analítico rotulado: o de GPON não tem Manaus (D-188). Com um analítico de GPON de Manaus, cruzar pela O.S. |
+| No APK: trava de **GPS simulado**, **rastro com o app fechado**, botões **Reagendar/Cancelar visita**, e a causa do **app fechando** | D-171, D-172. Se fechar: `select criado_em, tipo, mensagem, contexto, versao, aparelho from erro_app order by criado_em desc;` |
+| Planilha de cadastro aberta no **Excel de verdade**; **lote com acessos** logado; **controlador** barrado na importação de cadastro | D-176. |
+
+### D · Melhorias técnicas conhecidas (nenhuma urgente)
+
+| O quê | Por quê |
+|---|---|
+| **TEC1 calculado em dobro na importação** | ~0,5 s a ganhar tirando o cálculo por linha do `importar_toa_interno` (a reconciliação já recalcula) — D-181. |
+| Cache de **`eh_gestor()` / `minha_empresa()`** na transação | ~4.800 chamadas cada no painel de Equipes; não feito porque a tela já abre em 2,4 s — D-183. |
+| **`testar_policies` criar o próprio contrato** | O cenário "CONTROLADOR exclui contrato" depende de existir contrato no banco (ficou 16/17 enquanto não havia) — D-178. |
+| **Mesmo login TOA em duas cidades** | `vincular_tecnico_ao_usuario` acha o técnico pelo login sem olhar a cidade (`limit 1`) — D-176. |
+| **`tecnico.foto_url` sem uso** | Substituída por `perfil.foto_path` (D-180); pode sair numa migration. |
+| **TEC1 "Sem tratamento"** | Fora da conta por decisão (D-187). Se a importação do fim do dia virar garantida, dá para seguir o livro. |
+| Página **`/campo`** da web; **"Esqueci minha senha"** por e-mail | D-172: alinhar ou aposentar a página; e-mail exige SMTP. |
+
+---
+
+## Pendente em 19/10/2026, noite — Sincronismo com o TOA (D-189)
+
+Migrations **110 a 113**; tela Sincronismo e extensão `extensao-toa/`. Sincroniza com o login de quem opera (113).
+Baterias 26/26 e 23/23. **Web ainda não publicada** (ver abaixo).
+
+| O quê | Por quê |
+|---|---|
+| **Montar o primeiro computador** | Extensão carregada, TOA aberto no Chrome, "Sincronizar por este computador" na tela. Passo a passo em `extensao-toa/README.md`. |
+| **Ligar em Sincronismo** | Marcar MAN-AFLINE e MAN-AFLINE_01_VT, escolher o intervalo. Nasce desligado. |
+| **Ninguém viu a extensão rodar** | A chamada do Exportar foi testada da aba do TOA, não do fundo da extensão. A primeira rodada de verdade é o teste: olhar "Rodadas do sincronismo". |
+| **Quanto dura a sessão do TOA parada** | Desconhecido. A tela acusa "a sessão do TOA caiu"; se cair muito, pensar no login automático (Cloudflare). |
+| **Medir a importação de 15 em 15 min** | Arquivo igual não reimporta (só depois de 1 h). Conferir no primeiro dia quantas rodadas viraram importação e o tempo de cada uma. |
+
 ## Pendente em 19/10/2026, tarde — TEC1, migração e GPON (D-187, D-188)
 
 Migration **109**; web publicada e conferida no ar. Baterias 19/19 e 23/23.
@@ -392,7 +459,7 @@ Migrations **107** e **108**; web publicada e conferida no ar; APK **0.3.0**
 
 | O quê | Por quê |
 |---|---|
-| **Instalar o APK 0.3.0** nos celulares | O 0.2.1 não tem `expo-updates` e não recebe atualização. Depois do 0.3.0, mudança de JavaScript vai por `eas update` (`campo/README.md`). |
+| **Instalar o APK 0.3.0** nos celulares | **Build pronto em 19/10, 14:35**: https://expo.dev/artifacts/eas/4N1JoDaHtvbGgfupxyOAd2scG7Q3DNM47iR6meEIJi0.apk. O 0.2.1 não tem `expo-updates` e não recebe atualização. Depois do 0.3.0, mudança de JavaScript vai por `eas update` (`campo/README.md`). |
 | **Primeira atualização pelo ar** | Não testada: depende do 0.3.0 instalado. Conferir que chega em até duas aberturas do app. |
 | **Família do 425** | EQUIPAMENTO provisória, marcada "a revisar" (D-184). Pergunta ao Emanuel. |
 | **Tela de códigos logada** | Compilada e publicada; o banco por trás testado (D-185). Não vista logada pelo assistente. |
@@ -423,9 +490,9 @@ conferida no ar. Baterias: `testar_policies()` **16/17**, `testar_campo()` 23/23
 
 | O quê | Por quê |
 |---|---|
-| **`testar_policies` 16/17 sem contrato no banco** | "CONTROLADOR exclui contrato" falha porque não há contrato desde a limpeza (D-177); "TECNICO exclui contrato" passa pelo motivo errado. Fica verde com a primeira importação do TOA; o certo é a bateria criar o próprio contrato. |
+| ~~`testar_policies` 16/17 sem contrato no banco~~ | **Resolvido em 19/10**: com a rota importada, 19/19. A melhoria (a bateria criar o próprio contrato) está na lista consolidada. |
 | **Botões "Impedimento" / "Registrar impedimento"** | O status virou "Ticket de suporte", os botões de ação não. Pergunta ao Emanuel: renomear também? (D-179) |
-| **APK com o nome novo** | O rótulo do app está no código: só aparece num APK novo (ou no Expo Go). |
+| ~~APK com o nome novo~~ | **19/10**: está no APK 0.3.0 (D-186). |
 | **Data de contratação dos 55** | Opcional, um a um em Editar cadastro. A planilha não serve para quem já tem acesso (D-178). |
 | **Salvar a data pela tela** | Conferido o campo e o tempo de casa na janela, sem salvar (dado real); a gravação foi testada no banco como ADMIN e como técnico. |
 
@@ -436,7 +503,7 @@ publicada e conferida.
 
 | O quê | Por quê |
 |---|---|
-| **Importar Manaus (55 técnicos)** | Planilha convertida e com prévia limpa (D-177): falta o Emanuel enviá-la em Administração › Importar planilha, logado, com a senha inicial. 3 e-mails parecem ter erro de digitação. |
+| ~~Importar Manaus (55 técnicos)~~ | **Feito em 17/10** pelo Emanuel: 55 acessos, 55 logins roteados (D-178). |
 | **5 fotos órfãs no Storage** | Da limpeza de 17/10; o SQL não apaga arquivo. Painel do Supabase › Storage › evidencia. |
 | **Testar o lote inteiro logado, com acessos** | A criação de acessos em lote cria contas reais e não se desfaz sem a `service_role`. Sugestão: primeiro com 2 ou 3 pessoas de teste numa cidade de teste. |
 | **Abrir a planilha no Excel de verdade** | As listas e as notas foram conferidas lendo o arquivo; ninguém clicou numa lista suspensa no Excel. |
@@ -467,7 +534,7 @@ Migrations **098** e **099**; web publicada e conferida no ar; app em
 
 | O quê | Por quê |
 |---|---|
-| **Gerar o APK 0.2.1** (`npx eas-cli@latest build --platform android --profile preview`) | Tudo do app desta leva (leitura única do GPS, guarda do segundo plano, tela "tropeçou", botão Reagendar/Cancelar) só chega ao APK instalado com build novo. No Expo Go já dá para testar, **menos** o rastro com o app fechado |
+| ~~Gerar o APK 0.2.1~~ | **Substituído pelo 0.3.0** (19/10), que já traz tudo do 0.2.1. |
 | **Achar a causa do app fechando** | Não está provada — está cercada (D-172). Depois de instalar o 0.2.1, se fechar de novo: `select criado_em, tipo, mensagem, contexto, versao, aparelho from erro_app order by criado_em desc;` — o passo em que fechou sobe no início seguinte |
 | **Testar com o dedo** o botão "Reagendar visita" / "Cancelar visita" e a lista de códigos travada no desfecho da 1ª O.S. | `tsc` e `expo export` passam; nada foi tocado num aparelho |
 | Provar a trava de GPS simulado e o rastro em segundo plano | Herdado da D-171 — só no APK |

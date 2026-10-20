@@ -26,7 +26,7 @@ custo por linha não compensava.
 ## As duas baterias — rode antes de commitar
 
 ```sql
-select * from testar_policies();   -- 19 cenários
+select * from testar_policies();   -- 26 cenários
 select * from testar_campo();      -- 23 cenários
 ```
 

@@ -60,6 +60,9 @@ const P = {
   // Monitoramento: o alvo sobre o ponto — onde cada técnico está (096)
   monitor: <><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.2" />
              <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" /></>,
+  // Sincronismo: as duas setas girando — o TOA entrando sozinho (111)
+  sincronismo: <><path d="M19.5 8.5A8 8 0 0 0 5 7.2" /><path d="M5 3.5v3.7h3.7" />
+                 <path d="M4.5 15.5A8 8 0 0 0 19 16.8" /><path d="M19 20.5v-3.7h-3.7" /></>,
 } as const
 
 export type NomeIcone = keyof typeof P

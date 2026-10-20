@@ -5,6 +5,8 @@ import { supabase, carregarSituacoes } from './supabase'
 export type Papel =
   | 'ADMIN' | 'COP' | 'CONTROLADOR' | 'SUPERVISOR'
   | 'TECNICO' | 'ALMOXARIFE' | 'FROTA'
+  /** O usuário do sincronismo com o TOA (110, D-189): só importa. */
+  | 'ROBO'
 
 interface Perfil {
   id: string

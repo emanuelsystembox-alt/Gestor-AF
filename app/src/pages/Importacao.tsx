@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from '../lib/toa'
+import {
+  ETAPAS, importarLinhasToa, reconciliarImportacao, type Resumo,
+} from '../lib/importarToa'
 import { Alerta } from '../components/ui'
 import { Shell } from '../components/Shell'
 import { isoLocal, dataBR } from '../lib/formato'
@@ -15,16 +18,6 @@ interface Origem {
 }
 
 type Fase = 'ocioso' | 'lendo' | 'lida' | 'enviando' | 'pronto'
-
-interface Resumo {
-  criadas: number; atualizadas: number; ignoradas: number
-  /** Atividades suspensas recusadas na leitura (D-104): tentativa
-   *  abortada nao e trabalho, e some da tela -- mas nao daqui. */
-  suspensas?: number
-  erros: number; conflitos: number; ordens_servico: number
-  /** O dia em que as visitas entraram (090). */
-  dia?: string
-}
 
 /**
  * "25/09/26" (como o TOA escreve a coluna Data) → "2026-09-25".
@@ -79,14 +72,6 @@ const ROTULO_ESTADO: Record<EstadoImp, { texto: string; classe: string }> = {
   processando:  { texto: 'Processando',   classe: 'bg-amber-900/40 text-amber-300' },
 }
 
-/** As etapas que a tela mostra enquanto importa. */
-const ETAPAS = [
-  'Registrando a importação',
-  'Enviando as linhas',
-  'Criando e atualizando os contratos',
-  'Ligando jornada, tipo de atividade e TEC1',
-] as const
-
 const quando = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }) : '—'
 
@@ -112,11 +97,10 @@ export default function Importacao() {
 
   async function reconciliar(id: string): Promise<boolean> {
     setReconciliando(true)
-    const { error } = await supabase.rpc('reconciliar_importacao', { p_importacao_id: id })
+    const ok = await reconciliarImportacao(id)
     setReconciliando(false)
-    if (error) { setReconciliarPendente(id); return false }
-    setReconciliarPendente(null)
-    return true
+    setReconciliarPendente(ok ? null : id)
+    return ok
   }
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -126,11 +110,8 @@ export default function Importacao() {
   const [problemas, setProblemas] = useState<string[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [resumo, setResumo] = useState<Resumo | null>(null)
-  const [progresso, setProgresso] = useState('')
   /** Andamento visível (D-182): etapa atual, linhas enviadas, cronômetro. */
-  const [etapa, setEtapaEstado] = useState(0)
-  const etapaRef = useRef(0)
-  const setEtapa = (n: number) => { etapaRef.current = n; setEtapaEstado(n) }
+  const [etapa, setEtapa] = useState(0)
   const [enviadas, setEnviadas] = useState(0)
   const [inicio, setInicio] = useState<number | null>(null)
   const [agora, setAgora] = useState(Date.now())
@@ -195,86 +176,34 @@ export default function Importacao() {
     if (!leitura || !arquivo) return
     setFase('enviando'); setErro(null)
     setEtapa(0); setEnviadas(0); setInicio(Date.now()); setAgora(Date.now())
-    // O id da importação, para gravar a falha nela se der errado depois.
-    let impId: string | null = null
     try {
       if (!ativa) throw new Error('Escolha a cidade no topo da tela antes de importar.')
-      const base = { id: ativa.id }
 
-      setProgresso('Registrando a importação…')
-      const { data: imp, error: ei } = await supabase
-        .from('importacao')
-        .insert({
-          base_id: base.id,
-          usuario_id: perfil?.id ?? null,
-          arquivo_nome: arquivo.name,
-          arquivo_path: `manual/${arquivo.name}`,
-          fonte: 'TOA',
-          // 090: quem decide o dia é quem importa, não a coluna Data.
-          data_atuacao: dia,
-        })
-        .select('id').single()
-      if (ei || !imp) throw new Error(ei?.message ?? 'Falha ao registrar a importação.')
-      impId = imp.id
-      setEtapa(1)
-
-      // Em lotes: 349 linhas num único insert estoura o limite da requisição.
-      const LOTE = 100
-      const linhas = leitura.linhas
-      for (let i = 0; i < linhas.length; i += LOTE) {
-        const fatia = linhas.slice(i, i + LOTE).map((d, k) => ({
-          importacao_id: imp.id,
-          numero_linha: i + k + 1,
-          dados: d,
-        }))
-        setProgresso(`Enviando linhas ${i + 1}–${Math.min(i + LOTE, linhas.length)} de ${linhas.length}…`)
-        const { error } = await supabase.from('importacao_linha').insert(fatia)
-        if (error) throw new Error(`Linha ${i + 1}: ${error.message}`)
-        setEnviadas(Math.min(i + LOTE, linhas.length))
-      }
-
-      setEtapa(2)
-      setProgresso('Processando no banco…')
-      const { data: res, error: er } = await supabase.rpc('importar_toa', {
-        p_importacao_id: imp.id,
+      // O caminho inteiro mora em lib/importarToa.ts — o mesmo do robô (111).
+      // A falha já sai de lá gravada na importação (105).
+      const r = await importarLinhasToa({
+        linhas: leitura.linhas,
+        arquivoNome: arquivo.name,
+        baseId: ativa.id,
+        dia,
+        usuarioId: perfil?.id ?? null,
+        origem: 'manual',
+        aoAvancar: (e, n) => { setEtapa(e); setEnviadas(n) },
       })
-      if (er) throw new Error(er.message)
-
-      await supabase.from('importacao')
-        .update({ total_linhas: linhas.length }).eq('id', imp.id)
-
-      // 104b: a segunda parte, numa chamada própria. Os contratos já estão
-      // gravados; se esta falhar, a tela oferece rodar de novo.
-      setEtapa(3)
-      setProgresso('Ligando jornada, tipo de atividade e TEC1…')
-      await reconciliar(imp.id)
+      setReconciliarPendente(r.reconciliou ? null : r.importacaoId)
       // 108: o código que o cadastro não conhece não trava nada — o
       // contrato só fica parado. A tela diz qual é, aqui, na hora.
-      const { data: novos } = await supabase.rpc('codigos_sem_cadastro', { p_importacao: imp.id })
+      const { data: novos } = await supabase.rpc('codigos_sem_cadastro', { p_importacao: r.importacaoId })
       setCodigosNovos((novos ?? []) as { codigo: number; texto: string; presos: number }[])
 
-      setResumo(res as Resumo)
+      setResumo(r.resumo)
       setFase('pronto')
       await carregarHistorico()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Falha na importação.'
-      // O banco desfaz a transação inteira quando estoura o tempo: dizer
-      // "nada entrou" evita alguém procurar contrato pela metade.
-      const texto = /statement timeout/i.test(msg)
-        ? 'O banco demorou mais que o limite e desfez a importação inteira — nenhum contrato entrou. Tente de novo; se repetir, avise.'
-        : msg
-      setErro(texto)
+      // ErroImportacao já traz o "nada entrou" do estouro de tempo (D-181).
+      setErro(e instanceof Error ? e.message : 'Falha na importação.')
       setFase('lida')
-      // 105: a falha fica GRAVADA na importação, para o histórico de todo
-      // mundo dizer "não entrou" — e não "Processando" para sempre.
-      if (impId) {
-        await supabase.from('importacao')
-          .update({ status: 'ERRO', erro_mensagem: `${ETAPAS[etapaRef.current]}: ${texto}` })
-          .eq('id', impId)
-      }
       await carregarHistorico()
-    } finally {
-      setProgresso('')
     }
   }
 
@@ -586,7 +515,6 @@ export default function Importacao() {
                 {fase === 'enviando' ? 'Importando…'
                   : `Importar ${leitura.linhas.length} visitas em ${dataBR(dia).slice(0, 5)}`}
               </button>
-              {fase !== 'enviando' && progresso && <span className="text-sm text-graf-400">{progresso}</span>}
             </div>
 
             {/* ┌─ o andamento, À VISTA (D-182) ───────────────────────────┐

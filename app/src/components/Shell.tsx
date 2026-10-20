@@ -65,6 +65,8 @@ const OPERACAO: Modulo = {
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
     { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
     { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },
+    // 111: o robô que importa sozinho, de 15 em 15, 30 em 30 ou de hora em hora.
+    { para: '/controle/sincronismo', rotulo: 'Sincronismo', icone: 'sincronismo', busca: 'robo automatico toa importar intervalo' },
     // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
   ],
 }
@@ -84,6 +86,12 @@ const AJUSTES: Modulo = {
     { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao', busca: 'usuarios perfil acesso' },
   ],
 }
+/** O robô de sincronismo (111) não é gestão: vê só a tela que ele roda. */
+const ROBO: Modulo = {
+  chave: 'robo', titulo: 'Robô', icone: 'sincronismo', itens: [
+    { para: '/controle/sincronismo', rotulo: 'Sincronismo', icone: 'sincronismo' },
+  ],
+}
 const FUTURO: Modulo = {
   chave: 'futuro', titulo: 'Próximas fases', icone: 'relatorios', itens: [
     { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
@@ -96,6 +104,7 @@ const FUTURO: Modulo = {
 function useModulos(): Modulo[] {
   const { pode, ehGestor, temPapel } = useAuth()
   const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
+  if (!gestao && temPapel('ROBO')) return [ROBO]
   return [
     ...(gestao ? [OPERACAO] : []),
     ...(pode('almoxarifado.ver') ? [ALMOXARIFADO] : []),

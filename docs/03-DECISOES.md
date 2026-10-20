@@ -7296,6 +7296,14 @@ regra saiu dos analíticos **e** da linha do TOA já no banco (17 e 19/10).
   Equipes). Resultado: 60 de 250 adesões, 44 de 47 migrações, 9 mudanças de
   endereço, 11 retornos, 4 serviços.
 
+**Nos relatórios também** (*"se vai aparecer esse marcador também quando
+formos extrair algum relatório, se vamos conseguir separar as adesões gpon?"*,
+Emanuel, 19/10): coluna **Tecnologia** no "Exportar" de Serviços e nos dois
+relatórios (por contrato e por O.S.), escrita GPON ou NÃO IDENTIFICADA —
+nunca em branco, que pareceria HFC. E o filtro Toda tecnologia / Só GPON /
+Sem GPON identificado em Serviços e em Relatórios; com Tipo de serviço =
+ADESAO + Só GPON, sai a lista das adesões GPON.
+
 **O tipo 57 (MUDANCA DE PACOTE DIGITAL) NÃO é migração** — *"se não tem no
 analítico teste que te mandei não vamos considerar como migração"* (Emanuel,
 19/10). Só o que o dado mostrou entra na regra.
@@ -7309,3 +7317,99 @@ reclassificados na 109 (sem tocar situação: nada de aviso, nada de
 há: o analítico de GPON não tem Manaus e nenhuma O.S. dele casou com os
 arquivos do TOA). A skill PON é o requisito que o próprio TOA grava para
 mandar técnico de fibra — é o melhor sinal disponível na linha.
+
+### D-189 · Sincronismo com o TOA: um robô que é a nossa própria tela
+
+> *"Em baixo do nosso site seria bom ter um botão chamado sincronismo, eu
+> quero fazer uma mascara que entrar em um site, e loga nele dentro do nosso
+> sistema, depois disso, conseguimos escolher quanto e quanto tempo queremos
+> que o sistema importe o excel"* — Emanuel, 19/10.
+
+**O que o TOA faz por baixo** (aba de rede do Console de Alocação, 19/10,
+logado com o usuário do Emanuel): o botão Ações › Exportar é **um GET só** —
+`?m=gridexport&a=download&itype=manage&providerId=<n>&date=<dia>&…` —, que
+devolve o .xlsx pronto (206 KB em 2,2 s para MAN-AFLINE) com o nome
+`Atividades-<BUCKET>_DD_MM_AA.xlsx`, o mesmo de que a importação precisa
+(D-180). Depende só do cookie da sessão. O `providerId` de cada bucket é o
+`data-id` da árvore; 43 foram lidos (MAN-AFLINE = 32041, MAN-AFLINE_01_VT =
+32040). O login é tela montada por JavaScript, com opção de SSO; não vimos
+captcha nem MFA.
+
+**Decisões do Emanuel (19/10):**
+- a CLARO **permite** acesso automatizado com login de prestador; credencial
+  de API ela **não** dá → o caminho é o robô;
+- o login do robô no TOA é um **usuário exclusivo de importação** — testado:
+  entrar com o mesmo usuário em outro navegador **derruba** a sessão anterior;
+- quem opera escolhe os **buckets** e o **intervalo: 15, 30 ou 60 min** (5 e
+  10 foram descartados por ele);
+- a importação entra em nome de um usuário **"Robô de sincronismo"**,
+  registrando quem configurou;
+- o robô roda num **PC da AFLINE** (grátis), não no Cloudflare (US$ 5/mês) —
+  se o PC der trabalho, migra depois; banco e tela servem aos dois.
+
+**O desenho:**
+- **A "máscara" com o TOA dentro do nosso site não existe**: a Oracle
+  proíbe a página dela dentro de outro site, e o navegador proíbe um site de
+  usar o login de outro. Por isso uma **extensão do Chrome**
+  (`extensao-toa/`) faz a chamada do Exportar — e **só** ela: monta a URL a
+  partir de número e dia conferidos; a página não pede outra coisa ao TOA.
+- **O robô é a nossa tela Sincronismo**, aberta no PC com o usuário ROBO. Ela
+  bate o pulso (`sincronismo_pulso`) a cada 60 s, recebe do servidor o DIA
+  (`hoje_local`) e os buckets VENCIDOS, pede a planilha à extensão e importa
+  pelo **mesmo** caminho da importação manual — que saiu de dentro da página
+  para `lib/importarToa.ts`, para não haver duas cópias.
+- **Papel `ROBO`** (110): insere importação em nome PRÓPRIO, na cidade dele,
+  e chama `importar_toa`/`reconciliar_importacao`. Não lê contrato, não
+  baixa, não exclui, não configura o sincronismo. A senha dele mora num PC
+  ligado o dia todo: se vazar, o estrago tem de ser "importou uma planilha".
+  Perfil de acesso "Robo de sincronismo" (112) para criar em um passo.
+- **Arquivo igual não reimporta**: a impressão digital é SHA-256 das LINHAS
+  lidas (não dos bytes — o .xlsx carrega a hora em que foi gerado). Igual à
+  última importação de hoje → rodada `SEM_MUDANCA`. Mas **depois de 1 hora
+  reimporta mesmo igual**, para código cadastrado depois (D-185) e a
+  reconciliação valerem. Isso é regra técnica nossa, não da operação.
+- **Zero e desconhecido** (regra 6): pulso parado há mais de 3 min =
+  "robô sem sinal há X min", em vermelho, para todo mundo; o TOA devolvendo
+  HTML em vez de planilha = "a sessão do TOA caiu"; cada tentativa vira uma
+  linha em `sincronismo_rodada`, inclusive as que não importaram.
+- **"Rodar agora" respeita o desligado**: quem decide é quem configura, não
+  quem está na frente do PC do robô.
+- O nome que o TOA dá ao arquivo **confere o número**: se `numero_toa`
+  estiver errado, a planilha de outro bucket é recusada antes de importar.
+
+**Recusado:** guardar a senha do TOA no nosso banco (o login fica na mão de
+gente, no PC); robô no Cloudflare agora (custo, e ninguém pediu); copiar o
+código de importação na tela do robô; pedir ao TOA por chamada de login
+(frágil: a tela é montada por JS).
+
+**Não verificado:** a extensão não pôde ser carregada no navegador da sessão
+de desenvolvimento — a chamada foi testada da própria aba do TOA, não do
+fundo da extensão (que manda o cookie por regra de extensão com permissão de
+host). Também não se sabe por quanto tempo a sessão do TOA dura sem gente
+mexendo; a tela acusa quando cair. O ciclo do robô ponta a ponta (extensão →
+importação) só roda com o usuário ROBO criado e a extensão instalada.
+
+**Revisão no mesmo dia (113) — sem usuário especial.**
+
+> *"não vejo nessecidade disso, pra mim qual quer um que configurar sua
+> maquina, vai conseguir importar com seu login entende? precisa corrigir
+> isso."* — Emanuel, 19/10, sobre o "Robô de sincronismo".
+
+- Quem pode importar à mão (gestão, controlador) pode **sincronizar pelo
+  próprio computador, com o próprio login** — no Gestor AF e no TOA. A
+  importação entra em nome de quem sincronizou. Não há segundo login no TOA
+  para derrubar ninguém: a extensão usa a sessão já aberta naquele Chrome.
+- O risco novo — dois computadores importando em dobro — virou regra do
+  servidor: **um computador por vez por cidade** (`sincronismo.executor_id`).
+  Quem pulsa enquanto outro está vivo (pulso há menos de 3 min) recebe
+  "Fulano está sincronizando" e não roda nada; se o dono da vez some por
+  3 min, o próximo que pulsar assume (o segundo PC é reserva automática).
+  `ASSUMIR` toma a vez na mão; `SOLTAR` devolve. Testado com dois
+  controladores reais, transação desfeita.
+- "Sincronizar por este computador" é escolha de quem está no computador
+  (guardada no navegador, como o tema); sem a extensão o computador nem
+  pulsa — não tira a vez de quem consegue.
+- O papel **ROBO** e o perfil "Robo de sincronismo" ficam como **opção**
+  (PC dedicado sem login de pessoa). O cenário da bateria "CONTROLADOR se
+  passa pelo robo" virou "SUPERVISOR sincroniza pelo computador dele"
+  (barrado): o controlador agora pode.
