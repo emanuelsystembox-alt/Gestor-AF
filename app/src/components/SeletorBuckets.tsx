@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SEM_BUCKET } from '../lib/filtroContratos'
 
 /**
@@ -11,6 +12,12 @@ import { SEM_BUCKET } from '../lib/filtroContratos'
  * aqui é um botão que abre uma lista de caixinhas. Nada marcado = todos —
  * o mesmo "Toda janela" dos outros filtros, sem um estado a mais.
  * As opções saem do que o dia TEM, com a contagem, como o status do TOA.
+ *
+ * A lista abre por PORTAL na `.sup-controle`, com `position: fixed`: o
+ * cartão dos filtros tem animação com `transform`, que prende o
+ * `absolute` e o z-index dentro dele — o cartão de baixo cobria a lista
+ * (Emanuel, 20/10: "o filtro foi engolido"). Mesma saída do MenuContrato
+ * (D-169, D-173).
  */
 export function SeletorBuckets({ opcoes, semBucket, valor, onChange, className }: {
   opcoes: { nome: string; qtd: number }[]
@@ -22,19 +29,39 @@ export function SeletorBuckets({ opcoes, semBucket, valor, onChange, className }
 }) {
   const [aberto, setAberto] = useState(false)
   const caixa = useRef<HTMLDivElement>(null)
+  const lista = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ x: number; dir: number; y: number } | null>(null)
+
+  function abrirOuFechar() {
+    if (aberto) { setAberto(false); return }
+    const r = caixa.current?.getBoundingClientRect()
+    if (r) setPos({ x: r.left, dir: r.right, y: r.bottom + 4 })
+    setAberto(true)
+  }
 
   // Fecha ao clicar fora ou no Esc — é um menu, não um formulário.
   useEffect(() => {
     if (!aberto) return
     const fora = (e: MouseEvent) => {
-      if (caixa.current && !caixa.current.contains(e.target as Node)) setAberto(false)
+      const alvo = e.target as Node
+      if (caixa.current?.contains(alvo) || lista.current?.contains(alvo)) return
+      setAberto(false)
     }
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    // fixed não acompanha a rolagem: rolou, fecha (em vez de flutuar longe do botão)
+    const rolou = (e: Event) => {
+      if (lista.current?.contains(e.target as Node)) return
+      setAberto(false)
+    }
     document.addEventListener('mousedown', fora)
     document.addEventListener('keydown', esc)
+    window.addEventListener('scroll', rolou, true)
+    window.addEventListener('resize', rolou)
     return () => {
       document.removeEventListener('mousedown', fora)
       document.removeEventListener('keydown', esc)
+      window.removeEventListener('scroll', rolou, true)
+      window.removeEventListener('resize', rolou)
     }
   }, [aberto])
 
@@ -49,16 +76,21 @@ export function SeletorBuckets({ opcoes, semBucket, valor, onChange, className }
 
   return (
     <div ref={caixa} className="relative">
-      <button type="button" onClick={() => setAberto(a => !a)}
+      <button type="button" onClick={abrirOuFechar}
         aria-haspopup="true" aria-expanded={aberto} aria-label="Bucket do TOA"
         className={`${className} inline-flex items-center gap-1.5 ${
           valor.length ? 'border-af-500 text-graf-100' : ''}`}>
         {texto}
         <span aria-hidden className="text-[9px] opacity-60">▼</span>
       </button>
-      {aberto && (
-        <div role="group" aria-label="Buckets do TOA"
-          className="absolute left-0 top-full z-30 mt-1 min-w-60 rounded-md border
+      {aberto && pos && createPortal(
+        <div ref={lista} role="group" aria-label="Buckets do TOA"
+          // sem espaço à direita, alinha pela borda direita do botão — o
+          // translate usa o tamanho real da lista, não um estimado (traps.md)
+          style={pos.x + 260 > window.innerWidth
+            ? { position: 'fixed', left: pos.dir, top: pos.y, transform: 'translateX(-100%)' }
+            : { position: 'fixed', left: pos.x, top: pos.y }}
+          className="z-50 max-h-80 min-w-60 overflow-y-auto rounded-md border
                      border-graf-700 bg-graf-900 p-1.5 shadow-lg">
           {todas.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-graf-400">Nenhum contrato no dia.</p>
@@ -79,7 +111,8 @@ export function SeletorBuckets({ opcoes, semBucket, valor, onChange, className }
               Todos os buckets
             </button>
           )}
-        </div>
+        </div>,
+        document.querySelector('.sup-controle') ?? document.body,
       )}
     </div>
   )
