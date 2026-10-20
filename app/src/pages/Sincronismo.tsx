@@ -61,13 +61,14 @@ interface Ordem {
   buckets: { id: string; nome: string; numero_toa: number; vencido: boolean; impressao: string | null }[]
 }
 
-const INTERVALOS = [15, 30, 60] as const
+/** 5 e 10 entraram na 114 (Emanuel, 19/10): o igual não reimporta, e a conferência custa < 1 s. */
+const INTERVALOS = [5, 10, 15, 30, 60] as const
 /** O pulso é de 60 s; três pulsos perdidos é silêncio de verdade, não atraso. */
 const SEM_SINAL_MS = 3 * 60_000
 
 const ROTULO: Record<Rodada['resultado'], { texto: string; classe: string }> = {
   IMPORTADA:   { texto: 'Importou',     classe: 'bg-emerald-900/40 text-emerald-300' },
-  SEM_MUDANCA: { texto: 'Sem mudança',  classe: 'bg-graf-800 text-graf-300' },
+  SEM_MUDANCA: { texto: 'Conferido · sem mudança', classe: 'bg-sky-900/40 text-sky-300' },
   SEM_SESSAO:  { texto: 'TOA deslogou', classe: 'bg-amber-900/40 text-amber-300' },
   ERRO:        { texto: 'Erro',         classe: 'bg-af-900/40 text-af-300' },
 }
@@ -188,7 +189,11 @@ function Estado({ cfg, rodadas, agora }: { cfg: Config | null; rodadas: Rodada[]
     detalhe = `O computador de ${quem} está ligado, mas o TOA pediu login de novo. Entre no TOA nesse computador.`
   } else {
     tom = 'ok'; titulo = `Sincronizando a cada ${cfg.intervalo_min} min, pelo computador de ${quem}`
+    const imp = rodadas.find(r => r.resultado === 'IMPORTADA')
     detalhe = `Último pulso ${ha(cfg.executor_visto_em, agora)}.`
+      + (imp ? ` Última importação às ${hora(imp.terminada_em)}`
+               + (imp.importacao ? ` (${imp.importacao.qtd_atualizadas ?? 0} atualizados, ${imp.importacao.qtd_criadas ?? 0} novos)` : '')
+               + '.' : '')
       + (ultima ? ` Última rodada às ${hora(ultima.terminada_em)} (${ultima.bucket}: ${ROTULO[ultima.resultado].texto.toLowerCase()}).` : '')
   }
 
@@ -381,6 +386,8 @@ function Executor({ baseId, dedicado, aoRodar }: {
   const [log, setLog] = useState<LinhaLog[]>([])
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [vigilia, setVigilia] = useState<boolean | null>(null)
+  /** O que a última rodada deste computador fez, bucket a bucket — à vista. */
+  const [resultado, setResultado] = useState<LinhaLog[] | null>(null)
   const rodando = useRef(false)
   const agora = Date.now()
 
@@ -399,16 +406,24 @@ function Executor({ baseId, dedicado, aoRodar }: {
     if (error) anotar(`Não consegui registrar a rodada: ${error.message}`, 'erro')
   }
 
-  /** Uma rodada de um bucket: exporta, lê, compara, importa, registra. */
-  async function rodarBucket(b: Ordem['buckets'][number], dia: string) {
+  /**
+   * Uma rodada de um bucket: exporta, lê, compara, importa, registra.
+   * Devolve a frase do resultado, para a tela dizer o que aconteceu —
+   * "sem mudança" calado parecia que nada tinha rodado (Emanuel, 19/10).
+   * `forcar` (o botão "Importar agora") importa mesmo com a planilha igual:
+   * quem clica quer importar; pular o igual é economia das rodadas sozinhas.
+   */
+  async function rodarBucket(b: Ordem['buckets'][number], dia: string, forcar: boolean): Promise<LinhaLog> {
+    const fim = (texto: string, tom: LinhaLog['tom']): LinhaLog => {
+      anotar(texto, tom); return { em: Date.now(), texto, tom }
+    }
     const iniciada = new Date().toISOString()
     setOcupado(`${b.nome}: baixando do TOA…`)
     const r = await exportarDoToa(b.numero_toa, dia)
     if (!r.ok) {
-      anotar(`${b.nome}: ${r.mensagem}`, 'erro')
       await registrar(baseId, b.id, dia, iniciada, r.motivo === 'SEM_SESSAO' ? 'SEM_SESSAO' : 'ERRO',
                       { mensagem: r.mensagem })
-      return
+      return fim(`${b.nome}: ${r.mensagem}`, 'erro')
     }
     const nome = r.nome ?? nomePadrao(b.nome, dia)
     // O nome que o TOA deu diz de que bucket o arquivo é DE VERDADE: um
@@ -417,9 +432,8 @@ function Executor({ baseId, dedicado, aoRodar }: {
     const doNome = bucketDoNome(nome)
     if (doNome && doNome !== b.nome) {
       const msg = `O número ${b.numero_toa} no TOA é do bucket ${doNome}, não de ${b.nome}. Corrija o número nesta tela.`
-      anotar(msg, 'erro')
       await registrar(baseId, b.id, dia, iniciada, 'ERRO', { mensagem: msg })
-      return
+      return fim(msg, 'erro')
     }
 
     setOcupado(`${b.nome}: lendo a planilha…`)
@@ -428,10 +442,9 @@ function Executor({ baseId, dedicado, aoRodar }: {
       const leitura = await lerPlanilhaTOA(new File([r.bytes], nome))
       const problemas = validarPlanilha(leitura)
       if (leitura.linhas.length === 0) {
-        anotar(`${b.nome}: o TOA não tem atividade neste bucket hoje.`)
         await registrar(baseId, b.id, dia, iniciada, 'SEM_MUDANCA',
                         { mensagem: 'Planilha sem nenhuma atividade.', linhas: 0 })
-        return
+        return fim(`${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.`, 'info')
       }
       if (problemas.length) throw new Error(problemas.join(' '))
       linhas = leitura.linhas
@@ -439,17 +452,17 @@ function Executor({ baseId, dedicado, aoRodar }: {
       const msg = e instanceof Error ? e.message : 'Não consegui ler a planilha.'
       // "A planilha está vazia" é o TOA sem atividade, não defeito.
       const vazia = /vazia/i.test(msg)
-      anotar(`${b.nome}: ${msg}`, vazia ? 'info' : 'erro')
       await registrar(baseId, b.id, dia, iniciada, vazia ? 'SEM_MUDANCA' : 'ERRO',
                       { mensagem: vazia ? 'Planilha sem nenhuma atividade.' : msg, linhas: vazia ? 0 : undefined })
-      return
+      return fim(vazia ? `${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.` : `${b.nome}: ${msg}`,
+                 vazia ? 'info' : 'erro')
     }
 
     const impressao = await impressaoDasLinhas(linhas)
-    if (b.impressao && b.impressao === impressao) {
-      anotar(`${b.nome}: ${linhas.length} atividades, iguais à última importação.`)
+    if (!forcar && b.impressao && b.impressao === impressao) {
       await registrar(baseId, b.id, dia, iniciada, 'SEM_MUDANCA', { impressao, linhas: linhas.length })
-      return
+      return fim(`${b.nome}: conferido no TOA — as ${linhas.length} atividades estão iguais às da última `
+        + 'importação. Os contratos já estão em dia.', 'ok')
     }
 
     try {
@@ -459,18 +472,18 @@ function Executor({ baseId, dedicado, aoRodar }: {
         aoAvancar: (_e, n) => setOcupado(`${b.nome}: importando (${n}/${linhas.length})…`),
       })
       const s = res.resumo
-      anotar(`${b.nome}: importou ${linhas.length} atividades — ${s.criadas} novas, ${s.atualizadas} atualizadas`
-        + (s.erros ? `, ${s.erros} com erro` : '')
-        + (res.reconciliou ? '.' : '. A segunda parte (TEC1, jornada) não terminou; a próxima rodada refaz.'),
-        s.erros ? 'erro' : 'ok')
       await registrar(baseId, b.id, dia, iniciada, 'IMPORTADA',
                       { importacao: res.importacaoId, impressao, linhas: linhas.length })
+      return fim(`${b.nome}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, `
+        + `${s.atualizadas} atualizadas` + (s.erros ? `, ${s.erros} com erro` : '')
+        + (res.reconciliou ? '.' : '. A segunda parte (TEC1, jornada) não terminou; a próxima rodada refaz.'),
+        s.erros ? 'erro' : 'ok')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Falha na importação.'
-      anotar(`${b.nome}: ${msg}`, 'erro')
       await registrar(baseId, b.id, dia, iniciada, 'ERRO', {
         mensagem: msg, importacao: e instanceof ErroImportacao ? e.importacaoId : null, linhas: linhas.length,
       })
+      return fim(`${b.nome}: ${msg}`, 'erro')
     }
   }
 
@@ -496,12 +509,13 @@ function Executor({ baseId, dedicado, aoRodar }: {
       const o = data as Ordem
       setOrdem(o)
       if (modo === 'ASSUMIR') anotar('Este computador assumiu o sincronismo.', 'ok')
-      // Desligado é desligado, inclusive para o "Rodar agora": quem decide
+      // Desligado é desligado, inclusive para o "Importar agora": quem decide
       // é quem configura, não quem está na frente do computador.
       if (!o.ligado || o.outro) return
       const fila = o.buckets.filter(b => forcar || b.vencido)
-      for (const b of fila) await rodarBucket(b, o.hoje)
-      if (fila.length) aoRodar()
+      const feitos: LinhaLog[] = []
+      for (const b of fila) feitos.push(await rodarBucket(b, o.hoje, forcar))
+      if (fila.length) { setResultado(feitos); aoRodar() }
     } finally {
       rodando.current = false
       setOcupado(null)
@@ -617,9 +631,10 @@ function Executor({ baseId, dedicado, aoRodar }: {
             </button>
           ) : (
             <button onClick={() => ciclo(true)} disabled={!!ocupado || !ext || !ordem?.ligado}
+              title="Baixa do TOA e importa agora, mesmo que nada tenha mudado"
               className="rounded-lg border border-af-600 px-3 py-1.5 text-xs font-medium text-af-200
                          hover:bg-af-600/15 disabled:opacity-50">
-              Rodar agora
+              Importar agora
             </button>
           )}
           {!dedicado && (
@@ -656,6 +671,19 @@ function Executor({ baseId, dedicado, aoRodar }: {
         </li>
       </ul>
 
+      {resultado && !ocupado && (
+        <div className="mt-3">
+          <Alerta tipo={resultado.some(r => r.tom === 'erro') ? 'erro' : 'ok'}>
+            <p className="font-medium">
+              Última rodada às {new Date(resultado[0]?.em ?? agora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <ul className="mt-0.5 space-y-0.5">
+              {resultado.map((r, k) => <li key={k}>{r.texto}</li>)}
+            </ul>
+          </Alerta>
+        </div>
+      )}
+
       {ext === null && (
         <div className="mt-3">
           <Alerta tipo="erro">
@@ -687,6 +715,17 @@ function Executor({ baseId, dedicado, aoRodar }: {
 }
 
 /* ─────────────────────────── o histórico ─────────────────────────── */
+
+/** "346 atividades conferidas no TOA — iguais à importação das 20:44; contratos em dia." */
+function semMudanca(r: Rodada, todas: Rodada[]): string {
+  // A lista vem da mais nova para a mais velha: a importação de referência é
+  // a primeira IMPORTADA do mesmo bucket DEPOIS desta na lista.
+  const i = todas.indexOf(r)
+  const ref = todas.slice(i + 1).find(x => x.bucket === r.bucket && x.resultado === 'IMPORTADA')
+  return `${r.linhas ?? '—'} atividades conferidas no TOA — iguais `
+    + (ref ? `à importação das ${hora(ref.terminada_em)}` : 'à última importação')
+    + '; contratos em dia.'
+}
 
 function Historico({ rodadas }: { rodadas: Rodada[] }) {
   return (
@@ -732,7 +771,9 @@ function Historico({ rodadas }: { rodadas: Rodada[] }) {
                             <> · <span className="tabular text-af-400">{r.importacao.qtd_erro}</span> erros</>
                           )}
                         </>
-                      : r.mensagem ?? (r.linhas != null ? `${r.linhas} atividades` : '—')}
+                      : r.mensagem ?? (r.resultado === 'SEM_MUDANCA'
+                          ? semMudanca(r, rodadas)
+                          : r.linhas != null ? `${r.linhas} atividades` : '—')}
                   </td>
                 </tr>
               ))}

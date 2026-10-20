@@ -12,6 +12,10 @@ para o endereço do TOA e consegue.
 **Ela não altera nada no TOA**, não guarda senha e não fala com nenhum
 outro endereço.
 
+> **Vai mexer na extensão?** Como ela funciona, o protocolo com a tela, as
+> regras que não se quebram e o passo a passo para acrescentar uma ação
+> nova estão em [`docs/11-EXTENSAO-TOA.md`](../docs/11-EXTENSAO-TOA.md).
+
 ## Sincronizar pelo seu computador
 
 Qualquer pessoa que importa à mão (gestão ou controlador) pode — com o

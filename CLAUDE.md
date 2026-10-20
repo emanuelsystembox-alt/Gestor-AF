@@ -81,12 +81,13 @@ app/                  web do controle (16 telas, com Almoxarifado, Frota e Monit
   src/pages/          Controle · Servicos · Equipes · Rota · Produtividade
                       Relatorios · Importacao · Administracao · Visita…
   scripts/            criar-usuarios-teste.mjs (exige service_role)
+extensao-toa/         EXTENSÃO do Chrome — a ponte com o TOA do Sincronismo (D-189)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · Material
                       Abastecer · Visita · Captura · Romaneios · Transferir
 docs/                 mapeamento, domínio, 189 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (110 arquivos, até a 113)
+supabase/migrations/  schema, em ordem (111 arquivos, até a 114)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -124,6 +125,7 @@ tarefa pedir.
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 189 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
+| `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |
 | `docs/01` `02` `05` `07` | mapeamento, domínio, concorrente, telas |

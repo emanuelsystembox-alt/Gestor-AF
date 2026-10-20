@@ -174,6 +174,7 @@ As três últimas, para não repetir o esquecimento:
 | 111 | **Sincronismo com o TOA** — `toa_bucket.numero_toa` (providerId do TOA, 11 buckets preenchidos) e `sincronizar`; tabelas `sincronismo` (uma por cidade: ligado, intervalo 15/30/60, pulso do PC) e `sincronismo_rodada`; RPCs `configurar_sincronismo`, `definir_numero_toa`, `sincronismo_pulso`, `sincronismo_registrar_rodada`; policies do ROBO em `importacao`/`importacao_linha` (em nome próprio, sem DELETE); `importar_toa` e `reconciliar_importacao` aceitam ROBO (editadas sobre a versão viva); `testar_policies` com 7 cenários novos (26) (D-189) | ✓ |
 | 112 | **Perfil de acesso "Robo de sincronismo"** — papel ROBO, só `importacao.ver`/`importacao.executar`; cria o robô em um passo (D-189) | ✓ |
 | 113 | **Sincronismo pelo login de quem opera** — gestão e controlador sincronizam pelo próprio computador; um computador por vez por cidade (`sincronismo_pulso` com `p_modo` PULSO/ASSUMIR/SOLTAR; o outro fica de reserva e assume após 3 min sem pulso); ROBO vira opcional; cenário da bateria passa ao SUPERVISOR (26) (D-189) | ✓ |
+| 114 | **Sincronismo de 5 e de 10 minutos** — o CHECK de `sincronismo.intervalo_min` e `configurar_sincronismo` aceitam 5, 10, 15, 30 e 60 (D-189) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

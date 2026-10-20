@@ -7413,3 +7413,25 @@ importação) só roda com o usuário ROBO criado e a extensão instalada.
   (PC dedicado sem login de pessoa). O cenário da bateria "CONTROLADOR se
   passa pelo robo" virou "SUPERVISOR sincroniza pelo computador dele"
   (barrado): o controlador agora pode.
+
+**Primeira rodada real (19/10, 20:44):** extensão 0.1.0 no Chrome 155 do
+Emanuel, MAN-AFLINE: 346 atividades → 339 contratos atualizados, 0 erros,
+**7,7 s** do pedido ao TOA até o fim da importação. A dúvida de que o fundo
+da extensão levaria o cookie do TOA ficou respondida: leva. A extensão está
+documentada para crescer em `docs/11-EXTENSAO-TOA.md` (*"documente ela, que
+vamos editar depois algumas coisas que ela pode nos ajudar ainda"* — Emanuel).
+
+**"Sem mudança" parecia que não tinha rodado** (*"mais é bom informar que a
+importação esta feita com sucesso entende? parece que nem atualizou"* —
+Emanuel, 19/10). O banco estava certo (20:46 e 20:47: as mesmas 346 linhas,
+mesma impressão). A tela passou a dizer: rótulo **"Conferido · sem mudança"**,
+com "346 atividades conferidas no TOA — iguais à importação das 20:44;
+contratos em dia"; o quadro de estado mostra a última importação; e cada
+rodada deste computador aparece num quadro de resultado. O botão virou
+**"Importar agora" e importa mesmo com a planilha igual** — quem clica quer
+importar; pular o igual ficou só para as rodadas sozinhas.
+
+**5 e 10 minutos (114).** *"adicione 5 minutos e 10 minutos por favor na extensão,
+pra ter mais opções"* — Emanuel, 19/10, depois da primeira rodada real. O que
+pesava era reimportar o igual, e isso não acontece: a conferência sem mudança
+mediu 0,4–0,7 s. Intervalos agora: 5, 10, 15, 30 e 60 min.

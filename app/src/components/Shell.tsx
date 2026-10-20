@@ -65,7 +65,7 @@ const OPERACAO: Modulo = {
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
     { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
     { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },
-    // 111: o robô que importa sozinho, de 15 em 15, 30 em 30 ou de hora em hora.
+    // 111: o robô que importa sozinho, de 5 em 5 minutos a de hora em hora.
     { para: '/controle/sincronismo', rotulo: 'Sincronismo', icone: 'sincronismo', busca: 'robo automatico toa importar intervalo' },
     // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
   ],

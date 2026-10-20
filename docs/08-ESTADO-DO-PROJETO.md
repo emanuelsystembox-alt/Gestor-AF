@@ -434,9 +434,8 @@ Baterias 26/26 e 23/23. Web publicada em 19/10 e conferida no ar (o arquivo da t
 
 | O quê | Por quê |
 |---|---|
-| **Montar o primeiro computador** | Extensão carregada, TOA aberto no Chrome, "Sincronizar por este computador" na tela. Passo a passo em `extensao-toa/README.md`. |
 | **Ligar em Sincronismo** | Marcar MAN-AFLINE e MAN-AFLINE_01_VT, escolher o intervalo. Nasce desligado. |
-| **Ninguém viu a extensão rodar** | A chamada do Exportar foi testada da aba do TOA, não do fundo da extensão. A primeira rodada de verdade é o teste: olhar "Rodadas do sincronismo". |
+| ~~Ninguém viu a extensão rodar~~ | **Rodou em 19/10, 20:44** no Chrome do Emanuel: MAN-AFLINE, 346 atividades → 339 atualizados, 0 erros, 7,7 s. Documentada em `docs/11-EXTENSAO-TOA.md`. |
 | **Quanto dura a sessão do TOA parada** | Desconhecido. A tela acusa "a sessão do TOA caiu"; se cair muito, pensar no login automático (Cloudflare). |
 | **Medir a importação de 15 em 15 min** | Arquivo igual não reimporta (só depois de 1 h). Conferir no primeiro dia quantas rodadas viraram importação e o tempo de cada uma. |
 

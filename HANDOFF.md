@@ -27,6 +27,7 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
+| **Extensão do Chrome (TOA)** | `extensao-toa/` — a ponte que baixa a planilha do TOA para o **Sincronismo** (D-189). Usar: `extensao-toa/README.md` · mexer: `docs/11-EXTENSAO-TOA.md` |
 
 O `.env` já está preenchido e **não** vai para o Git.
 
@@ -39,6 +40,7 @@ O `.env` já está preenchido e **não** vai para o Git.
 ## Ordem de leitura
 
 0. **`docs/10-APP-DO-TECNICO.md`** — se você veio pelo aplicativo, é aqui
+0. **`docs/11-EXTENSAO-TOA.md`** — se você veio pela extensão do TOA / Sincronismo, é aqui
 1. **`CLAUDE.md`** — como trabalhar aqui: vocabulário, armadilhas, regras
 2. **`docs/08-ESTADO-DO-PROJETO.md`** — o inventário, com números do banco
 3. **`docs/03-DECISOES.md`** — as 56 decisões e o porquê de cada uma
