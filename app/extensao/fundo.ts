@@ -291,7 +291,10 @@ async function abrirJanelaDaVarredura(): Promise<{ ok: boolean; mensagem?: strin
   if (atual) {
     try { await chrome.windows.update(atual, { focused: true, state: 'normal' }); return { ok: true } } catch { /* fechada: abre outra */ }
   }
-  const j = await chrome.windows.create({ url: TOA + '/', type: 'normal', width: 1280, height: 860, focused: true })
+  // 0.4.1: pequena e sem roubar o foco — "eu não queria o site aberto o
+  // tempo todo" (Emanuel). Não pode ser minimizada (o Chrome para a tela),
+  // mas pode ficar num canto, num segundo monitor ou atrás das outras.
+  const j = await chrome.windows.create({ url: TOA + '/', type: 'normal', width: 760, height: 560, focused: false })
   await chrome.storage.local.set({ janela_varredura: j?.id })
   await anotar('Janela da varredura aberta: deixe o TOA nela, no Console de Alocação. Pode cobri-la; não minimize.', 'ok')
   return { ok: true }
