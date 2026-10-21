@@ -32,6 +32,8 @@ export const cor = {
   verde900: '#14532d',
   ambar: '#d97706',
   ambar50: '#fffbeb',
+  /** Texto sobre `ambar50`: o `ambar` dá ~3:1, abaixo do AA no sol. */
+  ambar900: '#92400e',
   azul: '#2563eb',
 } as const
 

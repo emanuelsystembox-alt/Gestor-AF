@@ -18,6 +18,7 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
+import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { useEstadoRastro } from '../lib/useRastro'
 import { BarraInferior } from '../ui/BarraInferior'
 import { cor, raio, sombraCard } from '../ui/tema'
@@ -53,6 +54,13 @@ export interface LinhaAgenda {
    *  não vale nada. Ver D-117. */
   pontos: number | null
   pontos_achou: boolean
+  /** Os sinais que o controlador já vê na central (124): o segmento como
+   *  o TOA mandou, a ouvidoria (nula = a linha não trouxe), o TEC1 (nulo
+   *  = o TOA ainda não encerrou) e o produto pendente de cada O.S. */
+  segmento: string | null
+  ouvidoria: boolean | null
+  tec1: string | null
+  produtos: string[] | null
 }
 
 interface Producao {
@@ -396,6 +404,17 @@ export default function Agenda({ navigation }: Props) {
 
             <Text style={e.servico}>{l.servico}</Text>
 
+            {/* O que o controlador vê na linha do contrato, o técnico vê
+                aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
+                muda como ele trata o cliente. */}
+            {(!!l.ouvidoria || !!l.segmento || !!l.tec1) && (
+              <View style={e.marcas}>
+                <SeloOuvidoria ouvidoria={l.ouvidoria} />
+                <SeloSegmento segmento={l.segmento} />
+                <SeloTec1 tec1={l.tec1} />
+              </View>
+            )}
+
             {/* Contrato e node deixaram de ser letra miúda cinza: o
                 contrato é o que o técnico fala ao telefone com o COP, e
                 o node é o pedaço da planta onde ele está. */}
@@ -411,6 +430,15 @@ export default function Agenda({ navigation }: Props) {
                 </Text>
               )}
             </View>
+
+            {/* O produto pendente de cada O.S. (D-107) — o que ele vai
+                instalar, antes de abrir o contrato. */}
+            {(l.produtos ?? []).some(Boolean) && (
+              <Text style={e.produtos} numberOfLines={2}>
+                <Text style={e.rotuloId}>produto </Text>
+                {[...new Set((l.produtos ?? []).filter(Boolean))].join(' · ')}
+              </Text>
+            )}
 
             {!!l.cliente_nome && <Text style={e.cliente}>{l.cliente_nome}</Text>}
             {!!l.logradouro && (
@@ -593,6 +621,8 @@ const e = StyleSheet.create({
   linhaIds: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 2 },
   identificador: { fontSize: 13, fontWeight: '600', color: cor.graf600 },
   rotuloId: { fontWeight: '400', color: cor.graf400 },
+  marcas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 2 },
+  produtos: { fontSize: 13, fontWeight: '600', color: cor.graf600, marginTop: 4, lineHeight: 18 },
   cliente: { fontSize: 14, color: cor.graf600, marginTop: 2 },
   endereco: { fontSize: 14, color: cor.graf500, marginTop: 3, lineHeight: 19 },
   selos: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },

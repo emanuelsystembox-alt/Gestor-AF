@@ -7895,3 +7895,24 @@ data/hora da publicação e o aviso de alterações não commitadas. Lateral rec
 
 Consequência: **commitar antes do build** (`docs/09-PUBLICAR.md`), senão a versão no ar
 aponta para o commit anterior.
+
+### D-201 · O técnico vê no app o que o controlador vê: produto, segmento, ouvidoria e TEC1
+
+*"esta faltando a visão para o técnico do produto, o segmento do cliente se é PME ou
+não, a sinalização de ouvidoria técnico tem que visualizar também, e na tela principal
+de cada contrato podemos colocar se perdeu tec1 ou não"* — Emanuel, 21/10.
+
+**Nada novo é calculado.** A 124 faz a `agenda_do_campo` devolver as MESMAS colunas
+que a linha do contrato da web lê: `segmentacao.nome`, `visita.ouvidoria`,
+`visita.tec1` e `visita.produtos_pendentes`. O cartão do celular e a central não podem
+dizer coisas diferentes do mesmo contrato. A tela do contrato lê o mesmo pelo select.
+
+- **Ouvidoria**: etiqueta preta sólida, só quando é (1 em 468 em 21/10). Nula não desenha.
+- **Segmento**: o nome como o TOA mandou (PME, PURPLE PME PF...); "PME ou não" é o
+  próprio nome, sem regra nossa por cima.
+- **TEC1**: "TEC1 no padrão" / "Perdeu TEC1" / "TEC1 fora do cálculo". Nulo (o TOA
+  ainda não encerrou) não desenha nada: não é "no padrão".
+- **Produto**: o pendente de cada O.S. no cartão (sem repetir) e na O.S. aberta.
+
+`campo/src/ui/MarcasCliente.tsx` é cópia declarada da web (D-112). Chega ao APK
+instalado por `eas update` (só JavaScript, mesma runtime 0.3.0).

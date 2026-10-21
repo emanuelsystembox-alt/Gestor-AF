@@ -184,6 +184,7 @@ As três últimas, para não repetir o esquecimento:
 | 121 | **A varredura escolhida** — `varredura_pendentes(base, buckets[], o_que)`: só estes buckets e TUDO / NOME / EQUIPAMENTO; a de 1 argumento foi derrubada (assinatura com default não convive) (D-197) | ✓ |
 | 122 | **Toda visita com endereço tem edificação** — `edificacao_de/origem(tipo, complemento, LOGRADOURO)`: LOJA, APTO, BECO (TV/BC/"beco"), senão CASA; QUALQUER só sem endereço. COMERCIAL → LOJA; na pontuação BECO paga como CASA (D-198) | ✓ |
 | 123 | **Ouvidoria** — `visita.ouvidoria`, gerada de "Caso crítico (ouvidoria)" do TOA (nula = não veio). A segmentação já existia (`segmentacao_id`); a cópia criada por engano foi derrubada no mesmo arquivo (123b) (D-199) | ✓ |
+| 124 | **A agenda do técnico mostra o que a central mostra** — `agenda_do_campo` devolve segmento, ouvidoria, TEC1 e produtos pendentes (as mesmas colunas da web); recriada, ACL fechada ao anon (D-201) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

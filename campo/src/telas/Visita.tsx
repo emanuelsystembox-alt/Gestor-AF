@@ -14,6 +14,7 @@ import { carimbo, duracao, hhmm, isoLocal, mascaraTelefone, tamanho } from '../l
 import { distanciaM, ondeEstou, type EstadoGps } from '../lib/gps'
 import { pendentesDaVisita, urlAssinada } from '../lib/midia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
+import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -75,6 +76,8 @@ interface OS {
   codigo_baixa: CodigoBaixa | null
   baixa_afline: CodigoBaixa | null
   sub_falha: { nome: string } | null
+  /** O que falta fazer nesta O.S. — o primeiro pendente do Ponto (D-107). */
+  produto_pendente: string | null
 }
 interface Evid {
   id: string; tipo: string; midia: string; arquivo_path: string
@@ -112,6 +115,10 @@ interface Detalhe {
    *  vieram (D-158). Nulos em contrato que não veio do TOA. */
   status_toa: string | null
   motivo_fechamento_toa: string | null
+  /** Os sinais da central (123, 124) — ver `ui/MarcasCliente`. */
+  ouvidoria: boolean | null
+  tec1: string | null
+  segmentacao: { nome: string } | null
 }
 /** Uma peça que está na mão do técnico (`minha_carga`, 086-B). */
 interface PecaNaMao { serial: string; tipo: string | null; modelo: string | null }
@@ -120,10 +127,11 @@ const SELECT = `
   id, contrato, cliente_nome, telefones,
   logradouro, complemento, bairro, cep, lat, lng,
   janela_inicio, janela_fim, situacao, data_agendada, observacao,
+  ouvidoria, tec1, segmentacao:segmentacao_id ( nome ),
   tipo_atividade:tipo_atividade_id ( nome ),
   tipo_servico:tipo_servico_id ( nome ),
   ordem_servico (
-    id, sequencia, numero_os, descricao, status_operadora, baixa_observacao,
+    id, sequencia, numero_os, descricao, status_operadora, baixa_observacao, produto_pendente,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( id, codigo, descricao, natureza, responsabilidade, situacao_destino ),
     baixa_afline:codigo_baixa_afline_id ( id, codigo, descricao, natureza, responsabilidade, situacao_destino ),
@@ -552,6 +560,15 @@ export default function Visita({ route, navigation }: Props) {
           </Aviso>
         )}
 
+        {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). */}
+        {(!!v.ouvidoria || !!v.segmentacao?.nome || !!v.tec1) && (
+          <View style={e.marcas}>
+            <SeloOuvidoria ouvidoria={v.ouvidoria} />
+            <SeloSegmento segmento={v.segmentacao?.nome} />
+            <SeloTec1 tec1={v.tec1} />
+          </View>
+        )}
+
         {/* ---------- onde estou / onde é ---------- */}
         <View style={e.chipGps}>
           <View style={[e.pontinho, { backgroundColor: gps?.ok ? cor.verde : cor.ambar }]} />
@@ -620,7 +637,8 @@ export default function Visita({ route, navigation }: Props) {
 
         {/* A palavra do TOA, como veio, ao lado da nossa etiqueta — as
             duas podem divergir, e a diferença tem de aparecer (D-158). */}
-        {(v.status_toa || v.motivo_fechamento_toa) && (
+        {/* `!!`: status vazio ('') solto numa View derruba o APK (D-172). */}
+        {(!!v.status_toa || !!v.motivo_fechamento_toa) && (
           <Text style={e.operadora}>
             No TOA: {[v.status_toa, v.motivo_fechamento_toa].filter(Boolean).join(' · ')}
           </Text>
@@ -641,6 +659,9 @@ export default function Visita({ route, navigation }: Props) {
             <Text style={e.descricaoOs}>
               {os.descricao ?? os.tipo_os?.descricao ?? 'Serviço não descrito'}
             </Text>
+            {!!os.produto_pendente && (
+              <Text style={e.produtoOs}>{os.produto_pendente}</Text>
+            )}
 
             {/* A baixa da operadora é leitura: veio do TOA (D-042). */}
             {os.codigo_baixa && (
@@ -1312,6 +1333,12 @@ const e = StyleSheet.create({
   seq: { fontSize: 11, color: cor.graf300, fontWeight: '700' },
   numeroOs: { fontSize: 15, fontWeight: '800', color: cor.tinta },
   descricaoOs: { fontSize: 14, color: cor.graf600, marginTop: 4, lineHeight: 19 },
+  produtoOs: {
+    alignSelf: 'flex-start', marginTop: 6, fontSize: 12, fontWeight: '700',
+    color: cor.ambar900, backgroundColor: cor.ambar50,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden',
+  },
+  marcas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   operadora: { fontSize: 12, color: cor.graf400, marginTop: 8 },
   semAcao: { fontSize: 13, color: cor.graf400, marginTop: 10 },
 
