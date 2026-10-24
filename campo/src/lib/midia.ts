@@ -212,6 +212,23 @@ export async function sincronizar(): Promise<{ enviadas: number; restam: number 
   return { enviadas, restam: sobraram.length }
 }
 
+/**
+ * Apaga de verdade a foto/vídeo errado — só quem enviou, e o campo só no
+ * dia (127, Emanuel 24/10: "sem guardar o arquivo").
+ *
+ * Dois passos, nesta ordem: o ARQUIVO sai pela API do Storage (o Supabase
+ * não deixa apagar pelo SQL), e só depois a linha, por `apagar_evidencia`,
+ * que recusa enquanto o arquivo existir. Se a rede cair no meio, a linha
+ * continua na tela e tocar de novo termina — apagar o que já saiu não dá erro.
+ * Devolve a mensagem de erro, ou null.
+ */
+export async function apagarEvidencia(id: string, caminho: string): Promise<string | null> {
+  const { error: erroArq } = await supabase.storage.from(BUCKET).remove([caminho])
+  if (erroArq) return erroArq.message
+  const { error } = await supabase.rpc('apagar_evidencia', { p_evidencia: id })
+  return error?.message ?? null
+}
+
 /** URL assinada para mostrar a evidência já enviada. O bucket é privado:
  *  sem assinatura a imagem volta 400 e a tela mostra um quadrado cinza. */
 export async function urlAssinada(caminho: string, segundos = 3600): Promise<string | null> {

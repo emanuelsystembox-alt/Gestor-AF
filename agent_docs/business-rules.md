@@ -107,10 +107,15 @@ botão não falhar sem explicar.
 está cadastrado como técnico não perde os poderes de controlador por
 abrir o aplicativo — a mesma conta é feita no banco e nas duas telas.
 
-**Evidência é prova: não se apaga.** Não há policy de UPDATE nem DELETE
-no bucket, nem RPC de exclusão. Foto errada hoje só sai pelo
-`service_role` — e a saída certa, se virar necessidade, é *ocultar com
-motivo*, não deletar.
+**Foto ou vídeo errado: QUEM ENVIOU apaga de verdade** (127, D-204 — mudou
+a regra da 055, que era "evidência é prova: não se apaga"). *"Quero que o
+técnico apague de verdade a foto ou vídeo errado, sem guardar o arquivo"*
+(Emanuel, 24/10; "ocultar com motivo" foi oferecido e recusado). Só o
+autor (`evidencia.usuario_id`), e o campo só no contrato de hoje. O arquivo
+sai pela API do Storage (policy `evidencia_arquivo_apagar`), depois a linha
+(`apagar_evidencia`, que recusa enquanto o arquivo existir). O histórico do
+contrato guarda que uma foto/vídeo foi apagado, por quem e quando — sem o
+arquivo. Ninguém apaga a evidência de OUTRO; não há UPDATE.
 
 **Nenhuma foto é obrigatória para baixar** — decisão do Emanuel entre
 quatro opções (D-115). Se virar exigência, é tabela nova + cenário em

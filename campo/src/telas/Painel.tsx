@@ -34,6 +34,10 @@ interface Painel {
   pontos: number; visitas: number; concluidas: number; dias: number
   quebradas: number; pontos_perdidos: number; perdidos_sem_regra: number
   tec1_perdidos: number
+  /** TEC1 do período por O.S., a conta do painel de Equipes (125, D-187).
+   *  `pct` NULO = nenhuma O.S. avaliada ainda — não é 0% nem 100%. */
+  tec1: { padrao: number; sem_padrao: number; expurgada: number; sem_regra: number
+          pct: number | null } | null
   meta: number | null; meta_dia: number | null
   fator: number | null; valor: number | null; proxima_faixa: number | null
   posicao: number | null; total: number | null; pontos_do_de_cima: number | null
@@ -204,6 +208,9 @@ export default function Painel() {
                    nota="fora da janela do cliente" alerta={n(p.tec1_perdidos) > 0} />
           </View>
 
+          {/* ---------- TEC1 entregue (Emanuel, 24/10) ---------- */}
+          <Tec1Entregue tec1={p.tec1} />
+
           {/* ---------- dia a dia ---------- */}
           <TituloSecao titulo="Pontos por dia" />
           <Cartao style={{ padding: 14, gap: 8 }}>
@@ -293,6 +300,57 @@ export default function Painel() {
   )
 }
 
+/**
+ * A meta do TEC1 — o livro da CLARO, "Indicadores COP - TEC1" (D-187): 94%.
+ * A mesma de `app/src/components/PainelDoDia.tsx`.
+ */
+const META_TEC1 = 94
+
+/**
+ * "a % do TEC1 que está sendo entregue, % padrão" (Emanuel, 24/10).
+ * TEC1 = O.S. no padrão / (no padrão + fora do padrão). Expurgada e as que
+ * o TOA ainda não encerrou ficam fora da conta, e a tela diz quantas são.
+ */
+function Tec1Entregue({ tec1 }: { tec1: Painel['tec1'] }) {
+  if (!tec1) return null
+  const avaliadas = n(tec1.padrao) + n(tec1.sem_padrao)
+  const pct = tec1.pct == null ? null : n(tec1.pct)
+  const noAlvo = pct != null && pct >= META_TEC1
+  return (
+    <Cartao style={e.tec1}>
+      <View style={e.tec1Topo}>
+        <Text style={e.blocoRotulo}>TEC1 entregue no mês</Text>
+        <Text style={e.tec1Meta}>meta {META_TEC1}%</Text>
+      </View>
+      {pct == null ? (
+        <Text style={e.nada}>Nenhuma O.S. encerrada no TOA para medir ainda.</Text>
+      ) : (<>
+        <View style={e.linhaNumero}>
+          <Text style={[e.tec1Pct, { color: noAlvo ? cor.verde900 : cor.af700 }]}
+                accessibilityLabel={`TEC1 ${num2(pct)} por cento`}>
+            {String(pct).replace('.', ',')}%
+          </Text>
+          <Text style={e.tec1Conta}>{n(tec1.padrao)} de {avaliadas} O.S. no padrão</Text>
+        </View>
+        <View style={e.trilho} accessibilityRole="progressbar"
+              accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}>
+          <View style={[e.progresso, { width: `${pct}%`, backgroundColor: noAlvo ? cor.verde : cor.af600 }]} />
+          {/* o risco da meta */}
+          <View style={[e.tec1Risco, { left: `${META_TEC1}%` }]} />
+        </View>
+        <Text style={e.notinha}>
+          {noAlvo ? 'Dentro da meta.' : `Abaixo da meta de ${META_TEC1}%.`}
+          {n(tec1.expurgada) + n(tec1.sem_regra) > 0
+            ? ` Fora da conta: ${n(tec1.expurgada) > 0 ? `${n(tec1.expurgada)} expurgada(s)` : ''}`
+              + `${n(tec1.expurgada) > 0 && n(tec1.sem_regra) > 0 ? ', ' : ''}`
+              + `${n(tec1.sem_regra) > 0 ? `${n(tec1.sem_regra)} ainda não encerrada(s) no TOA` : ''}.`
+            : ''}
+        </Text>
+      </>)}
+    </Cartao>
+  )
+}
+
 function Celula({ valor, rotulo, alerta }: { valor: string; rotulo: string; alerta?: boolean }) {
   return (
     <View style={e.celula}>
@@ -368,6 +426,12 @@ const e = StyleSheet.create({
   blocoNota: { fontSize: 12, color: cor.graf500, marginTop: 2, lineHeight: 16 },
 
   nada: { fontSize: 14, color: cor.graf500 },
+  tec1: { padding: 14, gap: 4 },
+  tec1Topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  tec1Meta: { fontSize: 12, fontWeight: '700', color: cor.graf500 },
+  tec1Pct: { fontSize: 34, fontWeight: '900', fontVariant: ['tabular-nums'], lineHeight: 38 },
+  tec1Conta: { fontSize: 13, fontWeight: '600', color: cor.graf600, paddingBottom: 5 },
+  tec1Risco: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: cor.tinta },
   linhaDia: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   diaRotulo: { width: 42, fontSize: 13, fontWeight: '700', color: cor.graf600, fontVariant: ['tabular-nums'] },
   diaTrilho: { flex: 1, height: 14, backgroundColor: cor.graf50, borderRadius: 4, overflow: 'hidden' },

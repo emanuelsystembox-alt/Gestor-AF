@@ -12,9 +12,10 @@ import {
 } from '../lib/dominio'
 import { carimbo, duracao, hhmm, isoLocal, mascaraTelefone, tamanho } from '../lib/formato'
 import { distanciaM, ondeEstou, type EstadoGps } from '../lib/gps'
-import { pendentesDaVisita, urlAssinada } from '../lib/midia'
+import { apagarEvidencia, pendentesDaVisita, urlAssinada } from '../lib/midia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
 import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
+import { MaterialToa } from '../ui/MaterialToa'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -84,11 +85,15 @@ interface Evid {
   mime: string | null; tamanho_bytes: number | null; duracao_seg: number | null
   lat: number | null; lng: number | null; precisao_m: number | null
   capturada_em: string | null; login: string | null; os_id: string | null
+  /** Quem enviou: só ele apaga (127). */
+  usuario_id: string | null
 }
 interface Equip {
   id: string; operacao: string; serial: string
   tipo: string | null; modelo: string | null
   criado_em: string; login: string | null
+  /** Quem lançou: o campo só corrige o que ELE lançou (126). */
+  tecnico_id: string | null
 }
 interface Evento {
   id: number; tipo: string; criado_em: string
@@ -119,6 +124,9 @@ interface Detalhe {
   ouvidoria: boolean | null
   tec1: string | null
   segmentacao: { nome: string } | null
+  /** Quando a varredura leu o material deste contrato no TOA (117). */
+  toa_varrido_em: string | null
+  tecnologia: string | null
 }
 /** Uma peça que está na mão do técnico (`minha_carga`, 086-B). */
 interface PecaNaMao { serial: string; tipo: string | null; modelo: string | null }
@@ -127,7 +135,7 @@ const SELECT = `
   id, contrato, cliente_nome, telefones,
   logradouro, complemento, bairro, cep, lat, lng,
   janela_inicio, janela_fim, situacao, data_agendada, observacao,
-  ouvidoria, tec1, segmentacao:segmentacao_id ( nome ),
+  ouvidoria, tec1, segmentacao:segmentacao_id ( nome ), toa_varrido_em, tecnologia,
   tipo_atividade:tipo_atividade_id ( nome ),
   tipo_servico:tipo_servico_id ( nome ),
   ordem_servico (
@@ -139,9 +147,9 @@ const SELECT = `
   ),
   evidencia (
     id, tipo, midia, arquivo_path, mime, tamanho_bytes, duracao_seg,
-    lat, lng, precisao_m, capturada_em, login, os_id
+    lat, lng, precisao_m, capturada_em, login, os_id, usuario_id
   ),
-  equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login ),
+  equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login, tecnico_id ),
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo"
 `
@@ -150,7 +158,7 @@ type Props = NativeStackScreenProps<Pilha, 'Visita'>
 
 export default function Visita({ route, navigation }: Props) {
   const { id } = route.params
-  const { ehCampo, pode } = useAuth()
+  const { ehCampo, pode, tecnicoId, session } = useAuth()
 
   const [v, setV] = useState<Detalhe | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
@@ -184,6 +192,8 @@ export default function Visita({ route, navigation }: Props) {
   const [equipTipo, setEquipTipo] = useState('')
   const [equipModelo, setEquipModelo] = useState('')
   const [carga, setCarga] = useState<PecaNaMao[]>([])
+  /** O lançamento sendo corrigido (126); nulo = lançamento novo. */
+  const [equipEditando, setEquipEditando] = useState<string | null>(null)
 
   // 094: a miscelânea do contrato, lançada pelo próprio técnico.
   const [miscLancada, setMiscLancada] = useState<MiscLancada[]>([])
@@ -407,7 +417,35 @@ export default function Visita({ route, navigation }: Props) {
    * │ certo. Digitar continua valendo — peça de fora da carga existe.  │
    * └──────────────────────────────────────────────────────────────────┘
    */
-  async function abrirEquipamento() {
+  /** Apagar não volta: o arquivo sai do servidor (127). Pergunta antes. */
+  function confirmarApagar(f: Evid) {
+    const nome = f.midia === 'VIDEO' ? 'vídeo' : 'foto'
+    Alert.alert(
+      `Apagar ${nome === 'vídeo' ? 'este vídeo' : 'esta foto'}?`,
+      `O arquivo é apagado de vez e não tem como recuperar. O histórico do contrato registra que uma ${nome} foi apagada.`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Apagar', style: 'destructive',
+          onPress: async () => {
+            setSalvando(true); setErro(null)
+            const falhou = await apagarEvidencia(f.id, f.arquivo_path)
+            setSalvando(false)
+            if (falhou) setErro(`Não apaguei: ${falhou}`)
+            await recarregar()
+          },
+        },
+      ],
+    )
+  }
+
+  async function abrirEquipamento(corrigir?: Equip) {
+    // 126: o mesmo formulário corrige o que ele lançou (Emanuel, 24/10).
+    setEquipEditando(corrigir?.id ?? null)
+    setEquipOper(corrigir?.operacao === 'RETIRADO' ? 'RETIRADO' : 'INSTALADO')
+    setEquipSerial(corrigir?.serial ?? '')
+    setEquipTipo(corrigir?.tipo ?? '')
+    setEquipModelo(corrigir?.modelo ?? '')
     setEquipAberto(true); setErro(null)
     const { data } = await supabase.rpc('minha_carga')
     setCarga((data ?? []) as PecaNaMao[])
@@ -469,17 +507,28 @@ export default function Visita({ route, navigation }: Props) {
   async function salvarEquipamento() {
     if (!v || equipSerial.trim().length < 4) return
     setSalvando(true); setErro(null)
-    const { error } = await supabase.rpc('registrar_equipamento', {
-      p_visita: v.id,
-      p_operacao: equipOper,
-      p_serial: equipSerial,
-      p_os: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
-      p_tipo: equipTipo.trim() || null,
-      p_modelo: equipModelo.trim() || null,
-    })
+    // Corrigir troca o serial e devolve a posse da peça errada — no banco
+    // (editar_equipamento, 126), não aqui.
+    const { error } = equipEditando
+      ? await supabase.rpc('editar_equipamento', {
+          p_movimento: equipEditando,
+          p_operacao: equipOper,
+          p_serial: equipSerial,
+          p_tipo: equipTipo.trim() || null,
+          p_modelo: equipModelo.trim() || null,
+        })
+      : await supabase.rpc('registrar_equipamento', {
+          p_visita: v.id,
+          p_operacao: equipOper,
+          p_serial: equipSerial,
+          p_os: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
+          p_tipo: equipTipo.trim() || null,
+          p_modelo: equipModelo.trim() || null,
+        })
     if (error) setErro(error.message)
     else {
-      setEquipAberto(false); setEquipSerial(''); setEquipTipo(''); setEquipModelo('')
+      setEquipAberto(false); setEquipEditando(null)
+      setEquipSerial(''); setEquipTipo(''); setEquipModelo('')
       await recarregar()
     }
     setSalvando(false)
@@ -508,6 +557,15 @@ export default function Visita({ route, navigation }: Props) {
           <Text style={e.tituloTopo} numberOfLines={1}>
             {v.tipo_servico?.nome ?? v.tipo_atividade?.nome ?? 'Visita'}
           </Text>
+          {/* O tipo do TOA embaixo do grupo, como na agenda (125). */}
+          {(() => {
+            const ta = v.tipo_atividade?.nome
+            const ts = v.tipo_servico?.nome
+            // Só quando acrescenta: sem grupo, o título já É o tipo.
+            const tipo = ta && ts && ta.toUpperCase() !== ts.toUpperCase() ? ta : null
+            const linha = [tipo, v.tecnologia === 'GPON' ? 'GPON' : null].filter(Boolean).join(' · ')
+            return linha ? <Text style={e.subTopo} numberOfLines={1}>{linha}</Text> : null
+          })()}
           <Text style={e.subTopo} numberOfLines={1}>
             {v.contrato ? `contrato ${v.contrato} · ` : ''}
             {hhmm(v.janela_inicio)}{v.janela_fim ? `–${hhmm(v.janela_fim)}` : ''}
@@ -622,10 +680,26 @@ export default function Visita({ route, navigation }: Props) {
               (o app fechou no meio, por exemplo), dá para responder aqui. */}
           {v.situacao === 'CONCLUIDA' && (
             contato ? (
-              <Text style={e.contatoLinha}>
-                Melhor contato: {contato.telefone
-                  ? mascaraTelefone(contato.telefone) : 'não informado'}
-              </Text>
+              <View>
+                <Text style={e.contatoLinha}>
+                  Melhor contato: {contato.telefone
+                    ? mascaraTelefone(contato.telefone) : 'não informado'}
+                </Text>
+                {/* 126: respondeu NÃO e o cliente deu o número depois? Ele
+                    volta atrás (Emanuel, 24/10). O banco grava por cima e o
+                    histórico guarda as duas respostas; só no dia. */}
+                {podeAnexar && (
+                  <Pressable onPress={() => {
+                      setTelefoneNovo(contato.telefone ?? '')
+                      setPerguntaContato(contato.telefone ? 'DIGITA' : 'PERGUNTA')
+                    }}
+                    hitSlop={8} accessibilityRole="button">
+                    <Text style={e.contatoAcao}>
+                      {contato.telefone ? 'Trocar o número ›' : 'Informar o número agora ›'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             ) : podeAnexar ? (
               <Pressable onPress={() => { setTelefoneNovo(''); setPerguntaContato('PERGUNTA') }}
                 hitSlop={8} accessibilityRole="button">
@@ -749,6 +823,14 @@ export default function Visita({ route, navigation }: Props) {
                 {f.lat == null && (
                   <Text style={e.semGpsMini}>sem GPS</Text>
                 )}
+                {/* 127: quem enviou apaga o errado, de verdade, só no dia. */}
+                {podeAnexar && f.usuario_id === session?.user.id && (
+                  <Pressable onPress={() => confirmarApagar(f)} hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={f.midia === 'VIDEO' ? 'Apagar este vídeo' : 'Apagar esta foto'}>
+                    <Text style={e.apagar}>Apagar</Text>
+                  </Pressable>
+                )}
               </View>
             ))}
           </View>
@@ -767,9 +849,15 @@ export default function Visita({ route, navigation }: Props) {
           </View>
         )}
 
+        {/* ---------- o que o TOA já registrou (125, Emanuel 24/10) ----------
+            Antes do lançamento do técnico: se já está no TOA, ele vê antes
+            de lançar de novo. */}
+        <MaterialToa visitaId={v.id} varridoEm={v.toa_varrido_em}
+          recarga={`${v.equipamento_movimento.length}-${miscLancada.length}`} />
+
         {/* ---------- equipamento ---------- */}
         <Text style={e.tituloSecao}>
-          Equipamento{v.equipamento_movimento.length > 0
+          Equipamento lançado por você{v.equipamento_movimento.length > 0
             ? ` · ${v.equipamento_movimento.length}` : ''}
         </Text>
 
@@ -793,6 +881,15 @@ export default function Visita({ route, navigation }: Props) {
                 {m.login ? ` · ${m.login}` : ''}
               </Text>
             </View>
+            {/* 126: corrige o que ELE lançou, enquanto o contrato é do dia.
+                Quem recusa de verdade é o banco (editar_equipamento). */}
+            {podeAnexar && !equipAberto
+              && (!ehCampo || m.tecnico_id === tecnicoId) && (
+              <Pressable onPress={() => abrirEquipamento(m)} hitSlop={10}
+                accessibilityRole="button" accessibilityLabel={`Corrigir o equipamento ${m.serial}`}>
+                <Text style={e.trocar}>Corrigir</Text>
+              </Pressable>
+            )}
           </Cartao>
         ))}
 
@@ -801,12 +898,18 @@ export default function Visita({ route, navigation }: Props) {
           // não botão (Emanuel, 27/09).
           <Botao
             titulo="Lançar equipamento" tom="contorno"
-            aoTocar={abrirEquipamento}
+            aoTocar={() => abrirEquipamento()}
           />
         )}
 
         {podeAnexar && equipAberto && (
           <Cartao style={{ padding: 14, gap: 10 }}>
+            {!!equipEditando && (
+              <Text style={e.cargaTitulo}>
+                Corrigindo o lançamento. Se trocar o serial, a peça errada volta
+                para onde estava.
+              </Text>
+            )}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['INSTALADO', 'RETIRADO'] as const).map(o => (
                 <Pressable
@@ -878,10 +981,10 @@ export default function Visita({ route, navigation }: Props) {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Botao
                 titulo="Cancelar" tom="contorno" style={{ flex: 1 }}
-                aoTocar={() => setEquipAberto(false)}
+                aoTocar={() => { setEquipAberto(false); setEquipEditando(null) }}
               />
               <Botao
-                titulo="Lançar" style={{ flex: 1.4 }}
+                titulo={equipEditando ? 'Salvar correção' : 'Lançar'} style={{ flex: 1.4 }}
                 desativado={equipSerial.trim().length < 4}
                 carregando={salvando}
                 aoTocar={salvarEquipamento}
@@ -893,7 +996,7 @@ export default function Visita({ route, navigation }: Props) {
         {/* ---------- miscelânea (094) — logo abaixo do equipamento: estava
             depois do histórico e sumia no fim da tela (Emanuel, 27/09) ---------- */}
         <Text style={e.tituloSecao}>
-          Miscelânea{miscLancada.length > 0 ? ` · ${miscLancada.length}` : ''}
+          Miscelânea lançada por você{miscLancada.length > 0 ? ` · ${miscLancada.length}` : ''}
         </Text>
         {miscLancada.map((m, i) => (
           <Cartao key={i} style={e.equipLinha}>
@@ -1359,6 +1462,7 @@ const e = StyleSheet.create({
   miniaturaRotulo: { fontSize: 11, fontWeight: '700', color: cor.graf600, marginTop: 4 },
   miniaturaMiudo: { fontSize: 10, color: cor.graf400 },
   semGpsMini: { fontSize: 10, color: cor.ambar, fontWeight: '700' },
+  apagar: { fontSize: 12, color: cor.af700, fontWeight: '800', marginTop: 4, paddingVertical: 4 },
 
   equipLinha: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   equipSelo: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },

@@ -185,6 +185,9 @@ As três últimas, para não repetir o esquecimento:
 | 122 | **Toda visita com endereço tem edificação** — `edificacao_de/origem(tipo, complemento, LOGRADOURO)`: LOJA, APTO, BECO (TV/BC/"beco"), senão CASA; QUALQUER só sem endereço. COMERCIAL → LOJA; na pontuação BECO paga como CASA (D-198) | ✓ |
 | 123 | **Ouvidoria** — `visita.ouvidoria`, gerada de "Caso crítico (ouvidoria)" do TOA (nula = não veio). A segmentação já existia (`segmentacao_id`); a cópia criada por engano foi derrubada no mesmo arquivo (123b) (D-199) | ✓ |
 | 124 | **A agenda do técnico mostra o que a central mostra** — `agenda_do_campo` devolve segmento, ouvidoria, TEC1 e produtos pendentes (as mesmas colunas da web); recriada, ACL fechada ao anon (D-201) | ✓ |
+| 125 | **App: tipo do contrato, TEC1 % e material do TOA** — `agenda_do_campo` + `tipo_atividade`/`tecnologia`; `painel_do_tecnico` + `tec1` (por O.S., conta do painel de Equipes); `material_do_toa` (leitura do TOA ao lado do lançamento do técnico, só leitura) (D-202) | ✓ |
+| 126 | **O técnico corrige o equipamento que lançou** — `equipamento_movimento` guarda a posse anterior; `editar_equipamento` devolve a peça errada se ninguém mexeu depois e relança; 2 cenários novos em `testar_campo` (25) (D-203) | ✓ |
+| 127 | **Quem enviou apaga a foto/vídeo errado** — policy de DELETE no bucket `evidencia` (`pode_apagar_evidencia_arquivo`) + `apagar_evidencia` (recusa se o arquivo ainda existe; deixa `EVIDENCIA_APAGADA` no histórico); muda a regra da 055; `testar_campo` 27 (D-204) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

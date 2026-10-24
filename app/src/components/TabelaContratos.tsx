@@ -57,7 +57,9 @@ export const SELECT_CONTRATO = `
     sub_falha:sub_falha_id ( nome, categoria ),
     baixa_em
   ),
-  visita_marcador ( id, indicador_id, cumprido )
+  visita_marcador ( id, indicador_id, cumprido ),
+  evidencias:evidencia ( count ),
+  equipamentos:equipamento_movimento ( count )
 `
 
 /** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
@@ -81,6 +83,11 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   /** Um por O.S.: o primeiro pendente do Ponto de cada uma (D-107).
    *  Serve para a visao compacta, onde as O.S. nao aparecem. */
   produtos_pendentes?: string[] | null
+  /** O que o técnico anexou pelo app: quantas fotos/vídeos e quantos
+   *  equipamentos lançados — o mesmo selo do cartão do aplicativo
+   *  (Emanuel, 24/10). O PostgREST devolve `[{ count }]`. */
+  evidencias?: { count: number }[] | null
+  equipamentos?: { count: number }[] | null
   /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
    *  quem nao encerrou (D-103). */
@@ -380,7 +387,9 @@ export function TabelaContratos({
                 )}
                 {(() => {
                   const p = pontos?.get(v.id)
-                  if (!p?.achou && !v.segmentacao?.nome) return null
+                  const nEvid = Number(v.evidencias?.[0]?.count ?? 0)
+                  const nEquip = Number(v.equipamentos?.[0]?.count ?? 0)
+                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip) return null
                   return (
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {p?.achou && <span
@@ -390,6 +399,20 @@ export function TabelaContratos({
                         ★ {pts(p.pontos_claro)}
                       </span>}
                       <SeloSegmento segmentacao={v.segmentacao?.nome} />
+                      {/* O que o técnico anexou pelo app, como no cartão dele
+                          (Emanuel, 24/10). Zero não desenha. */}
+                      {nEvid > 0 && (
+                        <span title="Fotos e vídeos anexados ao contrato"
+                          className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-medium text-graf-300">
+                          {nEvid} evidência(s)
+                        </span>
+                      )}
+                      {nEquip > 0 && (
+                        <span title="Equipamentos lançados pelo técnico no contrato"
+                          className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-medium text-graf-300">
+                          {nEquip} equipamento(s)
+                        </span>
+                      )}
                     </div>
                   )
                 })()}

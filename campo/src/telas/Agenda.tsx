@@ -61,6 +61,10 @@ export interface LinhaAgenda {
   ouvidoria: boolean | null
   tec1: string | null
   produtos: string[] | null
+  /** Como o TOA chama a atividade (Instalacao, Mudanca de Pacote…) e a
+   *  etiqueta GPON (D-188) — o que a coluna GRUPO da central mostra (125). */
+  tipo_atividade: string | null
+  tecnologia: string | null
 }
 
 interface Producao {
@@ -84,7 +88,7 @@ function mesCorrente() {
 type Props = NativeStackScreenProps<Pilha, 'Agenda'>
 
 export default function Agenda({ navigation }: Props) {
-  const { perfil, equipeId, sair } = useAuth()
+  const { perfil, equipeId, equipeCodigo, matricula, sair } = useAuth()
   const rastro = useEstadoRastro()
   const [data, setData] = useState(isoLocal())
   const [linhas, setLinhas] = useState<LinhaAgenda[]>([])
@@ -220,6 +224,13 @@ export default function Agenda({ navigation }: Props) {
         <Marca tamanho={36} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={e.nome} numberOfLines={1}>{perfil?.nome ?? 'Técnico'}</Text>
+          {/* O número da equipe é o que o COP fala no rádio (Emanuel, 24/10);
+              a matrícula é o login que vai no histórico de cada etapa. */}
+          {(!!equipeCodigo || !!matricula) && (
+            <Text style={e.equipe} numberOfLines={1}>
+              {[equipeCodigo && `Equipe ${equipeCodigo}`, matricula].filter(Boolean).join(' · ')}
+            </Text>
+          )}
           {/* O login aparece porque é ele que vai no histórico de cada
               etapa que o técnico registrar. */}
           <Text style={e.email} numberOfLines={1}>{perfil?.email ?? ''}</Text>
@@ -402,7 +413,20 @@ export default function Agenda({ navigation }: Props) {
                 : <Text style={e.semPontos}>sem regra</Text>}
             </View>
 
-            <Text style={e.servico}>{l.servico}</Text>
+            {/* O grupo (ADESAO, SERVICO, MUDANCA DE ENDERECO…) e, embaixo, o
+                tipo do TOA (Instalacao, Mudanca de Pacote…) — o que a coluna
+                GRUPO da central mostra (Emanuel, 24/10). O tipo só aparece
+                quando acrescenta: "VISITA TECNICA / Visita Tecnica" é eco. */}
+            <View style={e.linhaGrupo}>
+              <Text style={e.servico}>{l.servico}</Text>
+              {l.tecnologia === 'GPON' && (
+                <View style={e.gpon}><Text style={e.gponTexto}>GPON</Text></View>
+              )}
+            </View>
+            {!!l.tipo_atividade
+              && l.tipo_atividade.toUpperCase() !== l.servico.toUpperCase() && (
+              <Text style={e.tipoAtividade}>{l.tipo_atividade}</Text>
+            )}
 
             {/* O que o controlador vê na linha do contrato, o técnico vê
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
@@ -415,37 +439,22 @@ export default function Agenda({ navigation }: Props) {
               </View>
             )}
 
-            {/* Contrato e node deixaram de ser letra miúda cinza: o
-                contrato é o que o técnico fala ao telefone com o COP, e
-                o node é o pedaço da planta onde ele está. */}
-            <View style={e.linhaIds}>
-              {!!l.contrato && (
-                <Text style={e.identificador}>
-                  <Text style={e.rotuloId}>contrato </Text>{l.contrato}
-                </Text>
+            {/* Uma linha por informação, rótulo à esquerda na mesma coluna:
+                o olho desce pela coluna e acha o que procura sem ler tudo
+                (Emanuel, 24/10: "organizar melhor... fácil de ler"). */}
+            <View style={e.ficha}>
+              {!!l.contrato && <LinhaFicha rotulo="Contrato" valor={l.contrato} forte />}
+              {!!l.node && <LinhaFicha rotulo="Node" valor={l.node} forte />}
+              {(l.produtos ?? []).some(Boolean) && (
+                <LinhaFicha rotulo="Produto"
+                  valor={[...new Set((l.produtos ?? []).filter(Boolean))].join('\n')} />
               )}
-              {!!l.node && (
-                <Text style={e.identificador}>
-                  <Text style={e.rotuloId}>node </Text>{l.node}
-                </Text>
+              {!!l.cliente_nome && <LinhaFicha rotulo="Cliente" valor={l.cliente_nome} />}
+              {!!l.logradouro && (
+                <LinhaFicha rotulo="Endereço"
+                  valor={`${l.logradouro}${l.bairro ? `\n${l.bairro}` : ''}`} />
               )}
             </View>
-
-            {/* O produto pendente de cada O.S. (D-107) — o que ele vai
-                instalar, antes de abrir o contrato. */}
-            {(l.produtos ?? []).some(Boolean) && (
-              <Text style={e.produtos} numberOfLines={2}>
-                <Text style={e.rotuloId}>produto </Text>
-                {[...new Set((l.produtos ?? []).filter(Boolean))].join(' · ')}
-              </Text>
-            )}
-
-            {!!l.cliente_nome && <Text style={e.cliente}>{l.cliente_nome}</Text>}
-            {!!l.logradouro && (
-              <Text style={e.endereco}>
-                {l.logradouro}{l.bairro ? ` · ${l.bairro}` : ''}
-              </Text>
-            )}
 
             <View style={e.selos}>
               {/* "3 O.S." não diz o que falta fazer. "1 de 3 baixadas" diz. */}
@@ -532,7 +541,32 @@ export default function Agenda({ navigation }: Props) {
   )
 }
 
+/** Uma linha "rótulo · valor" da ficha do cartão. */
+function LinhaFicha({ rotulo, valor, forte }: { rotulo: string; valor: string; forte?: boolean }) {
+  return (
+    <View style={e.linhaFicha}>
+      <Text style={e.rotuloFicha}>{rotulo}</Text>
+      <Text style={[e.valorFicha, forte && e.valorForte]}>{valor}</Text>
+    </View>
+  )
+}
+
 const e = StyleSheet.create({
+  linhaGrupo: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  gpon: {
+    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: cor.azul,
+  },
+  gponTexto: { fontSize: 11, fontWeight: '800', color: cor.azul, letterSpacing: 0.5 },
+  tipoAtividade: { fontSize: 13, color: cor.graf500, marginTop: 1 },
+  ficha: {
+    marginTop: 10, paddingTop: 10, gap: 6,
+    borderTopWidth: 1, borderTopColor: cor.graf100,
+  },
+  linhaFicha: { flexDirection: 'row', gap: 10 },
+  rotuloFicha: { width: 70, fontSize: 13, color: cor.graf400, lineHeight: 19 },
+  valorFicha: { flex: 1, fontSize: 14, color: cor.graf600, lineHeight: 19 },
+  valorForte: { fontWeight: '700', color: cor.tinta },
   rastro: { fontSize: 12, color: cor.graf500, lineHeight: 17 },
   tela: { flex: 1, backgroundColor: cor.graf50 },
   cabecalho: {
@@ -547,6 +581,7 @@ const e = StyleSheet.create({
   logoTexto: { color: cor.branco, fontWeight: '800', fontSize: 14 },
   nome: { fontSize: 15, fontWeight: '700', color: cor.tinta },
   email: { fontSize: 11, color: cor.graf400 },
+  equipe: { fontSize: 13, fontWeight: '700', color: cor.af700 },
   sair: { paddingHorizontal: 10, paddingVertical: 8 },
   sairTexto: { color: cor.graf500, fontSize: 14, fontWeight: '600' },
   suporte: {
@@ -618,13 +653,7 @@ const e = StyleSheet.create({
   semPontos: { fontSize: 12, fontWeight: '700', color: cor.ambar },
 
   servico: { fontSize: 16, fontWeight: '700', color: cor.tinta },
-  linhaIds: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 2 },
-  identificador: { fontSize: 13, fontWeight: '600', color: cor.graf600 },
-  rotuloId: { fontWeight: '400', color: cor.graf400 },
-  marcas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 2 },
-  produtos: { fontSize: 13, fontWeight: '600', color: cor.graf600, marginTop: 4, lineHeight: 18 },
-  cliente: { fontSize: 14, color: cor.graf600, marginTop: 2 },
-  endereco: { fontSize: 14, color: cor.graf500, marginTop: 3, lineHeight: 19 },
+  marcas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   selos: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   selo: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   seloTexto: { fontSize: 12, fontWeight: '700' },

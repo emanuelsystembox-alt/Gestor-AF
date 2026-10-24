@@ -7916,3 +7916,96 @@ dizer coisas diferentes do mesmo contrato. A tela do contrato lê o mesmo pelo s
 
 `campo/src/ui/MarcasCliente.tsx` é cópia declarada da web (D-112). Chega ao APK
 instalado por `eas update` (só JavaScript, mesma runtime 0.3.0).
+
+### D-202 · App: o tipo do contrato, o % de TEC1 entregue e o material que o TOA leu (125)
+
+*"é bom colocar o tipo de os, se é adesão, serviço, mudança de endereço e organizar
+melhor na tela do app para ficar fácil de ler"* · *"é bom colocar a % do TEC1 que está
+sendo entregue, % padrão"* · *"queria que mostrasse esses lançamentos para o técnico
+também (...) não seria obrigatório o técnico lançar"* — Emanuel, 24/10.
+
+**Cartão da agenda.** Grupo grande (ADESAO, SERVICO...), etiqueta GPON, e embaixo o tipo
+do TOA (Instalacao, Mudanca de Pacote) só quando difere do grupo — "VISITA TECNICA /
+Visita Tecnica" é eco. Contrato, node, produto, cliente e endereço viraram uma ficha
+"rótulo · valor" com os rótulos na mesma coluna. `agenda_do_campo` devolve
+`tipo_atividade` e `tecnologia`, as mesmas da coluna GRUPO da central.
+
+**TEC1 entregue no painel.** `painel_do_tecnico` devolve `tec1` com a conta do painel de
+Equipes: por O.S. (`tec1_da_os`), sem jornada nem desconexão, pct = padrão / (padrão +
+sem padrão). Nenhuma O.S. avaliada = pct nulo e a tela diz isso. Medido como o técnico
+(Nicacio, outubro): 92,9% (79 de 85), 205 ms o painel inteiro, 11 ms a conta nova.
+Meta 94% (D-187, livro da CLARO). **Divergência achada, não corrigida:** o painel de
+Equipes da web ainda usa 95% (`META_TEC1` em `Equipes.tsx`, da 047); o Painel do Dia usa 94.
+
+**Material do TOA no contrato.** `material_do_toa(p_visita)` devolve a leitura da
+varredura (117) com o que o técnico lançou ao lado: equipamento por serial, miscelânea
+pelo código SAP do começo do nome do TOA (casa com `item_miscelanea.codigo` em 860 de
+907 linhas). Na tela: "você lançou", "do TOA" ou "você lançou N" (quantidade diferente);
+sem como comparar, sem selo. **Só leitura**: D-192 continua — nada mexe em saldo, posse
+ou no lançamento do técnico.
+
+**Em aberto (pergunta ao Emanuel):** a correção do lançamento do técnico pelo TOA
+("só será feito as correções se tiver lançado errado"). Corrigir mexe no saldo do técnico
+(a miscelânea sai do saldo dele, D-163) e muda a D-192; falta dizer o que é "errado",
+quem corrige e se o que só o TOA tem vira lançamento.
+
+### D-203 · O técnico volta atrás no melhor contato e corrige o equipamento que lançou (126)
+
+*"uma vez que ele selecionou que não quer adicionar o melhor contato do assinante, ele
+pode voltar atrás depois (...) a mesma coisa para equipamento - ele pode editar também,
+porém miscelânea uma vez importada do sistema não pode mais editar"* — Emanuel, 24/10.
+
+**Melhor contato.** O banco já aceitava responder de novo (`informar_contato_cliente`
+grava por cima; o histórico guarda cada resposta). Faltava o botão: "Informar o número
+agora" depois de um NÃO, "Trocar o número" depois de um SIM. Só no dia (trava 3).
+
+**Equipamento.** Lançar move a posse da peça (079). Corrigir o serial sem desfazer isso
+deixaria a peça errada "com o assinante" para sempre, e o banco não sabia como ela estava
+antes. Agora `equipamento_movimento` guarda a posse anterior (gatilho BEFORE INSERT), e
+`editar_equipamento` devolve a peça errada ao estado anterior **só se ela ainda está como
+aquele lançamento deixou** (ninguém mexeu depois, nem romaneio). Se não dá, não inventa:
+escreve no histórico e a posse fica para o almoxarifado conferir. Tipo/modelo sem trocar
+serial é só texto. O técnico corrige **só o que ele lançou**, e só no contrato de hoje;
+o controlador corrige qualquer um da equipe que enxerga.
+
+Testado como o técnico (transação desfeita): peça do almoxarifado lançada → com o
+assinante → corrigida para outra → voltou ao almoxarifado, e a nova foi para o assinante.
+`testar_campo` ganhou 2 cenários (25/25); `testar_policies` 26/26.
+
+**Miscelânea:** nada muda — o campo já não edita lançamento de miscelânea, e a leitura do
+TOA é só leitura (D-192, D-202).
+
+**Recusado por enquanto: apagar foto/vídeo** ("se ele enviou um vídeo errado (...) dar a
+chance para ele apagar", Emanuel, 24/10). Esbarra na regra "evidência é prova: não se
+apaga" (055). A saída prevista na própria regra é **ocultar com motivo** — pergunta em
+aberto com o Emanuel.
+
+### D-204 · Quem enviou a foto ou o vídeo errado apaga de verdade (127)
+
+*"se ele enviou um vídeo errado também precisa dar a chance para ele apagar o vídeo ou a
+foto do contrato"* · *"Quero que o técnico apague de verdade a foto ou vídeo errado, sem
+guardar o arquivo"* — Emanuel, 24/10.
+
+**Muda a regra da 055** ("evidência é prova: não se apaga"; a saída prevista era ocultar
+com motivo). Ocultar foi oferecido e **recusado** pelo Emanuel: o arquivo sai do bucket e
+a linha sai da tabela.
+
+**O que continua de pé:** só QUEM ENVIOU apaga (`evidencia.usuario_id = auth.uid()`); o
+campo só no contrato de hoje (a trava do anexo); o histórico do contrato registra
+`EVIDENCIA_APAGADA` (foto/vídeo, quando foi enviada, quem apagou) sem caminho nem arquivo —
+sumir sem rastro deixaria a auditoria sem saber que existiu.
+
+**Dois passos, nesta ordem.** O Supabase proíbe apagar `storage.objects` pelo SQL
+(gatilho `protect_delete`); o arquivo só sai pela API do Storage, que obedece à policy
+nova `evidencia_arquivo_apagar` (função `pode_apagar_evidencia_arquivo`, que nunca lança —
+D-116). Depois `apagar_evidencia` apaga a linha, e **recusa enquanto o arquivo existir**:
+nunca sobra arquivo guardado sem linha. Rede caiu entre os dois → a linha fica e o botão
+continua; tocar de novo termina.
+
+`testar_campo` 27/27 (2 cenários novos: apagar a de OUTRO → barrado; apagar a SUA → some e
+deixa 1 evento); `testar_policies` 26/26. A policy do Storage foi conferida pela função
+como o técnico (as 4 evidências de 24/10, todas dele, liberadas); o apagar pelo Storage
+de verdade NÃO foi exercitado (só pelo celular).
+
+Achado de passagem: o bucket tem 9 arquivos e a tabela 4 linhas — 5 fotos órfãs da limpeza
+de 17/10 (já listadas no estado do projeto).
