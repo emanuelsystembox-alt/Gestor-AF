@@ -8132,3 +8132,37 @@ No mesmo APK, as correções pendentes do SDK 57 (`expo` 57.0.21 → 57.0.31, ca
 location, task-manager…) — a aposta para o fechamento no Android novo do S24 Ultra.
 **Consequência:** a política de runtime é a versão do app; atualização pelo ar publicada
 daqui em diante vai para o 0.4.0, e quem ficar no 0.3.0 para de receber.
+
+### D-211 · Os números obedecem ao filtro: etiquetas de Serviços e painel de Equipes (131)
+
+*"quando eu filtrar os resultados de TODOS, EM ABERTO, NA ENTRADA devem mudar,
+atualmente esse numero não muda, tem que alterar no menu serv, equipes e no dashboard
+quando mudar o filtro os valores na tela tem que alterar onde tiver informações"* —
+Emanuel, 24/10, com o print de Serviços: "2 buckets" marcados e a etiqueta "Todas 223".
+
+**Serviços.** As etiquetas de situação (Todas, Em aberto, Na entrada…) e a barra de
+composição contavam sobre a lista sem filtro; só a tabela era filtrada. Agora contam
+com **todos os filtros menos o da própria situação** — com ele, clicar em "Concluída"
+zeraria as outras etiquetas e não daria para ver para onde ir. De passagem: a página
+da tabela voltava à 1 em quase todo filtro, mas não em tecnologia, bucket, segmento e
+ouvidoria; agora volta em todos.
+
+**Equipes.** O filtro de contrato só escolhia QUAIS equipes apareciam; contratos, O.S.,
+períodos, situação, pontos, TEC1, tempos e última baixa de cada equipe seguiam do dia
+inteiro (e uma nota dizia isso). Agora a tela manda ao banco os contratos que passaram
+e **`painel_equipes(p_data, p_visitas)`** (131) recalcula **com eles** — a mesma
+função, a mesma regra. Recalcular na tela seria uma segunda conta de TEC1 e pontos
+para divergir da primeira. A jornada não é filtrada (o filtro é de contrato, e ela
+explica por que a equipe parou). "N de M equipes com serviço" e "Ociosas" contam o
+filtrado; técnicos, sem técnico e fora do cadastro são do cadastro e não mudam.
+
+- Sem filtro, a função nova devolve **exatamente** o que a antiga devolvia (md5 do
+  painel de hoje igual: 85 equipes, 223 contratos).
+- Como `authenticated`: dia inteiro 771 ms; só a VT (71 contratos) 196 ms.
+- Assinatura com default não convive com a antiga: a de 1 argumento saiu; a recriada
+  teve `revoke` do `anon` (conferido). Monitor e Equipes sem filtro chamam igual.
+- A tela espera 250 ms antes de recalcular (quem marca três filtros seguidos não
+  dispara três cálculos) e escreve "Recalculando…" até chegar.
+
+**Dashboard: já obedecia.** Desde a correção da matriz (20/10), régua, matriz e
+gráficos saem da lista filtrada — conferido no código; nada mudou nele agora.

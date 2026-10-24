@@ -352,12 +352,27 @@ export default function Servicos() {
     ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria,
   }), [situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria])
 
-  const visiveis = useMemo(() => {
+  /**
+   * ┌─ as etiquetas contam o que o FILTRO deixa (24/10) ─────────────────┐
+   * │ > "quando eu filtrar os resultados de TODOS, EM ABERTO, NA ENTRADA │
+   * │ >  devem mudar" — Emanuel                                          │
+   * │                                                                    │
+   * │ Contavam sobre `base` (só sem jornada), e a tabela mostrava o      │
+   * │ filtrado: "2 buckets" marcados e "Todas 223" na etiqueta. Agora a  │
+   * │ conta passa por TODOS os filtros MENOS o da própria situação — com │
+   * │ ele, clicar em "Concluída" zeraria as outras etiquetas e não daria │
+   * │ para ver para onde ir. A lista é esta, filtrada pela situação.     │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const filtroSemSituacao = useMemo<FiltroContrato>(
+    () => ({ ...filtro, situacao: 'TODAS' }), [filtro])
+
+  const semSituacao = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return base.filter(v => {
-      // Situação, grupo, origem, resultado e responsável: a regra é a
+      // Grupo, origem, resultado, responsável, bucket, segmento: a regra é a
       // mesma de Equipes, e mora em um lugar só (lib/filtroContratos).
-      if (!passaNoFiltro(v, filtro)) return false
+      if (!passaNoFiltro(v, filtroSemSituacao)) return false
       if (area !== 'TODAS' && v.area?.apelido !== area && v.area?.codigo !== area) return false
       if (supervisor !== 'TODOS' && supervisorDo(v) !== supervisor) return false
       if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
@@ -373,7 +388,11 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, filtro, busca, area, supervisor, equipe, tecnologia])
+  }, [base, filtroSemSituacao, busca, area, supervisor, equipe, tecnologia])
+
+  const visiveis = useMemo(() => (situacao === 'TODAS'
+    ? semSituacao
+    : semSituacao.filter(v => passaNoFiltro(v, filtro))), [semSituacao, filtro, situacao])
 
   // ---- paginação ----
   const [pagina, setPagina] = useState(1)
@@ -382,7 +401,7 @@ export default function Servicos() {
   // de um filtro que agora tem 2 páginas é cair num vazio sem explicação.
   useEffect(() => { setPagina(1) },
     [situacao, busca, area, supervisor, equipe, grupo, origem, resultado,
-     culpa, soProdutivas, de, ate])
+     culpa, soProdutivas, de, ate, tecnologia, buckets, segmento, soOuvidoria])
   // A lista pode encolher por baixo (chegou baixa ao vivo, filtro do
   // Realtime): a página nunca passa do fim.
   const paginaAtual = Math.min(pagina, paginas)
@@ -412,9 +431,9 @@ export default function Servicos() {
   // (origem, não situação — ver filtroContratos.ts).
   const contagem = useMemo(() => {
     const c: Partial<Record<SituacaoDeTela, number>> = {}
-    for (const v of base) { const s = situacaoDeTela(v); c[s] = (c[s] ?? 0) + 1 }
+    for (const v of semSituacao) { const s = situacaoDeTela(v); c[s] = (c[s] ?? 0) + 1 }
     return c
-  }, [base])
+  }, [semSituacao])
 
   /** As fatias da barra de composicao, na ordem do dominio -- da
    *  entrada ao impedimento. Situacao sem nenhuma linha nao vira fatia
@@ -426,7 +445,7 @@ export default function Servicos() {
     qtd: contagem[s] ?? 0,
   })), [contagem])
 
-  const abertas = base.filter(v => EM_ABERTO.includes(v.situacao)).length
+  const abertas = semSituacao.filter(v => EM_ABERTO.includes(v.situacao)).length
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
     equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
     culpa !== 'TODAS', tecnologia !== 'TODAS', buckets.length > 0,
@@ -640,7 +659,7 @@ export default function Servicos() {
 
             <div className="flex flex-wrap gap-1.5">
               {(['TODAS', 'ABERTAS', ...SITUACOES_DE_TELA] as const).map(s => {
-                const n = s === 'TODAS' ? base.length
+                const n = s === 'TODAS' ? semSituacao.length
                   : s === 'ABERTAS' ? abertas : contagem[s as SituacaoDeTela] ?? 0
                 if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS') return null
                 const ativo = situacao === s

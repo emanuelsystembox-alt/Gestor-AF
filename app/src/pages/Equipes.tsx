@@ -622,6 +622,48 @@ export default function Equipes() {
     return m
   }, [contratosDia, filtro, filtrando])
 
+  /**
+   * ┌─ com filtro, os NÚMEROS da equipe também são do filtro (131) ──────┐
+   * │ > "quando mudar o filtro os valores na tela tem que alterar onde   │
+   * │ >  tiver informações" — Emanuel, 24/10                             │
+   * │                                                                    │
+   * │ Até aqui o filtro só escolhia QUAIS equipes apareciam; contratos,  │
+   * │ O.S., períodos, situação, pontos, TEC1 e tempos seguiam do dia     │
+   * │ inteiro. Agora a tela manda ao banco os contratos que passaram e   │
+   * │ `painel_equipes` recalcula com eles — a mesma função, a mesma      │
+   * │ regra; uma segunda conta de TEC1 e pontos aqui divergiria dela.    │
+   * │ A chave (os ids) evita mostrar o recálculo de um filtro antigo.    │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const idsFiltrados = useMemo(() => (filtrando && contratosDia
+    ? [...passamPorEquipe.values()].flat().map(v => v.id).sort()
+    : null), [filtrando, contratosDia, passamPorEquipe])
+  const chaveFiltro = idsFiltrados ? `${data}|${idsFiltrados.join(',')}` : null
+  const [painelDoFiltro, setPainelDoFiltro] =
+    useState<{ chave: string; mapa: Map<string, EquipePainel> } | null>(null)
+  useEffect(() => {
+    if (!chaveFiltro || !idsFiltrados) return
+    let vivo = true
+    // um respiro: quem marca três filtros seguidos não dispara três cálculos
+    const t = setTimeout(async () => {
+      const { data: d, error } = await supabase.rpc('painel_equipes',
+        { p_data: data, p_visitas: idsFiltrados })
+      if (!vivo) return
+      if (error) { setErro(error.message); return }
+      setPainelDoFiltro({ chave: chaveFiltro,
+        mapa: new Map(((d ?? []) as EquipePainel[]).map(e => [e.equipe_id, e])) })
+    }, 250)
+    return () => { vivo = false; clearTimeout(t) }
+    // `painel` recarregou (Atualizar, ao vivo): recalcula o filtro junto
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveFiltro, painel])
+  const recalculando = !!chaveFiltro && painelDoFiltro?.chave !== chaveFiltro
+  /** O painel que a tela mostra: o do filtro quando há filtro (e ele já
+   *  chegou), o do dia inteiro quando não há. */
+  const painelVisto = useMemo(() => (chaveFiltro && painelDoFiltro?.chave === chaveFiltro
+    ? painel.map(e => painelDoFiltro.mapa.get(e.equipe_id) ?? e)
+    : painel), [painel, painelDoFiltro, chaveFiltro])
+
   // As opções saem do que o dia TEM -- janela que ninguém tem não é
   // opção, e o status do TOA sai escrito como veio.
   const opContrato = useMemo(() => {
@@ -646,7 +688,7 @@ export default function Equipes() {
 
   const eqFiltradas = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    return painel.filter(e => {
+    return painelVisto.filter(e => {
       if (area !== 'TODAS' && e.area !== area) return false
       if (supervisor !== 'TODOS' && e.supervisor !== supervisor) return false
       if (soAtivas && e.visitas === 0) return false
@@ -657,7 +699,7 @@ export default function Equipes() {
       return [e.codigo, e.nome, e.supervisor, e.area, e.login_toa]
         .some(x => x?.toLowerCase().includes(t))
     })
-  }, [painel, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe])
+  }, [painelVisto, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe])
 
   const grupos = useMemo(() => {
     const ordenadas = [...eqFiltradas].sort((a, b) =>
@@ -684,11 +726,13 @@ export default function Equipes() {
   }, [tecnicos, busca, area])
 
   const semTecnico = painel.filter(e => e.tecnicos === 0).length
-  const emCampo = painel.filter(e => e.visitas > 0).length
+  // com filtro: as equipes com contrato QUE PASSOU no filtro (131)
+  const emCampo = painelVisto.filter(e => e.visitas > 0).length
   /** Nenhuma equipe rodou neste dia — diferente de "o filtro escondeu
    *  todas", e o estado vazio precisa dizer qual dos dois é. */
-  const diaSemMovimento = emCampo === 0
-  const ociosas = painel.filter(e => e.ocioso).length
+  // do DIA, não do filtro: "o filtro escondeu todas" é outro recado
+  const diaSemMovimento = painel.every(e => e.visitas === 0)
+  const ociosas = painelVisto.filter(e => e.ocioso).length
   const totalOrfaos = orfaos.reduce((s, o) => s + o.visitas, 0)
   const ehHoje = data === isoLocal(new Date())
 
@@ -941,8 +985,9 @@ export default function Equipes() {
               {filtrando > 0 && (
                 <p className="basis-full text-[11px] text-graf-400">
                   O filtro escolhe <strong className="text-graf-300">contratos</strong>: a
-                  equipe aparece se tiver ao menos um, e a gaveta mostra só eles. Pontos,
-                  TEC1, tempos, períodos e situação da equipe continuam sendo do dia inteiro.
+                  equipe aparece se tiver ao menos um, e os números dela — contratos, O.S.,
+                  períodos, situação, pontos, TEC1 e tempos — passam a ser só desses contratos.
+                  {recalculando && <strong className="ml-1 text-graf-300">Recalculando…</strong>}
                 </p>
               )}
             </>

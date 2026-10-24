@@ -191,6 +191,7 @@ As três últimas, para não repetir o esquecimento:
 | 128 | **A baixa automática vale para o que o campo não baixou, e sem vai-e-volta** — `importar_toa_interno` (REPLACE na função viva): `v_auto_aqui`; grava a situação do código desde a primeira escrita; o ramo tocado-pelo-campo atualiza início/fim/linha do TOA (D-205) | ✓ |
 | 129 | **2 contratos em andamento vindos do TOA** — gatilho `avisa_dois_ativos` (aviso DOIS_ATIVOS + sinal na central, uma vez por conjunto); `outros_ativos`; CHECKs de `aviso`/`sinal` ampliados; 129b conta os contratos (D-206) | ✓ |
 | 130 | **Geo-Rota** — `colegas_por_perto` (última posição, mesma cidade, em rota, 30 min, ciência v2), `mensagem_colega` + `enviar_ao_colega`/`marcar_colega_lida`, Realtime (D-207) | ✓ |
+| 131 | **O painel da equipe obedece ao filtro** — `painel_equipes(p_data, p_visitas uuid[] default null)`: com a lista, contratos, O.S., períodos, situação, pontos, TEC1 e tempos só desses contratos; nulo = o dia inteiro, igual a antes (md5 conferido) (D-211) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY
