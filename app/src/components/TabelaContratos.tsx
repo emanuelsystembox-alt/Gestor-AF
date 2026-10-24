@@ -6,6 +6,7 @@ import { FaixaJanela } from './telemetria'
 import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
 import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
+import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -470,6 +471,19 @@ export function TabelaContratos({
                           className="text-[10px] text-sky-400">⚲</span>
                   )}
                 </div>
+                {/* De onde veio o cancelamento (Emanuel, 24/10: "eu preciso
+                    saber a origem"): desatribuído (800) ou pela central. */}
+                {(() => {
+                  const o = origemCancelada(v)
+                  if (!o) return null
+                  const info = ORIGEM_CANCELADA_INFO[o]
+                  return (
+                    <div className="mt-1 text-[10px] font-semibold leading-snug" style={{ color: info.cor }}
+                      title={`Origem: ${info.origem}`}>
+                      {info.label} · <span className="font-normal text-graf-400">{info.origem}</span>
+                    </div>
+                  )
+                })()}
                 {/* Onde baixou (096). Ao lado da situação porque é a
                     pergunta que vem junto dela: "concluiu — e estava lá?" */}
                 {locais?.get(v.id) && (

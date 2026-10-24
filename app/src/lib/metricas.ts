@@ -19,12 +19,18 @@ export interface OS {
     codigo: number; descricao: string
     natureza: string; responsabilidade: string | null
   } | null
+  /** A baixa da AFLINE (D-042) — só a lista do TEC1 perdido usa. */
+  baixa_afline?: { codigo: number; descricao: string } | null
 }
 
 export interface Visita {
   id: string
   toa_atividade_id: string | null
   wo_numero: string | null
+  /** Só a lista do TEC1 perdido usa; telas que não pedem vêm sem. */
+  contrato?: string | null
+  /** "Status da Atividade" do TOA — separa "Cancelado pela central". */
+  status_toa?: string | null
   cliente_nome: string | null
   logradouro: string | null
   bairro: string | null
@@ -45,8 +51,8 @@ export interface Visita {
   tipo_atividade: { nome: string; natureza: string } | null
   tipo_servico: { nome: string; prioridade: number } | null
   area: { codigo: string } | null
-  equipe: { codigo: string; nome: string } | null
-  tecnico: { nome: string; matricula: string } | null
+  equipe: { codigo: string; nome: string; supervisor_nome?: string | null } | null
+  tecnico: { nome: string; matricula: string; supervisor?: { nome: string } | null } | null
   ordem_servico: OS[]
 }
 

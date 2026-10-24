@@ -14,7 +14,7 @@ import {
 import { ondeEstou, type EstadoGps } from '../lib/gps'
 import { quantosPendentes, sincronizar } from '../lib/midia'
 import {
-  assinarAvisos, carregarAvisos, marcarLidos, type Aviso as AvisoCampo,
+  assinarAvisos, carregarAvisos, marcarLidos, PESO_AVISO, type Aviso as AvisoCampo,
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
@@ -112,6 +112,7 @@ export default function Agenda({ navigation }: Props) {
   const [gps, setGps] = useState<EstadoGps | null>(null)
   const [pendentes, setPendentes] = useState(0)
   const [avisos, setAvisos] = useState<AvisoCampo[]>([])
+  const [sinoAberto, setSinoAberto] = useState(false)
 
   const carregar = useCallback(async (dia: string) => {
     setErro(null)
@@ -161,6 +162,11 @@ export default function Agenda({ navigation }: Props) {
       carregar(data)
     })
   }, [equipeId, data, carregar])
+
+  function abrirAviso(a: AvisoCampo) {
+    dispensar([a.id])
+    if (a.visita_id) navigation.navigate('Visita', { id: a.visita_id })
+  }
 
   async function dispensar(ids: number[]) {
     setAvisos(atual => atual.filter(a => !ids.includes(a.id)))
@@ -241,6 +247,17 @@ export default function Agenda({ navigation }: Props) {
         {/* "Solicitar suporte técnico" (Emanuel, 27/09): o botão de ajuda.
             É o Impedimento — cai direto na central do controlador. O
             Material que ficava aqui foi para a barra de baixo. */}
+        {/* O sino (Emanuel, 24/10): o número é o que ele ainda não leu. */}
+        <Pressable onPress={() => setSinoAberto(true)} style={e.sino} hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={avisos.length ? `${avisos.length} avisos não lidos` : 'Avisos'}>
+          <Text style={e.sinoIcone}>🔔</Text>
+          {avisos.length > 0 && (
+            <View style={e.sinoBolha}>
+              <Text style={e.sinoNumero}>{avisos.length > 99 ? '99+' : avisos.length}</Text>
+            </View>
+          )}
+        </Pressable>
         <Pressable onPress={abrirSuporte} style={e.suporte} hitSlop={8}
           accessibilityRole="button" accessibilityLabel="Solicitar suporte técnico">
           <Text style={e.suporteTexto}>Suporte</Text>
@@ -249,6 +266,26 @@ export default function Agenda({ navigation }: Props) {
           <Text style={e.sairTexto}>Sair</Text>
         </Pressable>
       </View>
+
+      {/* ---------- o sino ---------- */}
+      <Modal visible={sinoAberto} transparent animationType="slide"
+        onRequestClose={() => setSinoAberto(false)}>
+        <Pressable style={e.veu} onPress={() => setSinoAberto(false)} />
+        <View style={[e.folha, { maxHeight: '80%' }]}>
+          <Text style={e.folhaTitulo}>Avisos</Text>
+          {avisos.length === 0
+            ? <Text style={e.folhaMiudo}>Nada novo. O que mudar no seu trabalho aparece aqui.</Text>
+            : (
+              <PainelAvisos
+                avisos={avisos}
+                aoAbrir={a => { setSinoAberto(false); abrirAviso(a) }}
+                aoDispensar={a => dispensar([a.id])}
+                aoDispensarTodos={() => dispensar(avisos.map(a => a.id))}
+              />
+            )}
+          <Botao titulo="Fechar" tom="contorno" aoTocar={() => setSinoAberto(false)} />
+        </View>
+      </Modal>
 
       <View style={e.barraDia}>
         <Pressable onPress={() => setData(somarDias(data, -1))} style={e.seta} hitSlop={10}>
@@ -299,14 +336,15 @@ export default function Agenda({ navigation }: Props) {
         {erro && <Aviso tipo="erro">Não consegui carregar: {erro}</Aviso>}
         {suporteOk && <Aviso tipo="ok">{suporteOk}</Aviso>}
 
+        {/* Os avisos moram no sino (Emanuel, 24/10). Na agenda só fica o
+            que muda o que ele faz AGORA: "a operadora cancelou — não vá" e
+            "você tem 2 contratos em andamento". */}
         <PainelAvisos
-          avisos={avisos}
-          aoAbrir={a => {
-            dispensar([a.id])
-            if (a.visita_id) navigation.navigate('Visita', { id: a.visita_id })
-          }}
+          avisos={avisos.filter(a => PESO_AVISO[a.tipo] === 'urgente')}
+          aoAbrir={abrirAviso}
           aoDispensar={a => dispensar([a.id])}
-          aoDispensarTodos={() => dispensar(avisos.map(a => a.id))}
+          aoDispensarTodos={() => dispensar(
+            avisos.filter(a => PESO_AVISO[a.tipo] === 'urgente').map(a => a.id))}
         />
 
         {/* O estado do GPS fica visível o tempo todo, e não só na hora
@@ -583,6 +621,14 @@ const e = StyleSheet.create({
   email: { fontSize: 11, color: cor.graf400 },
   equipe: { fontSize: 13, fontWeight: '700', color: cor.af700 },
   sair: { paddingHorizontal: 10, paddingVertical: 8 },
+  sino: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  sinoIcone: { fontSize: 22 },
+  sinoBolha: {
+    position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9,
+    paddingHorizontal: 4, backgroundColor: cor.af600,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sinoNumero: { fontSize: 11, fontWeight: '800', color: cor.branco },
   sairTexto: { color: cor.graf500, fontSize: 14, fontWeight: '600' },
   suporte: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,

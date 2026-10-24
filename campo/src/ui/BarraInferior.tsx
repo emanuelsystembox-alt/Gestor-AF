@@ -4,6 +4,7 @@ import { StackActions, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useAuth } from '../lib/auth'
 import { useNaoLidas } from '../lib/mensagens'
+import { useNaoLidasColegas } from '../lib/colegas'
 import { cor, TOQUE_GRANDE } from './tema'
 import type { Aba, Pilha } from '../navegacao'
 
@@ -23,6 +24,8 @@ const ABAS: { nome: Aba; rotulo: string }[] = [
   { nome: 'Agenda', rotulo: 'Agenda' },
   { nome: 'Painel', rotulo: 'Painel' },
   { nome: 'Conversa', rotulo: 'Conversa' },
+  // 130: ao lado da Conversa (Emanuel, 24/10) — o mapa e os colegas.
+  { nome: 'Geo', rotulo: 'Geo' },
   { nome: 'Material', rotulo: 'Material' },
   { nome: 'Abastecer', rotulo: 'Abastecer' },
 ]
@@ -32,12 +35,14 @@ export function BarraInferior({ ativa }: { ativa: Aba }) {
   const { bottom } = useSafeAreaInsets()
   const { tecnicoId } = useAuth()
   const naoLidas = useNaoLidas(tecnicoId)
+  const naoLidasColegas = useNaoLidasColegas(tecnicoId)
 
   return (
     <View style={[e.barra, { paddingBottom: Math.max(bottom, 6) }]} accessibilityRole="tablist">
       {ABAS.map(a => {
         const eh = a.nome === ativa
-        const selo = a.nome === 'Conversa' && naoLidas != null && naoLidas > 0 ? naoLidas : null
+        const n = a.nome === 'Conversa' ? naoLidas : a.nome === 'Geo' ? naoLidasColegas : null
+        const selo = n != null && n > 0 ? n : null
         return (
           <Pressable
             key={a.nome}

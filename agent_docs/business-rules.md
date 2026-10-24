@@ -70,6 +70,15 @@ do ngestor, `EXECUTADA` virou Reagendamento 1.075 vezes e Cancelado 657.
 linhas); o parâmetro `baixa_automatica` decide se agimos sozinhos.
 Ver D-097.
 
+**A baixa automática vale para o contrato que o campo NÃO BAIXOU** (128,
+D-205). Contrato tocado pelo campo (suporte, status) e encerrado no TOA com
+código fecha pelo código; se alguma O.S. tem baixa da AFLINE, a do campo é
+respeitada. E a importação grava direto a situação do código — nunca
+"Em execução" e de volta, que mandava 2 avisos ao técnico a cada hora.
+
+**Mais de um contrato em andamento vindo do TOA é AVISADO, não corrigido**
+(129, D-206): aviso no sino do técnico e sinal na central. Nada muda sozinho.
+
 **São duas baixas, e elas divergem.** A da operadora vem do TOA e não se
 edita (D-042). A da AFLINE é a nossa afirmação do que aconteceu. A tela
 mostra as duas lado a lado justamente para a diferença aparecer.
@@ -327,7 +336,12 @@ app vira ponto `SAIU` ("app fechado" na trilha, não "parado"). Sem
 contrato produtivo de hoje em aberto, o segundo plano **desliga
 sozinho**: rastrear o técnico fora da rota não foi pedido e é dado
 pessoal de empregado. O técnico **sabe** que é registrado (aviso na
-Agenda). Só a gestão lê o rastro, e só de equipe visível.
+Agenda). Só a gestão lê o rastro (a TRILHA), e só de equipe visível.
+
+**Geo-Rota: o colega vê só a última posição** (130, D-207). Da mesma cidade,
+em rota hoje, vista há até 30 min, ponto real — e só de quem deu ciência do
+texto v2 do rastro, que diz isso. Nunca a trilha. A conversa entre técnicos
+é lida pelos dois e pela gestão (escolha do Emanuel, 24/10).
 
 **Sair do login apaga a fila de pontos do aparelho.** Quem é o técnico o
 servidor decide pelo login (D-061); ponto de um login não sobe na sessão

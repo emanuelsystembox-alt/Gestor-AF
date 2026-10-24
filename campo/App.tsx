@@ -21,6 +21,8 @@ import Painel from './src/telas/Painel'
 import Conversa from './src/telas/Conversa'
 import Material from './src/telas/Material'
 import Abastecer from './src/telas/Abastecer'
+import GeoRota from './src/telas/GeoRota'
+import ConversaColega from './src/telas/ConversaColega'
 import { Carregando } from './src/ui/componentes'
 import { cor } from './src/ui/tema'
 import type { Pilha } from './src/navegacao'
@@ -70,11 +72,13 @@ function Aplicacao() {
         <Stack.Screen name="Agenda" component={Agenda} options={{ animation: 'none' }} />
         <Stack.Screen name="Painel" component={Painel} options={{ animation: 'none' }} />
         <Stack.Screen name="Conversa" component={Conversa} options={{ animation: 'none' }} />
+        <Stack.Screen name="Geo" component={GeoRota} options={{ animation: 'none' }} />
         <Stack.Screen name="Material" component={Material} options={{ animation: 'none' }} />
         <Stack.Screen name="Abastecer" component={Abastecer} options={{ animation: 'none' }} />
         <Stack.Screen name="Visita" component={Visita} />
         <Stack.Screen name="Romaneios" component={Romaneios} />
         <Stack.Screen name="Transferir" component={Transferir} />
+        <Stack.Screen name="ConversaColega" component={ConversaColega} />
         <Stack.Screen
           name="Captura" component={Captura}
           options={{ animation: 'fade', presentation: 'fullScreenModal' }}

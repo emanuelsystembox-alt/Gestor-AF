@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
@@ -21,6 +21,7 @@ import { fotosDosTecnicos } from '../lib/foto'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import {
   FILTRO_VAZIO, SEM_JANELA, SEM_SEGMENTO, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
+  SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela,
   type FiltroContrato,
 } from '../lib/filtroContratos'
 
@@ -638,7 +639,8 @@ export default function Equipes() {
       segmentos: uniq(cs.map(v => v.segmentacao?.nome)),
       semSegmento: cs.some(v => !v.segmentacao?.nome),
       ouvidorias: cs.filter(v => v.ouvidoria).length,
-      situacoes: SITUACOES.filter(s => cs.some(v => v.situacao === s)),
+      // Desatribuído e Cancelado pela central à parte (origem — filtroContratos.ts).
+      situacoes: SITUACOES_DE_TELA.filter(s => cs.some(v => situacaoDeTela(v) === s)),
     }
   }, [contratosDia])
 
@@ -879,7 +881,7 @@ export default function Equipes() {
                   <option value="TODAS">Toda situação</option>
                   <option value="ABERTAS">Em aberto</option>
                   {opContrato.situacoes.map(s => (
-                    <option key={s} value={s}>{SITUACAO_INFO[s]?.label ?? s}</option>))}
+                    <option key={s} value={s}>{infoSituacaoDeTela(s).label}</option>))}
                 </select>
                 <select value={filtro.statusToa} aria-label="Status da Atividade no TOA"
                   onChange={e => mudaFiltro('statusToa', e.target.value)} className={sel}>

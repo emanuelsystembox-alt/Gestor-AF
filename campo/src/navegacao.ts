@@ -16,6 +16,10 @@ export type Pilha = {
   Painel: undefined
   /** A conversa com o controle (091). */
   Conversa: undefined
+  /** Geo-Rota: os contratos do dia no mapa e os colegas por perto (130). */
+  Geo: undefined
+  /** A conversa com um colega, aberta pelo Geo-Rota (130). */
+  ConversaColega: { id: string; nome: string; equipe: string | null }
   /** Meu estoque: ferramental, miscelânea, seriais; e sinalizar (091). */
   Material: undefined
   /** Pedir abastecimento do carro que está no meu nome (091). */
@@ -38,4 +42,4 @@ export type Pilha = {
 }
 
 /** As abas da barra de baixo, na ordem em que aparecem. */
-export type Aba = 'Agenda' | 'Painel' | 'Conversa' | 'Material' | 'Abastecer'
+export type Aba = 'Agenda' | 'Painel' | 'Conversa' | 'Geo' | 'Material' | 'Abastecer'

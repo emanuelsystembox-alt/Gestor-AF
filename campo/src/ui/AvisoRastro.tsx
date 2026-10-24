@@ -21,7 +21,10 @@ import { cor } from './tema'
  * │ AFLINE deve passá-lo pelo jurídico; trocando, suba a VERSAO.      │
  * └───────────────────────────────────────────────────────────────────┘
  */
-export const VERSAO_AVISO = 'rastro-v1-2026-09-27'
+/** v2 (130, Geo-Rota): os colegas da cidade passam a ver a ÚLTIMA posição
+ *  durante a rota. Texto novo = versão nova (096): todos dão ciência de
+ *  novo, e o banco só mostra no mapa quem deu ciência da v2. */
+export const VERSAO_AVISO = 'rastro-v2-2026-10-24'
 
 /** Devolve `true` quando o técnico já deu ciência desta versão. */
 export function useCienciaRastro(usuarioId: string | null, ativo: boolean) {
@@ -79,8 +82,14 @@ export function AvisoRastro({ visivel, aoCiente }: {
             <Text style={e.item}>• no momento de cada baixa e de cada encerramento;</Text>
             <Text style={e.item}>• o registro para sozinho quando o último contrato do dia é encerrado, e quando você sai do login.</Text>
             <Text style={e.texto}>
-              <Text style={e.forte}>Quem vê:</Text> apenas a gestão da AFLINE (COP,
-              controladores e supervisores da sua equipe).
+              <Text style={e.forte}>Quem vê:</Text> o caminho do dia, apenas a gestão da
+              AFLINE (COP, controladores e supervisores da sua equipe).
+            </Text>
+            <Text style={e.texto}>
+              <Text style={e.forte}>Colegas (Geo-Rota):</Text> os técnicos da sua cidade
+              veem só onde você está agora — nome e equipe — enquanto você tiver contrato
+              aberto no dia, para pedirem ajuda ou material a quem está perto. Fora da
+              rota, ninguém vê.
             </Text>
             <Text style={e.texto}>
               <Text style={e.forte}>Por quanto tempo:</Text> 90 dias. Depois é apagado

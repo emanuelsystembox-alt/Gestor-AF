@@ -188,6 +188,9 @@ As três últimas, para não repetir o esquecimento:
 | 125 | **App: tipo do contrato, TEC1 % e material do TOA** — `agenda_do_campo` + `tipo_atividade`/`tecnologia`; `painel_do_tecnico` + `tec1` (por O.S., conta do painel de Equipes); `material_do_toa` (leitura do TOA ao lado do lançamento do técnico, só leitura) (D-202) | ✓ |
 | 126 | **O técnico corrige o equipamento que lançou** — `equipamento_movimento` guarda a posse anterior; `editar_equipamento` devolve a peça errada se ninguém mexeu depois e relança; 2 cenários novos em `testar_campo` (25) (D-203) | ✓ |
 | 127 | **Quem enviou apaga a foto/vídeo errado** — policy de DELETE no bucket `evidencia` (`pode_apagar_evidencia_arquivo`) + `apagar_evidencia` (recusa se o arquivo ainda existe; deixa `EVIDENCIA_APAGADA` no histórico); muda a regra da 055; `testar_campo` 27 (D-204) | ✓ |
+| 128 | **A baixa automática vale para o que o campo não baixou, e sem vai-e-volta** — `importar_toa_interno` (REPLACE na função viva): `v_auto_aqui`; grava a situação do código desde a primeira escrita; o ramo tocado-pelo-campo atualiza início/fim/linha do TOA (D-205) | ✓ |
+| 129 | **2 contratos em andamento vindos do TOA** — gatilho `avisa_dois_ativos` (aviso DOIS_ATIVOS + sinal na central, uma vez por conjunto); `outros_ativos`; CHECKs de `aviso`/`sinal` ampliados; 129b conta os contratos (D-206) | ✓ |
+| 130 | **Geo-Rota** — `colegas_por_perto` (última posição, mesma cidade, em rota, 30 min, ciência v2), `mensagem_colega` + `enviar_ao_colega`/`marcar_colega_lida`, Realtime (D-207) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

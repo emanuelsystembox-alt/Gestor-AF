@@ -8009,3 +8009,102 @@ de verdade NÃO foi exercitado (só pelo celular).
 
 Achado de passagem: o bucket tem 9 arquivos e a tabela 4 linhas — 5 fotos órfãs da limpeza
 de 17/10 (já listadas no estado do projeto).
+
+### D-205 · A baixa automática vale para o contrato que o campo não baixou; e sem o vai-e-volta (128)
+
+*"227087686 — esse contrato já foi encerrado e ainda está em execução no app do técnico e
+site (...) acho que é devido à regra de tocada pelo campo"* — Emanuel, 24/10.
+
+**Defeito 1 (o 227087686).** Tocado pelo campo (suporte às 12:45), o contrato tinha o
+STATUS espelhado do TOA ("concluído" → Em execução) mas a BAIXA AUTOMÁTICA pulada
+(`not v_bloqueada`). O TOA fechou com 409 nas duas O.S., ninguém deu baixa da AFLINE, e ele
+ficaria em execução para sempre — deixando o técnico com 2 ativos. Esse ramo também não
+atualizava início/fim nem a linha do TOA (o banco dizia "pendente"/15:00; o arquivo das
+13:08, concluído 12:34–12:48). **Decisão do Emanuel:** a baixa automática vale para o
+contrato que o campo **não baixou**; se alguma O.S. tem baixa da AFLINE, continua protegido
+(D-006). Era o único preso desde 01/09; fechado na hora com o evento de sempre.
+
+**Defeito 2 (223471716 e todo concluído sem toque).** Cada importação gravava "concluído" →
+Em execução e, no mesmo instante, a baixa automática voltava para Concluída: **2 eventos e 2
+avisos ao técnico por sincronização** (11:56, 12:56, 13:03, 13:06). Também com status
+"iniciado" de quem reabriu no TOA. Como a baixa automática no fim SEMPRE leva à situação do
+código quando todas as O.S. têm código, a situação do código é gravada desde a primeira
+escrita. Ensaio (reimportação inteira das 13:06, desfeita): **1 evento** — o conserto do
+227087686 — contra 11 antes, e nenhum outro contrato mudou.
+
+### D-206 · "Você tem 2 contratos em andamento" — no sino, sem mexer em nada (129)
+
+*"tem que deixar apenas 1 contrato com status (...) ou então sinalizar o técnico no app
+(...) no app do técnico também deve ser um sininho de notificações"* — Emanuel, 24/10.
+Escolha: **avisar**, nada muda sozinho.
+
+A trava 095 barra todo mundo menos a importação. Quando a IMPORTAÇÃO deixa o técnico (ou a
+equipe sem técnico) com mais de um contrato em deslocamento/execução, um gatilho AFTER
+grava um **aviso** (DOIS_ATIVOS, urgente) para a equipe e um **sinal** na central, vigente
+enquanto continuar. Uma vez por conjunto de contratos (chave), não a cada sincronização.
+Mesma conta da trava (fora jornada e o fechado-e-não-tocado). Erro aqui vira warning, não
+derruba a importação. Ensaio desfeito: 2 sinais/2 avisos com o texto contando 2 e 3
+contratos; reimportar não repetiu.
+
+**O sino do app.** Os avisos saíram da agenda (8 cartões grandes no print) para um sino no
+cabeçalho com o número de não lidos. Na agenda ficam só os urgentes (a operadora cancelou —
+não vá; 2 em andamento).
+
+### D-207 · Geo-Rota: os contratos no mapa, os colegas por perto e a conversa entre técnicos (130)
+
+*"um novo menu chamado Geo - Rota (...) onde cada contrato caiu pra ele no mapa (...) por
+cores (...) mostrar os outros colegas (...) pedir ajuda de alguém próximo ou pedir algum
+equipamento (...) mandar mensagem direto pra esse amigo"* — Emanuel, 24/10.
+
+**Muda a regra 096 ("só a gestão lê o rastro")**, dentro do que o Emanuel escolheu:
+- o técnico vê só a **última posição** (nunca a trilha) dos colegas da **mesma cidade**, em
+  **rota hoje** (contrato produtivo aberto), vista há **até 30 min**, ponto real;
+- e só de quem deu "Estou ciente" do **texto v2** do rastro, que diz isso. Texto novo =
+  versão nova (096): todos dão ciência de novo no próximo login.
+A trilha continua só da gestão; a leitura passa por `colegas_por_perto` (DEFINER, 5 ms).
+
+**Conversa entre técnicos** (`mensagem_colega`): lida pelos dois e pela gestão que vê a
+equipe de um deles (escolha do Emanuel). Escreve-se só por `enviar_ao_colega` (autor pelo
+servidor, mesma cidade). Realtime filtrado por destinatário. Testado como o Nicacio
+(desfeito): sem ciência v2 o colega não aparece; com, aparece; o técnico não lê
+`rastro_ponto`; um terceiro técnico não lê a conversa.
+
+**O mapa é peça nativa** (`react-native-maps` 1.27.2). O APK 0.3.0 não tem: a tela só
+carrega o mapa no Expo Go e no APK 0.4.0+ (`temMapaNativo`, pela runtime); no 0.3.0 mostra
+a lista de colegas e o recado de atualizar. Assim a atualização pelo ar não derruba o APK
+antigo. **Falta para o APK 0.4.0:** a chave do Google Maps para Android no `app.json`.
+
+**Ainda não feito:** a tela da web para a gestão ler a conversa entre técnicos (o banco já
+deixa).
+
+### D-208 · Clicar no card de TEC1 mostra quem perdeu, e por quê
+
+*"ao clicar no card do TEC1 em nosso site, o sistema deve aparecer o técnico que perdeu,
+janela, hora início e fim, cód de baixa, supervisor ofensor"* — Emanuel, 24/10.
+
+O card do Dashboard abre a lista das O.S. fora do padrão: técnico (matrícula, equipe),
+supervisor (o do técnico; sem ele, o da equipe; sem os dois, "não definido"), contrato e
+O.S., janela, início e fim, **quanto o fim passou da janela** (a diferença, não o veredito —
+a tolerância e o expurgo já estão na classe que vem do banco, D-187), e o código de baixa da
+operadora (e o da AFLINE quando difere). No topo, a contagem **por supervisor**.
+
+A lista sai do **mesmo conjunto** que o card conta (as O.S. das visitas produtivas
+filtradas, `tec1_ao_vivo`): conferido no navegador, card "2" e lista com 2. Abre por portal
+em `.sup-controle` — a primeira versão abriu recortada dentro do card (o `transform` da
+animação, a armadilha da D-169/D-173).
+
+### D-209 · Desatribuído e Cancelado pela central: menus pela ORIGEM do cancelamento
+
+*"temos que adicionar outro menu chamado desatribuído (...) se ele for importado no novo
+relatório e o contrato não existe mais deve ir pra aí como desatribuído 800, contrato com
+status cancelados pela central no TOA devem ir para o menu cancelados pela central, e o
+restante dos outros status permanecem, eu preciso saber a origem"* · *"adiciona também no
+dashboard"* — Emanuel, 24/10. Desatribuído é **só o 800** (escolha do Emanuel).
+
+**Não é situação nova no banco**: os três continuam `CANCELADA` (pontos, TEC1, relatórios e a
+trava terminal não mudam). A tela separa pela origem, que o dado já diz
+(`origemCancelada` em `lib/filtroContratos.ts`, uma regra para Serviços, Equipes e
+Dashboard): baixa da AFLINE com 800 → **Desatribuído**; "Status da Atividade" = cancelado
+→ **Cancelado pela central**; o resto (302, 301…) segue **Cancelada**. A linha do contrato
+escreve a origem embaixo da situação. Nos 7 dias até 24/10: 86 / 126 / 75. Em 24/10 o
+"Cancelada 21" virou 2 + 16 + 3 (mesmos 21), conferido no Dashboard e em Serviços.

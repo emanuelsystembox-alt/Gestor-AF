@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
-import type { Metricas } from '../lib/metricas'
+import type { Metricas, Visita } from '../lib/metricas'
+import {
+  SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela, type SituacaoDeTela,
+} from '../lib/filtroContratos'
 
 /**
  * As duas peças de abertura do Dashboard: a **régua do dia** e a
@@ -49,17 +53,24 @@ const META_TEC1 = 94
 //  A RÉGUA
 // ================================================================== //
 
-/** Uma célula da régua: número, rótulo e a linha que explica o número. */
-function Celula({ valor, sufixo, rotulo, apoio, cor, alerta }: {
+/** Uma célula da régua: número, rótulo e a linha que explica o número.
+ *  Com `aoClicar`, a célula inteira vira botão (o TEC1 abre a lista). */
+function Celula({ valor, sufixo, rotulo, apoio, cor, alerta, aoClicar, dica }: {
   valor: string | number
   sufixo?: string
   rotulo: string
   apoio: React.ReactNode
   cor?: string
   alerta?: boolean
+  aoClicar?: () => void
+  dica?: string
 }) {
+  const Caixa = aoClicar ? 'button' : 'div'
   return (
-    <div>
+    <Caixa onClick={aoClicar} title={dica}
+      className={aoClicar
+        ? 'block w-full rounded-md text-left transition hover:bg-graf-900/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-af-500'
+        : undefined}>
       <div className="flex items-baseline gap-1">
         <span className="tabular text-3xl font-bold leading-none"
               style={cor ? { color: cor } : undefined}>{valor}</span>
@@ -71,31 +82,196 @@ function Celula({ valor, sufixo, rotulo, apoio, cor, alerta }: {
         {rotulo}
       </div>
       <div className="mt-1 text-[11px] leading-snug text-graf-500">{apoio}</div>
-    </div>
+      {aoClicar && (
+        <div className="mt-1 text-[11px] font-medium text-af-400">ver quem perdeu →</div>
+      )}
+    </Caixa>
   )
 }
 
-export function ReguaDoDia({ m, de, ate }: {
+// ================================================================== //
+//  O TEC1 PERDIDO — clicar no card abre quem perdeu e por quê
+// ================================================================== //
+
+const hora = (iso: string | null) => iso
+  ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'
+
+/** "+1h12" / "−0h20": o fim do atendimento contra o fim da janela. É a
+ *  DIFERENÇA, não o veredito — a tolerância (2 h ou 1 h, D-187) e o
+ *  expurgo já estão na classe que veio do banco. */
+function sobreAJanela(v: Visita): string | null {
+  if (!v.fim || !v.janela_fim) return null
+  const [h, mi] = v.janela_fim.split(':').map(Number)
+  const lim = new Date(v.data_agendada + 'T00:00:00'); lim.setHours(h, mi, 0, 0)
+  const d = Math.round((new Date(v.fim).getTime() - lim.getTime()) / 60000)
+  const a = Math.abs(d)
+  return `${d >= 0 ? '+' : '−'}${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`
+}
+
+const supervisorDe = (v: Visita) =>
+  v.tecnico?.supervisor?.nome ?? v.equipe?.supervisor_nome ?? null
+
+/**
+ * Quem perdeu o TEC1 — "o técnico que perdeu, janela, hora início e fim,
+ * cód de baixa, supervisor ofensor" (Emanuel, 24/10).
+ *
+ * Sai do MESMO conjunto que o card conta (as O.S. das visitas produtivas
+ * filtradas, classe `tec1_ao_vivo` do banco): o card diz "2 perdidas" e a
+ * lista tem 2, sempre. O ranking de supervisor fica no topo porque é a
+ * pergunta que a gestão faz primeiro.
+ */
+function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
+  const perdidas = useMemo(() => linhas
+    .filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+    .flatMap(v => v.ordem_servico
+      .filter(o => o.tec1_ao_vivo === 'SEM_PADRAO')
+      .map(o => ({ v, o })))
+    .sort((a, b) => (supervisorDe(a.v) ?? 'zz').localeCompare(supervisorDe(b.v) ?? 'zz')
+      || (a.v.tecnico?.nome ?? '').localeCompare(b.v.tecnico?.nome ?? '')),
+  [linhas])
+
+  const porSupervisor = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const { v } of perdidas) {
+      const s = supervisorDe(v) ?? 'Sem supervisor definido'
+      m.set(s, (m.get(s) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [perdidas])
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [aoFechar])
+
+  // Portal para `.sup-controle` (que também dá o tema): o card da régua tem
+  // `transform` (animação "sobe") e `overflow-hidden`, e um `fixed` dentro
+  // dele abriu recortado no próprio card — a armadilha da D-169/D-173.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
+      role="dialog" aria-modal="true" aria-label="O.S. que perderam o TEC1" onClick={aoFechar}>
+      <div className="card-controle mt-10 w-full max-w-6xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-graf-800 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">TEC1 perdido · {perdidas.length} O.S.</h2>
+            <p className="mt-0.5 text-[11px] text-graf-500">
+              Fora do padrão pelo livro da CLARO (D-187): baixa depois do fim da janela mais a
+              tolerância do grupo. "Sobre a janela" é o fim do atendimento contra o fim da janela.
+            </p>
+          </div>
+          <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
+            Fechar
+          </button>
+        </div>
+
+        {perdidas.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-graf-400">Nenhuma O.S. perdeu o TEC1 no período e nos filtros.</p>
+        ) : (<>
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">Por supervisor</span>
+            {porSupervisor.map(([s, n]) => (
+              <span key={s} className="rounded bg-graf-800 px-2 py-0.5 text-xs text-graf-200">
+                {s} <strong className="tabular text-af-400">{n}</strong>
+              </span>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-graf-800 bg-graf-900 text-left text-[11px] uppercase tracking-wide text-graf-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Técnico</th>
+                  <th className="px-3 py-2 font-medium">Supervisor</th>
+                  <th className="px-3 py-2 font-medium">Contrato · O.S.</th>
+                  <th className="px-3 py-2 font-medium">Janela</th>
+                  <th className="px-3 py-2 font-medium">Início</th>
+                  <th className="px-3 py-2 font-medium">Fim</th>
+                  <th className="px-3 py-2 font-medium">Sobre a janela</th>
+                  <th className="px-3 py-2 font-medium">Cód. de baixa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perdidas.map(({ v, o }) => {
+                  const sobre = sobreAJanela(v)
+                  return (
+                    <tr key={o.id} className="border-b border-graf-800/60 align-top hover:bg-graf-900/60">
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{v.tecnico?.nome ?? <span className="text-graf-400">sem técnico</span>}</div>
+                        <div className="text-[11px] text-graf-400">
+                          {[v.tecnico?.matricula, v.equipe?.codigo && `equipe ${v.equipe.codigo}`].filter(Boolean).join(' · ')}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {supervisorDe(v) ?? <span className="text-graf-400">não definido</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
+                          {v.contrato ?? v.wo_numero ?? '—'}
+                        </Link>
+                        <div className="text-[11px] text-graf-400">
+                          {o.numero_os}{o.tipo_os ? ` · ${o.tipo_os.codigo} ${o.tipo_os.descricao}` : ''}
+                        </div>
+                        <div className="text-[11px] text-graf-500">{v.tipo_servico?.nome ?? ''} · {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}</div>
+                      </td>
+                      <td className="tabular whitespace-nowrap px-3 py-2">
+                        {v.janela_inicio ? `${v.janela_inicio.slice(0, 5)}–${v.janela_fim?.slice(0, 5) ?? '?'}` : '—'}
+                      </td>
+                      <td className="tabular whitespace-nowrap px-3 py-2">{hora(v.inicio)}</td>
+                      <td className="tabular whitespace-nowrap px-3 py-2">{hora(v.fim)}</td>
+                      <td className="tabular whitespace-nowrap px-3 py-2">
+                        {sobre ? <span className={sobre.startsWith('+') ? 'font-semibold text-af-400' : 'text-graf-300'}>{sobre}</span> : '—'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {o.codigo_baixa
+                          ? <><span className="tabular font-medium">{o.codigo_baixa.codigo}</span> <span className="text-graf-300">{o.codigo_baixa.descricao}</span></>
+                          : <span className="text-graf-400">sem código</span>}
+                        {o.baixa_afline && o.baixa_afline.codigo !== o.codigo_baixa?.codigo && (
+                          <div className="text-[11px] text-graf-400">AFLINE: {o.baixa_afline.codigo} {o.baixa_afline.descricao}</div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+      </div>
+    </div>,
+    document.querySelector('.sup-controle') ?? document.body,
+  )
+}
+
+export function ReguaDoDia({ m, de, ate, linhas }: {
   m: Metricas
+  /** As visitas FILTRADAS, as mesmas de onde `m` saiu — a lista do TEC1
+   *  perdido tem de bater com o número do card. */
+  linhas: Visita[]
   /** Vão junto no link para Serviços: clicar em "Cancelada 41" tem de
    *  cair nas 41 canceladas DESTE período, não nas de hoje. */
   de: string
   ate: string
 }) {
+  const [verTec1, setVerTec1] = useState(false)
   const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.produtivas) - m.concluidas)
   const naMeta = m.taxaConclusao >= META
 
-  // Só as situações que existem no período, na ordem do domínio.
-  const fatias = SITUACOES
-    .map(s => ({
-      s,
-      qtd: m.porSituacao.find(x => x.rotulo === SITUACAO_INFO[s].label)?.valor ?? 0,
-      cor: SITUACAO_INFO[s].cor,
-      label: SITUACAO_INFO[s].label,
-    }))
-    .filter(f => f.qtd > 0)
+  // Só as situações que existem no período, na ordem do domínio — com
+  // Desatribuído e Cancelado pela central à parte de Cancelada, a mesma
+  // conta de Serviços (filtroContratos.ts; Emanuel, 24/10).
+  const fatias = useMemo(() => {
+    const c = new Map<SituacaoDeTela, number>()
+    for (const v of linhas) {
+      if (v.tipo_atividade?.natureza === 'JORNADA') continue
+      const s = situacaoDeTela({ ...v, status_toa: v.status_toa ?? null })
+      c.set(s, (c.get(s) ?? 0) + 1)
+    }
+    return SITUACOES_DE_TELA
+      .map(s => ({ s, qtd: c.get(s) ?? 0, ...infoSituacaoDeTela(s) }))
+      .filter(f => f.qtd > 0)
+  }, [linhas])
 
-  const link = (s?: Situacao) =>
+  const link = (s?: SituacaoDeTela) =>
     `/controle/servicos?de=${de}&ate=${ate}${s ? `&situacao=${s}` : ''}`
 
   return (
@@ -131,6 +307,9 @@ export function ReguaDoDia({ m, de, ate }: {
           valor={m.tec1Medidas ? m.pctTec1.toFixed(1).replace('.', ',') : '—'}
           sufixo={m.tec1Medidas ? '%' : undefined}
           rotulo="TEC1 - Atendimento no Prazo"
+          // "ao clicar no card do TEC1 (...) o técnico que perdeu" (Emanuel, 24/10)
+          aoClicar={m.tec1SemPadrao > 0 ? () => setVerTec1(true) : undefined}
+          dica={m.tec1SemPadrao > 0 ? `Ver as ${m.tec1SemPadrao} O.S. que perderam o TEC1` : undefined}
           cor={!m.tec1Medidas ? 'var(--color-graf-500)'
             : m.pctTec1 >= META_TEC1 ? 'var(--st-concluida)' : 'var(--st-reagendamento)'}
           apoio={m.tec1Medidas
@@ -195,6 +374,7 @@ export function ReguaDoDia({ m, de, ate }: {
           </div>
         </div>
       )}
+      {verTec1 && <Tec1Perdido linhas={linhas} aoFechar={() => setVerTec1(false)} />}
     </section>
   )
 }

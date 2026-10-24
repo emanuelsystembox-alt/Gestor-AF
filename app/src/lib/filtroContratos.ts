@@ -1,4 +1,4 @@
-import { EM_ABERTO, type Situacao } from './supabase'
+import { EM_ABERTO, SITUACOES, SITUACAO_INFO, type Situacao } from './supabase'
 import type { ContratoLinha } from '../components/TabelaContratos'
 
 /**
@@ -18,8 +18,66 @@ import type { ContratoLinha } from '../components/TabelaContratos'
  * livre ficam em cada tela: em Equipes eles escolhem a equipe, não o
  * contrato.
  */
+/**
+ * ┌─ Desatribuído e Cancelado pela central: ORIGEM, não situação ─────┐
+ * │ > "temos que adicionar outro menu chamado desatribuído (...) se ele│
+ * │ >  for importado no novo relatório e o contrato não existe mais    │
+ * │ >  deve ir pra aí como desatribuído 800 ok, contrato com status    │
+ * │ >  cancelados pela central no TOA devem ir para o menu cancelados  │
+ * │ >  pela central (...) eu preciso saber a origem" — Emanuel, 24/10  │
+ * │                                                                    │
+ * │ No banco os três são CANCELADA, e continuam: pontos, TEC1, rela-   │
+ * │ tórios e a trava de situação terminal não mudam. A tela separa     │
+ * │ pela origem, que o dado já diz:                                    │
+ * │  · DESATRIBUIDO — a baixa da AFLINE tem o 800 (sumiu da planilha   │
+ * │    do bucket, 116/D-191);                                          │
+ * │  · CANCELADO_CENTRAL — a planilha trouxe "Status da Atividade" =   │
+ * │    cancelado (a central cancelou no TOA, sem código);              │
+ * │  · o resto segue CANCELADA (cancelado por código: 302, 301…).      │
+ * │ Medido nos 7 dias até 24/10: 86 / 126 / 75.                        │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+export type OrigemCancelada = 'DESATRIBUIDO' | 'CANCELADO_CENTRAL'
+export type SituacaoDeTela = Situacao | OrigemCancelada
+
+export const ORIGEM_CANCELADA_INFO: Record<OrigemCancelada, { label: string; cor: string; origem: string }> = {
+  DESATRIBUIDO: { label: 'Desatribuído', cor: '#8a8178', origem: 'sumiu da planilha do TOA (cód. 800)' },
+  CANCELADO_CENTRAL: { label: 'Cancelado pela central', cor: '#b65a55', origem: 'cancelado pela central no TOA' },
+}
+
+type ParaOrigem = Pick<ContratoLinha, 'situacao' | 'status_toa'> & {
+  ordem_servico: { baixa_afline?: { codigo: number } | null }[]
+}
+
+/** De onde veio o cancelamento — nulo quando não é um dos dois menus. */
+export function origemCancelada(v: ParaOrigem): OrigemCancelada | null {
+  if (v.situacao !== 'CANCELADA') return null
+  if (v.ordem_servico.some(o => o.baixa_afline?.codigo === 800)) return 'DESATRIBUIDO'
+  if ((v.status_toa ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase() === 'CANCELADO') {
+    return 'CANCELADO_CENTRAL'
+  }
+  return null
+}
+
+/** A situação como as etiquetas de filtro contam. */
+export const situacaoDeTela = (v: ParaOrigem): SituacaoDeTela =>
+  origemCancelada(v) ?? (v.situacao as Situacao)
+
+/** A ordem das etiquetas: os dois menus novos logo depois de Cancelada. */
+export const SITUACOES_DE_TELA: SituacaoDeTela[] = SITUACOES.flatMap(s =>
+  s === 'CANCELADA' ? ['CANCELADA', 'CANCELADO_CENTRAL', 'DESATRIBUIDO'] as SituacaoDeTela[] : [s])
+
+export function infoSituacaoDeTela(s: SituacaoDeTela): { label: string; cor: string } {
+  return s in ORIGEM_CANCELADA_INFO
+    ? ORIGEM_CANCELADA_INFO[s as OrigemCancelada]
+    : SITUACAO_INFO[s as Situacao] ?? { label: s, cor: '#64748b' }
+}
+
+export const ehSituacaoDeTela = (s: string | null): s is SituacaoDeTela =>
+  !!s && (SITUACOES_DE_TELA as string[]).includes(s)
+
 export interface FiltroContrato {
-  situacao: Situacao | 'TODAS' | 'ABERTAS'
+  situacao: SituacaoDeTela | 'TODAS' | 'ABERTAS'
   grupo: string                 // 'TODOS' ou o nome do grupo de serviço
   origem: string                // 'TODAS' | 'TOA' | 'MANUAL'
   resultado: 'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'
@@ -63,7 +121,7 @@ export function quantosLigados(f: FiltroContrato): number {
 
 export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
   if (f.situacao === 'ABERTAS' && !EM_ABERTO.includes(v.situacao)) return false
-  if (f.situacao !== 'TODAS' && f.situacao !== 'ABERTAS' && v.situacao !== f.situacao) return false
+  if (f.situacao !== 'TODAS' && f.situacao !== 'ABERTAS' && situacaoDeTela(v) !== f.situacao) return false
   if (f.grupo !== 'TODOS' && v.tipo_servico?.nome !== f.grupo) return false
   if (f.origem !== 'TODAS' && v.origem !== f.origem) return false
   if (f.buckets.length && !f.buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false

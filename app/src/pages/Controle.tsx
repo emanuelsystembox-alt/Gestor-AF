@@ -31,18 +31,20 @@ import { SEM_BUCKET } from '../lib/filtroContratos'
  */
 
 const SELECT = `
-  id, toa_atividade_id, wo_numero, cliente_nome, logradouro, bairro,
+  id, toa_atividade_id, wo_numero, contrato, cliente_nome, logradouro, bairro,
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, toa_bucket,
+  status_toa:dados_origem->>"Status da Atividade",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo ),
-  equipe:equipe_id ( codigo, nome ),
-  tecnico:tecnico_responsavel_id ( nome, matricula ),
+  equipe:equipe_id ( codigo, nome, supervisor_nome ),
+  tecnico:tecnico_responsavel_id ( nome, matricula, supervisor:supervisor_id ( nome ) ),
   ordem_servico (
     id, sequencia, numero_os, status_operadora, tec1_ao_vivo,
     tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade )
+    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
+    baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
   )
 `
 
@@ -296,7 +298,7 @@ export default function Controle() {
         {!carregando && m.produtivas > 0 && (
           <>
             {/* ===== 3. quanto, e como está indo ===== */}
-            <ReguaDoDia m={m} de={dtInicio} ate={dtFim} />
+            <ReguaDoDia m={m} de={dtInicio} ate={dtFim} linhas={filtradas} />
 
             {/* ===== 4. onde está o volume ===== */}
             {/* As FILTRADAS, como a régua e os gráficos. Recebia `linhas` (o

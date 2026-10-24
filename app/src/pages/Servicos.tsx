@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { supabase, SITUACOES, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, EM_ABERTO, SITUACAO_INFO } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
@@ -12,7 +12,10 @@ import { useLocaisDaBaixa } from '../lib/localBaixa'
 import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
-import { FILTRO_VAZIO, SEM_SEGMENTO, passaNoFiltro, type FiltroContrato } from '../lib/filtroContratos'
+import {
+  FILTRO_VAZIO, SEM_SEGMENTO, SITUACOES_DE_TELA, ehSituacaoDeTela, infoSituacaoDeTela,
+  passaNoFiltro, situacaoDeTela, type FiltroContrato, type SituacaoDeTela,
+} from '../lib/filtroContratos'
 import { tecnologiaTxt } from '../lib/relatorio'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
@@ -100,10 +103,10 @@ export default function Servicos() {
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
 
   // filtros
-  const [situacao, setSituacao] = useState<Situacao | 'TODAS' | 'ABERTAS'>(() => {
+  const [situacao, setSituacao] = useState<SituacaoDeTela | 'TODAS' | 'ABERTAS'>(() => {
     if (params.get('filtro') === 'abertas') return 'ABERTAS'
     const s = params.get('situacao')
-    return s && (SITUACOES as readonly string[]).includes(s) ? s as Situacao : 'TODAS'
+    return ehSituacaoDeTela(s) ? s : 'TODAS'
   })
   const [busca, setBusca] = useState('')
   const [area, setArea] = useState('TODAS')
@@ -405,19 +408,21 @@ export default function Servicos() {
     grupos: [...new Set(base.map(v => v.tipo_servico?.nome).filter(Boolean) as string[])].sort(),
   }), [base])
 
+  // Desatribuído e Cancelado pela central contam à parte de Cancelada
+  // (origem, não situação — ver filtroContratos.ts).
   const contagem = useMemo(() => {
-    const c: Partial<Record<Situacao, number>> = {}
-    for (const v of base) c[v.situacao] = (c[v.situacao] ?? 0) + 1
+    const c: Partial<Record<SituacaoDeTela, number>> = {}
+    for (const v of base) { const s = situacaoDeTela(v); c[s] = (c[s] ?? 0) + 1 }
     return c
   }, [base])
 
   /** As fatias da barra de composicao, na ordem do dominio -- da
    *  entrada ao impedimento. Situacao sem nenhuma linha nao vira fatia
    *  de largura zero: ela simplesmente nao esta no dia. */
-  const fatias = useMemo(() => SITUACOES.map(s => ({
+  const fatias = useMemo(() => SITUACOES_DE_TELA.map(s => ({
     chave: s as string,
-    rotulo: SITUACAO_INFO[s]?.label ?? s,
-    cor: SITUACAO_INFO[s]?.cor ?? '#64748b',
+    rotulo: infoSituacaoDeTela(s).label,
+    cor: infoSituacaoDeTela(s).cor,
     qtd: contagem[s] ?? 0,
   })), [contagem])
 
@@ -634,22 +639,22 @@ export default function Servicos() {
               ativa={situacao !== 'TODAS' && situacao !== 'ABERTAS' ? situacao : null} />
 
             <div className="flex flex-wrap gap-1.5">
-              {(['TODAS', 'ABERTAS', ...SITUACOES] as const).map(s => {
+              {(['TODAS', 'ABERTAS', ...SITUACOES_DE_TELA] as const).map(s => {
                 const n = s === 'TODAS' ? base.length
-                  : s === 'ABERTAS' ? abertas : contagem[s as Situacao] ?? 0
+                  : s === 'ABERTAS' ? abertas : contagem[s as SituacaoDeTela] ?? 0
                 if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS') return null
                 const ativo = situacao === s
                 // A cor do botao e a cor da SITUACAO, nao a da marca:
                 // "Concluida" ligada nao pode acender em vermelho.
                 const cor = s === 'TODAS' ? 'var(--color-graf-400)'
                   : s === 'ABERTAS' ? 'var(--st-execucao)'
-                  : SITUACAO_INFO[s as Situacao]?.cor ?? '#64748b'
+                  : infoSituacaoDeTela(s as SituacaoDeTela).cor
                 return (
                   <button key={s} onClick={() => setSituacao(s)} aria-pressed={ativo}
                     style={{ ['--pill-cor' as string]: cor }}
                     className={`pill pill-filtro ${ativo ? 'pill-ativo' : 'pill-apagada'}`}>
                     {s === 'TODAS' ? 'Todas' : s === 'ABERTAS' ? 'Em aberto'
-                      : SITUACAO_INFO[s as Situacao]?.label ?? s}
+                      : infoSituacaoDeTela(s as SituacaoDeTela).label}
                     <span className="tabular font-bold opacity-70">{n}</span>
                   </button>
                 )

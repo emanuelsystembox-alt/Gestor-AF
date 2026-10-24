@@ -21,6 +21,8 @@ export interface Aviso {
   tipo: 'NOVO' | 'SITUACAO' | 'REABERTO' | 'CANCELADO_OPERADORA' | 'CHEGOU' | 'SAIU'
     /** Resposta do almoxarifado a uma sinalização de material (091). */
     | 'MATERIAL'
+    /** A importação deixou mais de um contrato em andamento (129). */
+    | 'DOIS_ATIVOS'
   titulo: string
   /** A observação que o controlador escreveu ao mudar o status. */
   detalhe: string | null
@@ -37,6 +39,8 @@ export interface Aviso {
  *  para o técnico: ele pode estar a caminho do endereço agora. */
 export const PESO_AVISO: Record<Aviso['tipo'], 'urgente' | 'atencao' | 'informa'> = {
   CANCELADO_OPERADORA: 'urgente',
+  // 129: dois em andamento — ele precisa baixar um antes de seguir.
+  DOIS_ATIVOS: 'urgente',
   SAIU: 'atencao',
   REABERTO: 'atencao',
   SITUACAO: 'atencao',
