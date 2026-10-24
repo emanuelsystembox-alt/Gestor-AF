@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import * as Updates from 'expo-updates'
+import { isRunningInExpoGo } from 'expo'
 import { supabase } from './supabase'
 
 /**
@@ -107,6 +108,11 @@ export function useNaoLidasColegas(eu: string | null): number | null {
  * (a política de runtime é a versão do app).
  */
 export function temMapaNativo(): boolean {
+  // O Expo Go traz a peça embutida. Perguntar a ELE, e não ao
+  // expo-updates: dentro do Expo Go o `isEnabled` vem ligado e a runtime
+  // não é a versão do app — a 1ª versão desta conta mostrou "precisa do
+  // aplicativo novo" no Expo Go (Emanuel, 24/10).
+  if (isRunningInExpoGo()) return true
   if (!Updates.isEnabled) return true
   const r = Updates.runtimeVersion
   if (!r) return false
