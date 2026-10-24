@@ -8108,3 +8108,27 @@ Dashboard): baixa da AFLINE com 800 → **Desatribuído**; "Status da Atividade"
 → **Cancelado pela central**; o resto (302, 301…) segue **Cancelada**. A linha do contrato
 escreve a origem embaixo da situação. Nos 7 dias até 24/10: 86 / 126 / 75. Em 24/10 o
 "Cancelada 21" virou 2 + 16 + 3 (mesmos 21), conferido no Dashboard e em Serviços.
+
+### D-210 · Placar do dia na agenda e o APK 0.4.0 (mapa do Geo-Rota)
+
+*"nessa tela principal é bom mostrar a pontuação do dia de hoje também e a produtividade
+do dia, com relação aos contratos que não foram feitos, expurgando desatribuído e
+cancelado"* — Emanuel, 24/10.
+
+**Placar do dia** (cartão acima da produção do mês, do dia escolhido na agenda): pontos dos
+contratos **concluídos** (sem regra conta à parte, D-117) e produtividade = concluídos ÷
+(contratos do dia − **cancelados**: desatribuído, pela central e por código). Reagendado e
+em aberto contam como "não feito". "Cancelado" foi lido como TODO cancelado — se o
+cancelado por código tiver de contar como não feito, é uma linha.
+
+**APK 0.4.0.** O mapa (`react-native-maps`) é peça nativa: só chega com APK novo. A chave do
+Google Maps para Android **não vai para o Git** — mesmo caminho da chave da web: `app.config.js`
+lê `GOOGLE_MAPS_ANDROID_KEY` do `campo/.env` (local) ou da variável **sensível** do ambiente
+`preview` da EAS (o perfil `preview` passou a declarar `environment: preview`). Build sem a
+chave falha no `app.config.js`, em vez de sair APK com o mapa em branco. Chave criada no
+projeto `amazing-coast-h9v0l`, separada da "Browser key" (que é de navegador e libera 26
+APIs); a restrição a Maps SDK for Android + pacote + SHA-1 é no Google Cloud.
+No mesmo APK, as correções pendentes do SDK 57 (`expo` 57.0.21 → 57.0.31, camera,
+location, task-manager…) — a aposta para o fechamento no Android novo do S24 Ultra.
+**Consequência:** a política de runtime é a versão do app; atualização pelo ar publicada
+daqui em diante vai para o 0.4.0, e quem ficar no 0.3.0 para de receber.

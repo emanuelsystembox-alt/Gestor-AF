@@ -192,6 +192,29 @@ export default function Agenda({ navigation }: Props) {
 
   const lista = aba === 'abertas' ? abertas : aba === 'andamento' ? andamento : feitas
 
+  /**
+   * O placar do dia. Produtividade = concluídos ÷ (contratos do dia −
+   * cancelados): cancelado — desatribuído (800), pela central ou por
+   * código — não é trabalho que ele deixou de fazer (Emanuel, 24/10).
+   * Reagendado e o que segue em aberto contam como "não feito".
+   * Pontos: só concluído, como a produção do mês; sem regra não é zero
+   * (D-117) — conta à parte.
+   */
+  const placar = useMemo(() => {
+    const canceladas = linhas.filter(l => l.situacao === 'CANCELADA').length
+    const conc = linhas.filter(l => l.situacao === 'CONCLUIDA')
+    const base = linhas.length - canceladas
+    return {
+      total: linhas.length,
+      canceladas,
+      base,
+      concluidas: conc.length,
+      pct: base > 0 ? (conc.length / base) * 100 : null,
+      pontos: conc.reduce((s, l) => s + (l.pontos_achou ? Number(l.pontos ?? 0) : 0), 0),
+      semRegra: conc.filter(l => !l.pontos_achou).length,
+    }
+  }, [linhas])
+
   function abrirSuporte() {
     setSuporteErro(null); setSuporteTexto('')
     // O contrato em andamento é o provável; se não houver, ele escolhe.
@@ -374,6 +397,35 @@ export default function Agenda({ navigation }: Props) {
               {pendentes} evidência(s) esperando sinal para subir.
             </Text>
             <Botao titulo="Tentar agora" tom="contorno" aoTocar={puxar} />
+          </Cartao>
+        )}
+
+        {/* O placar do DIA (Emanuel, 24/10): "a pontuação do dia de hoje
+            também e a produtividade do dia, com relação aos contratos que
+            não foram feitos, expurgando desatribuído e cancelado".
+            Sai dos mesmos contratos da agenda deste dia. */}
+        {!carregando && placar.total > 0 && (
+          <Cartao style={e.placar}>
+            <View style={e.placarCelula}>
+              <Text style={e.placarRotulo}>Pontos {ehHoje ? 'hoje' : rotuloDoDia(data).toLowerCase()}</Text>
+              <Text style={e.placarNumero}>{num2(placar.pontos)}</Text>
+              <Text style={e.miudo}>
+                {placar.concluidas} concluído(s)
+                {placar.semRegra > 0 ? ` · ${placar.semRegra} sem regra` : ''}
+              </Text>
+            </View>
+            <View style={e.placarDivisor} />
+            <View style={e.placarCelula}>
+              <Text style={e.placarRotulo}>Produtividade do dia</Text>
+              <Text style={[e.placarNumero,
+                placar.pct != null && { color: placar.pct >= 85 ? cor.verde900 : cor.tinta }]}>
+                {placar.pct == null ? '—' : `${Math.round(placar.pct)}%`}
+              </Text>
+              <Text style={e.miudo}>
+                {placar.concluidas} de {placar.base} feitos
+                {placar.canceladas > 0 ? ` · ${placar.canceladas} cancelado(s) fora` : ''}
+              </Text>
+            </View>
           </Cartao>
         )}
 
@@ -590,6 +642,11 @@ function LinhaFicha({ rotulo, valor, forte }: { rotulo: string; valor: string; f
 }
 
 const e = StyleSheet.create({
+  placar: { flexDirection: 'row', padding: 14 },
+  placarCelula: { flex: 1, gap: 2 },
+  placarDivisor: { width: 1, backgroundColor: cor.graf100, marginHorizontal: 12 },
+  placarRotulo: { fontSize: 13, fontWeight: '700', color: cor.graf600 },
+  placarNumero: { fontSize: 28, fontWeight: '800', color: cor.tinta, lineHeight: 32, fontVariant: ['tabular-nums'] },
   linhaGrupo: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   gpon: {
     borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
