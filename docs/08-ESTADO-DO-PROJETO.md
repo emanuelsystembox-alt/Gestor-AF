@@ -1,4 +1,4 @@
-# Estado do projeto — 08/09/2026 (pendências atualizadas em 20/10/2026)
+# Estado do projeto — 08/09/2026 (pendências atualizadas em 24/10/2026)
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -377,7 +377,7 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
-## Pendências abertas — consolidado em 19/10/2026 (somar a seção de 20/10 logo abaixo)
+## Pendências abertas — consolidado em 19/10/2026 (somar as seções de 24/10 e 20/10 logo abaixo)
 
 **Comece por aqui.** As seções datadas abaixo são o histórico de cada leva;
 esta é a lista do que AINDA está aberto, juntando todas, por quem tem de agir.
@@ -397,7 +397,7 @@ Riscado nas seções de baixo = resolvido.
 
 | O quê | Como |
 |---|---|
-| **Instalar o APK 0.3.0** nos celulares | Pronto desde 19/10, 14:35: https://expo.dev/artifacts/eas/4N1JoDaHtvbGgfupxyOAd2scG7Q3DNM47iR6meEIJi0.apk — instala por cima do 0.2.1 (mesmo pacote e assinatura). Só a partir dele o app recebe atualização pelo ar (D-186). |
+| **Instalar o APK 0.4.0** nos celulares (substitui o 0.3.0) | Ver a seção de 24/10: só o 0.4.0 tem o mapa e recebe as atualizações pelo ar daqui em diante (D-210). Instala por cima (mesmo pacote e assinatura). |
 | **Cadastrar os buckets que faltam** | Configurações › Buckets do TOA, na cidade de cada um: MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ (11 já cadastrados). Arquivo de bucket não cadastrado é recusado na importação. |
 | **Data de contratação dos 55 técnicos** | Opcional, um a um em Administração › Editar cadastro (D-178). |
 | **5 fotos órfãs no Storage** | Da limpeza de 17/10; o SQL não apaga arquivo. Painel do Supabase › Storage › evidencia (D-177). |
@@ -431,6 +431,65 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 24/10/2026 — app do técnico, importação, Geo-Rota e menus de cancelado (D-201 a D-210)
+
+Migrations **124 a 130** (e 129b) — a **131** (o painel de Equipes obedece ao filtro,
+D-211) veio de outra sessão no mesmo dia, commit `c239342`. Web publicada e conferida no ar; app publicado
+pelo ar no 0.3.0 até o commit `b3d17a5`; **APK 0.4.0 pronto** (build `cbe14d6c`,
+commit `85d9695`). O conserto do Geo-Rota no Expo Go (`38cee08`) não está no APK —
+lá ele não faz falta — e vai na próxima atualização pelo ar, para o 0.4.0. Baterias **27/27** (`testar_campo`, 4 cenários
+novos) e **26/26**; nenhuma `SECURITY DEFINER` para o `anon`; nenhuma tabela sem RLS.
+
+### Resolvido nesta leva
+
+- **App:** ouvidoria, segmento, TEC1 e produto no cartão e no contrato (D-201); grupo,
+  GPON e tipo do TOA, ficha legível, equipe no topo (D-202); TEC1 % no Painel; material
+  e equipamento do TOA no contrato, ao lado do que o técnico lançou (D-202); voltar
+  atrás no melhor contato e **corrigir equipamento** com a posse da peça errada
+  devolvida (D-203); **apagar foto/vídeo** de verdade, só quem enviou, só no dia — mudou
+  a regra da 055 (D-204); **sino** de avisos (D-206); **Geo-Rota** — mapa, colegas por
+  perto e conversa entre técnicos (D-207); **placar do dia** (D-210).
+- **Importação:** o 227087686 preso em "Em execução" (tocado pelo campo, a baixa
+  automática era pulada) e o **vai-e-volta** que mandava 2 avisos por sincronização
+  (D-205); aviso de **2 contratos em andamento** vindos do TOA (D-206).
+- **Site:** "N evidência(s) / N equipamento(s)" na lista; **card de TEC1** abre quem
+  perdeu, com supervisor (D-208); **Desatribuído** e **Cancelado pela central**
+  separados de Cancelada no Dashboard, Serviços e Equipes, com a origem na linha (D-209).
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Restringir a chave do Google Maps (Android)** | Criada em 24/10 no projeto `amazing-coast-h9v0l` ("App do técnico (Android)"). Restrição: **Apps Android** com o pacote `br.com.afline.campo` e a SHA-1 `E7:22:F9:AD:8F:09:77:D2:48:8F:EE:B5:A0:26:E5:16:20:4D:8C:19` (lida do certificado do APK 0.4.0 e conferida com o `openssl`; é o keystore da EAS, o mesmo do 0.3.0) + **Restrições de API**: só Maps SDK for Android. Até restringir, quem tiver o texto usa a cota. A chave NÃO está no Git (`campo/.env` + variável sensível da EAS, D-210); está no manifesto do APK, onde o Maps a lê. |
+| **Instalar o APK 0.4.0 em todos os celulares** | Pronto em 24/10: https://expo.dev/artifacts/eas/wu6j_qoEUcCRyQSXAUYeKLQLXtOrGPxI47YZgAizdU8.apk (build `cbe14d6c`, commit `85d9695`, expira em 07/11 na EAS). Instala por cima do 0.3.0 (mesmo pacote e assinatura). Só ele tem o mapa do Geo-Rota e as correções do SDK 57. **Atualização pelo ar daqui em diante vai só para o 0.4.0**: quem ficar no 0.3.0 para de receber (a runtime é a versão do app). |
+| **Expo Go do SDK 57 no celular de teste** | A Play Store atualizou o Expo Go para o SDK 58, que recusa o projeto. Instalar o do SDK 57 (`https://expo.dev/go?sdkVersion=57&platform=android&device=true`) e desligar a atualização automática dele. Alternativa: subir o projeto para o SDK 58 (APK novo para todos). |
+| **Meta de TEC1: 94 ou 95?** | O livro da CLARO e o Dashboard usam 94% (D-187); o painel de **Equipes** do site ainda usa 95% (`META_TEC1` em `Equipes.tsx`, da 047). Alinhar. |
+| **"Cancelado" no placar do dia** | A produtividade tira TODO cancelado (desatribuído, central e por código, D-210). Se o cancelado por código (302 desistência…) tiver de contar como "não feito", é uma linha. |
+| **"0 de 2 O.S. baixadas" em contrato concluído pelo TOA** | O app conta só a baixa da AFLINE; contrato fechado pela baixa automática mostra "0 de 2" em vermelho. Contar a do TOA, ou mostrar as duas? |
+| **Correção do lançamento do técnico pelo TOA** | Pedido de 24/10: "só será feito as correções se tiver lançado errado". Hoje a leitura do TOA é SÓ LEITURA (D-192, D-202). Falta dizer: o que é "errado" (serial? quantidade?), quem corrige (o sistema sozinho ou o controlador), e se o que só o TOA tem vira lançamento (sai do saldo do técnico). |
+| **Geo-Rota: ciência do texto v2** | Cada técnico dá "Estou ciente" de novo no próximo login; quem não der não aparece para os colegas (D-207). Avisar a equipe. |
+
+### Construção que ficou para depois
+
+| O quê | Por quê |
+|---|---|
+| **Tela da web para a gestão ler a conversa entre técnicos** | O banco já deixa (escolha do Emanuel: "controlador também lê", D-207); falta a tela. |
+| **38 contratos de 24/10 "Em execução" com o TOA dizendo "concluído"** | Visto de passagem: provavelmente O.S. sem código ou com código sem cadastro (a baixa automática só fecha com TODAS as O.S. com código de destino conhecido). Investigar. |
+| **Cenário de `testar_policies` para `mensagem_colega`** | Testado à mão como o técnico (o terceiro não lê), mas não está na bateria. |
+| **9 arquivos no bucket `evidencia` para 4 linhas** | As 5 órfãs de 17/10 (abaixo) — agora o técnico apaga as próprias, mas essas não têm linha. |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **APK 0.4.0 no celular** | O mapa com a chave nova (no Expo Go o mapa usa a chave do Expo); e se as correções do SDK 57 resolvem o **fechamento no S24 Ultra** (Android novo). Se fechar: `select * from erro_app order by criado_em desc`. |
+| **Apagar foto pelo Storage de verdade** | A regra foi testada pela função como o técnico; o apagar do arquivo pela API do Storage só se prova pelo celular (D-204). |
+| **Corrigir equipamento, voltar atrás no contato, sino, placar e Geo-Rota com o dedo** | Testados no banco e no Expo Go do Emanuel em partes; não com um técnico em rota. |
+| **Aviso de 2 em andamento numa importação real** | Ensaio desfeito com 2 contratos do Nicacio; ainda não aconteceu de verdade (D-206). |
+| **A reimportação seguinte do 227087686 e dos "iniciado"** | A 128 foi ensaiada com a importação das 13:06; a próxima sincronização real deve gerar 0 vai-e-volta. Conferir no histórico de um concluído. |
+
+---
+
 ## Pendente em 20/10/2026 — VT de Manaus, filtros e varredura por bucket (D-194 a D-197)
 
 Migrations **119 a 123**; web publicada e conferida no ar (o pedaço de cada tela
@@ -460,7 +519,7 @@ baixado do ar tem a mudança); extensão **0.6.0** no repositório. Baterias 26/
 | **Matrícula do ponto dos 12 da VT** | Ficou vazia: na planilha era igual ao login TOA (D-194). Quando houver a matrícula real, editar ou reimportar. |
 | **Varrer só os encerrados?** | Hoje a varredura lê o nome de TODO contrato sem nome (qualquer situação) e o equipamento só dos encerrados. A 0.6.0 deixa escolher por vez; se o padrão deve mudar, é decisão. |
 | **Edificações de julgamento** | "PORT", "BSD 1", "ME", "SN" e condomínio sem bloco ficaram CASA; TV com LJ ficou LOJA (D-198). Se alguma estiver errada, é uma linha na regra. |
-| **Ouvidoria no aplicativo do técnico?** | Hoje só a web mostra; no app pede a agenda devolver a ouvidoria e uma atualização pelo ar (D-199). |
+| ~~**Ouvidoria no aplicativo do técnico?**~~ | Resolvido em 21/10 (124, D-201). |
 | **Recarregar a extensão 0.6.0** | `chrome://extensions` → recarregar a AFLINE, e F5 na aba do TOA. |
 
 ### Verificação que ninguém fez ainda

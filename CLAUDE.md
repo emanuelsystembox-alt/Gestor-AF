@@ -70,7 +70,7 @@ Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
 select * from testar_policies();   -- 26 cenários, todos têm que passar
-select * from testar_campo();      -- 23 cenários das travas do campo (e do antifraude)
+select * from testar_campo();      -- 27 cenários das travas do campo (e do antifraude)
 ```
 
 # Estrutura
@@ -86,9 +86,10 @@ app/                  web do controle (16 telas, com Almoxarifado, Frota e Monit
 extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193)
                       fundo.js/popup.js são GERADOS de app/extensao/ (npm run extensao)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
-  src/lib/            gps · rastro · antifraude · midia · avisos · dominio · formato · auth
-  src/telas/          Entrar · Agenda · Painel · Conversa · Material
-                      Abastecer · Visita · Captura · Romaneios · Transferir
+  src/lib/            gps · rastro · antifraude · midia · avisos · colegas · dominio · formato · auth
+  src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
+                      Material · Abastecer · Visita · Captura · Romaneios · Transferir
+  app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
 docs/                 mapeamento, domínio, 211 decisões, mapa do concorrente
 supabase/migrations/  schema, em ordem (128 arquivos, até a 131)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)

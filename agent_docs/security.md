@@ -27,7 +27,7 @@ custo por linha não compensava.
 
 ```sql
 select * from testar_policies();   -- 26 cenários
-select * from testar_campo();      -- 23 cenários
+select * from testar_campo();      -- 27 cenários
 ```
 
 **As duas têm de passar inteiras.** A primeira prova o RLS; a segunda
