@@ -8196,3 +8196,38 @@ Só `Animated` do React Native, no thread nativo (sem biblioteca nova); "reduzir
 do celular encurta a abertura e tira os pulsos.
 
 **O ícone e a abertura são nativos: só chegam com APK novo.** A tela de entrada chega pelo ar.
+
+### D-213 · Ver o que subiu, mandar da galeria, chat direcionado e cache com teto (132, app 0.5.0)
+
+*"a foto ou o vídeo (...) o técnico poderá assistir ele no app (...) as fotos e vídeos
+precisam da opção pra ele enviar da galeria (...) o nosso app tem que ser contra a fraude
+(...) separado, miscelânea e EMTA (...) o técnico poderá escolher para qual usuário mandar
+mensagem (...) técnico, ou COP, supervisor e coordenador (...) limite o cache"* — Emanuel, 25/10.
+
+- **Visor:** tocar na miniatura abre a foto ou toca o vídeo (`expo-video`, player nativo),
+  direto da URL assinada — sem cópia no celular. A ficha diz hora, GPS e se veio da galeria.
+- **Galeria** (`expo-image-picker`): sobe marcada `evidencia.da_galeria`, com a hora e o GPS
+  **do arquivo** (EXIF) quando ele traz e **nulos** quando não traz — o GPS do celular agora
+  diria que a foto foi tirada aqui, e isso é mentira. O site mostra "da galeria" na
+  evidência. Nenhuma regra de bloqueio foi inventada (ex.: "só foto de hoje") — pergunta
+  aberta ao Emanuel. GPS simulado continua pausando o app inteiro (D-171), galeria inclusa.
+- **No TOA:** Equipamento e Miscelânea em blocos separados dentro de Instalado/Retirado.
+- **Chat com destinatário:** a conversa segue UMA por técnico (a caixa que o site já usa);
+  cada mensagem do campo leva `mensagem.para_usuario_id` — nulo = o controle todo; ou uma
+  pessoa de COP, supervisão ou coordenação (`destinatarios_do_campo`: grupo pelo cargo ou
+  perfil de acesso, só quem acessa a cidade do técnico). No site, "para você" em destaque.
+  Técnico com técnico: a conversa entre colegas (130), agora com a lista da cidade inteira
+  (`tecnicos_da_cidade`), não só os de perto. Em 25/10: 2 coordenadores, nenhum COP nem
+  supervisor cadastrado (o grupo vazio diz isso).
+- **Cache com teto:** o arquivo que subiu sai do cache na hora; a faxina da abertura tira o
+  que passou de 3 dias e põe teto de 250 MB (para 150 MB, os mais velhos primeiro) —
+  **nunca** o que está na fila sem sinal. A galeria do técnico nunca é tocada.
+- `registrar_evidencia` (+`p_galeria`) e `enviar_mensagem` (+`p_para`) recriadas sem a versão
+  antiga (traps.md: as duas juntas ficam ambíguas), ACL fechada. Baterias 27/27 e 26/26.
+
+**APK 0.5.0** (player e galeria são nativos): a atualização pelo ar passa a ir só para o 0.5.0.
+O 0.4.0 de ontem não precisa ser instalado — vai direto o 0.5.0.
+
+**Armadilha pega antes do build:** `cameraPermission: false` no plugin do `expo-image-picker`
+**bloqueia a CAMERA (e `microphonePermission: false`, o RECORD_AUDIO) do app inteiro** — o
+APK sairia sem câmera. Conferido nas permissões resolvidas pelo `expo config`.

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gestor AF Campo",
     "slug": "afline-manager",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "gestoraf",
@@ -76,6 +76,12 @@
           "backgroundColor": "#1d2024",
           "image": "./assets/splash-icon.png",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "A galeria é usada para enviar uma foto ou vídeo de evidência que já está no celular."
         }
       ]
     ],

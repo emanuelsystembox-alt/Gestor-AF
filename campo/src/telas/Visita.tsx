@@ -12,7 +12,11 @@ import {
 } from '../lib/dominio'
 import { carimbo, duracao, hhmm, isoLocal, mascaraTelefone, tamanho } from '../lib/formato'
 import { distanciaM, ondeEstou, type EstadoGps } from '../lib/gps'
-import { apagarEvidencia, pendentesDaVisita, urlAssinada } from '../lib/midia'
+import {
+  apagarEvidencia, enfileirar, enviarEvidencia, pendentesDaVisita, urlAssinada,
+} from '../lib/midia'
+import { escolherDaGaleria } from '../lib/galeria'
+import { VisorEvidencia } from '../ui/VisorEvidencia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
 import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
@@ -87,6 +91,8 @@ interface Evid {
   capturada_em: string | null; login: string | null; os_id: string | null
   /** Quem enviou: só ele apaga (127). */
   usuario_id: string | null
+  /** Veio da galeria, não da câmera (132). */
+  da_galeria: boolean | null
 }
 interface Equip {
   id: string; operacao: string; serial: string
@@ -147,7 +153,7 @@ const SELECT = `
   ),
   evidencia (
     id, tipo, midia, arquivo_path, mime, tamanho_bytes, duracao_seg,
-    lat, lng, precisao_m, capturada_em, login, os_id, usuario_id
+    lat, lng, precisao_m, capturada_em, login, os_id, usuario_id, da_galeria
   ),
   equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login, tecnico_id ),
   status_toa:dados_origem->>"Status da Atividade",
@@ -185,7 +191,10 @@ export default function Visita({ route, navigation }: Props) {
   const [obsEtapa, setObsEtapa] = useState('')
 
   // evidência e equipamento
-  const [escolhendoTipo, setEscolhendoTipo] = useState<'FOTO' | 'VIDEO' | null>(null)
+  const [escolhendoTipo, setEscolhendoTipo] = useState<'FOTO' | 'VIDEO' | 'GALERIA' | null>(null)
+  // 132: ver o que subiu, e mandar da galeria.
+  const [vendo, setVendo] = useState<Evid | null>(null)
+  const [enviandoGaleria, setEnviandoGaleria] = useState(false)
   const [equipAberto, setEquipAberto] = useState(false)
   const [equipOper, setEquipOper] = useState<'INSTALADO' | 'RETIRADO'>('INSTALADO')
   const [equipSerial, setEquipSerial] = useState('')
@@ -417,6 +426,38 @@ export default function Visita({ route, navigation }: Props) {
    * │ certo. Digitar continua valendo — peça de fora da carga existe.  │
    * └──────────────────────────────────────────────────────────────────┘
    */
+  /**
+   * Da galeria (132): escolhe, e sobe JÁ — sem passar pela câmera. Sem
+   * sinal, vai para a mesma fila da câmera. A hora e o GPS são os do
+   * arquivo (EXIF); sem eles, sobe sem — nunca com os de agora.
+   */
+  async function enviarDaGaleria(tipo: string) {
+    if (!v) return
+    setErro(null)
+    let g: Awaited<ReturnType<typeof escolherDaGaleria>>
+    try { g = await escolherDaGaleria() } catch (err) {
+      setErro(err instanceof Error ? err.message : String(err)); return
+    }
+    if (!g) return
+    setEnviandoGaleria(true)
+    const dados = {
+      visitaId: v.id,
+      osId: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
+      tipo, lat: g.lat, lng: g.lng, precisao: null,
+      capturadaEm: g.capturadaEm, galeria: true,
+    }
+    try {
+      await enviarEvidencia(g.captura, dados)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // Arquivo grande demais não adianta guardar na fila.
+      if (/limite/i.test(msg)) setErro(msg)
+      else { await enfileirar(g.captura, dados); setErro('Sem sinal: a evidência ficou na fila e sobe sozinha.') }
+    }
+    setEnviandoGaleria(false)
+    await recarregar()
+  }
+
   /** Apagar não volta: o arquivo sai do servidor (127). Pergunta antes. */
   function confirmarApagar(f: Evid) {
     const nome = f.midia === 'VIDEO' ? 'vídeo' : 'foto'
@@ -804,15 +845,20 @@ export default function Visita({ route, navigation }: Props) {
           <View style={e.galeria}>
             {v.evidencia.map(f => (
               <View key={f.id} style={e.miniatura}>
-                {f.midia === 'FOTO' && miniaturas[f.id] ? (
-                  <Image source={{ uri: miniaturas[f.id] }} style={e.miniaturaImg} />
-                ) : (
-                  <View style={[e.miniaturaImg, e.miniaturaVideo]}>
-                    <Text style={e.miniaturaVideoTexto}>
-                      {f.midia === 'VIDEO' ? `▶ ${duracao(f.duracao_seg)}` : '…'}
-                    </Text>
-                  </View>
-                )}
+                {/* Tocar abre a foto ou toca o vídeo (Emanuel, 25/10). */}
+                <Pressable onPress={() => setVendo(f)} accessibilityRole="button"
+                  accessibilityLabel={f.midia === 'VIDEO' ? 'Assistir o vídeo' : 'Abrir a foto'}>
+                  {f.midia === 'FOTO' && miniaturas[f.id] ? (
+                    <Image source={{ uri: miniaturas[f.id] }} style={e.miniaturaImg} />
+                  ) : (
+                    <View style={[e.miniaturaImg, e.miniaturaVideo]}>
+                      <Text style={e.miniaturaVideoTexto}>
+                        {f.midia === 'VIDEO' ? `▶ ${duracao(f.duracao_seg)}` : '…'}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+                {!!f.da_galeria && <Text style={e.galeriaMini}>da galeria</Text>}
                 <Text style={e.miniaturaRotulo} numberOfLines={1}>
                   {rotuloEvidencia(f.tipo)}
                 </Text>
@@ -847,6 +893,12 @@ export default function Visita({ route, navigation }: Props) {
               aoTocar={() => setEscolhendoTipo('VIDEO')}
             />
           </View>
+        )}
+        {/* 132: da galeria do celular — sobe marcada, com hora e GPS do arquivo. */}
+        {podeAnexar && (
+          <Botao titulo={enviandoGaleria ? 'Enviando da galeria…' : 'Enviar da galeria'}
+            tom="contorno" carregando={enviandoGaleria}
+            aoTocar={() => setEscolhendoTipo('GALERIA')} />
         )}
 
         {/* ---------- o que o TOA já registrou (125, Emanuel 24/10) ----------
@@ -1234,6 +1286,8 @@ export default function Visita({ route, navigation }: Props) {
         </KeyboardAvoidingView>
       </Modal>
 
+      <VisorEvidencia ev={vendo} aoFechar={() => setVendo(null)} />
+
       {/* ---------- escolher o tipo da evidência ---------- */}
       <Modal
         visible={escolhendoTipo !== null}
@@ -1244,7 +1298,8 @@ export default function Visita({ route, navigation }: Props) {
         <Pressable style={e.fundoModal} onPress={() => setEscolhendoTipo(null)} />
         <View style={e.folha}>
           <Text style={e.folhaTitulo}>
-            {escolhendoTipo === 'VIDEO' ? 'Gravar vídeo de quê?' : 'Foto de quê?'}
+            {escolhendoTipo === 'VIDEO' ? 'Gravar vídeo de quê?'
+              : escolhendoTipo === 'GALERIA' ? 'Da galeria: é de quê?' : 'Foto de quê?'}
           </Text>
           <Text style={e.folhaMiudo}>
             O tipo é o que faz a evidência ser encontrada depois. Nenhum
@@ -1257,6 +1312,7 @@ export default function Visita({ route, navigation }: Props) {
                 onPress={() => {
                   const modo = escolhendoTipo!
                   setEscolhendoTipo(null)
+                  if (modo === 'GALERIA') { enviarDaGaleria(t.chave); return }
                   navigation.navigate('Captura', {
                     visitaId: v.id,
                     osId: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
@@ -1463,6 +1519,7 @@ const e = StyleSheet.create({
   miniaturaMiudo: { fontSize: 10, color: cor.graf400 },
   semGpsMini: { fontSize: 10, color: cor.ambar, fontWeight: '700' },
   apagar: { fontSize: 12, color: cor.af700, fontWeight: '800', marginTop: 4, paddingVertical: 4 },
+  galeriaMini: { fontSize: 10, color: cor.ambar900, fontWeight: '800' },
 
   equipLinha: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   equipSelo: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },

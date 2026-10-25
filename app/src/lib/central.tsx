@@ -63,6 +63,8 @@ export interface Sinal {
 export interface MensagemAoVivo {
   id: number; tecnico_id: string; do_campo: boolean; autor_nome: string | null
   texto: string; criado_em: string; lida_em: string | null
+  /** Para quem o técnico mandou (132). Nulo = o controle todo. */
+  para_usuario_id?: string | null
 }
 
 interface Ctx {

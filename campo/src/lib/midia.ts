@@ -3,6 +3,7 @@ import { File } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from './supabase'
+import { apagarDoCache } from './cache'
 
 /**
  * Evidência: do celular para o bucket, e do bucket para a tabela.
@@ -42,7 +43,10 @@ export interface DadosEvidencia {
   lat?: number | null
   lng?: number | null
   precisao?: number | null
-  capturadaEm?: string
+  /** Nula = a hora não é conhecida (da galeria, sem EXIF). */
+  capturadaEm?: string | null
+  /** Veio da galeria do celular, não da câmera do app (132). */
+  galeria?: boolean
 }
 
 interface Pendente extends DadosEvidencia {
@@ -131,11 +135,18 @@ export async function enviarEvidencia(
     p_lat: dados.lat ?? null,
     p_lng: dados.lng ?? null,
     p_precisao_m: dados.precisao ?? null,
-    p_capturada_em: dados.capturadaEm ?? new Date().toISOString(),
+    // Da galeria, a hora nula fica nula: "agora" mentiria a hora da foto.
+    p_capturada_em: dados.galeria ? (dados.capturadaEm ?? null)
+      : (dados.capturadaEm ?? new Date().toISOString()),
     p_duracao_seg: captura.duracaoSeg ?? null,
     p_observacao: dados.observacao ?? null,
+    p_galeria: !!dados.galeria,
   })
   if (error) throw new Error(error.message)
+  // Subiu: o que ficou no cache do app sai agora (a cópia reduzida e o
+  // original da câmera/galeria). A galeria do técnico não é tocada.
+  apagarDoCache(uri)
+  if (uri !== captura.uri) apagarDoCache(captura.uri)
   return data as string
 }
 

@@ -405,3 +405,15 @@ do `eas.json` antes, e confira o `diff` depois (D-186).
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`
 ou `campo/`.
+
+**`cameraPermission: false` no plugin do `expo-image-picker` tira a câmera do APP INTEIRO.**
+A opção não é "esta tela não usa câmera": ela põe `android.permission.CAMERA` (e, com
+`microphonePermission: false`, o `RECORD_AUDIO`) em `blockedPermissions` do manifesto —
+a câmera de evidência morreria no APK, e no Expo Go nada acusa. Depois de mexer em plugin,
+confira as permissões resolvidas: `npx expo config --json` → `android.permissions` e
+`android.blockedPermissions` (D-213).
+
+**No Expo Go, `expo-updates` não diz a versão do app.** `Updates.isEnabled` vem ligado e
+`runtimeVersion` não é a do `app.json` — guarda de "peça nativa só no APK X+" pela runtime
+mostrou "precisa do app novo" no Expo Go. Pergunte `isRunningInExpoGo()` (do pacote `expo`)
+antes (D-210).

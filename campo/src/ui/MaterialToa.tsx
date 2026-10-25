@@ -95,12 +95,22 @@ export function MaterialToa({ visitaId, varridoEm, recarga }: {
               </View>
             )
           }
+          // Equipamento (EMTA, decoder…) e miscelânea (cabo, conector…) são
+          // coisas diferentes e não se misturam (Emanuel, 25/10).
+          const equip = da.filter(i => !i.miscelanea)
+          const misc = da.filter(i => i.miscelanea)
           return (
             <View key={s}>
-              <Text style={e.secao}>{TITULO[s]} · {da.length}</Text>
-              {da.length === 0
-                ? <Text style={e.miudo}>Nada nesta lista no TOA.</Text>
-                : da.map((i, k) => <Linha key={k} i={i} />)}
+              <Text style={e.secao}>{TITULO[s]}</Text>
+              {da.length === 0 && <Text style={e.miudo}>Nada nesta lista no TOA.</Text>}
+              {equip.length > 0 && (<>
+                <Text style={e.subsecao}>Equipamento · {equip.length}</Text>
+                {equip.map((i, k) => <Linha key={`e${k}`} i={i} />)}
+              </>)}
+              {misc.length > 0 && (<>
+                <Text style={e.subsecao}>Miscelânea · {misc.length}</Text>
+                {misc.map((i, k) => <Linha key={`m${k}`} i={i} />)}
+              </>)}
             </View>
           )
         })}
@@ -119,7 +129,8 @@ function Linha({ i, semSelo }: { i: ItemToa; semSelo?: boolean }) {
         <Text style={e.nome} numberOfLines={2}>{nome}</Text>
         <Text style={e.detalhe} numberOfLines={2}>
           {[
-            i.miscelanea ? 'miscelânea' : (i.modelo && i.tipo ? i.tipo : null),
+            // O bloco já diz que é miscelânea; aqui vai o que distingue a linha.
+            !i.miscelanea && i.modelo && i.tipo ? i.tipo : null,
             i.serial,
             i.serial_substituido ? `no lugar de ${i.serial_substituido}` : null,
           ].filter(Boolean).join(' · ')}
@@ -167,6 +178,11 @@ const e = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.4,
   },
   abrir: { fontSize: 13, fontWeight: '700', color: cor.af700 },
+  subsecao: {
+    fontSize: 13, fontWeight: '800', color: cor.tinta, marginTop: 8,
+    paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6,
+    backgroundColor: cor.graf50, alignSelf: 'flex-start',
+  },
   linha: {
     flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8,
     borderTopWidth: 1, borderTopColor: cor.graf100,

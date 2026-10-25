@@ -34,6 +34,8 @@ interface Evidencia {
   precisao_m: number | null
   observacao: string | null; login: string | null; origem: string | null
   tecnico: { nome: string; matricula: string } | null
+  /** Veio da galeria do celular, não da câmera do app (132). */
+  da_galeria: boolean | null
 }
 interface Det {
   id: string; toa_atividade_id: string | null; wo_numero: string | null
@@ -181,7 +183,7 @@ export default function VisitaDetalhe() {
         .eq('visita_id', id!).order('criado_em', { ascending: false }),
       supabase.from('evidencia')
         .select(`id, tipo, arquivo_path, tamanho_bytes, lat, lng, capturada_em, criado_em,
-                 midia, mime, duracao_seg, precisao_m, observacao, login, origem,
+                 midia, mime, duracao_seg, precisao_m, observacao, login, origem, da_galeria,
                  tecnico:tecnico_id ( nome, matricula )`)
         .eq('visita_id', id!).order('criado_em'),
       supabase.from('equipe').select('id, codigo').order('codigo'),
@@ -698,6 +700,15 @@ export default function VisitaDetalhe() {
                           <span className="absolute right-1.5 top-1.5 rounded bg-amber-500/90
                                            px-1.5 py-0.5 text-[10px] font-bold text-graf-950">
                             sem GPS
+                          </span>
+                        )}
+                        {/* 132: da galeria, não da câmera do app — hora e GPS
+                            são os do arquivo. Quem audita tem de saber. */}
+                        {a.da_galeria && (
+                          <span title="Enviada da galeria do celular: hora e GPS são os do próprio arquivo, quando ele traz"
+                            className="absolute left-1.5 top-1.5 rounded bg-graf-950/90 px-1.5 py-0.5
+                                       text-[10px] font-bold text-amber-300">
+                            da galeria
                           </span>
                         )}
                       </div>

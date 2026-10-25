@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCentral } from '../lib/central'
+import { useAuth } from '../lib/auth'
 import { Avatar } from './ui'
 
 /**
@@ -23,7 +24,13 @@ interface Conversa {
 interface Msg {
   id: number; do_campo: boolean; autor_nome: string | null; texto: string
   criado_em: string; lida_em: string | null
+  /** Para quem o técnico mandou (132): nulo = o controle todo. */
+  para_usuario_id?: string | null
+  para?: { nome: string } | null
 }
+
+/** O que a conversa lê: com o destinatário, que o técnico escolhe desde a 132. */
+const SELECT_MSG = 'id, do_campo, autor_nome, texto, criado_em, lida_em, para_usuario_id, para:para_usuario_id ( nome )'
 interface TecnicoOpcao { id: string; nome: string; usuario_id: string | null; equipe: { codigo: string } | null }
 
 const hora = (ts: string) => {
@@ -35,6 +42,7 @@ const hora = (ts: string) => {
 
 export function ChatControle() {
   const { chatAberto, fecharChat, chatTecnico, abrirChat, ultimaMensagem, recarregar } = useCentral()
+  const eu = useAuth().session?.user.id ?? null
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [texto, setTexto] = useState('')
@@ -72,12 +80,12 @@ export function ChatControle() {
     if (!chatAberto || !chatTecnico) { setMsgs([]); return }
     let vivo = true
     setErro(null)
-    supabase.from('mensagem').select('id, do_campo, autor_nome, texto, criado_em, lida_em')
+    supabase.from('mensagem').select(SELECT_MSG)
       .eq('tecnico_id', chatTecnico).order('criado_em', { ascending: false }).limit(200)
       .then(({ data, error }) => {
         if (!vivo) return
         if (error) setErro(error.message)
-        setMsgs(((data ?? []) as Msg[]).reverse())
+        setMsgs(((data ?? []) as unknown as Msg[]).reverse())
       })
     supabase.rpc('marcar_conversa_lida', { p_tecnico_id: chatTecnico })
       .then(() => { carregarConversas(); recarregar() })
@@ -121,9 +129,9 @@ export function ChatControle() {
     if (error) { setErro(error.message); return }
     setTexto('')
     const { data } = await supabase.from('mensagem')
-      .select('id, do_campo, autor_nome, texto, criado_em, lida_em')
+      .select(SELECT_MSG)
       .eq('tecnico_id', chatTecnico).order('criado_em', { ascending: false }).limit(200)
-    setMsgs(((data ?? []) as Msg[]).reverse())
+    setMsgs(((data ?? []) as unknown as Msg[]).reverse())
     carregarConversas()
   }
 
@@ -230,6 +238,12 @@ export function ChatControle() {
               return (
                 <div key={m.id} className={`flex flex-col ${doControle ? 'items-end' : 'items-start'}`}>
                   {mostraAutor && <span className="mb-0.5 text-[10px] text-graf-400">{m.autor_nome ?? 'Controle'}</span>}
+                  {/* 132: o técnico direcionou a mensagem a uma pessoa. */}
+                  {m.do_campo && m.para_usuario_id && (
+                    m.para_usuario_id === eu
+                      ? <span className="mb-0.5 rounded bg-af-600 px-1.5 text-[10px] font-semibold text-white">para você</span>
+                      : <span className="mb-0.5 text-[10px] text-amber-300">para {m.para?.nome ?? 'outra pessoa da gestão'}</span>
+                  )}
                   <div className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
                     doControle ? 'rounded-br-md bg-af-600 text-white'
                                : 'rounded-bl-md border border-graf-700 bg-graf-900 text-graf-100'}`}>

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useAuth } from '../lib/auth'
 import {
-  assinarConversa, carregarConversa, enviarMensagem, marcarLida, type Mensagem,
+  assinarConversa, carregarColegasDaCidade, carregarConversa, carregarDestinatarios,
+  enviarMensagem, marcarLida, type ColegaDaCidade, type Destinatario, type Mensagem,
 } from '../lib/mensagens'
+import type { Pilha } from '../navegacao'
 import { carimbo, isoLocal } from '../lib/formato'
 import { Aviso, Carregando } from '../ui/componentes'
 import { CabecalhoAba } from '../ui/CabecalhoAba'
@@ -25,7 +28,13 @@ import { cor, raio, TOQUE } from '../ui/tema'
  * Sem sinal, o envio falha e o TEXTO FICA na caixa — perder o que o
  * técnico digitou no sol, com uma mão, é o pior defeito possível aqui.
  */
-export default function Conversa() {
+const GRUPOS: { chave: Destinatario['grupo']; rotulo: string }[] = [
+  { chave: 'COP', rotulo: 'COP' },
+  { chave: 'SUPERVISOR', rotulo: 'Supervisor' },
+  { chave: 'COORDENADOR', rotulo: 'Coordenador' },
+]
+
+export default function Conversa({ navigation }: NativeStackScreenProps<Pilha, 'Conversa'>) {
   const { tecnicoId } = useAuth()
   const [msgs, setMsgs] = useState<Mensagem[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -33,6 +42,28 @@ export default function Conversa() {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const rolagem = useRef<ScrollView>(null)
+  /**
+   * Para quem vai (132, Emanuel 25/10: "o técnico poderá escolher para qual
+   * usuário mandar mensagem (...) direcionar a demanda"). Nulo = o controle
+   * todo, como sempre. Técnico com técnico abre a conversa entre colegas.
+   */
+  const [para, setPara] = useState<Destinatario | null>(null)
+  const [escolhendo, setEscolhendo] = useState(false)
+  const [aba, setAba] = useState<Destinatario['grupo'] | 'TECNICO'>('COP')
+  const [destinatarios, setDestinatarios] = useState<Destinatario[] | null>(null)
+  const [colegas, setColegas] = useState<ColegaDaCidade[] | null>(null)
+  const [busca, setBusca] = useState('')
+
+  useEffect(() => {
+    carregarDestinatarios().then(setDestinatarios).catch(() => setDestinatarios([]))
+  }, [])
+  useEffect(() => {
+    if (!escolhendo || aba !== 'TECNICO' || colegas) return
+    carregarColegasDaCidade().then(setColegas).catch(() => setColegas([]))
+  }, [escolhendo, aba, colegas])
+
+  const nomeDe = (id: string | null | undefined) =>
+    id ? destinatarios?.find(d => d.usuario_id === id)?.nome ?? 'gestão' : null
 
   useEffect(() => {
     if (!tecnicoId) { setCarregando(false); return }
@@ -55,7 +86,7 @@ export default function Conversa() {
     if (!t || enviando) return
     setEnviando(true); setErro(null)
     try {
-      await enviarMensagem(t)
+      await enviarMensagem(t, para?.usuario_id)
       setTexto('')
       // O Realtime traz a linha de volta; se ele estiver atrasado, a
       // leitura garante (a linha é a verdade).
@@ -115,6 +146,9 @@ export default function Conversa() {
                 {!meu && !mesmoAutor && (
                   <Text style={e.autor}>{m.autor_nome ?? 'Controle'}</Text>
                 )}
+                {meu && !!m.para_usuario_id && (
+                  <Text style={e.paraQuem}>para {nomeDe(m.para_usuario_id)}</Text>
+                )}
                 <View style={[e.balao, meu ? e.balaoMeu : e.balaoDele]}>
                   <Text style={[e.texto, meu && { color: cor.branco }]}>{m.texto}</Text>
                 </View>
@@ -127,6 +161,16 @@ export default function Conversa() {
         </ScrollView>
 
         {erro && <View style={{ paddingHorizontal: 12 }}><Aviso tipo="erro">{erro}</Aviso></View>}
+
+        {/* Para quem vai esta mensagem. */}
+        <Pressable onPress={() => setEscolhendo(true)} style={e.paraLinha}
+          accessibilityRole="button" accessibilityLabel="Escolher para quem mandar">
+          <Text style={e.paraRotulo}>Para:</Text>
+          <Text style={e.paraNome} numberOfLines={1}>
+            {para ? `${para.nome} · ${GRUPOS.find(g => g.chave === para.grupo)?.rotulo}` : 'Controle (todos)'}
+          </Text>
+          <Text style={e.paraTrocar}>trocar ›</Text>
+        </Pressable>
 
         <View style={e.compor}>
           <TextInput
@@ -147,6 +191,64 @@ export default function Conversa() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* ---------- escolher o destinatário ---------- */}
+      <Modal visible={escolhendo} transparent animationType="slide" onRequestClose={() => setEscolhendo(false)}>
+        <Pressable style={e.veu} onPress={() => setEscolhendo(false)} />
+        <View style={e.folha}>
+          <Text style={e.folhaTitulo}>Para quem é a mensagem?</Text>
+          <Pressable onPress={() => { setPara(null); setEscolhendo(false) }}
+            style={[e.opcao, !para && e.opcaoAtiva]} accessibilityRole="radio" accessibilityState={{ checked: !para }}>
+            <Text style={e.opcaoNome}>Controle (todos)</Text>
+            <Text style={e.opcaoMiudo}>Quem estiver com a sua equipe responde</Text>
+          </Pressable>
+          <View style={e.abas}>
+            {[...GRUPOS, { chave: 'TECNICO' as const, rotulo: 'Técnico' }].map(g => (
+              <Pressable key={g.chave} onPress={() => setAba(g.chave)}
+                style={[e.aba, aba === g.chave && e.abaAtiva]} accessibilityRole="tab"
+                accessibilityState={{ selected: aba === g.chave }}>
+                <Text style={[e.abaTexto, aba === g.chave && { color: cor.branco }]}>{g.rotulo}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {aba === 'TECNICO' && (
+            <TextInput value={busca} onChangeText={setBusca} placeholder="Buscar nome ou equipe…"
+              placeholderTextColor={cor.graf500} style={e.busca} accessibilityLabel="Buscar técnico" />
+          )}
+          <ScrollView style={{ maxHeight: 300 }}>
+            {aba === 'TECNICO' ? (
+              colegas === null ? <Carregando texto="Carregando colegas…" />
+              : colegas.filter(c => {
+                  const q = busca.trim().toLowerCase()
+                  return !q || c.nome.toLowerCase().includes(q) || (c.equipe ?? '').includes(q)
+                }).slice(0, 60).map(c => (
+                  <Pressable key={c.tecnico_id} style={e.opcao}
+                    onPress={() => {
+                      setEscolhendo(false)
+                      navigation.navigate('ConversaColega', { id: c.tecnico_id, nome: c.nome, equipe: c.equipe })
+                    }}>
+                    <Text style={e.opcaoNome}>{c.nome}</Text>
+                    <Text style={e.opcaoMiudo}>{c.equipe ? `Equipe ${c.equipe}` : 'sem equipe'} · conversa só entre vocês e a gestão</Text>
+                  </Pressable>
+                ))
+            ) : destinatarios === null ? <Carregando texto="Carregando…" />
+              : (() => {
+                  const lista = destinatarios.filter(d => d.grupo === aba)
+                  if (lista.length === 0) {
+                    return <Text style={e.vazioTexto}>Ninguém cadastrado ainda nesse grupo para a sua cidade.</Text>
+                  }
+                  return lista.map(d => (
+                    <Pressable key={d.usuario_id} onPress={() => { setPara(d); setEscolhendo(false) }}
+                      style={[e.opcao, para?.usuario_id === d.usuario_id && e.opcaoAtiva]}
+                      accessibilityRole="radio" accessibilityState={{ checked: para?.usuario_id === d.usuario_id }}>
+                      <Text style={e.opcaoNome}>{d.nome}</Text>
+                      <Text style={e.opcaoMiudo}>{d.cargo ?? GRUPOS.find(g => g.chave === d.grupo)?.rotulo}</Text>
+                    </Pressable>
+                  ))
+                })()}
+          </ScrollView>
+        </View>
+      </Modal>
       <BarraInferior ativa="Conversa" />
     </SafeAreaView>
   )
@@ -183,4 +285,36 @@ const e = StyleSheet.create({
     backgroundColor: cor.af600, alignItems: 'center', justifyContent: 'center',
   },
   enviarTexto: { color: cor.branco, fontSize: 16, fontWeight: '800' },
+  paraQuem: { fontSize: 11, fontWeight: '700', color: cor.af700, marginBottom: 2, marginRight: 4 },
+  paraLinha: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: cor.branco, borderTopWidth: 1, borderTopColor: cor.graf200,
+  },
+  paraRotulo: { fontSize: 13, color: cor.graf500 },
+  paraNome: { flex: 1, fontSize: 14, fontWeight: '800', color: cor.tinta },
+  paraTrocar: { fontSize: 13, fontWeight: '700', color: cor.af700 },
+  veu: { flex: 1, backgroundColor: 'rgba(15,17,21,0.45)' },
+  folha: {
+    backgroundColor: cor.branco, padding: 16, gap: 10,
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+  },
+  folhaTitulo: { fontSize: 17, fontWeight: '800', color: cor.tinta },
+  opcao: {
+    paddingVertical: 12, paddingHorizontal: 12, borderRadius: raio.m,
+    borderWidth: 1, borderColor: cor.graf200, marginBottom: 6,
+  },
+  opcaoAtiva: { borderColor: cor.af600, borderWidth: 2, backgroundColor: cor.af50 },
+  opcaoNome: { fontSize: 15, fontWeight: '700', color: cor.tinta },
+  opcaoMiudo: { fontSize: 12, color: cor.graf500, marginTop: 1 },
+  abas: { flexDirection: 'row', gap: 6 },
+  aba: {
+    flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center',
+    borderRadius: raio.s, backgroundColor: cor.graf50,
+  },
+  abaAtiva: { backgroundColor: cor.tinta },
+  abaTexto: { fontSize: 13, fontWeight: '700', color: cor.graf600 },
+  busca: {
+    minHeight: 44, borderWidth: 1, borderColor: cor.graf200, borderRadius: raio.m,
+    paddingHorizontal: 12, fontSize: 15, color: cor.tinta, backgroundColor: cor.graf50,
+  },
 })

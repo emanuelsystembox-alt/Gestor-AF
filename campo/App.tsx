@@ -10,6 +10,7 @@ import { GuardaGps } from './src/ui/GuardaGps'
 import { Tropeco } from './src/ui/Tropeco'
 import { conferirFechamentoAnterior, instalarRedeDeErros } from './src/lib/diagnostico'
 import { anotarQueDerrubou } from './src/lib/rastro'
+import { faxinarCache } from './src/lib/cache'
 import { AvisoRastro, useCienciaRastro } from './src/ui/AvisoRastro'
 import Entrar from './src/telas/Entrar'
 import Agenda from './src/telas/Agenda'
@@ -47,6 +48,11 @@ function Aplicacao() {
   useEffect(() => {
     if (!usuario) return
     conferirFechamentoAnterior().then(anotarQueDerrubou).catch(() => {})
+    // 132: a faxina do cache, uma vez por abertura — sem tocar no que está
+    // na fila sem sinal (lib/cache.ts). Depois do primeiro desenho, para
+    // não atrasar a agenda.
+    const t = setTimeout(() => { faxinarCache().catch(() => {}) }, 4000)
+    return () => clearTimeout(t)
   }, [usuario])
 
   if (carregando && !session) {

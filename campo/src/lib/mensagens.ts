@@ -21,13 +21,37 @@ export interface Mensagem {
   texto: string
   criado_em: string
   lida_em: string | null
+  /** Para quem o técnico mandou (132). Nulo = o controle todo. */
+  para_usuario_id?: string | null
+}
+
+/** Alguém da gestão que o técnico pode escolher (132). */
+export interface Destinatario {
+  usuario_id: string
+  nome: string
+  grupo: 'COP' | 'SUPERVISOR' | 'COORDENADOR'
+  cargo: string | null
+}
+
+export async function carregarDestinatarios(): Promise<Destinatario[]> {
+  const { data, error } = await supabase.rpc('destinatarios_do_campo')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Destinatario[]
+}
+
+export interface ColegaDaCidade { tecnico_id: string; nome: string; equipe: string | null }
+
+export async function carregarColegasDaCidade(): Promise<ColegaDaCidade[]> {
+  const { data, error } = await supabase.rpc('tecnicos_da_cidade')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ColegaDaCidade[]
 }
 
 /** Filtra pela conversa DELE mesmo com o RLS já filtrando: um controlador
  *  que também é técnico enxerga as conversas das equipes dele. */
 export async function carregarConversa(tecnicoId: string, limite = 200): Promise<Mensagem[]> {
   const { data, error } = await supabase.from('mensagem')
-    .select('id, do_campo, autor_nome, texto, criado_em, lida_em')
+    .select('id, do_campo, autor_nome, texto, criado_em, lida_em, para_usuario_id')
     .eq('tecnico_id', tecnicoId)
     .order('criado_em', { ascending: false }).limit(limite)
   if (error) throw new Error(error.message)
@@ -36,9 +60,12 @@ export async function carregarConversa(tecnicoId: string, limite = 200): Promise
   return ((data ?? []) as Mensagem[]).reverse()
 }
 
-/** O autor e a conversa são carimbados pelo servidor (D-061). */
-export async function enviarMensagem(texto: string): Promise<void> {
-  const { error } = await supabase.rpc('enviar_mensagem', { p_tecnico_id: null, p_texto: texto })
+/** O autor e a conversa são carimbados pelo servidor (D-061). `para` =
+ *  a pessoa da gestão escolhida; sem ela, vai para o controle todo (132). */
+export async function enviarMensagem(texto: string, para?: string | null): Promise<void> {
+  const { error } = await supabase.rpc('enviar_mensagem', {
+    p_tecnico_id: null, p_texto: texto, p_para: para ?? null,
+  })
   if (error) throw new Error(error.message)
 }
 
@@ -68,6 +95,7 @@ export function assinarConversa(tecnicoId: string, aoChegar: (m: Mensagem) => vo
             autor_nome: (n.autor_nome as string) ?? null, texto: String(n.texto ?? ''),
             criado_em: String(n.criado_em ?? new Date().toISOString()),
             lida_em: (n.lida_em as string) ?? null,
+            para_usuario_id: (n.para_usuario_id as string) ?? null,
           })
         })
       .subscribe()
