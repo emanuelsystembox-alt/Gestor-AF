@@ -1,4 +1,4 @@
-# Estado do projeto — 08/09/2026 (pendências atualizadas em 24/10/2026)
+# Estado do projeto — 08/09/2026 (pendências atualizadas em 25/10/2026)
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -377,7 +377,7 @@ Ficam aqui porque custaram tempo e podem voltar:
 
 ---
 
-## Pendências abertas — consolidado em 19/10/2026 (somar as seções de 24/10 e 20/10 logo abaixo)
+## Pendências abertas — consolidado em 19/10/2026 (somar as seções de 25/10, 24/10 e 20/10 logo abaixo)
 
 **Comece por aqui.** As seções datadas abaixo são o histórico de cada leva;
 esta é a lista do que AINDA está aberto, juntando todas, por quem tem de agir.
@@ -397,7 +397,7 @@ Riscado nas seções de baixo = resolvido.
 
 | O quê | Como |
 |---|---|
-| **Instalar o APK 0.4.0** nos celulares (substitui o 0.3.0) | Ver a seção de 24/10: só o 0.4.0 tem o mapa e recebe as atualizações pelo ar daqui em diante (D-210). Instala por cima (mesmo pacote e assinatura). |
+| **Instalar o APK 0.5.0** nos celulares (substitui o 0.3.0; o 0.4.0 pode ser pulado) | Ver a seção de 25/10: só o 0.5.0 recebe as atualizações pelo ar daqui em diante (D-213). Instala por cima (mesmo pacote e assinatura). |
 | **Cadastrar os buckets que faltam** | Configurações › Buckets do TOA, na cidade de cada um: MAN-AFLINE_ADM, BSB-AFLINE_14/15_VT, CWL, CXS, ITZ, JIP, MBA, PIT, PMJ (11 já cadastrados). Arquivo de bucket não cadastrado é recusado na importação. |
 | **Data de contratação dos 55 técnicos** | Opcional, um a um em Administração › Editar cadastro (D-178). |
 | **5 fotos órfãs no Storage** | Da limpeza de 17/10; o SQL não apaga arquivo. Painel do Supabase › Storage › evidencia (D-177). |
@@ -428,6 +428,56 @@ falta o olho de quem usa.
 | **`tecnico.foto_url` sem uso** | Substituída por `perfil.foto_path` (D-180); pode sair numa migration. |
 | **TEC1 "Sem tratamento"** | Fora da conta por decisão (D-187). Se a importação do fim do dia virar garantida, dá para seguir o livro. |
 | Página **`/campo`** da web; **"Esqueci minha senha"** por e-mail | D-172: alinhar ou aposentar a página; e-mail exige SMTP. |
+
+---
+
+## Pendente em 25/10/2026 — logo nova, galeria, visor, chat direcionado e cache (D-212, D-213)
+
+Migration **132**; web publicada e conferida no ar (o pedaço de cada tela baixado do ar
+igual ao local); **APK 0.5.0 em compilação na EAS** (build `52fd0309`, commit `b2ca05d`).
+Baterias 27/27 e 26/26; nenhuma `SECURITY DEFINER` para o `anon`; uma versão só de
+`registrar_evidencia` e `enviar_mensagem`.
+
+### Resolvido nesta leva
+
+- **Logo nova** (D-212): ícone do app (era o "A" azul padrão do Expo), ícone adaptativo do
+  Android dentro do círculo seguro, abertura nativa escura, tela de entrada com abertura
+  animada e animação no login.
+- **Visor** de foto e vídeo enviados; **envio da galeria** marcado `da_galeria`, com hora e
+  GPS do arquivo (D-213).
+- **No TOA**: equipamento e miscelânea separados.
+- **Chat com destinatário**: controle, COP, supervisor, coordenador ou técnico; "para você"
+  no site (D-213).
+- **Cache com teto**: o que subiu sai na hora; faxina na abertura (3 dias, 250 MB), sem
+  tocar na fila sem sinal.
+- **Expo Go do SDK 57** instalado no celular do Emanuel (a tela nova foi vista nele).
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Instalar o APK 0.5.0 em todos os celulares** (no lugar do 0.4.0) | Só ele tem o player de vídeo, a galeria, o ícone novo e a abertura escura. **A atualização pelo ar daqui em diante vai só para o 0.5.0** (a runtime é a versão do app); o 0.4.0 de 24/10 pode ser pulado. Link: o build `52fd0309` na EAS, quando terminar. |
+| **Restringir a chave do Google Maps (Android)** | Continua da seção de 24/10 — pacote `br.com.afline.campo` + SHA-1 `E7:22:F9:AD:8F:09:77:D2:48:8F:EE:B5:A0:26:E5:16:20:4D:8C:19` + só Maps SDK for Android. O 0.5.0 é assinado com o mesmo certificado. |
+| **Galeria: aceitar qualquer foto?** | Hoje aceita foto/vídeo de qualquer data e só MARCA a origem (D-213). Se a regra for "só de hoje" ou "só com GPS no arquivo", é uma trava a mais — não foi inventada. |
+| **Cadastrar COP e supervisores** | O chat direcionado acha a pessoa pelo **cargo** (CONTROLADOR (COP), SUPERVISOR, COORDENADOR) ou pelo perfil de acesso. Em 25/10 só há 2 coordenadores; as abas COP e Supervisor dizem "ninguém cadastrado ainda". |
+| **Conferir a tela de entrada nova** | Vista no Expo Go pelo Emanuel; falta o "ok" (ou o ajuste) da abertura e das cores (D-212). |
+
+### Construção que ficou para depois
+
+| O quê | Por quê |
+|---|---|
+| **Ícone monocromático** (o "temático" do Android 13+) | A perna fina do A ainda falha no recorte. Poucos usam o tema; o ícone colorido está certo. |
+| **Cenários na bateria** para `mensagem_colega` e o destinatário de `enviar_mensagem` | Testados à mão como o técnico (terceiro não lê; destinatário fora da lista barrado); não estão em `testar_policies`/`testar_campo`. |
+| **Tela da web para a conversa entre técnicos** | Continua da seção de 24/10. |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **APK 0.5.0 no celular** | Ícone novo no launcher, abertura escura, **câmera funcionando** (a armadilha do image-picker foi pega no `expo config`, não no aparelho), galeria com EXIF de um Android real, vídeo tocando pelo player, e o fechamento no S24 Ultra. |
+| **Faxina do cache** | Escrita e compilada; o efeito (MB liberados) só se mede num celular com uso de dias. |
+| **"para você" no site com login de coordenador** | Publicado e conferido no código do ar; ninguém mandou uma mensagem direcionada e abriu o site com o login do destinatário. |
+| **Galeria sem sinal** | Cai na mesma fila da câmera; não foi provado com o celular sem rede. |
 
 ---
 

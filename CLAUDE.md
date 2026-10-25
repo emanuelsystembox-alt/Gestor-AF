@@ -86,12 +86,12 @@ app/                  web do controle (16 telas, com Almoxarifado, Frota e Monit
 extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193)
                       fundo.js/popup.js são GERADOS de app/extensao/ (npm run extensao)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
-  src/lib/            gps · rastro · antifraude · midia · avisos · colegas · dominio · formato · auth
+  src/lib/            gps · rastro · antifraude · midia · galeria · cache · avisos · colegas · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
-docs/                 mapeamento, domínio, 211 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (128 arquivos, até a 131)
+docs/                 mapeamento, domínio, 213 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (129 arquivos, até a 132)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -127,7 +127,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 211 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 213 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
