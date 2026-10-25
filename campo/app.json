@@ -22,7 +22,7 @@
     "android": {
       "package": "br.com.afline.campo",
       "adaptiveIcon": {
-        "backgroundColor": "#d11a24",
+        "backgroundColor": "#26292d",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -68,6 +68,14 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "O Face ID confirma que foi você quem recebeu o material do almoxarifado."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1d2024",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
         }
       ]
     ],

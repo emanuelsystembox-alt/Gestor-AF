@@ -8166,3 +8166,33 @@ filtrado; técnicos, sem técnico e fora do cadastro são do cadastro e não mud
 
 **Dashboard: já obedecia.** Desde a correção da matriz (20/10), régua, matriz e
 gráficos saem da lista filtrada — conferido no código; nada mudou nele agora.
+
+### D-212 · A logo nova: ícone do app, abertura nativa e a tela de entrada animada
+
+*"altere o ícone de entrada (...) a tela principal do app precisa ser remodelada, de acordo
+com a logo, deve ter efeitos antes de entrar, e animações quando estiver fazendo o login (...)
+altere também a foto do ícone do celular"* — Emanuel, 25/10, com a logo reformulada
+(selo grafite, "AF" vermelho, "LINE" branco, WebP 1024×1024).
+
+**Os ícones eram os padrão do Expo** (o "A" azul) desde o começo — nunca tinham sido
+trocados. Agora saem da logo (`campo/assets/logo-afline.png`, a fonte), gerados com PIL:
+`icon.png` (a logo inteira), `marca-afline.png` (a marca dentro do app) e o **ícone
+adaptativo do Android** em duas camadas — fundo = o degradê grafite medido na logo, frente
+= só as letras com transparência e sombra curta, dentro do círculo seguro (66 dp de 108):
+a 1ª tentativa, com 64% da camada, era cortada pelo círculo do launcher; a 2ª, recortando o
+miolo do selo, deixava um quadrado mais claro atrás. Monocromático (ícone temático do
+Android 13+) em branco chapado; a perna fina do A ainda falha nele.
+
+**Abertura nativa escura** (`expo-splash-screen`, só configuração — nenhum JavaScript chama
+o módulo, então a atualização pelo ar continua segura no APK 0.4.0 de hoje): sem ela, a
+abertura do Android era branca e passava um clarão antes da tela escura.
+
+**Tela de entrada** com o grafite da logo e um clarão vermelho difuso; a logo nasce com
+salto, dois anéis vermelhos se espalham, um brilho atravessa a logo, e ela sobe para o
+formulário aparecer. Ao entrar, um arco vermelho gira em volta da logo e ela pulsa; erro
+balança o cartão. **O formulário fica num cartão branco** com os campos claros do app
+(D-011: no sol, tela escura vira espelho) — o escuro é a marca, vista uma vez por dia.
+Só `Animated` do React Native, no thread nativo (sem biblioteca nova); "reduzir movimento"
+do celular encurta a abertura e tira os pulsos.
+
+**O ícone e a abertura são nativos: só chegam com APK novo.** A tela de entrada chega pelo ar.
