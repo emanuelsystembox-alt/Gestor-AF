@@ -431,6 +431,44 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 25/10/2026 (noite) — conversa do controle, tela de responder e abas (D-214)
+
+Migration **133**; só web (o aplicativo não precisa de versão nova: diretor e gerente somem
+da lista dele pelo cadastro). Baterias **26/26** e **27/27**; nenhuma tabela sem RLS;
+nenhuma `SECURITY DEFINER` para o `anon`.
+
+### Resolvido nesta leva
+
+- **O controle escolhe com quem fala** (D-214): a gaveta ganhou **Pessoas** além de
+  Técnicos. A conversa entre duas pessoas é tabela nova (`mensagem_interna`), **privada**:
+  só as duas leem, nem o ADMIN. Quem recebe sempre pode responder; abrir é que é restrito a
+  COP, supervisor e coordenador da cidade ativa.
+- **Diretor e gerente fora do chat**: cargos DIRETOR e GERENTE criados; Marcio e Alisson
+  saíram de COORDENADOR. Sem grupo, não aparecem no site nem no aplicativo — e continuam
+  podendo escrever.
+- **Responder ao técnico** mostra **as duas últimas atualizações** do histórico.
+- **Aba Responder**: resposta, conversa com o técnico, fotos e histórico numa tela só.
+- **Aba Equipamento**: o que o TOA mostra saiu do Detalhe — na página cheia e na janela.
+- **Equipes**: o LOGIN do cartão é a matrícula de quem está cadastrado na equipe, sem a
+  etiqueta "cadastrado".
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Cadastrar COP, supervisor ou coordenador** | Com o diretor e o gerente fora, **a lista de Pessoas está vazia hoje** — a tela diz isso. Ela se enche sozinha quando alguém for cadastrado com um desses cargos (ou perfil de acesso COP/Controlador/Supervisor) na cidade. |
+| **Dizer se o ADMIN sem cargo deve aparecer** | Hoje não aparece (não tem grupo). Quem receber uma mensagem dele consegue responder; ninguém consegue COMEÇAR uma conversa com ele. |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **A conversa entre pessoas, pela tela** | Provada **no banco** como `authenticated` (enviar, ler, responder, terceiro não lê, técnico barrado). Pela tela não dá para provar enquanto não houver duas pessoas com grupo — a lista está vazia por decisão. |
+| **O balão do topo somando as duas caixas** | Compilado e conferido na tela com a caixa do campo; sem mensagem interna real, o número das pessoas não foi visto somando. |
+| **Cenários na bateria** para `mensagem_interna` | Como em `mensagem_colega`: testado à mão, não está em `testar_policies`. |
+
+---
+
 ## Pendente em 25/10/2026 — logo nova, galeria, visor, chat direcionado e cache (D-212, D-213)
 
 Migration **132**; web publicada e conferida no ar (o pedaço de cada tela baixado do ar

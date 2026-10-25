@@ -67,6 +67,18 @@ export interface MensagemAoVivo {
   para_usuario_id?: string | null
 }
 
+/**
+ * Uma mensagem da conversa ENTRE DUAS PESSOAS da gestão (133).
+ *
+ * Não é a conversa com o técnico: aquela é do turno e todo controlador
+ * que enxerga a equipe lê. Esta é das duas pessoas, e o RLS não deixa
+ * um terceiro ler — nem o ADMIN (Emanuel, 25/10).
+ */
+export interface MensagemInterna {
+  id: number; de_usuario_id: string; para_usuario_id: string
+  texto: string; criado_em: string; lida_em: string | null
+}
+
 interface Ctx {
   dados: Central | null
   /** Os sinais do dia, na ordem do mais novo (095). */
@@ -77,12 +89,20 @@ interface Ctx {
   toasts: Toast[]
   fecharToast: (id: number) => void
   ultimaMensagem: MensagemAoVivo | null
+  /** A última mensagem interna que chegou pelo Realtime (133). */
+  ultimaInterna: MensagemInterna | null
+  /** Não lidas das conversas entre pessoas — entram no mesmo balão. */
+  naoLidasInternas: number
+  recarregarInternas: () => void
   /** Quantas coisas pedem atenção agora — o número do sino. */
   total: number
   chatAberto: boolean
   abrirChat: (tecnicoId?: string | null) => void
+  /** Abre a conversa com uma PESSOA da gestão (133). */
+  abrirChatPessoa: (usuarioId: string | null) => void
   fecharChat: () => void
   chatTecnico: string | null
+  chatPessoa: string | null
 }
 
 const CentralCtx = createContext<Ctx | null>(null)
@@ -103,10 +123,18 @@ export function CentralProvider({ children }: { children: ReactNode }) {
   const conhecidos = useRef<Set<number> | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [ultimaMensagem, setUltimaMensagem] = useState<MensagemAoVivo | null>(null)
+  const [ultimaInterna, setUltimaInterna] = useState<MensagemInterna | null>(null)
+  const [naoLidasInternas, setNaoLidasInternas] = useState(0)
   const [chatAberto, setChatAberto] = useState(false)
   const [chatTecnico, setChatTecnico] = useState<string | null>(null)
-  const chatRef = useRef({ aberto: false, tecnico: null as string | null })
-  chatRef.current = { aberto: chatAberto, tecnico: chatTecnico }
+  const [chatPessoa, setChatPessoa] = useState<string | null>(null)
+  const chatRef = useRef({ aberto: false, tecnico: null as string | null, pessoa: null as string | null })
+  chatRef.current = { aberto: chatAberto, tecnico: chatTecnico, pessoa: chatPessoa }
+  // Guardamos o ID, não o objeto da sessão: o supabase-js reemite a
+  // sessão a cada foco na aba, e objeto novo com conteúdo igual
+  // reassinaria o canal do Realtime a cada volta (D-085).
+  const euRef = useRef<string | null>(null)
+  euRef.current = session?.user.id ?? null
 
   const avisar = useCallback((t: Omit<Toast, 'id'>) => {
     const id = proximoToast++
@@ -139,6 +167,16 @@ export function CentralProvider({ children }: { children: ReactNode }) {
     })
   }, [ligado, avisar])
 
+  /** O balão do topo conta as duas caixas: a do campo e a das pessoas. */
+  const recarregarInternas = useCallback(() => {
+    if (!ligado || !gestao) return
+    supabase.rpc('conversas_internas').then(({ data, error }) => {
+      if (error || !data) return
+      setNaoLidasInternas((data as { nao_lidas: number }[])
+        .reduce((s, c) => s + Number(c.nao_lidas), 0))
+    })
+  }, [ligado, gestao])
+
   const dispensar = useCallback((ids: number[]) => {
     if (ids.length === 0) return
     setSinais(l => l.map(x => ids.includes(x.id) ? { ...x, dispensado: true } : x))
@@ -148,9 +186,10 @@ export function CentralProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ligado) { setDados(null); setSinais([]); conhecidos.current = null; return }
     recarregar()
-    const t = setInterval(recarregar, 60_000)
+    recarregarInternas()
+    const t = setInterval(() => { recarregar(); recarregarInternas() }, 60_000)
     return () => clearInterval(t)
-  }, [ligado, recarregar])
+  }, [ligado, recarregar, recarregarInternas])
 
   // Um canal só para os dois gatilhos. Só gestão assina: o almoxarife e a
   // frota não recebem pedido de ajuda nem conversa de técnico.
@@ -184,18 +223,35 @@ export function CentralProvider({ children }: { children: ReactNode }) {
           recarregar()
         }
       })
+      // 133: a conversa entre duas pessoas. O Realtime respeita o RLS, então
+      // só chega aqui o que esta pessoa já podia ler — remetente ou
+      // destinatário. O aviso é só de quem RECEBE: o eco da própria
+      // mensagem não vira toast.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagem_interna' }, c => {
+        const m = c.new as MensagemInterna
+        setUltimaInterna(m)
+        if (m.para_usuario_id !== euRef.current) return
+        const lendoEsta = chatRef.current.aberto && chatRef.current.pessoa === m.de_usuario_id
+        if (!lendoEsta) avisar({ tom: 'mensagem', titulo: 'Mensagem de um colega', texto: m.texto })
+        recarregarInternas()
+      })
       .subscribe()
     return () => { supabase.removeChannel(canal) }
-  }, [ligado, gestao, avisar, recarregar])
+  }, [ligado, gestao, avisar, recarregar, recarregarInternas])
 
   const valor: Ctx = {
     dados, sinais, dispensar, recarregar, toasts, ultimaMensagem,
+    ultimaInterna, naoLidasInternas, recarregarInternas,
     fecharToast: id => setToasts(l => l.filter(x => x.id !== id)),
     // 095: o sino conta SINAIS vigentes que este usuário não limpou.
     total: sinais.filter(x => x.vigente && !x.dispensado).length,
-    chatAberto, chatTecnico,
-    abrirChat: tec => { setChatTecnico(tec ?? null); setChatAberto(true) },
-    fecharChat: () => { setChatAberto(false); recarregar() },
+    chatAberto, chatTecnico, chatPessoa,
+    // Uma conversa de cada vez: escolher um técnico solta a pessoa, e
+    // vice-versa. Duas seleções vivas deixariam a tela mostrando uma
+    // conversa e enviando para a outra.
+    abrirChat: tec => { setChatTecnico(tec ?? null); setChatPessoa(null); setChatAberto(true) },
+    abrirChatPessoa: p => { setChatPessoa(p); setChatTecnico(null); setChatAberto(true) },
+    fecharChat: () => { setChatAberto(false); recarregar(); recarregarInternas() },
   }
 
   return (

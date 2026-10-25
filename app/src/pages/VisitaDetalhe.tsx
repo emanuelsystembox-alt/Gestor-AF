@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, SITUACOES, EM_ABERTO, type Situacao } from '../lib/supabase'
-import { useCentral } from '../lib/central'
+import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Pill } from '../components/ui'
 import { EquipamentoToa } from '../components/EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
+import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
+import { ConversaTecnico } from '../components/ConversaTecnico'
 
 interface OS {
   id: string; sequencia: number; numero_os: string; ponto: string | null
@@ -82,7 +83,16 @@ const SELECT = `
   )
 `
 
-type Aba = 'detalhe' | 'historico' | 'anexos' | 'anteriores'
+/**
+ * As abas do contrato.
+ *
+ * `responder` nasceu da 133: fotos, histórico e conversa numa tela só,
+ * para o controlador responder sem ficar indo e voltando. `equipamento`
+ * saiu de dentro do Detalhe — > "podemos tirar também essa parte do
+ * equipamento e miscelânea e criar um menu pra ele, pra ganharmos mais
+ * informações do contrato" (Emanuel, 25/10).
+ */
+type Aba = 'detalhe' | 'responder' | 'historico' | 'anexos' | 'equipamento' | 'anteriores'
 
 const dt = (s: string | null) => s
   ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -159,11 +169,6 @@ export default function VisitaDetalhe() {
   const [transferindo, setTransferindo] = useState(false)
   const [novaEquipe, setNovaEquipe] = useState('')
   const [motivo, setMotivo] = useState('')
-  // Responder ao técnico e mudar o status (Emanuel, 27/09).
-  const [novaSituacao, setNovaSituacao] = useState('')
-  const [resposta, setResposta] = useState('')
-  const [respondendo, setRespondendo] = useState(false)
-  const { abrirChat, recarregar: recarregarCentral } = useCentral()
 
   async function carregar() {
     setCarregando(true); setErro(null)
@@ -219,45 +224,10 @@ export default function VisitaDetalhe() {
     setTransferindo(false)
   }
 
-  /**
-   * Responde ao técnico mudando o status, com a resposta colada na mudança.
-   *
-   * Não é um canal novo: a observação da mudança JÁ vira aviso no celular
-   * dele (059, `aviso_do_evento`). Contrato aberto muda por
-   * `registrar_etapa` (encerrar exige todas as O.S. baixadas — a mesma
-   * trava do campo); contrato encerrado só volta por `reverter_situacao`,
-   * que exige motivo (D-030). A tela escolhe a porta; quem decide é o banco.
-   */
-  async function responder() {
-    if (!v || !novaSituacao) return
-    // Encerrado = fora de EM_ABERTO: a lista que a web já tem, sem cópia nova.
-    const encerrado = !EM_ABERTO.includes(v.situacao)
-    if (encerrado && !resposta.trim()) {
-      setErro('Contrato encerrado só volta com motivo — escreva a resposta.')
-      return
-    }
-    setRespondendo(true); setErro(null); setOk(null)
-    const { error } = encerrado
-      ? await supabase.rpc('reverter_situacao', {
-          p_visita: v.id, p_situacao: novaSituacao, p_motivo: resposta.trim(),
-        })
-      : await supabase.rpc('registrar_etapa', {
-          p_visita: v.id, p_situacao: novaSituacao,
-          p_observacao: resposta.trim() || null, p_lat: null, p_lng: null,
-        })
-    setRespondendo(false)
-    if (error) { setErro(error.message); return }
-    setOk(`Status mudado para ${SITUACAO_INFO[novaSituacao as Situacao]?.label ?? novaSituacao}`
-      + (resposta.trim() ? ' — o técnico recebe a resposta como aviso no celular.' : '.'))
-    setNovaSituacao(''); setResposta('')
-    await carregar()
-    recarregarCentral()
-  }
-
-  /** O último pedido de ajuda do campo: Impedimento registrado pelo celular. */
-  const pedidoDeAjuda = useMemo(() => {
+  /** O pedido de ajuda do campo vale como destaque na aba, não só no bloco. */
+  const temPedidoDeAjuda = useMemo(() => {
     const ev = eventos.find(e => (e.para as { situacao?: string } | null)?.situacao === 'COM_IMPEDIMENTO')
-    return ev && ev.origem === 'MOBILE' && v?.situacao === 'COM_IMPEDIMENTO' ? ev : null
+    return !!ev && ev.origem === 'MOBILE' && v?.situacao === 'COM_IMPEDIMENTO'
   }, [eventos, v])
 
   const resumo = useMemo(() => {
@@ -282,10 +252,80 @@ export default function VisitaDetalhe() {
 
   const abas: [Aba, string, number?][] = [
     ['detalhe', 'Detalhe'],
+    ['responder', 'Responder'],
     ['historico', 'Histórico', eventos.length],
     ['anexos', 'Anexos', anexos.length],
+    ['equipamento', 'Equipamento'],
     ['anteriores', 'Serviços anteriores', anteriores.length],
   ]
+
+  /** O que a aba Responder e a aba Anexos mostram: a mesma grade. */
+  const grade = (lista: Evidencia[], colunas = 'sm:grid-cols-2 lg:grid-cols-4') => (
+    <div className={`grid gap-3 ${colunas}`}>
+      {lista.map(a => {
+        const url = urls[a.arquivo_path]
+        const ehVideo = a.midia === 'VIDEO'
+        return (
+          <button
+            key={a.id} onClick={() => setAmpliada(a)}
+            className="group overflow-hidden rounded-lg border border-graf-800
+                       bg-graf-900 text-left transition hover:border-graf-600"
+          >
+            <div className="relative flex h-36 items-center justify-center
+                            overflow-hidden bg-graf-950">
+              {url && !ehVideo && (
+                <img src={url} alt={a.tipo} loading="lazy"
+                     className="h-full w-full object-cover transition
+                                group-hover:scale-105" />
+              )}
+              {url && ehVideo && <span className="text-2xl text-graf-400">▶</span>}
+              {!url && <span className="text-[11px] text-graf-600">carregando…</span>}
+
+              {/* Foto sem coordenada é prova fraca, e a tela
+                  diz isso em vez de sumir com a informação. */}
+              {!a.lat && (
+                <span className="absolute right-1.5 top-1.5 rounded bg-amber-500/90
+                                 px-1.5 py-0.5 text-[10px] font-bold text-graf-950">
+                  sem GPS
+                </span>
+              )}
+              {/* 132: da galeria, não da câmera do app — hora e GPS
+                  são os do arquivo. Quem audita tem de saber. */}
+              {a.da_galeria && (
+                <span title="Enviada da galeria do celular: hora e GPS são os do próprio arquivo, quando ele traz"
+                  className="absolute left-1.5 top-1.5 rounded bg-graf-950/90 px-1.5 py-0.5
+                             text-[10px] font-bold text-amber-300">
+                  da galeria
+                </span>
+              )}
+            </div>
+
+            <div className="p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px]
+                                 font-semibold uppercase text-graf-300">
+                  {a.tipo.replace(/_/g, ' ')}
+                </span>
+                {ehVideo && a.duracao_seg && (
+                  <span className="tabular text-[10px] text-graf-400">
+                    {Math.floor(a.duracao_seg / 60)}:
+                    {String(a.duracao_seg % 60).padStart(2, '0')}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 text-[11px] text-graf-500">
+                {dt(a.capturada_em ?? a.criado_em)}
+                {a.tamanho_bytes ? ` · ${(a.tamanho_bytes / 1024).toFixed(0)} KB` : ''}
+              </p>
+              <p className="truncate text-[11px] text-graf-500">
+                {a.tecnico?.nome ?? a.login ?? '—'}
+              </p>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
 
   return (
     <Shell>
@@ -335,6 +375,12 @@ export default function VisitaDetalhe() {
                 aba === k ? 'border-af-500 font-medium text-graf-100'
                           : 'border-transparent text-graf-400 hover:text-graf-200'}`}>
               {r}{n !== undefined && <span className="tabular ml-1.5 text-xs opacity-60">{n}</span>}
+              {/* O ticket de suporte aberto pelo campo acende a aba: quem
+                  chega na tela tem de ver que alguém está esperando. */}
+              {k === 'responder' && temPedidoDeAjuda && (
+                <span aria-label="ticket de suporte aberto"
+                  className="ml-1.5 inline-block h-2 w-2 rounded-full bg-orange-500 align-middle" />
+              )}
             </button>
           ))}
         </div>
@@ -402,8 +448,9 @@ export default function VisitaDetalhe() {
               )}
             </section>
 
-            {/* 117: o que o TOA mostra de equipamento e miscelânea. */}
-            <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
+            {/* O equipamento e a miscelânea do TOA (117) saíram daqui para a
+                aba Equipamento (133, Emanuel 25/10): o Detalhe é do contrato,
+                e a lista de peças empurrava as O.S. para baixo da dobra. */}
 
             {/* ---------- ordens de serviço ---------- */}
             <section className="card-controle overflow-hidden">
@@ -486,62 +533,13 @@ export default function VisitaDetalhe() {
             </section>
 
             {/* ---------- responder ao técnico / mudar status ---------- */}
-            <section className={`card-controle p-4 ${pedidoDeAjuda ? 'ring-1 ring-orange-500/60' : ''}`}>
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold">Responder ao técnico</h2>
-                {v.tecnico_responsavel_id && (
-                  <button onClick={() => abrirChat(v.tecnico_responsavel_id)}
-                    className="ml-auto rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
-                               hover:border-af-600 hover:text-af-400">
-                    Abrir conversa com {v.tecnico?.nome?.split(' ')[0] ?? 'o técnico'}
-                  </button>
-                )}
-              </div>
-
-              {pedidoDeAjuda && (
-                <div className="mb-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2.5">
-                  <p className="text-xs font-semibold text-orange-300">
-                    Suporte técnico solicitado pelo campo · {new Date(pedidoDeAjuda.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  <p className="mt-0.5 text-sm text-graf-100">
-                    {pedidoDeAjuda.observacao ? `“${pedidoDeAjuda.observacao}”` : 'O técnico registrou impedimento sem observação.'}
-                  </p>
-                </div>
-              )}
-
-              <p className="mb-3 text-xs text-graf-400">
-                Escolha o status que faz sentido e escreva a resposta: ela chega no celular do
-                técnico como aviso, junto com a mudança. Encerrar exige todas as O.S. baixadas;
-                contrato já encerrado só volta com motivo.
-              </p>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-44">
-                  <label htmlFor="nova-situacao" className="mb-1 block text-[11px] text-graf-400">Novo status</label>
-                  <select id="nova-situacao" value={novaSituacao} onChange={e => setNovaSituacao(e.target.value)}
-                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
-                    <option value="">Selecione…</option>
-                    {SITUACOES.filter(s => s !== v.situacao).map(s => (
-                      <option key={s} value={s}>{SITUACAO_INFO[s].label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="min-w-56 flex-1">
-                  <label htmlFor="resposta-tecnico" className="mb-1 block text-[11px] text-graf-400">
-                    Resposta ao técnico
-                  </label>
-                  <input id="resposta-tecnico" value={resposta} onChange={e => setResposta(e.target.value)}
-                    maxLength={500}
-                    onKeyDown={e => { if (e.key === 'Enter') responder() }}
-                    placeholder="Ex.: pode seguir, liguei para o cliente e ele está em casa"
-                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
-                </div>
-                <button onClick={responder} disabled={!novaSituacao || respondendo}
-                  className="rounded-md bg-af-600 px-4 py-1.5 text-sm font-medium text-white
-                             hover:bg-af-500 disabled:opacity-40">
-                  {respondendo ? 'Enviando…' : 'Responder e mudar status'}
-                </button>
-              </div>
-            </section>
+            {/* A tela cheia disso é a aba Responder: lá a conversa, as fotos
+                e o histórico ficam do lado (133). Aqui fica o atalho. */}
+            <ResponderTecnico
+              visita={{ id: v.id, situacao: v.situacao,
+                        tecnico_responsavel_id: v.tecnico_responsavel_id,
+                        tecnico: v.tecnico }}
+              eventos={eventos} aoMudar={carregar} />
 
             {/* ---------- transferir equipe ---------- */}
             <section className="card-controle p-4">
@@ -573,6 +571,84 @@ export default function VisitaDetalhe() {
                 </button>
               </div>
             </section>
+          </div>
+        )}
+
+        {/* ================= RESPONDER =================
+            ┌─ a tela de responder ao técnico ──────────────────────────┐
+            │ > "podemos fazer algo parecido (...) onde ver as fotos e   │
+            │ >  histórico das conversas em uma única tela, assim fica   │
+            │ >  bem melhor do controlador responder o técnico"          │
+            │ >  — Emanuel, 25/10                                        │
+            │                                                            │
+            │ Era: ler o impedimento numa aba, abrir Anexos para ver a   │
+            │ foto, voltar ao Detalhe para responder, e abrir a gaveta   │
+            │ da conversa por cima de tudo. Quatro telas para uma        │
+            │ decisão. Agora é uma: o que o técnico disse, o que ele     │
+            │ mandou, e a resposta — lado a lado.                        │
+            └────────────────────────────────────────────────────────────┘ */}
+        {aba === 'responder' && (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-3">
+              <section className={`card-controle p-4 ${temPedidoDeAjuda ? 'ring-1 ring-orange-500/60' : ''}`}>
+                <ResponderTecnico semMoldura
+                  visita={{ id: v.id, situacao: v.situacao,
+                            tecnico_responsavel_id: v.tecnico_responsavel_id,
+                            tecnico: v.tecnico }}
+                  eventos={eventos} aoMudar={carregar} />
+              </section>
+
+              <section className="card-controle p-4">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                  <h2 className="text-sm font-semibold">Conversa com o técnico</h2>
+                  <span className="text-[11px] text-graf-400">
+                    {v.tecnico?.nome ?? 'sem técnico responsável'}
+                  </span>
+                </div>
+                <p className="mb-2 text-xs text-graf-500">
+                  É a mesma conversa da caixa do topo — uma por técnico, lida por todo
+                  controlador que enxerga a equipe dele. Não é um canal deste contrato.
+                </p>
+                <ConversaTecnico tecnicoId={v.tecnico_responsavel_id}
+                  nome={v.tecnico?.nome ?? null} altura="h-72" />
+              </section>
+            </div>
+
+            <div className="space-y-3">
+              <section className="card-controle p-4">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                  <h2 className="text-sm font-semibold">Fotos e vídeos</h2>
+                  <span className="tabular text-[11px] text-graf-400">{anexos.length}</span>
+                  {anexos.length > 0 && (
+                    <button onClick={() => setAba('anexos')}
+                      className="ml-auto text-[11px] text-af-400 underline underline-offset-2">
+                      ver na aba Anexos
+                    </button>
+                  )}
+                </div>
+                {anexos.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-graf-400">
+                    Nenhuma evidência anexada nesta visita.
+                  </p>
+                ) : grade(anexos.slice(-8), 'grid-cols-2')}
+                {anexos.length > 8 && (
+                  <p className="mt-2 text-[11px] text-graf-500">
+                    Mostrando as 8 mais recentes de {anexos.length}.
+                  </p>
+                )}
+              </section>
+
+              <section className="card-controle p-4">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                  <h2 className="text-sm font-semibold">Histórico do contrato</h2>
+                  <button onClick={() => setAba('historico')}
+                    className="ml-auto text-[11px] text-af-400 underline underline-offset-2">
+                    ver o histórico inteiro
+                  </button>
+                </div>
+                <UltimasAtualizacoes eventos={eventos} quantas={6} />
+              </section>
+            </div>
           </div>
         )}
 
@@ -673,73 +749,16 @@ export default function VisitaDetalhe() {
               <p className="py-10 text-center text-sm text-graf-500">
                 Nenhuma evidência anexada nesta visita.
               </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {anexos.map(a => {
-                  const url = urls[a.arquivo_path]
-                  const ehVideo = a.midia === 'VIDEO'
-                  return (
-                    <button
-                      key={a.id} onClick={() => setAmpliada(a)}
-                      className="group overflow-hidden rounded-lg border border-graf-800
-                                 bg-graf-900 text-left transition hover:border-graf-600"
-                    >
-                      <div className="relative flex h-36 items-center justify-center
-                                      overflow-hidden bg-graf-950">
-                        {url && !ehVideo && (
-                          <img src={url} alt={a.tipo} loading="lazy"
-                               className="h-full w-full object-cover transition
-                                          group-hover:scale-105" />
-                        )}
-                        {url && ehVideo && <span className="text-2xl text-graf-400">▶</span>}
-                        {!url && <span className="text-[11px] text-graf-600">carregando…</span>}
-
-                        {/* Foto sem coordenada é prova fraca, e a tela
-                            diz isso em vez de sumir com a informação. */}
-                        {!a.lat && (
-                          <span className="absolute right-1.5 top-1.5 rounded bg-amber-500/90
-                                           px-1.5 py-0.5 text-[10px] font-bold text-graf-950">
-                            sem GPS
-                          </span>
-                        )}
-                        {/* 132: da galeria, não da câmera do app — hora e GPS
-                            são os do arquivo. Quem audita tem de saber. */}
-                        {a.da_galeria && (
-                          <span title="Enviada da galeria do celular: hora e GPS são os do próprio arquivo, quando ele traz"
-                            className="absolute left-1.5 top-1.5 rounded bg-graf-950/90 px-1.5 py-0.5
-                                       text-[10px] font-bold text-amber-300">
-                            da galeria
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px]
-                                           font-semibold uppercase text-graf-300">
-                            {a.tipo.replace(/_/g, ' ')}
-                          </span>
-                          {ehVideo && a.duracao_seg && (
-                            <span className="tabular text-[10px] text-graf-400">
-                              {Math.floor(a.duracao_seg / 60)}:
-                              {String(a.duracao_seg % 60).padStart(2, '0')}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1.5 text-[11px] text-graf-500">
-                          {dt(a.capturada_em ?? a.criado_em)}
-                          {a.tamanho_bytes ? ` · ${(a.tamanho_bytes / 1024).toFixed(0)} KB` : ''}
-                        </p>
-                        <p className="truncate text-[11px] text-graf-500">
-                          {a.tecnico?.nome ?? a.login ?? '—'}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            ) : grade(anexos)}
           </section>
+        )}
+
+        {/* ================= EQUIPAMENTO ================= */}
+        {/* 117 dentro da própria aba (133): a lista de peças do TOA é
+            longa e não é o contrato — era ela que empurrava as O.S. para
+            fora da primeira tela do Detalhe. */}
+        {aba === 'equipamento' && (
+          <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
         )}
 
         {/* ---------- a evidência em tela cheia ---------- */}

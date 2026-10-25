@@ -151,7 +151,7 @@ export function ContratoModal({
   acaoInicial?: AcaoContrato | null
 }) {
   const [v, setV] = useState<Visita | null>(null)
-  const [aba, setAba] = useState<'detalhe' | 'historico' | 'marcadores'>(
+  const [aba, setAba] = useState<'detalhe' | 'historico' | 'equipamento' | 'marcadores'>(
     acaoInicial === 'marcadores' ? 'marcadores' : 'detalhe')
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -382,6 +382,9 @@ export function ContratoModal({
         <div className="flex gap-1 border-b border-graf-800 px-5 pt-2">
           {([['detalhe', 'Detalhe'],
              ['historico', `Histórico (${v?.visita_evento.length ?? 0})`],
+             // 133: o equipamento do TOA tem aba própria aqui também — a
+             // janela e a página cheia mostram o contrato do mesmo jeito.
+             ['equipamento', 'Equipamento'],
              ['marcadores', `Marcadores (${marcados.length})`]] as const).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(a)}
               className={`rounded-t-md px-3 py-1.5 text-xs font-medium transition ${
@@ -937,9 +940,6 @@ export function ContratoModal({
                 )}
               </section>
 
-              {/* 117: o que o TOA mostra de equipamento e miscelânea. */}
-              <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
-
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-graf-500">
                   Atendimento
@@ -1039,6 +1039,10 @@ export function ContratoModal({
                 )}
               </section>
             </>
+          ) : aba === 'equipamento' ? (
+            /* 117 na aba dele (133): a lista de peças não disputa mais
+               espaço com os dados do contrato. */
+            <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
           ) : aba === 'historico' ? (
             v.visita_evento.length === 0 ? (
               <p className="text-sm text-graf-500">Sem histórico registrado.</p>

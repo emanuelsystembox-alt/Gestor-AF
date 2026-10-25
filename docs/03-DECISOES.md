@@ -8231,3 +8231,60 @@ O 0.4.0 de ontem não precisa ser instalado — vai direto o 0.5.0.
 **Armadilha pega antes do build:** `cameraPermission: false` no plugin do `expo-image-picker`
 **bloqueia a CAMERA (e `microphonePermission: false`, o RECORD_AUDIO) do app inteiro** — o
 APK sairia sem câmera. Conferido nas permissões resolvidas pelo `expo config`.
+
+### D-214 · O controle também escolhe com quem fala, e a tela de responder (133)
+
+*"Vamos adicionar além do técnico pessoas de outros setores (...) cada usuário vai poder
+escolher isso (...) da parte do técnico já vi que está ok, falta agora do controlador"* —
+Emanuel, 25/10. A 132 deu a escolha ao campo; esta dá a mesma escolha a quem está no site.
+
+- **Quem aparece:** o MESMO grupo que o técnico escolhe — COP, supervisor e coordenador —
+  da **cidade ativa**. Escolhido pelo Emanuel entre "todo mundo da cidade (todos os
+  setores)" e "qualquer cidade", que foram oferecidas e recusadas.
+- **Quem lê:** **só as duas pessoas**. A outra opção ("as duas e o ADMIN") foi oferecida e
+  recusada. É por isso que a conversa entre pessoas é **tabela nova** (`mensagem_interna`) e
+  não `mensagem` com `tecnico_id` nulo: lá a policy abre a conversa para todo controlador
+  que enxerga a equipe (091) — certo para o turno, errado para duas pessoas. Aqui nem o
+  ADMIN lê; o RLS não tem exceção para ele. Sem policy de INSERT: quem escreve é a RPC, que
+  carimba o autor (D-061).
+- **Responder sempre pode**, mesmo que o remetente não esteja na lista de quem responde —
+  senão o ADMIN sem cargo abriria conversa sem volta. **Abrir** é que é restrito.
+- A classificação de grupo saiu de dentro de `destinatarios_do_campo` e virou
+  `grupo_interno(usuario)`: uma regra, dois lugares que perguntam (campo e controle). Antes
+  de mudar o de/para de cargo, lembre que ele vale para as duas telas.
+- O balão do topo passa a contar as duas caixas; o Realtime de `mensagem_interna` respeita
+  o RLS, então só chega a quem já podia ler. Baterias 26/26 e 27/27.
+
+**Diretor e gerente ficam FORA do chat** — *"Márcio é GERENTE e ALISSON é o Diretor, eles
+não podem aparecer no chat, não faz sentido, agora eles podem visualizar as outras pessoas e
+enviar mensagem se quiserem (...) no aplicativo também o técnico não pode visualizar os
+dois"* (Emanuel, 25/10). Os dois cargos não existiam no cadastro e as duas pessoas estavam
+como COORDENADOR — era por isso que apareciam. `grupo_interno` não classifica DIRETOR nem
+GERENTE: sem grupo, o nome não entra em lista nenhuma, no site nem no aplicativo. **Escrever
+continua podendo** (são ADMIN, e quem recebe sempre responde). Consequência honesta de hoje:
+**a lista de Pessoas está vazia** até alguém ser cadastrado como COP, supervisor ou
+coordenador — e a tela diz isso, em vez de mostrar lista vazia sem explicação.
+
+**A tela de responder** — *"é importante ver as duas últimas atualizações do histórico do
+contrato para poder o controlador responder (...) essa resposta não tá muito clara"* e
+*"podemos fazer algo parecido (...) onde ver as fotos e histórico das conversas em uma única
+tela"* (Emanuel, 25/10).
+
+- O bloco **Responder ao técnico** passa a trazer **as duas últimas atualizações do
+  histórico** em cima do formulário — antes só destacava o ticket de suporte, e só quando o
+  contrato estava nele. Responder sem o que acabou de acontecer é responder no escuro.
+- Aba **Responder**: resposta + conversa com o técnico embutida de um lado; fotos e
+  histórico do outro. Eram quatro telas para uma decisão (impedimento no Detalhe, foto em
+  Anexos, resposta no Detalhe, conversa na gaveta por cima). A conversa embutida é a MESMA
+  da gaveta (091) — não é um canal do contrato; mensagem não tem dono de contrato, e
+  inventar um criaria duas caixas que divergem.
+- Aba **Equipamento**: *"podemos tirar também essa parte do equipamento e miscelânea e criar
+  um menu pra ele, pra ganharmos mais informações do contrato"*. Vale na página cheia **e**
+  na janela do contrato — contrato que muda de forma conforme a tela em que se olha confunde.
+
+**O LOGIN da equipe é o do técnico, e só** — *"deixa somente o login cadastrado que está no
+usuário dele, não sei por que você foi colocando outros cadastrados"* (Emanuel, 25/10). O
+cartão listava TODO login que roteou contrato para a equipe no dia, com etiqueta de origem:
+numa dupla que cobriu colega viravam quatro logins embaixo de um nome só, e "cadastrado"
+repetia o que o cadastro já afirma. Agora é a matrícula de quem está cadastrado na equipe. O
+login sem dono continua visível onde importa: na equipe **Sem login definido**.

@@ -1152,28 +1152,32 @@ export default function Equipes() {
                                               : <span className="text-af-400">sem técnico cadastrado</span>}
                                           </dd>
 
+                                          {/* ┌─ o LOGIN é o do técnico, e só ─────────┐
+                                              │ > "deixa somente o login cadastrado    │
+                                              │ >  que está no usuário dele, não sei   │
+                                              │ >  por que você foi colocando outros   │
+                                              │ >  cadastrados" — Emanuel, 25/10       │
+                                              │                                        │
+                                              │ Antes esta linha listava TODO login    │
+                                              │ que roteou contrato para a equipe no   │
+                                              │ dia, com etiqueta de origem. Numa dupla │
+                                              │ que cobriu colega isso virava quatro   │
+                                              │ logins embaixo de um nome só, e a      │
+                                              │ etiqueta "cadastrado" repetia o que o  │
+                                              │ cadastro já afirma. O login de quem    │
+                                              │ não é da equipe continua visível onde  │
+                                              │ ele é do dono: no cartão DELE.         │
+                                              └────────────────────────────────────────┘ */}
                                           <dt className="text-graf-600">LOGIN</dt>
-                                          <dd className="min-w-0">
-                                            {ls.length === 0 ? (
-                                              <span className="text-graf-600">sem login TOA no dia</span>
-                                            ) : ls.map(l => (
-                                              <span key={l.login} className="mr-2 inline-block">
-                                                <span className="tabular text-graf-300">{l.login}</span>
-                                                {/* Dizer de onde veio o login é o que
-                                                    impede confundir dedução com cadastro. */}
-                                                {l.origem === 'CADASTRO' ? (
-                                                  <span title="Cadastrado por alguém desta operação"
-                                                    className="ml-1 rounded bg-emerald-900/40 px-1
-                                                               text-[9px] font-semibold uppercase
-                                                               text-emerald-300">cadastrado</span>
-                                                ) : (
-                                                  <span title="Ninguém disse de quem é este login — o contrato dele está na equipe Sem login definido"
-                                                    className="ml-1 rounded bg-amber-900/40 px-1
-                                                               text-[9px] font-semibold uppercase
-                                                               text-amber-300">sem cadastro</span>
-                                                )}
+                                          <dd className="min-w-0 truncate"
+                                              title={ts.map(x => x.matricula).join(' · ')}>
+                                            {ts.length ? (
+                                              <span className="tabular text-graf-300">
+                                                {ts.map(x => x.matricula).join(' · ')}
                                               </span>
-                                            ))}
+                                            ) : (
+                                              <span className="text-graf-600">sem login cadastrado</span>
+                                            )}
                                           </dd>
 
                                           <dt className="text-graf-600">SUPERVISOR</dt>

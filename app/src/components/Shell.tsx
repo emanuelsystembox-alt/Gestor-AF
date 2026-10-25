@@ -370,7 +370,12 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   const abertos = useAbertosHoje(gestao)
   const central = useCentral()
   const [sinoAberto, setSinoAberto] = useState(false)
-  const naoLidas = central.dados?.mensagens?.reduce((s, m) => s + Number(m.nao_lidas), 0) ?? null
+  // O balão conta as DUAS caixas: o que o campo escreveu e o que uma
+  // pessoa da gestão escreveu direto para mim (133). Sem a central
+  // carregada o número do campo é nulo — e nulo não vira 0 calado.
+  const naoLidasCampo = central.dados?.mensagens?.reduce((s, m) => s + Number(m.nao_lidas), 0) ?? null
+  const naoLidas = naoLidasCampo === null && !central.naoLidasInternas
+    ? null : (naoLidasCampo ?? 0) + central.naoLidasInternas
   // 091: o selo do módulo mostra o que o CAMPO pediu e ainda espera
   // resposta — sinalização de material, pedido de abastecimento. Sem a
   // central carregada, nulo: nada de "0" que ninguém mediu.
@@ -541,8 +546,8 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
                   mensagem; o sino conta o que pede AÇÃO. */}
               {gestao && (
                 <button onClick={() => central.abrirChat(null)}
-                  aria-label={naoLidas ? `Conversas, ${naoLidas} não lida(s)` : 'Conversas com o campo'}
-                  title="Conversas com o campo"
+                  aria-label={naoLidas ? `Conversas, ${naoLidas} não lida(s)` : 'Conversas'}
+                  title="Conversas com o campo e com a gestão"
                   className="relative rounded-md border border-graf-700 px-2 py-1 text-graf-300
                              hover:border-af-600 hover:text-af-400">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
