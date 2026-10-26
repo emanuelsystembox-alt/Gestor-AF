@@ -63,6 +63,8 @@ const OPERACAO: Modulo = {
     // 096: onde cada técnico está, a trilha, os próximos e o local da baixa.
     { para: '/controle/monitor', rotulo: 'Monitoramento', icone: 'monitor', busca: 'gps rastro trilha localizacao tecnico mapa proximos' },
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
+    // 140: indicadores da operação — o primeiro é a Primeira WO.
+    { para: '/controle/indicadores', rotulo: 'Indicadores', icone: 'indicadores', busca: 'primeira wo chegada atraso indicador' },
     { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
     { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },
     // 111: o robô que importa sozinho, de 5 em 5 minutos a de hora em hora.

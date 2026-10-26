@@ -30,6 +30,9 @@ const P = {
                    <rect x="5.5" y="12" width="3.5" height="6" rx="1" />
                    <rect x="10.5" y="8" width="3.5" height="10" rx="1" />
                    <rect x="15.5" y="4" width="3.5" height="14" rx="1" /></>,
+  // Indicadores: o ponteiro do velocímetro — é sobre chegar no horário
+  indicadores: <><path d="M4.5 18a8 8 0 1 1 15 0" />
+                 <path d="M12 18 15.5 11" /><circle cx="12" cy="18" r="1.2" /></>,
   // Relatórios: folha com a dobra
   relatorios: <><path d="M13 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8.5Z" />
                 <path d="M13 3v5.5h5.5" />

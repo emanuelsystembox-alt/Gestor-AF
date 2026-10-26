@@ -8,6 +8,8 @@ const Servicos = lazy(() => import('./pages/Servicos'))
 const Rota = lazy(() => import('./pages/Rota'))
 const Equipes = lazy(() => import('./pages/Equipes'))
 const VisitaDetalhe = lazy(() => import('./pages/VisitaDetalhe'))
+// 140: Indicadores — nasce com a Primeira WO.
+const Indicadores = lazy(() => import('./pages/Indicadores'))
 const Importacao = lazy(() => import('./pages/Importacao'))
 const SubFalhas = lazy(() => import('./pages/SubFalhas'))
 const Configuracoes = lazy(() => import('./pages/Configuracoes'))
@@ -103,6 +105,8 @@ export default function App() {
           <Protegida exige="GESTAO"><SubFalhas /></Protegida>} />
         <Route path="/controle/produtividade" element={
           <Protegida exige="GESTAO"><Produtividade /></Protegida>} />
+        <Route path="/controle/indicadores" element={
+          <Protegida exige="GESTAO"><Indicadores /></Protegida>} />
         <Route path="/controle/relatorios" element={
           <Protegida exige="GESTAO"><Relatorios /></Protegida>} />
         <Route path="/controle/configuracoes" element={

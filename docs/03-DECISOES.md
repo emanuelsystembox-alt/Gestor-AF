@@ -8472,3 +8472,36 @@ mesma lista com um título.
 banco (`DOIS_ATIVOS` desde a 129, `SUMIU_TOA` desde a 134). Sinal sem rótulo e sem cor
 aparecia em branco no painel — e ninguém tinha percebido porque os dois são raros. Agora os
 doze tipos estão na lista. **Tipo novo no banco entra no front no mesmo dia.**
+
+### D-220 · Indicadores, e o primeiro deles: Primeira WO (140)
+
+*"criei abaixo do Meta técnica um menu chamado Indicadores. Vamos começar com o primeiro
+indicador, que se chama Primeira WO (...) o primeiro contrato que o técnico chegou na casa do
+cliente (...) a meta para esse indicador é 8 e vinte (...) mostrar uma tabela de todos os
+técnicos, quem é que mais chega atrasado, fazer gráficos dos 10 piores, para que o
+coordenador possa atuar (...) já deve mapear para trás"* — Emanuel, 25/10.
+
+**O que marca a chegada: `visita.inicio`, a hora do TOA.** É a única fonte que existe **para
+trás** — o aplicativo começou agora e o evento de chegada dele não tem histórico. Lida em
+horário de Manaus; em UTC as 20h daqui já são o dia seguinte (traps.md).
+
+**O que é "contrato real": natureza PRODUTIVA e com número de contrato.** Derivado do dado,
+não de uma lista escrita à mão — e por isso pega sozinho os dois casos sujos do cadastro:
+`Refeicao.` (com ponto, cadastrada como PRODUTIVA por engano) e `Corte no Drop`, que vem sem
+contrato. Jornada, refeição, apoio a outro técnico e almoxarifado já ficavam de fora pela
+natureza.
+
+**Dia sem atendimento não entra.** Folga não é atraso. A tela mostra **quantos dias** cada um
+tem ao lado do número, porque dois dias ruins não são o mesmo problema que dez.
+
+**O atraso médio conta só os dias fora da meta.** Quem chegou 07:58 num dia não "compensa" o
+dia em que chegou 09:14: média de sinal trocado esconde exatamente quem o coordenador
+precisa ver.
+
+**Medido antes de escrever a tela**, em 14 dias: **377 dias-técnico, 65 técnicos, chegada
+média 08:39, 40,1% dentro da meta**, o mais cedo 07:58, o mais tarde 15:09. A meta das 08:20
+é parâmetro (`primeira_wo_meta`), não constante.
+
+A tela nasce com **uma aba só** e o lugar das próximas: o segundo indicador não deve virar
+outra tela no menu. Clicar no técnico abre o **dia a dia** — a que horas ele chegou em cada
+dia e qual contrato abriu, com link para o contrato.

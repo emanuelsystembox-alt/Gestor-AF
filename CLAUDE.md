@@ -76,7 +76,7 @@ select * from testar_campo();      -- 27 cenários das travas do campo (e do ant
 # Estrutura
 
 ```
-app/                  web do controle (16 telas, com Almoxarifado, Frota e Monitoramento)
+app/                  web do controle (17 telas, com Almoxarifado, Frota, Monitoramento e Indicadores)
   src/lib/            toa.ts (leitor da planilha) · metricas · relatorio
                       supabase · auth · tempoReal · formato
   src/components/     Shell, gráficos (SVG à mão), TabelaContratos, ui
@@ -90,8 +90,8 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
-docs/                 mapeamento, domínio, 219 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (136 arquivos, até a 139)
+docs/                 mapeamento, domínio, 220 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (137 arquivos, até a 140)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -127,7 +127,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 219 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 220 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
