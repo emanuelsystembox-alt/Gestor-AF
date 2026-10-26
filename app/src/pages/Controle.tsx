@@ -45,7 +45,8 @@ const SELECT = `
     id, sequencia, numero_os, status_operadora, tec1_ao_vivo,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade,
-                                   responsavel_quebra, agrupamento_quebra, quebra_pct ),
+                                   responsavel_quebra, agrupamento_quebra, quebra_pct,
+                                   situacao_destino ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
   )
 `

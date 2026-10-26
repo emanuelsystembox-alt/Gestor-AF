@@ -8586,3 +8586,40 @@ Tubulação` (13), `305 Rua não cabeada` (9), `205 Falta Tap Ou Passivo` (5), `
 cabeada GPON` (2), `206 Prédio Sem Backbone` (1), `211 Falta NAP/NAP Lotada` (1). Enquanto
 ele não disser para onde vão, aparecem como **"sem agrupamento"** — a tela diz que não sabe,
 em vez de empurrar para um grupo qualquer (regra 6).
+
+### D-223 · O agrupamento de cada código, e o que NÃO é quebra (143)
+
+*"te mandei uma lista de códigos pra você colocar nos grupos caso tenha dúvidas (...) isso é
+válido somente para contratos improdutivos; concluídos, auditoria e cancelado central não
+entram"* — Emanuel, 26/10, com os painéis da CLARO abertos agrupamento por agrupamento.
+
+**O de/para passou a vir dele, não da planilha.** Os painéis são do mês inteiro e são a fonte
+direta; onde os dois discordam, vale o painel. Mudaram de lugar o **302** (a planilha dava
+AGENDAMENTO; o painel diz PROCESSO VENDA) e o **308** (AGENDAMENTO → INFRA CLARO).
+
+| Agrupamento | Códigos |
+|---|---|
+| AGENDAMENTO | 106, 101, 125, 107, 306 |
+| PROCESSO VENDA | 302, 402 |
+| INFRA CLARO | 305, 316, 206, 211, 308 |
+| TUBULACAO | 110 |
+| INFRA CLIENTE | 303, 112 |
+| CHUVA | 103 |
+| TÉCNICO | 134, 850, 126 |
+
+**Três coisas saíram da conta de quebra**, cada uma por um motivo:
+- **concluído** — há código improdutivo cuja baixa termina em CONCLUIDA (570 refazer coaxial,
+  582 roteador, 583 refazer óptico): o serviço saiu, e a própria CLARO marca SEM_QUEBRA;
+- **auditar** — o 800 é desatribuição nossa (116), não quebra da operação. Ele tinha ganho
+  INFRA CLARO da planilha e foi limpo;
+- **cancelado pela central** — quem cancelou foi a central no TOA, antes de o técnico ir.
+
+A regra vale nos dois lados: na tela (período atual, com filtros) e em `impacto_quebra`
+(período anterior, agregado) — senão a variação em p.p. compararia dois universos.
+
+Depois da troca, 7 dias: **AGENDAMENTO 7,59% (175)**, PROCESSO VENDA 3,38% (78), sem
+agrupamento 1,21% (28), INFRA CLARO 1,00% (23), TUBULACAO 0,56% (13), TÉCNICO 0,04% (1) — a
+mesma ordem do painel dele. As quebras caíram de 328 para **318** com as exclusões.
+
+**Ainda sem grupo, e só ele pode dizer:** `301 Tipo de OS Incorreta` (23 O.S. em 7 dias) e
+`205 Falta Tap Ou Passivo / Tap Ou Passivo Lotado` (5). Não apareceram em nenhum painel.

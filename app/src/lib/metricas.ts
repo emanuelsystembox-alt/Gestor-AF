@@ -1,5 +1,6 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
 import { equipeRotulo, horasMin } from './formato'
+import { origemCancelada } from './filtroContratos'
 
 /** A equipe abrigo: onde o contrato para quando ninguém disse de quem é
  *  o login do TOA (ver `agent_docs/business-rules.md`). Mesmo código que
@@ -24,6 +25,9 @@ export interface OS {
     responsavel_quebra: string | null
     agrupamento_quebra: string | null
     quebra_pct: number | null
+    /** 143: código improdutivo que termina em CONCLUIDA não é quebra —
+     *  o serviço saiu (570, 582, 583). */
+    situacao_destino: string | null
   } | null
   /** A baixa da AFLINE (D-042) — só a lista do TEC1 perdido usa. */
   baixa_afline?: { codigo: number; descricao: string } | null
@@ -174,7 +178,28 @@ export function calcular(visitas: Visita[]) {
   const os = produtivas.flatMap(v => v.ordem_servico)
   const osComBaixa = os.filter(o => o.codigo_baixa)
   const osSucesso = os.filter(o => o.codigo_baixa?.natureza === 'SUCESSO')
-  const osImprodutivas = os.filter(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')
+  /*
+   * ┌─ o que é QUEBRA, e o que só parece (143) ────────────────────────┐
+   * │ > "isso é válido somente para contratos improdutivos; concluídos,│
+   * │ >  auditoria e cancelado central não entram" — Emanuel, 26/10    │
+   * │                                                                   │
+   * │ Três coisas saem da conta, e cada uma por um motivo:             │
+   * │  · CONCLUÍDO — há código improdutivo cuja baixa leva a CONCLUIDA │
+   * │    (570 refazer coaxial, 582 roteador, 583 refazer óptico): o    │
+   * │    serviço saiu. A própria CLARO os marca SEM_QUEBRA;            │
+   * │  · AUDITAR — o 800 é desatribuição nossa (116), não quebra da    │
+   * │    operação;                                                      │
+   * │  · CANCELADO PELA CENTRAL — quem cancelou foi a central no TOA,  │
+   * │    antes de o técnico ir. Cobrar isso de quem executa é errado.  │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const foraDaQuebra = new Set(
+    produtivas.filter(v => origemCancelada(v) != null).map(v => v.id))
+  const osImprodutivas = produtivas.flatMap(v =>
+    foraDaQuebra.has(v.id) ? [] : v.ordem_servico.filter(o =>
+      o.codigo_baixa?.natureza === 'IMPRODUTIVA'
+      && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
+      && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'))
 
   const taxaConclusao = produtivas.length
     ? (concluidas.length / produtivas.length) * 100 : 0
