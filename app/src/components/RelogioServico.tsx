@@ -26,8 +26,16 @@ import { useEffect, useState } from 'react'
 
 export interface DadosRelogio {
   situacao: string
-  /** Quando a situação ATUAL começou — é daqui que o relógio conta. */
+  /** Quando a situação ATUAL começou. Só vale como relógio quando foi
+   *  GENTE que mudou a situação — ver `bloqueado_em` abaixo. */
   situacao_em?: string | null
+  /** Carimbado em toda mudança de situação FORA da importação (D-006).
+   *  Nulo = quem pôs o contrato nesta situação foi a importação, e
+   *  então `situacao_em` é o `now()` dela, não a hora do técnico. */
+  bloqueado_em?: string | null
+  /** "Tempo de Deslocamento" medido pelo TOA, como intervalo do
+   *  Postgres ("00:16:00"). É o mesmo número do painel de Equipes. */
+  tempo_deslocamento?: string | null
   /** Início e fim da atividade no TOA: o tempo de execução medido. */
   inicio?: string | null
   fim?: string | null
@@ -50,21 +58,55 @@ interface Leitura {
   /** Conta agora, na tela. */
   correndo: boolean
   fase: 'DESLOCAMENTO' | 'EXECUCAO'
+  /** O número é o medido pelo TOA, não um cronômetro nosso. */
+  doToa?: boolean
+}
+
+/** "00:16:00" → 16. O PostgREST devolve `interval` como texto. */
+export function minutosDeIntervalo(iv?: string | null): number | null {
+  if (!iv) return null
+  const m = /^(\d+):(\d{2})(?::(\d{2}))?$/.exec(iv.trim())
+  if (!m) return null
+  return Number(m[1]) * 60 + Number(m[2])
 }
 
 function ler(v: DadosRelogio, agora: number): Leitura | null {
   const desde = (iso?: string | null) =>
     iso ? Math.max(0, Math.round((agora - new Date(iso).getTime()) / 60000)) : null
 
+  /*
+   * ┌─ 144 · por que `situacao_em` não serve sozinho ─────────────────┐
+   * │ A importação faz `update visita set situacao_em = now()`. Todos │
+   * │ os contratos do mesmo arquivo ficam com o MESMO instante, e o   │
+   * │ relógio passava a contar "minutos desde a importação" em vez de │
+   * │ "minutos desde que o técnico saiu". Medido em 26/10: 11         │
+   * │ contratos EM DESLOCAMENTO, nenhum tocado pelo campo, DOIS       │
+   * │ instantes distintos — a tela mostrava "15 min" nos onze, com o  │
+   * │ TOA dizendo 00:06, 00:09, 00:13, 00:29…                         │
+   * │                                                                  │
+   * │ É a mesma armadilha que a 024 já conhecia: `situacao_em` só é a │
+   * │ hora do evento quando `bloqueado_em` existe, isto é, quando foi │
+   * │ gente que mudou a situação e não a importação.                  │
+   * │                                                                  │
+   * │ Então: campo tocou → cronômetro nosso, correndo. Veio da        │
+   * │ importação → o tempo que o TOA MEDIU, parado. E, sem nenhum     │
+   * │ dos dois, relógio nenhum: "não sei" não se escreve como número. │
+   * └──────────────────────────────────────────────────────────────────┘
+   */
   if (v.situacao === 'EM_DESLOCAMENTO') {
-    const m = desde(v.situacao_em)
-    return m == null ? null : { minutos: m, correndo: true, fase: 'DESLOCAMENTO' }
+    if (v.bloqueado_em) {
+      const m = desde(v.situacao_em)
+      if (m != null) return { minutos: m, correndo: true, fase: 'DESLOCAMENTO' }
+    }
+    const m = minutosDeIntervalo(v.tempo_deslocamento)
+    return m == null ? null
+      : { minutos: m, correndo: false, fase: 'DESLOCAMENTO', doToa: true }
   }
   if (v.situacao === 'EM_EXECUCAO') {
-    // O início do TOA é mais fiel que a hora em que a situação mudou aqui
-    // (a importação pode ter trazido a mudança depois). Sem ele, vale a
-    // nossa — e nunca "agora", que marcaria zero para um serviço antigo.
-    const m = desde(v.inicio) ?? desde(v.situacao_em)
+    // O início do TOA é a hora real do começo da execução. A `situacao_em`
+    // só entra quando foi gente que mudou aqui — senão seria o relógio da
+    // importação de novo.
+    const m = desde(v.inicio) ?? (v.bloqueado_em ? desde(v.situacao_em) : null)
     return m == null ? null : { minutos: m, correndo: true, fase: 'EXECUCAO' }
   }
   if (TERMINAIS.includes(v.situacao) && v.inicio && v.fim) {
@@ -106,7 +148,11 @@ export function RelogioServico({ v, tamanho = 38 }: { v: DadosRelogio; tamanho?:
   const r = (tamanho - 6) / 2
   const perimetro = 2 * Math.PI * r
   const titulo = l.fase === 'DESLOCAMENTO'
-    ? `Em deslocamento há ${textoMinutos(l.minutos)}. O deslocamento não tem meta — a distância na cidade varia demais.`
+    ? l.doToa
+      ? `Deslocamento de ${textoMinutos(l.minutos)}, medido pelo TOA — o mesmo número do painel de Equipes.`
+        + ' Não é cronômetro: o contrato entrou em deslocamento pela importação, e a hora dela não é a hora em que o técnico saiu.'
+      : `Em deslocamento há ${textoMinutos(l.minutos)}, desde que o campo marcou a saída.`
+        + ' O deslocamento não tem meta — a distância na cidade varia demais.'
     : temMeta
       ? `${l.correndo ? 'Em execução há' : 'Execução levou'} ${textoMinutos(l.minutos)} de ${textoMinutos(v.meta!)} de meta`
         + ` (${Math.round(pct! * 100)}%).${l.correndo ? '' : ' Medido pelo TOA: fim menos início.'}`
@@ -134,7 +180,9 @@ export function RelogioServico({ v, tamanho = 38 }: { v: DadosRelogio; tamanho?:
       </svg>
       <span className="text-[10px] leading-tight text-graf-400">
         <span className="block uppercase tracking-wide">
-          {l.fase === 'DESLOCAMENTO' ? 'deslocando' : l.correndo ? 'executando' : 'execução'}
+          {l.fase === 'DESLOCAMENTO'
+            ? (l.doToa ? 'deslocou' : 'deslocando')
+            : l.correndo ? 'executando' : 'execução'}
         </span>
         <span className={`tabular font-semibold ${c.texto}`}>
           {textoMinutos(l.minutos)}

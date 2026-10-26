@@ -6,6 +6,8 @@ import type { Metricas, Visita } from '../lib/metricas'
 import {
   SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela, type SituacaoDeTela,
 } from '../lib/filtroContratos'
+import { LOG_GRAVE, lerLog } from '../lib/log'
+import { SeloLog } from './SeloLog'
 
 /**
  * As duas peças de abertura do Dashboard: a **régua do dia** e a
@@ -55,7 +57,7 @@ const META_TEC1 = 94
 
 /** Uma célula da régua: número, rótulo e a linha que explica o número.
  *  Com `aoClicar`, a célula inteira vira botão (o TEC1 abre a lista). */
-function Celula({ valor, sufixo, rotulo, apoio, cor, alerta, aoClicar, dica }: {
+function Celula({ valor, sufixo, rotulo, apoio, cor, alerta, aoClicar, dica, chamada }: {
   valor: string | number
   sufixo?: string
   rotulo: string
@@ -64,6 +66,9 @@ function Celula({ valor, sufixo, rotulo, apoio, cor, alerta, aoClicar, dica }: {
   alerta?: boolean
   aoClicar?: () => void
   dica?: string
+  /** O texto do rodapé quando a célula é clicável. Era fixo em "ver quem
+   *  perdeu", que só serve ao TEC1: o LOG abre quem VOLTOU. */
+  chamada?: string
 }) {
   const Caixa = aoClicar ? 'button' : 'div'
   return (
@@ -83,7 +88,7 @@ function Celula({ valor, sufixo, rotulo, apoio, cor, alerta, aoClicar, dica }: {
       </div>
       <div className="mt-1 text-[11px] leading-snug text-graf-500">{apoio}</div>
       {aoClicar && (
-        <div className="mt-1 text-[11px] font-medium text-af-400">ver quem perdeu →</div>
+        <div className="mt-1 text-[11px] font-medium text-af-400">{chamada ?? 'ver quem perdeu'} →</div>
       )}
     </Caixa>
   )
@@ -242,6 +247,140 @@ function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
   )
 }
 
+// ================================================================== //
+//  O LOG — clicar no card abre quem voltou, por grupo de servico
+// ================================================================== //
+
+/**
+ * Os contratos que ja voltaram para a agenda (144).
+ *
+ * > "preciso saber igual ao tec1, os log acima de 0 devem aparecer, log
+ * >  de visita tecnica - log de adesao, de mudanca de pacote tecnicos e
+ * >  entre outros" — Emanuel, 26/10
+ *
+ * O recorte pedido e POR GRUPO DE SERVICO, entao e ele que abre a lista
+ * — e nao o supervisor, como no TEC1. Sai do mesmo conjunto que o card
+ * conta (as produtivas filtradas), para card e lista nunca divergirem.
+ *
+ * A ordem e por LOG decrescente: quem voltou oito vezes e a primeira
+ * linha, nao a decima — e por ela que se abre a tela.
+ */
+function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
+  const voltaram = useMemo(() => linhas
+    .filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+    .map(v => ({ v, n: lerLog(v.contador_log) }))
+    .filter((x): x is { v: Visita; n: number } => x.n != null && x.n > 0)
+    .sort((a, b) => b.n - a.n
+      || (a.v.tipo_servico?.nome ?? '').localeCompare(b.v.tipo_servico?.nome ?? '')),
+  [linhas])
+
+  const porGrupo = useMemo(() => {
+    const m = new Map<string, { qtd: number; graves: number }>()
+    for (const { v, n } of voltaram) {
+      const g = v.tipo_servico?.nome ?? 'Sem grupo de servico'
+      const t = m.get(g) ?? { qtd: 0, graves: 0 }
+      t.qtd++; if (n >= LOG_GRAVE) t.graves++
+      m.set(g, t)
+    }
+    return [...m.entries()].sort((a, b) => b[1].qtd - a[1].qtd)
+  }, [voltaram])
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [aoFechar])
+
+  // Portal para `.sup-controle` pelo mesmo motivo do TEC1 (D-169/D-173):
+  // o card da regua tem `transform`, e `fixed` dentro dele abre recortado.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
+      role="dialog" aria-modal="true" aria-label="Contratos que voltaram para a agenda" onClick={aoFechar}>
+      <div className="card-controle mt-10 w-full max-w-6xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-graf-800 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">LOG · {voltaram.length} contrato(s) que ja voltaram</h2>
+            <p className="mt-0.5 text-[11px] text-graf-500">
+              O &ldquo;Contador de log&rdquo; e da CLARO e vem na planilha do TOA: quantas vezes o
+              contrato ja voltou para a agenda. Conta o historico inteiro dela, inclusive o que
+              nunca passou por aqui — por isso pode divergir da nossa reincidencia.
+            </p>
+          </div>
+          <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
+            Fechar
+          </button>
+        </div>
+
+        {voltaram.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-graf-400">
+            Nenhum contrato com LOG acima de 0 no periodo e nos filtros.
+          </p>
+        ) : (<>
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">Por grupo de servico</span>
+            {porGrupo.map(([g, t]) => (
+              <span key={g} className="rounded bg-graf-800 px-2 py-0.5 text-xs text-graf-200">
+                {g} <strong className="tabular text-af-400">{t.qtd}</strong>
+                {t.graves > 0 && (
+                  <span className="tabular ml-1 text-amber-400"
+                    title={`${t.graves} com LOG ${LOG_GRAVE} ou mais`}>({t.graves} ≥ {LOG_GRAVE})</span>
+                )}
+              </span>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-graf-800 bg-graf-900 text-left text-[11px] uppercase tracking-wide text-graf-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">LOG</th>
+                  <th className="px-3 py-2 font-medium">Grupo de servico</th>
+                  <th className="px-3 py-2 font-medium">Contrato</th>
+                  <th className="px-3 py-2 font-medium">Tecnico</th>
+                  <th className="px-3 py-2 font-medium">Equipe</th>
+                  <th className="px-3 py-2 font-medium">Area</th>
+                  <th className="px-3 py-2 font-medium">Situacao</th>
+                  <th className="px-3 py-2 font-medium">Cod. de baixa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {voltaram.map(({ v, n }) => {
+                  const baixa = v.ordem_servico.find(o => o.codigo_baixa)?.codigo_baixa ?? null
+                  return (
+                    <tr key={v.id} className="border-b border-graf-800/60 align-top hover:bg-graf-900/60">
+                      <td className="px-3 py-2"><SeloLog valor={n} /></td>
+                      <td className="px-3 py-2">{v.tipo_servico?.nome ?? <span className="text-graf-400">sem grupo</span>}</td>
+                      <td className="px-3 py-2">
+                        <Link to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
+                          {v.contrato ?? v.wo_numero ?? '—'}
+                        </Link>
+                        <div className="text-[11px] text-graf-500">
+                          {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {v.tecnico?.nome ?? <span className="text-graf-400">sem tecnico</span>}
+                      </td>
+                      <td className="px-3 py-2">{v.equipe?.codigo ?? <span className="text-graf-400">—</span>}</td>
+                      <td className="px-3 py-2">{v.area?.codigo ?? <span className="text-graf-400">—</span>}</td>
+                      <td className="px-3 py-2">{SITUACAO_INFO[v.situacao]?.label ?? v.situacao}</td>
+                      <td className="px-3 py-2">
+                        {baixa
+                          ? <><span className="tabular font-medium">{baixa.codigo}</span> <span className="text-graf-300">{baixa.descricao}</span></>
+                          : <span className="text-graf-400">sem codigo</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+      </div>
+    </div>,
+    document.querySelector('.sup-controle') ?? document.body,
+  )
+}
+
 export function ReguaDoDia({ m, de, ate, linhas }: {
   m: Metricas
   /** As visitas FILTRADAS, as mesmas de onde `m` saiu — a lista do TEC1
@@ -253,6 +392,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
   ate: string
 }) {
   const [verTec1, setVerTec1] = useState(false)
+  const [verLog, setVerLog] = useState(false)
   const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.produtivas) - m.concluidas)
   const naMeta = m.taxaConclusao >= META
 
@@ -310,6 +450,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
           // "ao clicar no card do TEC1 (...) o técnico que perdeu" (Emanuel, 24/10)
           aoClicar={m.tec1SemPadrao > 0 ? () => setVerTec1(true) : undefined}
           dica={m.tec1SemPadrao > 0 ? `Ver as ${m.tec1SemPadrao} O.S. que perderam o TEC1` : undefined}
+          chamada="ver quem perdeu"
           cor={!m.tec1Medidas ? 'var(--color-graf-500)'
             : m.pctTec1 >= META_TEC1 ? 'var(--st-concluida)' : 'var(--st-reagendamento)'}
           apoio={m.tec1Medidas
@@ -340,6 +481,39 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
             ? <>de <span className="tabular">{num(m.osImprodutivas)}</span> O.S. improdutivas
                 {' '}· “Serviços de campo” na classificação da CLARO — o resto é argumento com ela</>
             : 'nenhuma O.S. improdutiva no período'}
+        />
+
+        {/* LOG (144) — "ao lado de improdutivas, coloque a tag log"
+            (Emanuel, 26/10). O número é de CONTRATO: o LOG conta idas à
+            agenda, e uma ida é uma visita, não uma O.S. */}
+        <Celula
+          valor={num(m.logComRetorno)}
+          rotulo="LOG - Contratos que voltaram"
+          aoClicar={m.logComRetorno > 0 ? () => setVerLog(true) : undefined}
+          dica={m.logComRetorno > 0
+            ? `Ver os ${m.logComRetorno} contratos com LOG acima de 0, por grupo de serviço`
+            : undefined}
+          chamada="ver quem voltou"
+          cor={!m.logMedidos ? 'var(--color-graf-500)'
+            : m.logComRetorno > 0 ? 'var(--st-reagendamento)' : 'var(--st-concluida)'}
+          alerta={m.logGraves > 0}
+          apoio={m.logMedidos
+            ? <>
+                de <span className="tabular">{num(m.logMedidos)}</span> contratos ·{' '}
+                <span className="tabular">{num(m.logRetornos)}</span> retorno(s) somado(s)
+                {m.logGraves > 0 && (
+                  <span className="block font-semibold text-graf-300">
+                    <span className="tabular">{num(m.logGraves)}</span> com LOG {LOG_GRAVE} ou mais
+                  </span>
+                )}
+                {/* Zero e desconhecido não são a mesma coisa (regra 6). */}
+                {m.logSemInfo > 0 && (
+                  <span className="block">
+                    <span className="tabular">{num(m.logSemInfo)}</span> sem a coluna na planilha, fora da conta
+                  </span>
+                )}
+              </>
+            : 'a planilha não trouxe o contador de log no período'}
         />
       </div>
 
@@ -375,6 +549,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
         </div>
       )}
       {verTec1 && <Tec1Perdido linhas={linhas} aoFechar={() => setVerTec1(false)} />}
+      {verLog && <LogRetornos linhas={linhas} aoFechar={() => setVerLog(false)} />}
     </section>
   )
 }

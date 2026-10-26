@@ -36,6 +36,7 @@ const SELECT = `
   data_agendada, janela_inicio, janela_fim, situacao, bloqueado_em,
   origem, criado_em, inicio, fim, tempo_deslocamento, toa_bucket,
   status_toa:dados_origem->>"Status da Atividade",
+  contador_log:dados_origem->>"Contador de log",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),
   area:area_id ( codigo ),

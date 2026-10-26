@@ -7,6 +7,7 @@ import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
 import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 import { RelogioServico } from './RelogioServico'
+import { SeloLog } from './SeloLog'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 
 /**
@@ -45,6 +46,7 @@ export const SELECT_CONTRATO = `
   segmentacao:segmentacao_id ( nome ),
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
+  contador_log:dados_origem->>"Contador de log",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade, meta_execucao_min ),
   area:area_id ( codigo, apelido ),
@@ -110,6 +112,10 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   /** "Motivo de Fechamento Externo" do TOA — ex.: "Liberado no Sistema
    *  NETSMS". Vazio na maioria das linhas. */
   motivo_fechamento_toa?: string | null
+  /** "Contador de log" do TOA: quantas vezes o contrato já voltou para
+   *  a agenda (144). Nulo = a linha não trouxe a coluna — jornada nunca
+   *  traz. Nulo NÃO é zero. */
+  contador_log?: string | null
   node: string | null
   /** 'GPON' quando a linha do TOA tem sinal de GPON (109, D-188). Nulo =
    *  não identificada — NÃO quer dizer HFC. */
@@ -422,6 +428,10 @@ export function TabelaContratos({
                           "é onde estou vendo espaço" (Emanuel, 25/10). */}
                       <RelogioServico v={{
                         situacao: v.situacao, situacao_em: v.situacao_em,
+                        // 144: sem estes dois o deslocamento contava desde a
+                        // IMPORTAÇÃO — o mesmo número em todos os contratos.
+                        bloqueado_em: v.bloqueado_em,
+                        tempo_deslocamento: v.tempo_deslocamento,
                         inicio: v.inicio, fim: v.fim, finalizado_toa: v.finalizado_toa,
                         meta: (v.tipo_servico as { meta_execucao_min?: number | null } | null)
                           ?.meta_execucao_min ?? null,
@@ -622,6 +632,15 @@ export function TabelaContratos({
               {mostra.area && (
                 <td className="px-3 py-2 align-top text-xs text-graf-400">
                   {v.area?.apelido ?? '—'}
+                  {/* 144: "ao lado da área vamos colocar uma tag (...) chamada
+                      LOG" (Emanuel, 26/10). Jornada não é contrato e não tem
+                      LOG — ali o selo seria um "?" em toda linha, sem informar. */}
+                  {!jornada && (
+                    <div className="mt-1">
+                      <SeloLog valor={v.contador_log}
+                        titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
+                    </div>
+                  )}
                 </td>
               )}
 

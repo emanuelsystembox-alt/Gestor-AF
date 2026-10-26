@@ -298,6 +298,32 @@ em laço até o lote vir menor que a página. Conferir é fácil e vale a
 pena: comparar a contagem da tela com um `select count(*)` do mesmo
 intervalo. Ver D-221.
 
+**`situacao_em` é o `now()` da IMPORTAÇÃO, não a hora do evento.** A importação faz
+`update visita set situacao_em = now()`, então todos os contratos do mesmo arquivo
+ficam com o mesmo instante. O relógio do serviço (138) contava `agora − situacao_em`
+e mostrava **"15 min" nos onze contratos em deslocamento** de 26/10 — nenhum tocado
+pelo campo, DOIS instantes distintos para os onze — enquanto o TOA mandava 00:06,
+00:09, 00:13, 00:16, 00:29 em `tempo_deslocamento`. A 024 já sabia disso desde
+setembro e está escrito lá: `situacao_em` só é a hora do evento quando
+**`bloqueado_em`** existe, isto é, quando foi gente que mudou a situação. Qualquer
+relógio, ociosidade ou "há quanto tempo" medido nele sem essa guarda mostra o mesmo
+número para a planilha inteira — e o defeito é **invisível em contrato único**, que é
+como ele passou. Ver D-224.
+
+**Meça contraste sobre o fundo REAL do elemento, não sobre o fundo da tela.** O
+`traps.md` dizia que `graf-400` dá 5,88 — e dá, **sobre o cartão** (`graf-900`). Sobre
+um chip `graf-800`, que é mais claro, o mesmo texto cai para **4,35:1** e reprova no
+4,5 da AA. Pegou no selo "log ?" da D-224. E a recíproca: um chip **preto** tem 21:1
+de texto e mesmo assim **some**, porque contra o cartão escuro a FORMA dele dá 1,11:1
+— ali a borda é estrutural, não enfeite. Meça o texto contra o fundo dele e o fundo
+contra o que está atrás.
+
+**Comentário JSX `{/* … */}` logo depois de `return (` não compila** — vira um segundo
+filho na raiz do `return`, e o Babel estoura *"Unexpected token, expected ','"*. Pior:
+`tsc --noEmit` rodado ANTES da edição passa limpo e dá falsa segurança. Comentário
+antes do `return`, em `//`. Foi carregar a página que pegou (D-224) — "compila" não é
+"funciona", e "compilou antes" não é "compila".
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

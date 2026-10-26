@@ -11,6 +11,7 @@ import { carregarProvas, type Prova } from '../lib/prova'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { ProvaDoContrato } from '../components/ProvaDoContrato'
 import { ConversaTecnico } from '../components/ConversaTecnico'
+import { lerLog } from '../lib/log'
 
 interface OS {
   id: string; sequencia: number; numero_os: string; ponto: string | null
@@ -479,6 +480,12 @@ export default function VisitaDetalhe() {
                   ? `${v.tecnico.nome} (${v.tecnico.matricula})` : null} />
                 <Campo r="Área" v={v.area ? `${v.area.apelido ?? ''} · ${v.area.codigo}` : null} />
                 <Campo r="Node" v={v.node} />
+                {/* 144: o LOG do TOA — quantas vezes o contrato ja voltou
+                    para a agenda. Nulo nao vira zero (regra 6). */}
+                <Campo r="LOG (retornos na agenda)" v={(() => {
+                  const n = lerLog(v.dados_origem?.['Contador de log'] as string | null)
+                  return n == null ? null : n === 0 ? '0 - nunca voltou' : String(n)
+                })()} />
                 <Campo r="Segmentação" v={v.segmentacao?.nome} />
                 <Campo r="Tipo de atividade (TOA)" v={v.tipo_atividade?.nome} />
                 <Campo r="Grupo de serviço" v={v.tipo_servico?.nome} />

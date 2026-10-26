@@ -8623,3 +8623,85 @@ mesma ordem do painel dele. As quebras caíram de 328 para **318** com as exclus
 
 **Ainda sem grupo, e só ele pode dizer:** `301 Tipo de OS Incorreta` (23 O.S. em 7 dias) e
 `205 Falta Tap Ou Passivo / Tap Ou Passivo Lotado` (5). Não apareceram em nenhum painel.
+
+### D-224 · O LOG do TOA, e o relógio de deslocamento que contava a importação (144)
+
+> *"Ao lado da área vamos colocar uma tag que tem no analítico de importação chamado - LOG
+> (...) acima de 2 os log já precisam mudar de cor, de 3 pra cima já precisa ficar preto
+> (...) o log pra você que não sabe é quantas vezes ele já voltou na agenda, porém a
+> própria planilha já informa, é só você implantar"* — Emanuel, 26/10
+
+**O dado já estava no banco e nunca tinha sido lido.** A coluna chama **"Contador de log"**
+na planilha do TOA, e a importação sempre a guardou em `dados_origem`. Não foi preciso
+migration nenhuma: o PostgREST lê a chave direto (`contador_log:dados_origem->>"Contador de
+log"`), como já se fazia com `Status da Atividade`.
+
+**Não é a nossa `reincidencia` (033), e os dois vão divergir.** A reincidência é derivação
+nossa — visita anterior no mesmo contrato, *dentro do que já importamos*. O LOG é o número
+da CLARO e conta o histórico inteiro dela, inclusive o que nunca passou por aqui. Os dois
+ficam, cada um com o seu nome.
+
+Distribuição medida em 26/10, nos dias carregados: **1.964 em LOG 0**, 201 em 1, 48 em 2,
+6 em 3, 4 em 4, um em 5 e um em 8. A coluna vem em **2.453 das 2.460 visitas produtivas** e
+em **nenhuma das 1.003 de jornada** — jornada não é contrato e não tem LOG, então ali o selo
+não aparece (seria um "?" em toda linha, sem informar nada).
+
+**Zero e desconhecido não são a mesma coisa** (regra 6): linha sem a coluna vira `log ?`,
+nunca `LOG 0`. `LOG 0` é a afirmação *"nunca voltou"*. No cartão do painel isso é o
+`logSemInfo`, contado à parte e fora do denominador.
+
+**A cor é a que ele pediu:** 0, 1 e 2 em cinza discreto; **3 ou mais em preto**. O preto é
+fixo, não variável de tema — o recado é o mesmo no claro e no escuro. Medido com o motor do
+navegador: branco sobre preto dá 21:1, mas **o chip preto contra o cartão escuro dá 1,11:1**,
+isto é, a forma some. Por isso o anel âmbar é estrutural, não enfeite. E o `graf-400` que eu
+tinha posto no `log ?` reprovou: **4,35:1 sobre o chip** (graf-800) contra o 4,5 da AA — os
+5,88 do `traps.md` são sobre o *cartão*, que é mais escuro. Virou `graf-300` (6,25 escuro /
+8,26 claro). Armadilha nova: **medir contraste sobre o fundo real do elemento, não sobre o
+fundo da tela.**
+
+**O card fica ao lado de Improdutivas e conta CONTRATO, não O.S.** — o LOG conta idas à
+agenda, e uma ida é uma visita. Clicar abre a lista, como no TEC1; o recorte é **por grupo de
+serviço**, que foi o que ele pediu ("log de visita técnica - log de adesão, de mudança de
+pacote"). Em 26/10: 39 contratos de 339, 52 retornos somados, 1 com LOG ≥ 3 — VISITA TECNICA
+28, SERVICO 5, RETORNO DE CREDENCIADA 4, ADESAO 2.
+
+---
+
+**E o tempo de deslocamento estava errado para todos** — *"o tempo de deslocamento também não
+tá certo, tá repetindo para todos os contratos"* (Emanuel, 26/10). Estava mesmo, e a causa é
+antiga.
+
+O relógio (138) contava `agora − situacao_em`. Mas a importação faz
+`update visita set situacao_em = now()`: **todos os contratos do mesmo arquivo ficam com o
+mesmo instante**, e o relógio passava a medir *"minutos desde a importação"*. Medido em 26/10:
+**11 contratos EM DESLOCAMENTO, nenhum tocado pelo campo, DOIS instantes distintos** de
+`situacao_em` — a tela escrevia "15 min" nos onze, enquanto o TOA mandava 00:06, 00:09, 00:13,
+00:16 e 00:29.
+
+É a **mesma armadilha que a 024 já conhecia** e estava escrita lá desde setembro:
+`situacao_em` só é a hora do evento quando `bloqueado_em` existe, isto é, quando foi gente que
+mudou a situação e não a importação. O relógio nasceu sem essa guarda.
+
+A regra agora:
+
+| de onde veio | o que o relógio mostra |
+|---|---|
+| campo/controlador tocou (`bloqueado_em`) | cronômetro nosso, correndo, desde `situacao_em` |
+| importação | **o tempo que o TOA MEDIU** (`tempo_deslocamento`), parado — rótulo "deslocou" |
+| nenhum dos dois | **nada** — "não sei" não se escreve como número |
+
+O número da importação é o mesmo do painel de Equipes, que já lia `tempo_deslocamento`: duas
+telas com o mesmo nome passam a dar o mesmo número. A execução não tinha o defeito porque já
+contava de `visita.inicio`, que é do TOA — mas o fallback dela para `situacao_em` ganhou a
+mesma guarda, senão seria o relógio da importação de novo no dia em que `inicio` vier vazio.
+
+**Armadilha para o `traps.md`:** `situacao_em` é `now()` da importação. Qualquer relógio,
+ociosidade ou "há quanto tempo" medido nele, sem conferir `bloqueado_em`, mostra o mesmo
+número para a planilha inteira — e o defeito é invisível em contrato único.
+
+**VERIFICADO ATÉ ONDE DEU:** `tsc --noEmit` e `npm run build` limpos; o `select` novo
+testado contra o PostgREST (parseia, sem PGRST100, e o RLS devolve vazio ao anônimo); 21 de
+21 casos de `lerLog` e `minutosDeIntervalo` com os valores reais do banco; os dois
+componentes renderizados de verdade no navegador, com os cinco contratos de hoje, cada um
+com o seu tempo. **Não verificado:** as telas inteiras logadas (Dashboard, Serviços, Equipes)
+— não tenho login, e os números do card saíram de SQL equivalente, não da tela.

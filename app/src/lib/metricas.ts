@@ -1,6 +1,7 @@
 import { SITUACAO_INFO, type Situacao } from './supabase'
 import { equipeRotulo, horasMin } from './formato'
 import { origemCancelada } from './filtroContratos'
+import { LOG_GRAVE, lerLog } from './log'
 
 /** A equipe abrigo: onde o contrato para quando ninguém disse de quem é
  *  o login do TOA (ver `agent_docs/business-rules.md`). Mesmo código que
@@ -41,6 +42,9 @@ export interface Visita {
   contrato?: string | null
   /** "Status da Atividade" do TOA — separa "Cancelado pela central". */
   status_toa?: string | null
+  /** "Contador de log" do TOA: quantas vezes o contrato já voltou para a
+   *  agenda (144). Nulo = a linha não trouxe a coluna. Nulo não é zero. */
+  contador_log?: string | null
   cliente_nome: string | null
   logradouro: string | null
   bairro: string | null
@@ -200,6 +204,30 @@ export function calcular(visitas: Visita[]) {
       o.codigo_baixa?.natureza === 'IMPRODUTIVA'
       && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
       && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'))
+
+  /*
+   * ┌─ 144 · o LOG, que é da CLARO e não nosso ────────────────────────┐
+   * │ > "ao lado de improdutivas, coloque a tag log, preciso saber     │
+   * │ >  igual ao tec1, os log acima de 0 devem aparecer, log de       │
+   * │ >  visita técnica - log de adesão, de mudança de pacote"         │
+   * │ >  — Emanuel, 26/10                                              │
+   * │                                                                   │
+   * │ O número que o card mostra é de CONTRATO, não de O.S.: o LOG     │
+   * │ conta idas à agenda, e uma ida é uma visita. Jornada fica fora   │
+   * │ (não é contrato e a planilha nem traz a coluna nela).            │
+   * │                                                                   │
+   * │ `logSemInfo` existe porque zero e desconhecido não são a mesma   │
+   * │ coisa: contrato sem a coluna não entra em "LOG 0", entra aqui —  │
+   * │ senão o card afirmaria "nunca voltou" sobre o que ele não sabe.  │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const logs = produtivas.map(v => ({ v, n: lerLog(v.contador_log) }))
+  const logComRetorno = logs.filter(l => l.n != null && l.n > 0).length
+  const logGraves = logs.filter(l => l.n != null && l.n >= LOG_GRAVE).length
+  const logSemInfo = logs.filter(l => l.n == null).length
+  const logMedidos = logs.length - logSemInfo
+  const logRetornos = logs.reduce((t, l) => t + (l.n ?? 0), 0)
+  const pctLog = logMedidos ? (logComRetorno * 100) / logMedidos : 0
 
   const taxaConclusao = produtivas.length
     ? (concluidas.length / produtivas.length) * 100 : 0
@@ -507,6 +535,7 @@ export function calcular(visitas: Visita[]) {
     osSucesso: osSucesso.length,
     osImprodutivas: osImprodutivas.length,
     nossas,
+    logComRetorno, logGraves, logSemInfo, logMedidos, logRetornos, pctLog,
     taxaConclusao,
     porSituacao,
     porResponsabilidade,
