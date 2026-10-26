@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useCentral, type Sinal } from '../lib/central'
+import { COM_ICONE, useCentral, type Sinal } from '../lib/central'
 
 /**
  * O painel que o sino abre (091, refeito na 095).
@@ -25,17 +25,24 @@ import { useCentral, type Sinal } from '../lib/central'
 
 // 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
 // que o controle precisa ver primeiro.
-const ORDEM: Sinal['tipo'][] = ['AJUDA', 'GPS', 'CERCA', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
+const ORDEM: Sinal['tipo'][] = ['AJUDA', 'ATRASO', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS',
+  'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
 const ROTULO: Record<Sinal['tipo'], string> = {
-  AJUDA: 'Suporte técnico', TEC1: 'TEC1 perdido', RITMO: 'Abaixo do ritmo',
+  AJUDA: 'Suporte técnico', TEC1: 'TEC1 / janela perdida', RITMO: 'Abaixo do ritmo',
   QUEBROU: 'Contratos quebrados', MATERIAL: 'Material sinalizado pelo campo',
   ABASTECIMENTO: 'Abastecimento aguardando aprovação',
   GPS: 'GPS com comportamento anormal', CERCA: 'Cercas e garagens',
+  // 129/134/139: estes quatro não tinham rótulo aqui — o sinal aparecia
+  // em branco, porque o tipo do front não acompanhou o do banco.
+  DOIS_ATIVOS: 'Dois contratos em andamento', SUMIU_TOA: 'Sumiu do TOA em andamento',
+  LOCAL: 'Baixa longe do cliente', ATRASO: 'Janela acabando sem chegada',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
   QUEBROU: 'bg-rose-500', MATERIAL: 'bg-violet-500', ABASTECIMENTO: 'bg-emerald-500',
   GPS: 'bg-red-600', CERCA: 'bg-indigo-500',
+  DOIS_ATIVOS: 'bg-fuchsia-500', SUMIU_TOA: 'bg-orange-600',
+  LOCAL: 'bg-cyan-500', ATRASO: 'bg-red-500',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -49,8 +56,17 @@ function destino(s: Sinal): string | null {
   return null
 }
 
-export function PainelCentral({ fechar }: { fechar: () => void }) {
-  const { dados, sinais, dispensar, abrirChat } = useCentral()
+export function PainelCentral({ fechar, filtro, titulo }: {
+  fechar: () => void
+  /** 139: os ícones da barra abrem ESTE painel, já filtrado no tipo
+   *  deles. Sem filtro é o sino: o que não tem ícone próprio. */
+  filtro?: Sinal['tipo'][]
+  titulo?: string
+}) {
+  const { dados, sinais: todos, dispensar, abrirChat } = useCentral()
+  const sinais = filtro
+    ? todos.filter(s => filtro.includes(s.tipo))
+    : todos.filter(s => !COM_ICONE.includes(s.tipo))
   const [aba, setAba] = useState<'agora' | 'historico'>('agora')
   const caixa = useRef<HTMLDivElement>(null)
 
@@ -65,12 +81,20 @@ export function PainelCentral({ fechar }: { fechar: () => void }) {
   }, [fechar])
 
   const ativos = sinais.filter(s => s.vigente && !s.dispensado)
-  const mensagens = dados?.mensagens ?? []
+  // As mensagens do campo só no sino: elas não são sinal, e repeti-las
+  // em cada ícone filtrado seria o mesmo recado em quatro lugares.
+  const mensagens = filtro ? [] : (dados?.mensagens ?? [])
 
   return (
     <div ref={caixa} role="dialog" aria-label="Central do controle"
       className="absolute right-0 top-full z-50 mt-2 flex max-h-[75vh] w-[24rem] max-w-[calc(100vw-1rem)]
                  flex-col overflow-hidden rounded-lg border border-graf-700 bg-graf-900 shadow-2xl">
+      {/* Com filtro, o painel diz de QUE assunto ele é: o mesmo painel
+          aberto por quatro ícones precisa se identificar. */}
+      {titulo && (
+        <p className="border-b border-graf-800 px-3 py-2 text-[11px] font-semibold
+                      uppercase tracking-wide text-graf-300">{titulo}</p>
+      )}
       <div className="flex items-center gap-1 border-b border-graf-800 px-2 py-2">
         {(['agora', 'historico'] as const).map(a => (
           <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}

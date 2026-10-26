@@ -53,7 +53,11 @@ export interface Toast { id: number; titulo: string; texto: string; tom: 'ajuda'
  */
 export interface Sinal {
   id: number
+  /** 129/134/139: os quatro últimos faltavam aqui — o painel desenhava
+   *  sinal sem rótulo e sem cor porque o tipo do front ficou para trás
+   *  do banco. Tipo novo no banco entra NESTA lista no mesmo dia. */
   tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO' | 'CERCA' | 'GPS'
+    | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO'
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean
@@ -94,8 +98,11 @@ interface Ctx {
   /** Não lidas das conversas entre pessoas — entram no mesmo balão. */
   naoLidasInternas: number
   recarregarInternas: () => void
-  /** Quantas coisas pedem atenção agora — o número do sino. */
+  /** Quantas coisas pedem atenção agora — o número do SINO (só o que
+   *  não tem ícone próprio). */
   total: number
+  /** Quantos sinais vigentes destes tipos — o número de cada ícone. */
+  quantos: (tipos: Sinal['tipo'][]) => number
   chatAberto: boolean
   abrirChat: (tecnicoId?: string | null) => void
   /** Abre a conversa com uma PESSOA da gestão (133). */
@@ -104,6 +111,18 @@ interface Ctx {
   chatTecnico: string | null
   chatPessoa: string | null
 }
+
+/**
+ * Os sinais que ganharam ÍCONE PRÓPRIO na barra (139).
+ *
+ * > "é bom a gente criar mais uns 3 a 4 ícones para sinalizar os
+ * >  problemas diferentes" — Emanuel, 25/10
+ *
+ * O sino continua existindo para o resto (suporte, GPS, cerca, material,
+ * abastecimento, dois ativos, sumiu do TOA). Decisão dele: cada coisa
+ * conta num lugar só.
+ */
+export const COM_ICONE: Sinal['tipo'][] = ['LOCAL', 'TEC1', 'ATRASO', 'RITMO']
 
 const CentralCtx = createContext<Ctx | null>(null)
 
@@ -158,7 +177,7 @@ export function CentralProvider({ children }: { children: ReactNode }) {
         for (const x of ativos) {
           if (!conhecidos.current.has(x.id)) {
             // GPS anormal e cerca chegam com o mesmo destaque do pedido de ajuda (097).
-            avisar({ tom: x.tipo === 'AJUDA' || x.tipo === 'GPS' || x.tipo === 'CERCA' ? 'ajuda' : 'sinal',
+            avisar({ tom: ['AJUDA', 'GPS', 'CERCA', 'ATRASO', 'SUMIU_TOA'].includes(x.tipo) ? 'ajuda' : 'sinal',
                      titulo: x.titulo, texto: x.detalhe ?? '' })
           }
         }
@@ -244,7 +263,12 @@ export function CentralProvider({ children }: { children: ReactNode }) {
     ultimaInterna, naoLidasInternas, recarregarInternas,
     fecharToast: id => setToasts(l => l.filter(x => x.id !== id)),
     // 095: o sino conta SINAIS vigentes que este usuário não limpou.
-    total: sinais.filter(x => x.vigente && !x.dispensado).length,
+    // 139: e só o que NÃO tem ícone próprio — cada número aparece em um
+    // lugar só, senão a soma da barra deixa de bater.
+    total: sinais.filter(x => x.vigente && !x.dispensado
+      && !COM_ICONE.includes(x.tipo)).length,
+    quantos: (tipos: Sinal['tipo'][]) => sinais.filter(
+      x => x.vigente && !x.dispensado && tipos.includes(x.tipo)).length,
     chatAberto, chatTecnico, chatPessoa,
     // Uma conversa de cada vez: escolher um técnico solta a pessoa, e
     // vice-versa. Duas seleções vivas deixariam a tela mostrando uma

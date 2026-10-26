@@ -8443,3 +8443,32 @@ número"*. O contador de Serviços conta contratos **em aberto**, e em aberto é
 
 **5. A importação passou a dizer o que sumiu EM ANDAMENTO** (134) no mesmo lugar onde já
 dizia o que foi desatribuído — antes o número existia só no banco.
+
+### D-219 · Um ícone por problema, e o sino com o resto (139)
+
+*"temos o símbolo da mensagem para receber mensagem do técnico que estiver precisando de
+ajuda. Temos um sino que ele é geral (...) é bom a gente criar mais uns 3 a 4 ícones para
+sinalizar os problemas diferentes. Por exemplo, baixou o contrato longe do cliente, perdeu
+TEC1, atendimento dentro da janela, técnicos atrasados, técnicos de baixa produtividade no
+dia"* — Emanuel, 25/10.
+
+**Dos cinco que ele citou, três já eram sinal.** TEC1 **é** a aderência à janela — ele
+confirmou que "atendimento dentro da janela" e "perdeu TEC1" são a mesma coisa, então é um
+ícone só. RITMO já existia. Faltavam dois, e os dois já eram **dado sem virar aviso**:
+
+- **LOCAL** — a baixa saiu fora do raio de 200 m. O número estava em `local_da_baixa` desde
+  setembro (096, D-170), e alguém tinha de abrir contrato por contrato para achar.
+- **ATRASO** — a janela está acabando e o técnico não chegou. Entre três definições, ele
+  escolheu avisar **enquanto ainda dá tempo de ligar para ele**: 30 min antes do fim da
+  janela (`atraso_antecedencia_min`). Chegou = está Em execução ou já encerrou — e aí o sinal
+  apaga sozinho.
+
+**O sino passa a contar só o resto** (suporte, GPS, cerca, material, abastecimento, dois
+ativos, sumiu do TOA), por decisão dele: cada coisa conta num lugar só, e a soma da barra
+bate. Os quatro ícones abrem **o mesmo painel**, filtrado no assunto — não é tela nova, é a
+mesma lista com um título.
+
+**Defeito achado no caminho:** o tipo `Sinal['tipo']` do front estava quatro tipos atrás do
+banco (`DOIS_ATIVOS` desde a 129, `SUMIU_TOA` desde a 134). Sinal sem rótulo e sem cor
+aparecia em branco no painel — e ninguém tinha percebido porque os dois são raros. Agora os
+doze tipos estão na lista. **Tipo novo no banco entra no front no mesmo dia.**

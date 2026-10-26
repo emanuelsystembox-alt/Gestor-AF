@@ -6,7 +6,7 @@ import { supabase, EM_ABERTO } from '../lib/supabase'
 import { isoLocal } from '../lib/formato'
 import { Avatar, Logo, Marca } from './ui'
 import { Icone, type NomeIcone } from './icones'
-import { useCentral } from '../lib/central'
+import { useCentral, type Sinal } from '../lib/central'
 import { PainelCentral } from './PainelCentral'
 import { ChatControle } from './ChatControle'
 import { useCidades, trocarCidade } from '../lib/cidade'
@@ -162,6 +162,36 @@ function useAbertosHoje(ligado: boolean): number | null {
 }
 
 /** O número ao lado de um item do menu, e o que ele conta. */
+/**
+ * Os quatro alertas que ganharam ícone próprio (139), na ordem em que o
+ * Emanuel os citou. A cor é a mesma do painel, para o olho ligar o
+ * número do topo ao bloco de dentro.
+ */
+const ALERTAS: {
+  chave: string; titulo: string; tipos: Sinal['tipo'][]; cor: string; icone: ReactNode
+}[] = [
+  {
+    chave: 'LOCAL', titulo: 'Baixa longe do cliente', tipos: ['LOCAL'], cor: '#06b6d4',
+    // alfinete de mapa
+    icone: <><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" /></>,
+  },
+  {
+    chave: 'TEC1', titulo: 'TEC1 / janela perdida', tipos: ['TEC1'], cor: '#f59e0b',
+    // alvo
+    icone: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
+  },
+  {
+    chave: 'ATRASO', titulo: 'Janela acabando sem chegada', tipos: ['ATRASO'], cor: '#ef4444',
+    // relógio
+    icone: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+  },
+  {
+    chave: 'RITMO', titulo: 'Abaixo do ritmo no dia', tipos: ['RITMO'], cor: '#0ea5e9',
+    // linha caindo
+    icone: <><path d="M4 7l5 5 3-3 8 8" /><path d="M20 12v5h-5" /></>,
+  },
+]
+
 interface Contagem {
   n: number | null; titulo: string
   /** A cor do selo. O número de Serviços conta contratos EM ABERTO, e
@@ -376,7 +406,11 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
   const abertos = useAbertosHoje(gestao)
   const central = useCentral()
-  const [sinoAberto, setSinoAberto] = useState(false)
+  // 139: um painel de cada vez — o do sino ou o de um dos quatro ícones.
+  const [painel, setPainel] = useState<string | null>(null)
+  const sinoAberto = painel === 'SINO'
+  const setSinoAberto = (f: boolean | ((a: boolean) => boolean)) =>
+    setPainel(p => (typeof f === 'function' ? f(p === 'SINO') : f) ? 'SINO' : null)
   // O balão conta as DUAS caixas: o que o campo escreveu e o que uma
   // pessoa da gestão escreveu direto para mim (133). Sem a central
   // carregada o número do campo é nulo — e nulo não vira 0 calado.
@@ -570,11 +604,54 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
                   )}
                 </button>
               )}
+              {/* ┌─ um ícone por problema ──────────────────────────┐
+                  │ > "é bom a gente criar mais uns 3 a 4 ícones para │
+                  │ >  sinalizar os problemas diferentes (...) baixou │
+                  │ >  o contrato longe do cliente, perdeu TEC1,      │
+                  │ >  atendimento dentro da janela, técnicos         │
+                  │ >  atrasados, técnicos de baixa produtividade"    │
+                  │ >  — Emanuel, 25/10                               │
+                  │                                                   │
+                  │ TEC1 E a aderência à janela (confirmado por ele): │
+                  │ um ícone só para os dois. Cada ícone abre o mesmo │
+                  │ painel do sino, filtrado no assunto dele, e o     │
+                  │ sino fica com o RESTO — cada coisa conta num      │
+                  │ lugar só, senão a soma da barra não bate.         │
+                  └───────────────────────────────────────────────────┘ */}
+              {central.dados && ALERTAS.map(a => {
+                const n = central.quantos(a.tipos)
+                return (
+                  <div key={a.chave} className="relative hidden sm:block">
+                    <button onClick={() => setPainel(p => p === a.chave ? null : a.chave)}
+                      aria-expanded={painel === a.chave}
+                      aria-label={n ? `${a.titulo}: ${n}` : a.titulo} title={a.titulo}
+                      className={`relative rounded-md border px-2 py-1 transition ${
+                        n ? 'border-graf-600 text-graf-100' : 'border-graf-800 text-graf-500'}
+                        hover:border-af-600 hover:text-af-400`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        {a.icone}
+                      </svg>
+                      {n > 0 && (
+                        <span style={{ backgroundColor: a.cor }}
+                          className="tabular absolute -right-1.5 -top-1.5 min-w-4 rounded-full px-1
+                                     text-center text-[10px] font-semibold leading-4 text-white">
+                          {n > 99 ? '99+' : n}
+                        </span>
+                      )}
+                    </button>
+                    {painel === a.chave && (
+                      <PainelCentral fechar={() => setPainel(null)}
+                        filtro={a.tipos} titulo={a.titulo} />
+                    )}
+                  </div>
+                )
+              })}
               {central.dados && (
                 <div className="relative">
                   <button onClick={() => setSinoAberto(a => !a)} aria-expanded={sinoAberto}
                     aria-label={central.total ? `Central: ${central.total} item(ns) pedindo atenção` : 'Central do controle'}
-                    title="O que pede atenção"
+                    title="O resto: suporte, GPS, cerca, material, abastecimento, dois ativos, sumiu do TOA"
                     className="relative rounded-md border border-graf-700 px-2 py-1 text-graf-300
                                hover:border-af-600 hover:text-af-400">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
