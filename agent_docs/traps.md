@@ -402,6 +402,16 @@ no build: ambiente vazio = atualização sem o endereço do Supabase.
 do Android no `app.json` com duplicatas. Guarde uma cópia do `app.json` e
 do `eas.json` antes, e confira o `diff` depois (D-186).
 
+**E o `eas update` faz o mesmo.** Não é só o `:configure`: em 25/10 um
+`eas update --branch preview` deixou **16 permissões onde havia 7** (sete
+duplicadas) e acrescentou um segundo `runtimeVersion`, no topo, além do
+que já existia em `android`. O arquivo entrou no commit sem ninguém pedir.
+Depois de QUALQUER comando da EAS, `git diff campo/app.json` — e, se ele
+mexeu, compare as permissões RESOLVIDAS antes de aceitar:
+`npx expo config --json` → `android.permissions`. No caso, as 9 resolvidas
+eram as mesmas com e sem a lista inchada: o que a EAS escreveu era
+redundante, e o certo foi restaurar o arquivo.
+
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`
 ou `campo/`.
