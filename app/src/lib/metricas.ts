@@ -18,6 +18,12 @@ export interface OS {
   codigo_baixa: {
     codigo: number; descricao: string
     natureza: string; responsabilidade: string | null
+    /** 141: de quem é a culpa, no vocabulário da CLARO (RESPONSAVEL_QUEBRA
+     *  e AGRUPAMENTO_QUEBRA da planilha Quebra Qualificada). Nulo = a
+     *  CLARO classifica caso a caso; o código sozinho não responde. */
+    responsavel_quebra: string | null
+    agrupamento_quebra: string | null
+    quebra_pct: number | null
   } | null
   /** A baixa da AFLINE (D-042) — só a lista do TEC1 perdido usa. */
   baixa_afline?: { codigo: number; descricao: string } | null
@@ -56,22 +62,66 @@ export interface Visita {
   ordem_servico: OS[]
 }
 
+/**
+ * ┌─ o vocabulário é o da CLARO, não o nosso (141) ───────────────────┐
+ * │ > "o certo é dizer exatamente de quem é a culpa (...) essas       │
+ * │ >  informações estão na coluna AG e AH, responsável de quebra e   │
+ * │ >  agrupamento de quebra" — Emanuel, 25/10                        │
+ * │                                                                    │
+ * │ O de antes (TECNICO/CLIENTE/REDE/OPERADORA/TERCEIRO) era nosso,   │
+ * │ inventado antes de existir a planilha — e era o que classificava  │
+ * │ errado: dizia "100% Operadora" onde a CLARO diz Serviços de Campo. │
+ * │                                                                    │
+ * │ SERVICOS DE CAMPO é a AFLINE: é a única que é NOSSA conta.        │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+/**
+ * A hora do dia EM MANAUS, em minutos desde a meia-noite.
+ *
+ * `getHours()` usaria o fuso de quem abre o navegador — e o indicador
+ * Primeira WO (140) calcula em `America/Manaus`, no banco. Duas telas
+ * com o mesmo nome dando horas diferentes é o pior dos dois mundos
+ * (D-150), então aqui o fuso é o mesmo, fixo.
+ */
+function minutosEmManaus(iso: string): number {
+  const t = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Manaus', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso))
+  const [h, m] = t.split(':')
+  return Number(h) * 60 + Number(m)
+}
+
+/** Uma O.S. improdutiva por trás do número, para o coordenador atuar (141). */
+export interface ItemMotivo {
+  visita_id: string; contrato: string | null; os: string | null
+  servico: string | null; tecnico: string | null; equipe: string | null
+  responsavel: string | null
+}
+
 const RESP_ROTULO: Record<string, string> = {
-  TECNICO: 'Nossa (técnico)',
+  'SERVICOS DE CAMPO': 'Serviços de campo (nossa)',
+  COMERCIAL: 'Comercial',
+  DAC: 'DAC',
+  REAG_CLIENTE: 'Reagendamento do cliente',
   CLIENTE: 'Cliente',
-  REDE: 'Rede',
-  OPERADORA: 'Operadora (CLARO)',
-  TERCEIRO: 'Terceiro / força maior',
-  SEM_CLASSIFICACAO: 'Sem classificação',
+  USO_INTERNO: 'Uso interno',
+  CHUVA: 'Chuva',
+  SEM_QUEBRA: 'Sem quebra',
+  SEM_CLASSIFICACAO: 'A CLARO classifica caso a caso',
 }
 const RESP_COR: Record<string, string> = {
-  TECNICO: 'var(--color-af-500)',
-  CLIENTE: '#f59e0b',
-  REDE: '#0ea5e9',
-  OPERADORA: '#8b5cf6',
-  TERCEIRO: '#64748b',
+  'SERVICOS DE CAMPO': 'var(--color-af-500)',
+  COMERCIAL: '#8b5cf6',
+  DAC: '#0ea5e9',
+  REAG_CLIENTE: '#f59e0b',
+  CLIENTE: '#eab308',
+  USO_INTERNO: '#64748b',
+  CHUVA: '#38bdf8',
+  SEM_QUEBRA: '#16a34a',
   SEM_CLASSIFICACAO: '#3a4150',
 }
+/** A nossa — a que a AFLINE paga. */
+export const RESP_NOSSA = 'SERVICOS DE CAMPO'
 
 /** '00:32:00' → 32 (minutos). Postgres devolve interval como texto. */
 function intervParaMin(v: string | null): number | null {
@@ -128,7 +178,7 @@ export function calcular(visitas: Visita[]) {
   // ---------- improdutivas por responsabilidade (nosso diferencial) ----------
   const contaResp: Record<string, number> = {}
   for (const o of osImprodutivas) {
-    const k = o.codigo_baixa?.responsabilidade ?? 'SEM_CLASSIFICACAO'
+    const k = o.codigo_baixa?.responsavel_quebra ?? 'SEM_CLASSIFICACAO'
     contaResp[k] = (contaResp[k] ?? 0) + 1
   }
   const porResponsabilidade = Object.entries(contaResp)
@@ -137,20 +187,49 @@ export function calcular(visitas: Visita[]) {
       rotulo: RESP_ROTULO[k] ?? k,
       valor,
       cor: RESP_COR[k] ?? '#3a4150',
-      nossa: k === 'TECNICO',
+      nossa: k === RESP_NOSSA,
     }))
     .sort((a, b) => b.valor - a.valor)
 
-  const nossas = contaResp['TECNICO'] ?? 0
+  const nossas = contaResp[RESP_NOSSA] ?? 0
+
+  // 141: o segundo eixo da planilha — ONDE a quebra aconteceu
+  // (agendamento, infra CLARO, processo de venda, tubulação…).
+  const contaAgr: Record<string, number> = {}
+  for (const o of osImprodutivas) {
+    const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_CLASSIFICACAO'
+    contaAgr[k] = (contaAgr[k] ?? 0) + 1
+  }
+  const porAgrupamento = Object.entries(contaAgr)
+    .map(([k, valor]) => ({
+      chave: k, valor,
+      rotulo: k === 'SEM_CLASSIFICACAO' ? 'Sem agrupamento' : k.toLowerCase(),
+      cor: RESP_COR[k] ?? '#64748b',
+    }))
+    .sort((a, b) => b.valor - a.valor)
 
   // ---------- motivos de improdutividade ----------
-  const contaMotivo = new Map<string, number>()
-  for (const o of osImprodutivas) {
-    const k = `${o.codigo_baixa!.codigo} · ${o.codigo_baixa!.descricao}`
-    contaMotivo.set(k, (contaMotivo.get(k) ?? 0) + 1)
+  // 141: cada motivo leva junto QUAIS contratos são — "quando o usuário
+  // clicar em cima, aparecer o contrato, o tipo de serviço e o técnico
+  // que deu a quebra" (Emanuel, 25/10). Sem isso o coordenador vê o
+  // número e não tem onde atuar.
+  const contaMotivo = new Map<string, ItemMotivo[]>()
+  for (const v of produtivas) {
+    for (const o of v.ordem_servico) {
+      if (o.codigo_baixa?.natureza !== 'IMPRODUTIVA') continue
+      const k = `${o.codigo_baixa.codigo} · ${o.codigo_baixa.descricao}`
+      const l = contaMotivo.get(k) ?? []
+      l.push({
+        visita_id: v.id, contrato: v.contrato ?? null, os: o.numero_os ?? null,
+        servico: v.tipo_servico?.nome ?? v.tipo_atividade?.nome ?? null,
+        tecnico: v.tecnico?.nome ?? null, equipe: v.equipe?.codigo ?? null,
+        responsavel: o.codigo_baixa.responsavel_quebra ?? null,
+      })
+      contaMotivo.set(k, l)
+    }
   }
   const motivos = [...contaMotivo.entries()]
-    .map(([rotulo, valor]) => ({ rotulo, valor }))
+    .map(([rotulo, itens]) => ({ rotulo, valor: itens.length, itens }))
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 10)
 
@@ -238,6 +317,42 @@ export function calcular(visitas: Visita[]) {
   // janela, é melhor" (Emanuel, 23/09): 106 min não se lê de relance,
   // 1h46 sim. O `valor` segue em minutos para a barra ficar na mesma
   // escala das outras duas, que são curtas e continuam em minutos.
+  /*
+   * ┌─ a PRIMEIRA WO do time (141) ────────────────────────────────────┐
+   * │ > "era bom saber quanto o time inteiro se atrasou para chegar na │
+   * │ >  primeira WO (...) qual é o tempo médio de deslocamento de     │
+   * │ >  todas as equipes? E qual é o tempo de execução, conforme o    │
+   * │ >  filtro lá em cima?" — Emanuel, 25/10                          │
+   * │                                                                   │
+   * │ Mesma regra do indicador (140): a primeira visita PRODUTIVA com  │
+   * │ contrato de cada técnico em cada dia, pela hora de início do     │
+   * │ TOA. A média é do time inteiro, no filtro que está na tela.      │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const primeiraDoDia = new Map<string, number>()
+  for (const v of produtivas) {
+    // O mesmo filtro do indicador (140): natureza PRODUTIVA de verdade,
+    // não "tudo que não é jornada". Sem isto as duas telas dão horas
+    // diferentes para o mesmo nome.
+    if (v.tipo_atividade?.natureza !== 'PRODUTIVA') continue
+    if (!v.inicio || !v.contrato || !v.tecnico?.matricula) continue
+    const chave = `${v.tecnico.matricula}|${v.data_agendada}`
+    const min = minutosEmManaus(v.inicio)
+    const atual = primeiraDoDia.get(chave)
+    if (atual == null || min < atual) primeiraDoDia.set(chave, min)
+  }
+  const chegadas = [...primeiraDoDia.values()]
+  // Nulo quando ninguém tem início medido: zero diria "chegaram à
+  // meia-noite", que é pior que não dizer (regra 6).
+  const primeiraWoMin = chegadas.length
+    ? Math.round(chegadas.reduce((a, b) => a + b, 0) / chegadas.length) : null
+  const primeiraWo = {
+    minutos: primeiraWoMin,
+    dias: chegadas.length,
+    texto: primeiraWoMin == null ? null
+      : `${String(Math.floor(primeiraWoMin / 60)).padStart(2, '0')}:${String(primeiraWoMin % 60).padStart(2, '0')}`,
+  }
+
   const mAtraso = media(atraso)
   const etapas: { rotulo: string; valor: number; cor: string; texto: string }[] = [
     { rotulo: 'Atraso sobre a janela', valor: mAtraso, cor: '#f59e0b', texto: horasMin(mAtraso) },
@@ -327,10 +442,11 @@ export function calcular(visitas: Visita[]) {
     taxaConclusao,
     porSituacao,
     porResponsabilidade,
+    porAgrupamento,
     motivos,
     horas, hConcluida, hCancelada, hReagendamento,
     porGrupo,
-    etapas, gargalo, pctNaJanela, dentroDaJanela, comJanela,
+    etapas, gargalo, primeiraWo, pctNaJanela, dentroDaJanela, comJanela,
     tec1Padrao, tec1SemPadrao, tec1Expurgadas, tec1EmAberto, tec1Medidas, pctTec1,
     equipes, concluidasSemDono,
     porTipo,

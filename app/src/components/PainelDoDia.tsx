@@ -333,12 +333,12 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
 
         <Celula
           valor={num(m.nossas)}
-          rotulo="Improdutivas por nossa conta"
+          rotulo="Improdutivas de Serviços de campo"
           cor={m.nossas > 0 ? 'var(--st-conflito)' : 'var(--st-concluida)'}
           alerta={m.nossas > 0}
           apoio={m.osImprodutivas
             ? <>de <span className="tabular">{num(m.osImprodutivas)}</span> O.S. improdutivas
-                {' '}· o resto é argumento com a CLARO</>
+                {' '}· “Serviços de campo” na classificação da CLARO — o resto é argumento com ela</>
             : 'nenhuma O.S. improdutiva no período'}
         />
       </div>

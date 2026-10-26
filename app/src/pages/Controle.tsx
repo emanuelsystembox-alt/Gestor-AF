@@ -43,7 +43,8 @@ const SELECT = `
   ordem_servico (
     id, sequencia, numero_os, status_operadora, tec1_ao_vivo,
     tipo_os:tipo_os_id ( codigo, descricao ),
-    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade ),
+    codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade,
+                                   responsavel_quebra, agrupamento_quebra, quebra_pct ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
   )
 `
@@ -82,6 +83,18 @@ const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs
 
 export default function Controle() {
   const [periodo, setPeriodo] = useState<Periodo>('HOJE')
+  /** 141: o motivo aberto no detalhe (contrato, serviço, técnico). */
+  const [motivoAberto, setMotivoAberto] = useState<string | null>(null)
+  /** A meta da Primeira WO é cadastro (140), não constante: a tela lê. */
+  const [textoMeta, setTextoMeta] = useState('08:20')
+  useEffect(() => {
+    supabase.rpc('ler_parametro', { p_chave: 'primeira_wo_meta' })
+      .then(({ data }) => { if (typeof data === 'string') setTextoMeta(data.slice(0, 5)) })
+  }, [])
+  const metaPrimeiraWo = useMemo(() => {
+    const [h, mm] = textoMeta.split(':')
+    return Number(h) * 60 + Number(mm || 0)
+  }, [textoMeta])
   const [de, setDe] = useState(isoLocal(new Date()))
   const [ate, setAte] = useState(isoLocal(new Date()))
   const [origem, setOrigem] = useState('TODAS')
@@ -99,19 +112,45 @@ export default function Controle() {
   const [dtInicio, dtFim] = useMemo(
     () => intervalo(periodo, de, ate), [periodo, de, ate])
 
+  /*
+   * ┌─ o painel estava lendo MIL linhas e chamando de período ─────────┐
+   * │ O PostgREST devolve no máximo 1.000 linhas por consulta. Sem     │
+   * │ paginar, "7 dias" carregava 1.000 de 2.283 visitas — e TODOS os  │
+   * │ números (conclusão, improdutivas, TEC1, tempos, primeira WO)     │
+   * │ saíam sobre esse pedaço, sem nada na tela dizendo que faltava.   │
+   * │ Achado em 25/10 comparando a tela com o banco: 742 contratos na  │
+   * │ régua contra 2.283 no SQL do mesmo intervalo.                    │
+   * │                                                                   │
+   * │ Agora pagina até acabar. A página é de 1.000 porque é o teto do  │
+   * │ servidor; `linhas.length < PAGINA` é o fim — pedir mais uma vez  │
+   * │ para confirmar custaria uma viagem a cada carregamento.          │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
   useEffect(() => {
     let vivo = true
     setCarregando(true); setErro(null)
-    supabase.from('visita').select(SELECT)
-      .gte('data_agendada', dtInicio)
-      .lte('data_agendada', dtFim)
-      .order('data_agendada', { ascending: false })
-      .then(({ data, error }) => {
+    ;(async () => {
+      const PAGINA = 1000
+      const tudo: Visita[] = []
+      for (let p = 0; ; p++) {
+        const { data, error } = await supabase.from('visita').select(SELECT)
+          .gte('data_agendada', dtInicio)
+          .lte('data_agendada', dtFim)
+          .order('data_agendada', { ascending: false })
+          .order('id')
+          .range(p * PAGINA, (p + 1) * PAGINA - 1)
         if (!vivo) return
-        if (error) setErro(error.message)
-        else { setLinhas((data ?? []) as unknown as Visita[]); setAtualizado(new Date()) }
-        setCarregando(false)
-      })
+        if (error) { setErro(error.message); setCarregando(false); return }
+        const lote = (data ?? []) as unknown as Visita[]
+        tudo.push(...lote)
+        if (lote.length < PAGINA) break
+        // Trava de segurança: 20 páginas são 20 mil visitas, muito acima
+        // de qualquer mês real. Laço infinito aqui travaria a tela.
+        if (p >= 19) break
+      }
+      if (!vivo) return
+      setLinhas(tudo); setAtualizado(new Date()); setCarregando(false)
+    })()
     return () => { vivo = false }
   }, [dtInicio, dtFim])
 
@@ -316,9 +355,14 @@ export default function Controle() {
                 tabela={<TabelaSimples colunas={['Responsável', 'Qtd']}
                   linhas={m.porResponsabilidade.map(r => [r.rotulo, r.valor])} />}
                 nota={m.porResponsabilidade.length > 0 && <>
-                  Cada código de baixa da CLARO foi classificado por quem deu causa.
-                  Só o que está em <span className="text-af-400">vermelho</span> é
-                  cobrável de nós — o resto é argumento na mesa com a operadora.
+                  <strong className="text-graf-300">Responsável de quebra</strong> é a
+                  classificação da própria CLARO, aprendida da planilha
+                  <em> Quebra Qualificada</em> (coluna AG). Só{' '}
+                  <span className="text-af-400">Serviços de campo</span> é cobrável de
+                  nós — o resto é argumento na mesa com a operadora.
+                  {' '}<strong className="text-graf-300">“A CLARO classifica caso a caso”</strong>{' '}
+                  não é falha: há código que ela usa com responsáveis diferentes conforme
+                  o caso (o 301 aparece com quatro), e aí o código sozinho não responde.
                 </>}>
                 {m.porResponsabilidade.length === 0 ? (
                   <p className="py-6 text-center text-sm text-graf-500">
@@ -339,9 +383,81 @@ export default function Controle() {
                   O.S. improdutivas estão espalhadas em códigos de menor frequência —
                   o percentual é sobre as {m.osImprodutivas} do período, não sobre estas dez.</>}>
                 <BarrasHorizontais dados={m.motivos} cor="var(--st-conflito)"
-                  parte totalRef={m.osImprodutivas} rotuloLargo />
+                  parte totalRef={m.osImprodutivas} rotuloLargo
+                  aoClicar={r => setMotivoAberto(a => a === r ? null : r)}
+                  selecionado={motivoAberto} />
+                {/* 141: clicar no motivo abre QUEM deu a quebra — contrato,
+                    serviço e técnico. "Caso o coordenador queira detalhar
+                    melhor" (Emanuel, 25/10). */}
+                {motivoAberto && (() => {
+                  const mot = m.motivos.find(x => x.rotulo === motivoAberto)
+                  if (!mot) return null
+                  return (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-graf-800">
+                      <p className="flex items-center gap-2 border-b border-graf-800 bg-graf-900
+                                    px-3 py-1.5 text-[11px] text-graf-300">
+                        <strong>{mot.rotulo}</strong>
+                        <span className="tabular text-graf-500">{mot.valor} O.S.</span>
+                        <button onClick={() => setMotivoAberto(null)}
+                          className="ml-auto text-graf-400 hover:text-graf-100">fechar ✕</button>
+                      </p>
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="sticky top-0 bg-graf-900 text-left text-[10px]
+                                            uppercase tracking-wide text-graf-500">
+                            <tr>
+                              <th className="px-3 py-1.5 font-medium">Contrato</th>
+                              <th className="px-3 py-1.5 font-medium">Serviço</th>
+                              <th className="px-3 py-1.5 font-medium">Técnico</th>
+                              <th className="px-3 py-1.5 font-medium">Responsável</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mot.itens.map((it, i) => (
+                              <tr key={`${it.visita_id}-${i}`} className="border-t border-graf-800/60">
+                                <td className="px-3 py-1.5">
+                                  <Link to={`/controle/visita/${it.visita_id}`}
+                                    className="tabular text-af-400 underline underline-offset-2">
+                                    {it.contrato ?? '—'}
+                                  </Link>
+                                  {it.os && <span className="tabular ml-1.5 text-graf-600">O.S. {it.os}</span>}
+                                </td>
+                                <td className="px-3 py-1.5 text-graf-300">{it.servico ?? '—'}</td>
+                                <td className="px-3 py-1.5 text-graf-300">
+                                  {it.tecnico ?? <span className="text-graf-600">sem técnico</span>}
+                                  {it.equipe && <span className="ml-1.5 text-graf-600">{it.equipe}</span>}
+                                </td>
+                                <td className="px-3 py-1.5">
+                                  {it.responsavel
+                                    ? <span className={it.responsavel === 'SERVICOS DE CAMPO'
+                                        ? 'text-af-300' : 'text-graf-400'}>{it.responsavel.toLowerCase()}</span>
+                                    : <span className="text-graf-600">caso a caso</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })()}
               </Painel>
             </div>
+
+            {/* 141: o segundo eixo da planilha da CLARO — ONDE a quebra
+                aconteceu. Responsável diz QUEM paga; agrupamento diz em
+                que parte do processo quebrou, que é o que se ataca. */}
+            {m.porAgrupamento.length > 0 && (
+              <div className="sobe sobe-2">
+                <Painel titulo="Onde a quebra aconteceu"
+                  dica="O agrupamento de quebra da CLARO (coluna AH): em que parte do processo o serviço caiu."
+                  tabela={<TabelaSimples colunas={['Agrupamento', 'Qtd']}
+                    linhas={m.porAgrupamento.map(r => [r.rotulo, r.valor])} />}>
+                  <BarrasHorizontais dados={m.porAgrupamento}
+                    parte totalRef={m.osImprodutivas} rotuloLargo />
+                </Painel>
+              </div>
+            )}
 
             {/* ===== 6. quando, quão rápido, e por quem ===== */}
             <div className="sobe sobe-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
@@ -397,6 +513,37 @@ export default function Controle() {
                   combinado.
                 </>}>
                 <BarrasHorizontais dados={m.etapas} />
+                {/* 141: "era bom saber quanto o time inteiro se atrasou para
+                    chegar na primeira WO" (Emanuel, 25/10). A mesma regra do
+                    indicador Primeira WO, no filtro que está na tela. */}
+                <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1
+                                border-t border-graf-800 pt-3">
+                  <span className="text-[10px] uppercase tracking-wide text-graf-500">
+                    Primeira WO do time
+                  </span>
+                  {m.primeiraWo.texto == null ? (
+                    <span className="text-sm text-graf-400">sem início medido no período</span>
+                  ) : (() => {
+                    const atraso = m.primeiraWo.minutos! - metaPrimeiraWo
+                    return (<>
+                      <span className={`tabular text-xl font-semibold ${
+                        atraso <= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        {m.primeiraWo.texto}
+                      </span>
+                      <span className="text-xs text-graf-400">
+                        meta <span className="tabular">{textoMeta}</span> ·{' '}
+                        {atraso <= 0
+                          ? <span className="text-emerald-300">{-atraso} min adiantado</span>
+                          : <span className="text-amber-300">{atraso} min depois</span>}
+                        {' '}· <span className="tabular">{m.primeiraWo.dias}</span> dias-técnico
+                      </span>
+                      <Link to="/controle/indicadores"
+                        className="ml-auto text-[11px] text-af-400 underline underline-offset-2">
+                        ver por técnico
+                      </Link>
+                    </>)
+                  })()}
+                </div>
               </Painel>
 
               {/* ===== equipes: o ranking que ainda não dá para fazer ===== */}

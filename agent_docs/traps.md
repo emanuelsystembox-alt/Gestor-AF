@@ -288,6 +288,16 @@ cópia nova. Trocar `supabase.rpc` nela não troca nada na página — e o
 que não for a falsificada. Dado fictício nunca com cara de real: prefixo
 óbvio e conferência no banco depois.
 
+**Consulta de tela sem `range` para em 1.000 linhas, calada.** O PostgREST
+devolve no máximo mil por requisição. O Dashboard lia "7 dias" com um
+`select` sem paginação e mostrava **742 contratos onde o banco tem
+2.283** — e todos os números do painel (conclusão, improdutivas, TEC1,
+tempos) saíam sobre esse pedaço, sem aviso na tela. Em "Hoje" nunca
+apareceu, porque o dia cabe. Quem lê período longo pagina com `.range()`
+em laço até o lote vir menor que a página. Conferir é fácil e vale a
+pena: comparar a contagem da tela com um `select count(*)` do mesmo
+intervalo. Ver D-221.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

@@ -64,7 +64,7 @@ export interface Fatia { rotulo: string; valor: number; cor: string }
  *  isolado; "55 · 34%" diz. */
 export function BarrasHorizontais({
   dados, cor = 'var(--color-af-600)', sufixo = '', parte = false,
-  rotuloLargo = false, totalRef,
+  rotuloLargo = false, totalRef, aoClicar, selecionado,
 }: {
   /** `texto` troca só o que se LÊ ao lado da barra (ex.: `1h46`); o
    *  comprimento continua em `valor`, na mesma escala das outras. Barra
@@ -78,6 +78,10 @@ export function BarrasHorizontais({
    *  (os 10 maiores motivos), senao a fatia sai sobre os 10 e nao sobre
    *  o universo -- e a soma da 100% mentindo. */
   totalRef?: number
+  /** 141: a barra vira botão quando a tela tem o que mostrar por trás
+   *  dela (os contratos daquele motivo). Sem isto, continua só gráfico. */
+  aoClicar?: (rotulo: string) => void
+  selecionado?: string | null
 }) {
   if (dados.length === 0)
     return <p className="py-6 text-center text-sm text-graf-500">Sem dados no período.</p>
@@ -85,8 +89,15 @@ export function BarrasHorizontais({
   const total = totalRef ?? dados.reduce((s, d) => s + d.valor, 0)
   return (
     <div className="space-y-1.5">
-      {dados.map(d => (
-        <div key={d.rotulo} className="flex items-center gap-2.5 text-sm">
+      {dados.map(d => {
+        const Linha = aoClicar ? 'button' : 'div'
+        return (
+        <Linha key={d.rotulo} type={aoClicar ? 'button' : undefined}
+          onClick={aoClicar ? () => aoClicar(d.rotulo) : undefined}
+          aria-pressed={aoClicar ? selecionado === d.rotulo : undefined}
+          className={`flex w-full items-center gap-2.5 text-sm ${
+            aoClicar ? 'rounded px-1 text-left hover:bg-graf-900' : ''} ${
+            selecionado === d.rotulo ? 'bg-graf-900 ring-1 ring-graf-700' : ''}`}>
           {/* O rotulo encolhe na tela estreita: 208px fixos somados as
               colunas de numero estouravam a largura da pagina e punham
               rolagem horizontal no corpo. */}
@@ -107,8 +118,9 @@ export function BarrasHorizontais({
             </span>
           )}
           {d.nota && <span className="w-24 shrink-0 text-[11px] text-graf-500">{d.nota}</span>}
-        </div>
-      ))}
+        </Linha>
+        )
+      })}
     </div>
   )
 }

@@ -8505,3 +8505,51 @@ média 08:39, 40,1% dentro da meta**, o mais cedo 07:58, o mais tarde 15:09. A m
 A tela nasce com **uma aba só** e o lugar das próximas: o segundo indicador não deve virar
 outra tela no menu. Clicar no técnico abre o **dia a dia** — a que horas ele chegou em cada
 dia e qual contrato abriu, com link para o contrato.
+
+### D-221 · O responsável da quebra é o da CLARO, e o painel lia mil linhas (141)
+
+*"corrija essas duas imagens (...) improdutivas por responsabilidade e improdutivas por nossa
+conta. Ela está classificando as informações incorretas. O certo é dizer exatamente de quem é
+a culpa (...) essas informações estão na coluna AG e a H, responsável de quebra e agrupamento
+de quebra"* — Emanuel, 25/10.
+
+**O vocabulário passou a ser o da CLARO**, aprendido da planilha *Quebra Qualificada*:
+`SEM_QUEBRA`, `SERVICOS DE CAMPO`, `COMERCIAL`, `DAC`, `REAG_CLIENTE`, `CLIENTE`,
+`USO_INTERNO`, `CHUVA`. **Serviços de campo é a AFLINE** — a única que é nossa conta. O de
+antes (TECNICO/CLIENTE/REDE/OPERADORA/TERCEIRO) era invenção nossa, de antes de existir a
+planilha, e era o que classificava errado: o painel dizia **"100% Operadora (CLARO)" e "0 por
+nossa conta"** onde a verdade, de 17 a 25/10, é **122 O.S. de Serviços de Campo**, 108 DAC, 73
+Comercial.
+
+**O que o dado mostrou, e que muda a leitura da tela: a classificação não é função do
+código.** Dos 84 códigos da planilha, 68 são unânimes, mas **16 aparecem com mais de um
+responsável** — o **301 com quatro** (Comercial, Serviços de Campo, DAC, Reag. Cliente) e o
+106 com dois. Quem classifica é a CLARO, caso a caso, por WO. Por isso código com maioria
+abaixo de 50% fica **sem classificação**, e a tela escreve "a CLARO classifica caso a caso" em
+vez de escolher um. Escolher seria inventar.
+
+> A planilha **não entra no Git**: tem contrato e login de técnico (regra 3). Ela foi usada
+> como **referência** — *"é só pra você aprender os responsáveis da quebra"* —, não importada.
+
+**Dois eixos, duas perguntas.** Responsável diz **quem paga**; o agrupamento (coluna AH) diz
+**em que parte do processo quebrou**, que é o que se ataca. Virou painel próprio: em 7 dias,
+70% das improdutivas são de *agendamento*.
+
+**Motivos de improdutividade agora abrem.** *"quando o usuário clicar em cima, aparecer o
+contrato, o tipo de serviço e o técnico que deu a quebra"* — clicar na barra abre a lista, com
+link para cada contrato e o responsável de cada O.S.
+
+**A primeira WO do time entrou no Tempo médio por etapa.** *"era bom saber quanto o time
+inteiro se atrasou para chegar na primeira WO"* — a mesma regra do indicador (140), no filtro
+que está na tela, com a meta ao lado e link para o detalhe por técnico. Deslocamento e
+execução médios já estavam ali e passam a conviver com ela.
+
+**DEFEITO ACHADO NA CONFERÊNCIA — e era grande.** Comparando a tela com o banco:
+o Dashboard mostrava **742 contratos** onde o SQL do mesmo intervalo tem **2.283**. A consulta
+não paginava e o PostgREST devolve no máximo **1.000 linhas** — então *todos* os números do
+painel (conclusão, improdutivas, TEC1, tempos, pontos) saíam sobre um pedaço, **sem nada na
+tela dizendo que faltava**. Em "Hoje" nunca apareceu porque o dia cabe. Agora pagina até
+acabar; depois da correção: 1.738 contratos, 2.305 O.S. com baixa, 328 improdutivas.
+
+**Uma lição que vale para o repositório inteiro:** consulta de tela sem `range` mente em
+silêncio a partir de 1.000 linhas. Vale conferir as outras telas que leem período longo.
