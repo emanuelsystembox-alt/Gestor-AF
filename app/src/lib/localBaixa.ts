@@ -13,8 +13,12 @@ import { supabase } from './supabase'
  * feita na leitura, não guardada — se o TOA corrigir a coordenada do
  * endereço, a distância acompanha.
  *
+ * Desde a 135 há DUAS fontes: o registro do campo (APP) e, para a baixa
+ * feita no TOA, o ponto do RASTRO mais próximo da hora do encerramento.
+ *
  * Três ausências que NÃO são "dentro do raio" (regra 6):
- *   · sem linha aqui          → ninguém baixou pelo celular (web, TOA);
+ *   · sem linha aqui          → não houve registro do campo nem ponto de
+ *                               rastro perto da hora da baixa;
  *   · `distancia_m` nulo      → o endereço veio sem coordenada do TOA;
  *   · `precisao_m` nulo       → versão do app anterior à 096.
  */
@@ -33,6 +37,11 @@ export interface LocalBaixa {
   fora_do_raio: boolean | null
   registros: number
   registros_fora: number
+  /** De onde saiu a posição (135): APP = registro do campo com GPS;
+   *  RASTRO = o ponto do rastro mais próximo da hora da baixa no TOA. */
+  fonte: 'APP' | 'RASTRO'
+  /** Quantos minutos separam esse ponto da hora da baixa. Só no RASTRO. */
+  minutos_do_ponto: number | null
 }
 
 /** O PostgREST aceita a lista no corpo do POST; em lote para não

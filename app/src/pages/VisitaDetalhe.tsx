@@ -7,6 +7,9 @@ import { Alerta, Pill } from '../components/ui'
 import { EquipamentoToa } from '../components/EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
+import { carregarProvas, type Prova } from '../lib/prova'
+import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
+import { ProvaDoContrato } from '../components/ProvaDoContrato'
 import { ConversaTecnico } from '../components/ConversaTecnico'
 
 interface OS {
@@ -37,6 +40,11 @@ interface Evidencia {
   tecnico: { nome: string; matricula: string } | null
   /** Veio da galeria do celular, não da câmera do app (132). */
   da_galeria: boolean | null
+  /** Onde o CELULAR estava no instante do envio (135) — outra coisa que
+   *  `lat/lng`, que é onde a foto foi tirada. */
+  envio_lat: number | null
+  envio_lng: number | null
+  envio_precisao_m: number | null
 }
 interface Det {
   id: string; toa_atividade_id: string | null; wo_numero: string | null
@@ -45,6 +53,13 @@ interface Det {
   toa_varrido_em: string | null
   /** 123: caso crítico (ouvidoria), como o TOA mandou. */
   ouvidoria: boolean | null
+  /** 134: sumiu da planilha do TOA estando em andamento. Nada mexido. */
+  sumiu_do_toa_em: string | null
+  /** 135: a coordenada que o TOA capturou na justificativa de
+   *  geolocalização — do DESLOCAMENTO, não da baixa. */
+  toa_geo_lat: number | null
+  toa_geo_lng: number | null
+  dados_origem: Record<string, unknown> | null
   tipo_pessoa: string | null; tipo_residencia: string | null
   telefones: string[] | null
   logradouro: string | null; complemento: string | null; bairro: string | null
@@ -66,7 +81,7 @@ interface Det {
 
 const SELECT = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome, toa_varrido_em, tipo_pessoa,
-  ouvidoria,
+  ouvidoria, sumiu_do_toa_em, toa_geo_lat, toa_geo_lng, dados_origem,
   tipo_residencia, telefones, logradouro, complemento, bairro, cidade, uf, cep,
   lat, lng, node, data_agendada, janela_inicio, janela_fim, inicio, fim,
   tempo_deslocamento, situacao, bloqueado_em, origem, observacao, criado_em,
@@ -98,6 +113,16 @@ const dt = (s: string | null) => s
   ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
   : '—'
 const dia = (s: string) => new Date(s + 'T12:00').toLocaleDateString('pt-BR')
+
+/** Haversine em metros — a mesma conta do `distancia_m` do banco, para a
+ *  tela não ter de pedir ao servidor o que ela já tem na mão. */
+function metros(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000, r = Math.PI / 180
+  const dLat = (bLat - aLat) * r, dLng = (bLng - aLng) * r
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(aLat * r) * Math.cos(bLat * r) * Math.sin(dLng / 2) ** 2
+  return Math.round(2 * R * Math.asin(Math.sqrt(x)))
+}
 
 function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: boolean }) {
   return (
@@ -162,6 +187,9 @@ export default function VisitaDetalhe() {
     return () => { vivo = false }
   }, [anexos])
   const [anteriores, setAnteriores] = useState<Det[]>([])
+  /** 136: a prova do contrato, e 135: onde a baixa foi dada. */
+  const [prova, setProva] = useState<Prova | null>(null)
+  const [local, setLocal] = useState<LocalBaixa | null>(null)
   const [equipes, setEquipes] = useState<{ id: string; codigo: string }[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -189,10 +217,13 @@ export default function VisitaDetalhe() {
       supabase.from('evidencia')
         .select(`id, tipo, arquivo_path, tamanho_bytes, lat, lng, capturada_em, criado_em,
                  midia, mime, duracao_seg, precisao_m, observacao, login, origem, da_galeria,
+                 envio_lat, envio_lng, envio_precisao_m,
                  tecnico:tecnico_id ( nome, matricula )`)
         .eq('visita_id', id!).order('criado_em'),
       supabase.from('equipe').select('id, codigo').order('codigo'),
     ])
+    carregarProvas([id!]).then(m => setProva(m.get(id!) ?? null)).catch(() => setProva(null))
+    carregarLocais([id!]).then(m => setLocal(m.get(id!) ?? null)).catch(() => setLocal(null))
     setEventos((ev.data ?? []) as unknown as Evento[])
     setAnexos((an.data ?? []) as unknown as Evidencia[])
     setEquipes((eq.data ?? []) as { id: string; codigo: string }[])
@@ -229,6 +260,16 @@ export default function VisitaDetalhe() {
     const ev = eventos.find(e => (e.para as { situacao?: string } | null)?.situacao === 'COM_IMPEDIMENTO')
     return !!ev && ev.origem === 'MOBILE' && v?.situacao === 'COM_IMPEDIMENTO'
   }, [eventos, v])
+
+  /** 135: a justificativa de geolocalização que o TOA capturou. */
+  const geoToa = useMemo(() => {
+    if (!v?.toa_geo_lat || !v?.toa_geo_lng) return null
+    const bruta = v.dados_origem?.['Observação - Justificativa Geolocalizacao']
+    const obs = typeof bruta === 'string' ? bruta.trim() : ''
+    const d = v.lat != null && v.lng != null
+      ? metros(v.toa_geo_lat, v.toa_geo_lng, Number(v.lat), Number(v.lng)) : null
+    return { lat: v.toa_geo_lat, lng: v.toa_geo_lng, obs: obs || null, distancia_m: d }
+  }, [v])
 
   const resumo = useMemo(() => {
     if (!v) return null
@@ -343,6 +384,15 @@ export default function VisitaDetalhe() {
               <Pill situacao={v.situacao} />
               <SeloOuvidoria ouvidoria={v.ouvidoria} grande />
               <SeloSegmento segmentacao={v.segmentacao?.nome} grande />
+              {/* 134: sumiu da planilha estando em andamento. Nada foi
+                  mexido — e é por isso que alguém precisa olhar. */}
+              {v.sumiu_do_toa_em && (
+                <span title={`Sumiu da planilha do TOA em ${dt(v.sumiu_do_toa_em)} estando em andamento. Nada foi alterado: confira no TOA e corrija à mão.`}
+                  className="rounded bg-orange-900/50 px-1.5 py-0.5 text-[10px] font-semibold
+                             text-orange-200 ring-1 ring-orange-600/60">
+                  sumiu do TOA — conferir
+                </span>
+              )}
               {v.bloqueado_em && (
                 <span title={`Campo tocou em ${dt(v.bloqueado_em)} — o TOA não sobrescreve mais`}
                   className="rounded bg-af-900/40 px-1.5 py-0.5 text-[10px] font-semibold text-af-300">
@@ -447,6 +497,8 @@ export default function VisitaDetalhe() {
                 </div>
               )}
             </section>
+
+            <ProvaDoContrato prova={prova} local={local} geoToa={geoToa} />
 
             {/* O equipamento e a miscelânea do TOA (117) saíram daqui para a
                 aba Equipamento (133, Emanuel 25/10): o Detalhe é do contrato,
@@ -615,6 +667,8 @@ export default function VisitaDetalhe() {
             </div>
 
             <div className="space-y-3">
+              <ProvaDoContrato prova={prova} local={local} geoToa={geoToa} />
+
               <section className="card-controle p-4">
                 <div className="mb-2 flex flex-wrap items-baseline gap-2">
                   <h2 className="text-sm font-semibold">Fotos e vídeos</h2>
@@ -831,6 +885,31 @@ export default function VisitaDetalhe() {
                       )}
                     </dd>
                   </div>
+                  {/* 135: onde o CELULAR estava no instante do envio. Para a
+                      foto da galeria é a única coordenada honesta — a do
+                      arquivo pode ser de outro dia, ou não existir. */}
+                  {ampliada.envio_lat != null && ampliada.envio_lng != null && (() => {
+                    const d = v.lat != null && v.lng != null
+                      ? metros(Number(ampliada.envio_lat), Number(ampliada.envio_lng),
+                               Number(v.lat), Number(v.lng)) : null
+                    return (
+                      <div>
+                        <dt className="text-graf-500">Enviada de</dt>
+                        <dd>
+                          <a href={`https://www.google.com/maps?q=${ampliada.envio_lat},${ampliada.envio_lng}`}
+                             target="_blank" rel="noopener noreferrer"
+                             className="tabular text-af-400 underline">
+                            {Number(ampliada.envio_lat).toFixed(5)}, {Number(ampliada.envio_lng).toFixed(5)}
+                          </a>
+                          {d != null && (
+                            <span className={d > 200 ? ' text-amber-400' : ' text-emerald-400'}>
+                              {' '}· {d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : d + ' m'} do cliente
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    )
+                  })()}
                   <div>
                     <dt className="text-graf-500">Origem</dt>
                     <dd>{ampliada.origem === 'MOBILE' ? 'aplicativo do técnico' : 'web'}</dd>

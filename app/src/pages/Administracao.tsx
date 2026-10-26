@@ -11,6 +11,7 @@ import {
 } from '../lib/validacao'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
+import { ExpurgoPontuacao } from '../components/ExpurgoPontuacao'
 import { Alerta, Avatar, Vazio } from '../components/ui'
 import { ImportarCadastro } from '../components/ImportarCadastro'
 
@@ -148,7 +149,7 @@ export default function Administracao() {
   const { perfil, temPapel, pode } = useAuth()
   const souAdmin = temPapel('ADMIN')
 
-  const [aba, setAba] = useState<'usuarios' | 'tecnicos' | 'metas' | 'perfis' | 'cargos' | 'exclusoes' | 'importar'>('usuarios')
+  const [aba, setAba] = useState<'usuarios' | 'tecnicos' | 'metas' | 'perfis' | 'cargos' | 'exclusoes' | 'expurgo' | 'importar'>('usuarios')
   const [exclusoes, setExclusoes] = useState<Exclusao[]>([])
   const [buscaExc, setBuscaExc] = useState('')
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -872,6 +873,9 @@ export default function Administracao() {
              ['perfis', 'Perfis de acesso', perfis.length],
              ['cargos', 'Cargos', cargos.length],
              ['exclusoes', 'Contratos apagados', exclusoes.length],
+             // 136 (D-215): expurgo de pontuação por lote de WOs. Só ADMIN
+             // — é ele quem responde pelo número que o técnico recebe.
+             ...(souAdmin ? [['expurgo', 'Expurgar pontuação', null] as const] : []),
              // 100 (D-176): o cadastro de uma cidade inteira por planilha padrão.
              // Só ADMIN: quem cria acesso é ADMIN (admin-usuarios).
              ...(souAdmin ? [['importar', 'Importar planilha', null] as const] : [])] as const).map(([a, rot, n]) => (
@@ -1511,6 +1515,8 @@ export default function Administracao() {
           <MetasPorSkill podeEditar={pode('comissao.editar')} />
         ) : aba === 'importar' ? (
           <ImportarCadastro />
+        ) : aba === 'expurgo' ? (
+          <ExpurgoPontuacao />
         ) : aba === 'exclusoes' ? (
           <section className="card-controle overflow-hidden">
             <div className="border-b border-graf-800 px-4 py-3">

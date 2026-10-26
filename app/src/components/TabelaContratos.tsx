@@ -213,10 +213,19 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
   const fora = local.fora_do_raio === true
   const semEndereco = local.distancia_m == null
   const prec = local.precisao_m != null ? ` ±${Math.round(Number(local.precisao_m))} m` : ''
+  // 135: a baixa feita NO TOA não deixa registro nosso — a posição vem do
+  // rastro do celular, e a tela diz isso. Medida de outra fonte não pode
+  // passar por registro do campo.
+  const doRastro = local.fonte === 'RASTRO'
+  const deOnde = doRastro
+    ? `Posição do RASTRO do celular${local.minutos_do_ponto != null
+        ? `, ${local.minutos_do_ponto} min da hora que o TOA encerrou` : ''}`
+    : 'Registro do campo com GPS'
   const titulo = semEndereco
-    ? `Baixado pelo celular, mas o endereço veio do TOA sem coordenada — não dá para medir.${prec ? ' Precisão do GPS:' + prec : ''}`
-    : `${fora ? 'FORA do raio' : 'Dentro do raio'} de ${local.raio_m} m: o registro mais longe do endereço foi a ${textoDistancia(local.distancia_m)}${prec ? ' (GPS' + prec + ')' : ''}. `
-      + `${local.registros} registro(s) do campo neste contrato${local.registros_fora ? ', ' + local.registros_fora + ' fora do raio' : ''}. Clique para ver no mapa.`
+    ? `${deOnde}, mas o endereço veio do TOA sem coordenada — não dá para medir.${prec ? ' Precisão do GPS:' + prec : ''}`
+    : `${fora ? 'FORA do raio' : 'Dentro do raio'} de ${local.raio_m} m: ${deOnde}, a ${textoDistancia(local.distancia_m)}${prec ? ' (GPS' + prec + ')' : ''}. `
+      + (doRastro ? 'A baixa foi dada no TOA. ' : `${local.registros} registro(s) do campo neste contrato${local.registros_fora ? ', ' + local.registros_fora + ' fora do raio' : ''}. `)
+      + 'Clique para ver no mapa.'
   const cor = semEndereco
     ? 'bg-graf-800 text-graf-300 ring-graf-600/50'
     : fora ? 'bg-af-900/50 text-af-200 ring-af-600/60'
@@ -231,6 +240,7 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
         : <>
             {fora && !compacto && <span className="uppercase tracking-wide">fora do raio ·</span>}
             <span className="tabular">{textoDistancia(local.distancia_m)}</span>
+            {doRastro && <span className="font-normal opacity-80">· rastro</span>}
             {prec && !compacto && <span className="font-normal opacity-80">{prec}</span>}
           </>}
     </a>

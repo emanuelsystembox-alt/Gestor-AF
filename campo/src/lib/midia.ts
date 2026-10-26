@@ -4,6 +4,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from './supabase'
 import { apagarDoCache } from './cache'
+import { ondeEstou } from './gps'
 
 /**
  * Evidência: do celular para o bucket, e do bucket para a tabela.
@@ -116,6 +117,11 @@ export async function enviarEvidencia(
 
   const caminho = `${dados.visitaId}/${nomeUnico(extensaoDe(mime))}`
 
+  // Lido ANTES do upload: a leitura guardada de até 2 min serve, e assim
+  // o técnico não espera o GPS para a foto subir.
+  const g = await ondeEstou(2 * 60 * 1000)
+  const envio = g.ok ? g.posicao : null
+
   const { error: erroUp } = await supabase.storage
     .from(BUCKET)
     .upload(caminho, decode(await arquivo.base64()), {
@@ -141,6 +147,14 @@ export async function enviarEvidencia(
     p_duracao_seg: captura.duracaoSeg ?? null,
     p_observacao: dados.observacao ?? null,
     p_galeria: !!dados.galeria,
+    // 135: de ONDE a foto está sendo enviada. É outra pergunta que
+    // `p_lat/p_lng` (onde ela foi TIRADA): da galeria, a do arquivo pode
+    // ser de outro dia ou não existir, e o site precisa poder dizer se o
+    // envio saiu de perto da casa do cliente. GPS negado ou sem sinal
+    // manda nulo — "não sei" é resposta, zero não seria.
+    p_envio_lat: envio?.lat ?? null,
+    p_envio_lng: envio?.lng ?? null,
+    p_envio_precisao_m: envio?.precisao ?? null,
   })
   if (error) throw new Error(error.message)
   // Subiu: o que ficou no cache do app sai agora (a cópia reduzida e o
