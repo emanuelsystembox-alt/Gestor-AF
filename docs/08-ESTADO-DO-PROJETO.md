@@ -450,6 +450,9 @@ cenários novos); nenhuma tabela sem RLS; nenhuma `SECURITY DEFINER` para o `ano
 - **3 evidências para pontuar** (D-217), com prazo até o fim do dia seguinte, e **dos
   contratos novos em diante** (D-217b) — o passado pontua como sempre pontuou.
 - **Expurgo por lote de WOs** em Administração, com escopo por lote e motivo obrigatório.
+- **Apagar evidência continua só no dia** (Emanuel, 25/10): anexar ganhou prazo, apagar não.
+  Foto errada anexada no dia seguinte não se apaga pela tela — a correção é o expurgo da
+  pontuação pelo ADMIN, que foi feito para exatamente isso.
 
 ### Depende do Emanuel
 
@@ -457,7 +460,6 @@ cenários novos); nenhuma tabela sem RLS; nenhuma `SECURITY DEFINER` para o `ano
 |---|---|
 | **Avisar a equipe antes do corte** | `evidencia_obriga_desde` nasce em **26/10**. De lá em diante, contrato concluído sem 3 fotos não gera ponto para o técnico (gera para a empresa). Dá para adiar mudando o parâmetro. |
 | **Instalar a atualização do app** | A atualização pelo ar leva o envio do GPS e o recado "faltam N evidências". Quem não abrir o app não recebe. |
-| **Apagar evidência fora do dia** | O técnico passa a **anexar** até o fim do dia seguinte, mas **apagar** continua só no dia (D-204). Se ele anexar errado no dia seguinte, não consegue corrigir sozinho. |
 | **Prazo e mínimos** | 3 / 1 / 1 dia são parâmetros. Se a CLARO exigir foto por tipo de serviço, vira tabela nova. |
 
 ### Verificação que ninguém fez ainda

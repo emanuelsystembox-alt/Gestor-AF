@@ -8380,6 +8380,19 @@ individual no aplicativo não deve ser gerado"* — Emanuel, 25/10.
   (regra 6). O painel do técnico mostra os dois, e o gráfico por dia soma o mesmo que o total
   — a mesma tela não pode se contradizer (D-150).
 
+**Apagar continua só no dia** — *"isso só vale para o dia ok"* (Emanuel, 25/10), decidido
+depois de a pergunta ser levantada. Anexar ganhou prazo; **apagar não**. É assimétrico de
+propósito: anexar acrescenta prova, apagar tira — e prova que se apaga no dia seguinte é
+prova fraca. `apagar_evidencia` chama `pode_anexar_na_visita` **sem** `p_evidencia`, então o
+campo só apaga no mesmo dia; e a trava do autor (D-204) continua valendo para todo mundo,
+inclusive para o controlador.
+
+Consequência, escrita aqui para ninguém ser pego de surpresa: **foto errada anexada no dia
+seguinte não se apaga por ninguém pela tela** — nem pelo técnico (fora do dia), nem pela
+gestão (não é a autora). A saída é a que o próprio Emanuel pediu na mesma conversa: o
+**expurgo da pontuação pelo ADMIN**, por WO, com motivo — *"o técnico anexou foto de uma
+coisa, mas era de outra"*. O arquivo fica, o ponto sai, e o porquê fica escrito.
+
 **D-217b · a regra vale dos contratos novos em diante.** *"deixa como estava, a regra
 funcionará a partir de novos contratos baixados"* (Emanuel, 25/10), **mudando a decisão da
 136**, que valia já. Sem corte, a regra apagava o passado: medido, **1.296 concluídos em 7
