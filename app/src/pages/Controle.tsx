@@ -11,6 +11,7 @@ import {
 import { isoLocal, equipeRotulo } from '../lib/formato'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { SEM_BUCKET } from '../lib/filtroContratos'
+import { QuebraPorAgrupamento, tabelaQuebra } from '../components/QuebraPorAgrupamento'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -347,31 +348,26 @@ export default function Controle() {
 
             {/* ===== 5. por que o dia não fechou ===== */}
             <div className="sobe sobe-2 grid gap-3 xl:grid-cols-2">
-              <Painel titulo="Improdutivas por responsabilidade"
-                dica="De quem foi a causa — e, portanto, quem paga."
+              <Painel titulo="Responsável pela quebra"
+                dica="Em que parte do processo o serviço caiu — e quanto isso pesa no total."
                 extra={<span className="tabular text-xs text-graf-500">
                   {m.osImprodutivas} de {m.osComBaixa} O.S. com baixa
                 </span>}
-                tabela={<TabelaSimples colunas={['Responsável', 'Qtd']}
-                  linhas={m.porResponsabilidade.map(r => [r.rotulo, r.valor])} />}
-                nota={m.porResponsabilidade.length > 0 && <>
-                  <strong className="text-graf-300">Responsável de quebra</strong> é a
-                  classificação da própria CLARO, aprendida da planilha
-                  <em> Quebra Qualificada</em> (coluna AG). Só{' '}
-                  <span className="text-af-400">Serviços de campo</span> é cobrável de
-                  nós — o resto é argumento na mesa com a operadora.
-                  {' '}<strong className="text-graf-300">“A CLARO classifica caso a caso”</strong>{' '}
-                  não é falha: há código que ela usa com responsáveis diferentes conforme
-                  o caso (o 301 aparece com quatro), e aí o código sozinho não responde.
+                tabela={<TabelaSimples
+                  colunas={['Agrupamento', 'Quebras', 'Impacto no UN', '% das quebras']}
+                  linhas={tabelaQuebra(m.porAgrupamento)} />}
+                nota={m.porAgrupamento.length > 0 && <>
+                  O <strong className="text-graf-300">agrupamento de quebra</strong> é a
+                  classificação da própria CLARO (coluna AH da <em>Quebra Qualificada</em>):
+                  cada código de baixa cai no lugar do processo em que o serviço quebrou.
+                  {' '}<strong className="text-graf-300">Impacto no UN</strong> é sobre as{' '}
+                  <span className="tabular">{m.osComBaixa}</span> O.S. com baixa do período —
+                  o mesmo denominador do cabeçalho.
+                  {' '}Passe o mouse na barra para o resumo com os motivos.
                 </>}>
-                {m.porResponsabilidade.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-graf-500">
-                    Nenhuma improdutiva no período.
-                  </p>
-                ) : (
-                  <BarrasHorizontais dados={m.porResponsabilidade}
-                    parte totalRef={m.osImprodutivas} />
-                )}
+                <QuebraPorAgrupamento grupos={m.porAgrupamento} totalUn={m.osComBaixa}
+                  totalQuebras={m.osImprodutivas} de={dtInicio} ate={dtFim}
+                  temFiltro={temFiltro} />
               </Painel>
 
               <Painel titulo="Motivos de improdutividade"
@@ -443,21 +439,6 @@ export default function Controle() {
                 })()}
               </Painel>
             </div>
-
-            {/* 141: o segundo eixo da planilha da CLARO — ONDE a quebra
-                aconteceu. Responsável diz QUEM paga; agrupamento diz em
-                que parte do processo quebrou, que é o que se ataca. */}
-            {m.porAgrupamento.length > 0 && (
-              <div className="sobe sobe-2">
-                <Painel titulo="Onde a quebra aconteceu"
-                  dica="O agrupamento de quebra da CLARO (coluna AH): em que parte do processo o serviço caiu."
-                  tabela={<TabelaSimples colunas={['Agrupamento', 'Qtd']}
-                    linhas={m.porAgrupamento.map(r => [r.rotulo, r.valor])} />}>
-                  <BarrasHorizontais dados={m.porAgrupamento}
-                    parte totalRef={m.osImprodutivas} rotuloLargo />
-                </Painel>
-              </div>
-            )}
 
             {/* ===== 6. quando, quão rápido, e por quem ===== */}
             <div className="sobe sobe-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">

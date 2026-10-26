@@ -8553,3 +8553,36 @@ acabar; depois da correção: 1.738 contratos, 2.305 O.S. com baixa, 328 improdu
 
 **Uma lição que vale para o repositório inteiro:** consulta de tela sem `range` mente em
 silêncio a partir de 1.000 linhas. Vale conferir as outras telas que leem período longo.
+
+### D-222 · O painel da quebra no formato da CLARO (142)
+
+*"tire o gráfico Onde a quebra aconteceu, ele não vai nos ajudar (...) preciso melhorar as
+improdutivas por responsabilidade. Precisa usar a responsabilidade igual ao anexo 2 (...)
+quando eu botar o mouse em cima dessas barras, a ideia é aparecer também um resumo"* —
+Emanuel, 26/10.
+
+**Os dois painéis da 141 viraram um só**, no formato que ele já usa no sistema da CLARO:
+o eixo é o **agrupamento** — em que parte do processo o serviço caiu —, não o responsável.
+Cada barra traz o **impacto sobre o total de UN**, o volume, a fatia das quebras e a
+**variação em pontos percentuais** contra o período anterior. No mouse abre o resumo com
+volume, impacto, % das quebras, o percentual anterior e os **cinco motivos** que mais pesam
+dentro do agrupamento — os códigos de baixa com a contagem.
+
+Medido em 7 dias: **AGENDAMENTO 10,20% (235 O.S.)**, sem agrupamento 3,30% (76), infra claro
+0,39% (9), sem_quebra 0,30% (7), técnico 0,04% (1).
+
+- **UN = O.S. com baixa**, o mesmo denominador do cabeçalho do painel ("328 de 2305"). Dois
+  denominadores na mesma tela seria a contradição da D-150 outra vez.
+- **A seta some quando há filtro na tela.** O período atual é calculado no navegador, com os
+  filtros; o anterior vem agregado do banco, sem eles. Comparar os dois com filtro ligado
+  seria comparar coisas diferentes e chamar de melhora.
+- O resumo vai por **portal** para a raiz: dentro do cartão, um ancestral com `transform` ou
+  `overflow` recortaria a caixa — foi o que aconteceu com o menu do contrato (D-169).
+
+**Em aberto com o Emanuel: 8 códigos improdutivos sem agrupamento** — 76 O.S. em 7 dias, 23%
+das quebras. Não estão na planilha de 01/10, ou a maioria dela ficou abaixo de 50%:
+`301 Tipo de OS Incorreta` (23), `402 Divergência de Dados Cadastrais` (22), `110 Problema Na
+Tubulação` (13), `305 Rua não cabeada` (9), `205 Falta Tap Ou Passivo` (5), `316 Rua não
+cabeada GPON` (2), `206 Prédio Sem Backbone` (1), `211 Falta NAP/NAP Lotada` (1). Enquanto
+ele não disser para onde vão, aparecem como **"sem agrupamento"** — a tela diz que não sabe,
+em vez de empurrar para um grupo qualquer (regra 6).

@@ -123,6 +123,21 @@ const RESP_COR: Record<string, string> = {
 /** A nossa — a que a AFLINE paga. */
 export const RESP_NOSSA = 'SERVICOS DE CAMPO'
 
+/** A cor de cada agrupamento de quebra (142). Roxo para o maior ofensor
+ *  histórico (agendamento), como no painel da própria CLARO. */
+const AGR_COR: Record<string, string> = {
+  AGENDAMENTO: '#8b5cf6',
+  'PROCESSO VENDA': '#a855f7',
+  'INFRA CLARO': '#6366f1',
+  'MOVIMENTAÇÕES DE AGENDA': '#0ea5e9',
+  TUBULACAO: '#14b8a6',
+  'INFRA CLIENTE': '#eab308',
+  CHUVA: '#38bdf8',
+  'TÉCNICO': 'var(--color-af-500)',
+  SEM_QUEBRA: '#16a34a',
+  SEM_AGRUPAMENTO: '#3a4150',
+}
+
 /** '00:32:00' → 32 (minutos). Postgres devolve interval como texto. */
 function intervParaMin(v: string | null): number | null {
   if (!v) return null
@@ -193,18 +208,46 @@ export function calcular(visitas: Visita[]) {
 
   const nossas = contaResp[RESP_NOSSA] ?? 0
 
-  // 141: o segundo eixo da planilha — ONDE a quebra aconteceu
-  // (agendamento, infra CLARO, processo de venda, tubulação…).
-  const contaAgr: Record<string, number> = {}
+  /*
+   * ┌─ a quebra por AGRUPAMENTO, no formato da CLARO (142) ────────────┐
+   * │ > "preciso desse painel alinhado igual ao do anexo 2 (...) temos │
+   * │ >  o maior ofensor como agendamento, depois processo de venda,   │
+   * │ >  depois infra claro (...) quando eu botar o mouse em cima      │
+   * │ >  dessas barras, a ideia é aparecer também um resumo"           │
+   * │ >  — Emanuel, 26/10                                              │
+   * │                                                                   │
+   * │ O painel dele não é por RESPONSÁVEL (Comercial, DAC…): é por     │
+   * │ AGRUPAMENTO — em que parte do processo a quebra aconteceu. Cada  │
+   * │ barra traz o impacto sobre o total de UN, a fatia das quebras e  │
+   * │ os cinco motivos que mais pesam dentro dela.                     │
+   * │                                                                   │
+   * │ UN = O.S. COM BAIXA, o mesmo denominador que a tela já mostra    │
+   * │ em "328 de 2305 O.S. com baixa" — dois denominadores na mesma    │
+   * │ tela seria a contradição da D-150 de novo.                       │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const agrupados = new Map<string, { volume: number; motivos: Map<string, number> }>()
   for (const o of osImprodutivas) {
-    const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_CLASSIFICACAO'
-    contaAgr[k] = (contaAgr[k] ?? 0) + 1
+    const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_AGRUPAMENTO'
+    const g = agrupados.get(k) ?? { volume: 0, motivos: new Map<string, number>() }
+    g.volume += 1
+    const mot = `${o.codigo_baixa!.codigo} · ${o.codigo_baixa!.descricao}`
+    g.motivos.set(mot, (g.motivos.get(mot) ?? 0) + 1)
+    agrupados.set(k, g)
   }
-  const porAgrupamento = Object.entries(contaAgr)
-    .map(([k, valor]) => ({
-      chave: k, valor,
-      rotulo: k === 'SEM_CLASSIFICACAO' ? 'Sem agrupamento' : k.toLowerCase(),
-      cor: RESP_COR[k] ?? '#64748b',
+  const totalUn = osComBaixa.length
+  const porAgrupamento = [...agrupados.entries()]
+    .map(([chave, g]) => ({
+      chave,
+      rotulo: chave === 'SEM_AGRUPAMENTO' ? 'sem agrupamento' : chave.toLowerCase(),
+      valor: g.volume,
+      pctUn: totalUn ? (g.volume * 100) / totalUn : 0,
+      pctQuebras: osImprodutivas.length ? (g.volume * 100) / osImprodutivas.length : 0,
+      cor: AGR_COR[chave] ?? '#8b5cf6',
+      motivos: [...g.motivos.entries()]
+        .map(([rotulo, qtd]) => ({ rotulo, qtd }))
+        .sort((a, b) => b.qtd - a.qtd)
+        .slice(0, 5),
     }))
     .sort((a, b) => b.valor - a.valor)
 
@@ -442,7 +485,7 @@ export function calcular(visitas: Visita[]) {
     taxaConclusao,
     porSituacao,
     porResponsabilidade,
-    porAgrupamento,
+    porAgrupamento, totalUn,
     motivos,
     horas, hConcluida, hCancelada, hReagendamento,
     porGrupo,
