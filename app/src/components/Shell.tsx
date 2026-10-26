@@ -162,7 +162,13 @@ function useAbertosHoje(ligado: boolean): number | null {
 }
 
 /** O número ao lado de um item do menu, e o que ele conta. */
-interface Contagem { n: number | null; titulo: string }
+interface Contagem {
+  n: number | null; titulo: string
+  /** A cor do selo. O número de Serviços conta contratos EM ABERTO, e
+   *  em aberto é AZUL na tela inteira (Emanuel, 25/10) — pintá-lo de
+   *  vermelho, que é a cor da marca, fazia parecer alerta. */
+  cor?: string
+}
 
 function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
   modulo: Modulo; recolhido: boolean; fechado: boolean; alternar: () => void
@@ -227,8 +233,9 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                   <span className="truncate">{i.rotulo}</span>
                   {n != null && (
                     <span title={c!.titulo}
+                      style={c!.cor ? { color: c!.cor, backgroundColor: 'color-mix(in oklab, ' + c!.cor + ' 18%, transparent)' } : undefined}
                       className={`tabular ml-auto rounded px-1.5 text-[11px] font-medium ${
-                        eh ? 'bg-af-600/25 text-af-200' : 'bg-graf-800 text-graf-300'}`}>
+                        c!.cor ? '' : eh ? 'bg-af-600/25 text-af-200' : 'bg-graf-800 text-graf-300'}`}>
                       {n}
                     </span>
                   )}
@@ -380,7 +387,8 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   // resposta — sinalização de material, pedido de abastecimento. Sem a
   // central carregada, nulo: nada de "0" que ninguém mediu.
   const contagens: Record<string, Contagem> = {
-    '/controle/servicos': { n: abertos, titulo: 'em aberto hoje (sem jornada)' },
+    '/controle/servicos': { n: abertos, titulo: 'em aberto hoje (sem jornada)',
+                            cor: 'var(--st-execucao)' },
     // Selo de pedido só aparece quando há pedido: é chamada de atenção,
     // não inventário.
     '/almoxarifado': { n: central.dados?.material?.length || null, titulo: 'sinalização(ões) do campo aguardando' },

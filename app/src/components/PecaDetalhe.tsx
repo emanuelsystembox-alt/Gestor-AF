@@ -113,7 +113,7 @@ export function PecaDetalhe({ peca, estados, podeMexer, corEstado, rotuloPosse, 
       if (e2) throw e2
       const alerta = (res as { alerta: string | null } | null)?.alerta
       setOk(`${peca.serial} está no romaneio nº ${numero ?? '?'} de ${t?.nome ?? 'técnico'}.`
-        + ' Nada muda até ele confirmar no aplicativo (ou você confirmar na aba Romaneios).'
+        + ' Nada muda até ele confirmar no aplicativo (ou você confirmar na aba Entregas).'
         + (alerta ? ` Atenção: o estado que vale para ela é ${alerta}.` : ''))
       aoMudar()
     } catch (e) {
@@ -215,7 +215,7 @@ export function PecaDetalhe({ peca, estados, podeMexer, corEstado, rotuloPosse, 
         ) : (
           <p className="text-graf-400">
             Só se entrega o que está no almoxarifado ou sem posse declarada. Esta está
-            “{rotuloPosse(peca.posse)}” — se voltou, faça a devolutiva na aba Romaneios.
+            “{rotuloPosse(peca.posse)}” — se voltou, faça a devolutiva na aba Entregas.
           </p>
         ))}
       </div>

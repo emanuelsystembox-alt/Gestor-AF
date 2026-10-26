@@ -8399,3 +8399,47 @@ funcionará a partir de novos contratos baixados"* (Emanuel, 25/10), **mudando a
 dias, nenhum com 3 evidências** — o ranking inteiro iria a zero por trabalho feito sob outra
 regra. O corte é o **dia de atuação** (`evidencia_obriga_desde`, nasce em amanhã); antes dele
 a tela também **não cobra** prova, porque cobrar o que não muda nada é ruído.
+
+### D-218 · Relógio do serviço, AUDITAR, Entregas e a cor do selo (138)
+
+Cinco pedidos do Emanuel em 25/10, de uma vez:
+
+**1. O relógio do serviço.** *"a gente pode colocar um relógio de tempo, onde começa a marcar
+o tempo de deslocamento do técnico (...) o tempo de em execução, quando ele começa a iniciar
+um trabalho o relógio deve aparecer"*. Fica na coluna do contrato, ao lado do segmento —
+*"é onde estou vendo espaço"*.
+
+- **A meta é da EXECUÇÃO** (chegou → encerrou), escolha dele entre três opções. ADESÃO 90,
+  VISITA TÉCNICA 50, MUDANÇA DE ENDEREÇO 100, MIGRAÇÃO GPON 90. **PACOTE (30) ficou de fora:
+  não existe grupo com esse nome** — os 8 de hoje são ADESAO, VISITA TECNICA, SERVICO,
+  MIGRACAO GPON, RETORNO DE CREDENCIADA, MUDANCA DE ENDERECO, REINSTALACAO e DESCONEXAO.
+- **O deslocamento tem relógio, mas não tem meta.** Distância na cidade varia demais para um
+  número só, e ninguém definiu um. O relógio conta e cala — não acusa.
+- **Em andamento conta sozinho** (atualiza a cada 30 s, desde `inicio` do TOA ou, sem ele, da
+  hora em que a situação mudou). **Encerrado congela** no tempo medido pelo TOA (`fim −
+  início`), que é o mesmo número do painel de Equipes: duas telas com o mesmo nome têm de dar
+  o mesmo número.
+- Verde até 80% da meta, âmbar até estourar, vermelho depois. **Sem meta o relógio aparece
+  igual, em cinza** — "sem meta" é diferente de "dentro da meta" (regra 6).
+- A meta é **cadastro** (`tipo_servico.meta_execucao_min`), em Configurações › Tipo de
+  serviço. Precisou de RPC (`definir_meta_execucao`): os 8 grupos são globais
+  (`empresa_id is null`) e a policy do ADMIN só alcança o que é da empresa — um UPDATE direto
+  salvaria **zero linhas em silêncio**.
+
+**2. "Desatribuído" virou AUDITAR.** *"esse status serve para verificar o que houve de fato
+com ele"*. Só o rótulo muda, por decisão dele: o **código de baixa 800 continua
+"Desatribuído"** no cadastro, porque é ele que explica o que aconteceu (sumiu da planilha).
+A cor saiu do cinza para o âmbar — o status agora pede **ação** de alguém, e cinza apagado
+não pede nada. Vale em todas as telas que leem `infoSituacaoDeTela`, e no resultado da
+importação.
+
+**3. "Romaneios" virou "Entregas"**, na web e no aplicativo — palavra que se entende de
+primeira. O documento continua `romaneio` no banco: é o termo do almoxarifado, e trocar o
+domínio por causa de um rótulo seria caro e inútil.
+
+**4. O selo do menu em azul.** *"se é azul a cor com status em aberto deve ser azul o
+número"*. O contador de Serviços conta contratos **em aberto**, e em aberto é azul
+(`--st-execucao`) na tela inteira; pintá-lo com o vermelho da marca fazia parecer alerta.
+
+**5. A importação passou a dizer o que sumiu EM ANDAMENTO** (134) no mesmo lugar onde já
+dizia o que foi desatribuído — antes o número existia só no banco.

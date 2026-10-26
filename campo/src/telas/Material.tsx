@@ -175,7 +175,7 @@ export default function Material({ navigation }: Props) {
         )}
 
         <View style={e.atalhos}>
-          <Botao titulo="Recibos" tom="discreto" style={{ flex: 1 }}
+          <Botao titulo="Entregas" tom="discreto" style={{ flex: 1 }}
             aoTocar={() => navigation.navigate('Romaneios')} />
           <Botao titulo="Transferir" tom="discreto" style={{ flex: 1 }}
             aoTocar={() => navigation.navigate('Transferir')} />

@@ -276,7 +276,12 @@ export default function Almoxarifado() {
               Alocações, Baixar Miscelâneas, Movimentações/Pesquisar Serial
               e Kardex/Auditoria (este dentro de Miscelânea, por item). */}
           {([['posicao', 'Posição'],
-             ['romaneios', 'Romaneios'],
+             // "Entregas", e não "Romaneios": palavra que todo mundo
+             // entende de primeira (Emanuel, 25/10). A chave interna e o
+             // nome do documento no banco continuam `romaneio` — é o
+             // termo do almoxarifado, e trocar isso seria reescrever o
+             // domínio por causa de um rótulo.
+             ['romaneios', 'Entregas'],
              ['cargas', 'Cargas por técnico'],
              ['miscelanea', 'Material e ferramenta'],
              ['baixa', 'Baixa por contrato'],

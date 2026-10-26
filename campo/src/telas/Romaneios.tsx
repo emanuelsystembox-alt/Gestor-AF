@@ -298,9 +298,11 @@ export default function Romaneios({ navigation }: Props) {
             aoTocar={() => navigation.navigate('Transferir')}
             style={{ marginBottom: 16 }} />
 
-          <Text style={e.secao}>Romaneios</Text>
+          {/* "Entregas" em vez de "Romaneios" (Emanuel, 25/10): a palavra
+              do documento é do almoxarifado, não do técnico. */}
+          <Text style={e.secao}>Entregas</Text>
           {lista.length === 0 ? (
-            <Vazio titulo="Nenhum romaneio"
+            <Vazio titulo="Nenhuma entrega"
               descricao="Quando o almoxarifado montar uma carga no seu nome, ela aparece aqui para você conferir e confirmar." />
           ) : lista.map(r => {
             const aberto = r.situacao === 'ABERTO'

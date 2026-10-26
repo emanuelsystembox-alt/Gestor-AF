@@ -101,6 +101,9 @@ export default function Configuracoes() {
   const [atividades, setAtividades] = useState<TipoAtividade[]>([])
   const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
   const [grupos, setGrupos] = useState<string[]>([])
+  /** 138: o tempo de EXECUÇÃO aceitável de cada grupo de serviço. */
+  const [metas, setMetas] = useState<{ id: string; nome: string; meta_execucao_min: number | null }[]>([])
+  const [salvandoMeta, setSalvandoMeta] = useState<string | null>(null)
   const [buscaTipo, setBuscaTipo] = useState('')
   const [soSemGrupo, setSoSemGrupo] = useState(false)
   const [codigos, setCodigos] = useState<CodigoBaixa[]>([])
@@ -138,7 +141,7 @@ export default function Configuracoes() {
         .order('codigo'),
       supabase.rpc('ler_parametro', { p_chave: 'baixa_automatica' }),
       supabase.rpc('catalogo_tipo_os'),
-      supabase.from('tipo_servico').select('nome, prioridade')
+      supabase.from('tipo_servico').select('id, nome, prioridade, meta_execucao_min')
         .eq('ativo', true).order('prioridade'),
       supabase.from('tipo_atividade')
         .select('id, nome, natureza, ativo, conferir')
@@ -154,6 +157,7 @@ export default function Configuracoes() {
     setPrazoCarga(prazo); setRascunhoPrazo(prazo == null ? '' : String(prazo))
     setTiposOS((to.data ?? []) as TipoOS[])
     setGrupos(((gr.data ?? []) as { nome: string }[]).map(g => g.nome))
+    setMetas((gr.data ?? []) as { id: string; nome: string; meta_execucao_min: number | null }[])
     setAtividades((ta.data ?? []) as TipoAtividade[])
     setCarregando(false)
   }
@@ -564,6 +568,66 @@ export default function Configuracoes() {
             </div>
           </section>
         ) : aba === 'servico' ? (
+          <>
+          {/* ┌─ o relógio precisa de um número para comparar ─────────┐
+              │ > "já tenho algumas métricas que é aceitável: ADESÃO    │
+              │ >  90 minutos (...) isso deve ter no botão              │
+              │ >  configurações uma tela dela para configurar os       │
+              │ >  horários" — Emanuel, 25/10                           │
+              │                                                         │
+              │ É o tempo da EXECUÇÃO (chegou até encerrar), escolha    │
+              │ dele. Grupo SEM meta não vira zero nem vermelho: o      │
+              │ relógio aparece cinza e diz "sem meta".                 │
+              └─────────────────────────────────────────────────────────┘ */}
+          <section className="card-controle mb-3 overflow-hidden">
+            <div className="border-b border-graf-800 px-4 py-3">
+              <h2 className="text-sm font-semibold">Tempo de execução aceitável</h2>
+              <p className="mt-1 max-w-3xl text-sm text-graf-400">
+                Minutos entre <strong>chegar</strong> e <strong>encerrar</strong> o contrato.
+                É o número que o relógio da tela de Serviços usa: verde até 80%, âmbar até a
+                meta, vermelho depois. O <strong>deslocamento</strong> também tem relógio, mas
+                não tem meta — a distância na cidade varia demais, e ninguém definiu uma.
+                Grupo em branco = <strong>sem meta</strong>, e a tela diz isso.
+              </p>
+            </div>
+            <div className="divide-y divide-graf-800">
+              {metas.map(m => (
+                <div key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-2">
+                  <span className="min-w-48 text-sm">{m.nome}</span>
+                  <input type="number" min={1} max={1440}
+                    aria-label={`Minutos de execução para ${m.nome}`}
+                    defaultValue={m.meta_execucao_min ?? ''}
+                    placeholder="sem meta"
+                    onBlur={async ev => {
+                      const bruto = ev.target.value.trim()
+                      const novo = bruto === '' ? null : Number(bruto)
+                      if (novo === (m.meta_execucao_min ?? null)) return
+                      if (novo != null && (!Number.isFinite(novo) || novo < 1 || novo > 1440)) {
+                        setErro('O tempo tem de ficar entre 1 e 1440 minutos.')
+                        ev.target.value = String(m.meta_execucao_min ?? '')
+                        return
+                      }
+                      setSalvandoMeta(m.id); setErro(null); setOk(null)
+                      const { error } = await supabase.rpc('definir_meta_execucao',
+                        { p_tipo_servico: m.id, p_min: novo })
+                      setSalvandoMeta(null)
+                      if (error) {
+                        setErro(error.message)
+                        ev.target.value = String(m.meta_execucao_min ?? '')
+                        return
+                      }
+                      setMetas(l => l.map(x => x.id === m.id ? { ...x, meta_execucao_min: novo } : x))
+                      setOk(`${m.nome}: ${novo == null ? 'sem meta' : novo + ' min'}.`)
+                    }}
+                    className={`${campo} w-28 tabular`} />
+                  <span className="text-xs text-graf-500">
+                    {salvandoMeta === m.id ? 'salvando…' : 'minutos'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section className="card-controle overflow-hidden">
             <div className="border-b border-graf-800 px-4 py-3">
               <h2 className="text-sm font-semibold">
@@ -691,6 +755,7 @@ export default function Configuracoes() {
               usarem este tipo.
             </p>
           </section>
+          </>
 
         ) : aba === 'baixa' ? (
           <div className="space-y-4">

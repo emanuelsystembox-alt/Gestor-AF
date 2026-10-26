@@ -613,13 +613,22 @@ export default function Importacao() {
                 {desatrib.desatribuidos > 0 && (
                   <p>
                     <strong>{desatrib.desatribuidos}</strong> contrato(s) Na entrada sumiram desta planilha
-                    do TOA e foram <strong>desatribuídos</strong> (cód. 800 → Cancelada). O técnico foi avisado.
+                    do TOA e foram para <strong>Auditar</strong> (cód. 800 → Cancelada). O técnico foi avisado.
                   </p>
                 )}
                 {desatrib.devolvidos > 0 && (
                   <p>
-                    <strong>{desatrib.devolvidos}</strong> contrato(s) desatribuído(s) voltaram na planilha
+                    <strong>{desatrib.devolvidos}</strong> contrato(s) que estavam em Auditar voltaram na planilha
                     e estão <strong>de volta Na entrada</strong>, com quem o TOA mostra agora.
+                  </p>
+                )}
+                {/* 134: o que sumiu EM ANDAMENTO não é desatribuído — nada
+                    foi mexido nele, e por isso ele é avisado à parte. */}
+                {!!desatrib.sumiram && desatrib.sumiram > 0 && (
+                  <p>
+                    <strong>{desatrib.sumiram}</strong> contrato(s) sumiram da planilha <strong>em
+                    andamento</strong>. Nada foi alterado neles: confira no TOA e corrija à mão — estão
+                    marcados na tela de Serviços e no sino.
                   </p>
                 )}
               </Alerta>

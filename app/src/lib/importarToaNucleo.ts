@@ -27,7 +27,11 @@ export const ETAPAS = [
 ] as const
 
 /** O que a 3ª chamada fez (116, D-191). */
-export interface Desatribuicao { desatribuidos: number; devolvidos: number }
+export interface Desatribuicao {
+  desatribuidos: number; devolvidos: number
+  /** 134: sumiram EM ANDAMENTO — nada foi mexido, alguém tem de olhar. */
+  sumiram?: number; voltaram?: number
+}
 
 export interface Resumo {
   criadas: number; atualizadas: number; ignoradas: number

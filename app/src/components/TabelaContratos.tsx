@@ -6,6 +6,7 @@ import { FaixaJanela } from './telemetria'
 import { dataBR, diaSemana, equipeRotulo, pts } from '../lib/formato'
 import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
+import { RelogioServico } from './RelogioServico'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 
 /**
@@ -39,13 +40,13 @@ export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
   data_agendada, janela_inicio, janela_fim, janela_imediata, situacao, bloqueado_em, rota_fixada_em,
-  origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1,
+  origem, criado_em, inicio, fim, tempo_deslocamento, node, tec1, situacao_em,
   finalizado_toa, produtos_pendentes, tecnologia, toa_bucket, ouvidoria,
   segmentacao:segmentacao_id ( nome ),
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
-  tipo_servico:tipo_servico_id ( nome, prioridade ),
+  tipo_servico:tipo_servico_id ( nome, prioridade, meta_execucao_min ),
   area:area_id ( codigo, apelido ),
   equipe:equipe_id ( codigo, nome, supervisor_nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula,
@@ -103,6 +104,9 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
    *  crítico de ouvidoria (123). `ouvidoria` nula = a linha não trouxe a coluna. */
   segmentacao?: { nome: string } | null
   ouvidoria?: boolean | null
+  /** Quando a situação ATUAL começou — o relógio do serviço conta daqui
+   *  enquanto o contrato está em andamento (138). */
+  situacao_em?: string | null
   /** "Motivo de Fechamento Externo" do TOA — ex.: "Liberado no Sistema
    *  NETSMS". Vazio na maioria das linhas. */
   motivo_fechamento_toa?: string | null
@@ -400,7 +404,11 @@ export function TabelaContratos({
                   const p = pontos?.get(v.id)
                   const nEvid = Number(v.evidencias?.[0]?.count ?? 0)
                   const nEquip = Number(v.equipamentos?.[0]?.count ?? 0)
-                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip) return null
+                  // O relógio aparece sozinho: contrato em andamento sem
+                  // pontos nem segmento continua tendo tempo correndo.
+                  const emAndamento = v.situacao === 'EM_DESLOCAMENTO' || v.situacao === 'EM_EXECUCAO'
+                  const temTempo = emAndamento || (!!v.inicio && !!v.fim)
+                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip && !temTempo) return null
                   return (
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {p?.achou && <span
@@ -410,6 +418,14 @@ export function TabelaContratos({
                         ★ {pts(p.pontos_claro)}
                       </span>}
                       <SeloSegmento segmentacao={v.segmentacao?.nome} />
+                      {/* 138: o relógio do serviço, ao lado do segmento —
+                          "é onde estou vendo espaço" (Emanuel, 25/10). */}
+                      <RelogioServico v={{
+                        situacao: v.situacao, situacao_em: v.situacao_em,
+                        inicio: v.inicio, fim: v.fim, finalizado_toa: v.finalizado_toa,
+                        meta: (v.tipo_servico as { meta_execucao_min?: number | null } | null)
+                          ?.meta_execucao_min ?? null,
+                      }} />
                       {/* O que o técnico anexou pelo app, como no cartão dele
                           (Emanuel, 24/10). Zero não desenha. */}
                       {nEvid > 0 && (

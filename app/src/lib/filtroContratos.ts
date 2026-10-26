@@ -41,7 +41,13 @@ export type OrigemCancelada = 'DESATRIBUIDO' | 'CANCELADO_CENTRAL'
 export type SituacaoDeTela = Situacao | OrigemCancelada
 
 export const ORIGEM_CANCELADA_INFO: Record<OrigemCancelada, { label: string; cor: string; origem: string }> = {
-  DESATRIBUIDO: { label: 'Desatribuído', cor: '#8a8178', origem: 'sumiu da planilha do TOA (cód. 800)' },
+  // 138: "vamos mudar esse status para AUDITAR, esse status serve para
+  // verificar o que houve de fato com ele" (Emanuel, 25/10). Só o rótulo
+  // muda — o código de baixa 800 continua "Desatribuído" no cadastro,
+  // porque é ele que explica o que aconteceu. A cor saiu do cinza: o
+  // status agora pede AÇÃO de alguém, e cinza apagado não pede nada.
+  DESATRIBUIDO: { label: 'Auditar', cor: '#b08640',
+                  origem: 'sumiu da planilha do TOA (cód. 800) — conferir o que houve' },
   CANCELADO_CENTRAL: { label: 'Cancelado pela central', cor: '#b65a55', origem: 'cancelado pela central no TOA' },
 }
 
