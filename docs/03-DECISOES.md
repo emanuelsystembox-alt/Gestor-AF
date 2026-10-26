@@ -8288,3 +8288,101 @@ cartão listava TODO login que roteou contrato para a equipe no dia, com etiquet
 numa dupla que cobriu colega viravam quatro logins embaixo de um nome só, e "cadastrado"
 repetia o que o cadastro já afirma. Agora é a matrícula de quem está cadastrado na equipe. O
 login sem dono continua visível onde importa: na equipe **Sem login definido**.
+
+### D-215 · O que sumiu do TOA em andamento não se mexe (134)
+
+*"quando um contrato estiver em deslocamento (...) e depois há uma nova importação e esse
+contrato some da planilha, nós não devemos mexer nesse status. Alguém precisa ir lá ver o
+que aconteceu (...) significa que aconteceu alguma manipulação no TOA (...) precisa ser
+corrigido manualmente pelo técnico ou pelo controlador"* — Emanuel, 25/10.
+
+**Metade disso já era verdade:** a 116 (D-191) só desatribui contrato **Na entrada** e que o
+campo não tocou — *"so pode desatribuir contratos que tiverem em entrada, em outro status
+não pode"* (Emanuel, 19/10). O que faltava era o sistema **dizer** que o contrato sumiu: ele
+ficava parado na tela, com a hora velha, e ninguém sabia que a planilha deixou de trazê-lo.
+
+- `visita.sumiu_do_toa_em` + evento `CONFLITO_TOA` + **aviso ao técnico** no sino + **sinal**
+  na central (`SUMIU_TOA`, nos dois CHECK — lista fechada pega tipo novo, `traps.md`).
+- **Nenhuma situação muda, nenhuma baixa é dada.** O sistema não sabe o que aconteceu no
+  TOA, e fingir que sabe é pior que pedir que alguém olhe (regra 6).
+- Em andamento = `ATRIBUIDA`, `EM_DESLOCAMENTO`, `EM_EXECUCAO`, `COM_IMPEDIMENTO`. Terminal
+  some da planilha o tempo todo e isso é normal — não acusa.
+- A marca sai sozinha: quando o contrato **volta** à planilha, ou quando alguém **corrige o
+  status à mão** (gatilho `limpar_sumiu_do_toa`, que ignora o que a própria importação faz).
+
+Provado em transação desfeita: situação intacta (`EM_EXECUCAO`), marca, evento e aviso
+criados, e a correção manual limpando a marca.
+
+### D-216 · Onde o técnico estava na baixa — e o dado do TOA que NÃO servia (135)
+
+*"é interessante o nosso sistema puxar pela localização do celular dele onde ele estava (...)
+toda baixa do técnico tem que ser num raio de 200 metros da casa do cliente"* — Emanuel, 25/10.
+
+O raio de 200 m existe desde a 096 (D-170), mas só enxergava a baixa feita **pelo celular**.
+A baixa feita no TOA — a maioria hoje — ficava "sem registro do campo".
+
+**O que o dado desmentiu.** A planilha traz `Foto - Justificativa Geolocalizacao` com a
+coordenada que o **próprio TOA** capturou: `capture_image.jpg, 105KB, -3.10951x-60.06642`.
+Parecia a resposta pronta — a CLARO medindo por nós. Medido em **615 visitas de 7 dias**:
+**607 a mais de 200 m** do cliente, média de **3,7 km**, e as observações do técnico dizem
+*"a caminho"* (95), *"em deslocamento"* (58), *"trânsito"* (19). É a justificativa **do
+deslocamento**, não da baixa. Usá-la como local da baixa acusaria a operação inteira de
+baixar longe, com um dado que não fala disso. Ela virou **dado próprio** na tela, com o texto
+do técnico e a frase que explica o que é.
+
+**O local da baixa passou a ter duas fontes, nesta ordem:**
+1. **APP** — registro do campo com GPS (como já era: vale o mais longe do endereço);
+2. **RASTRO** — o ponto do rastro mais próximo da hora do `fim` do TOA, dentro de
+   `rastro_baixa_tolerancia_min` (10 min, parâmetro), **e só quando `finalizado_toa`**
+   (D-103: `fim` vem preenchido até em atividade só INICIADA).
+
+Sem nenhuma das duas não há linha — e "sem leitura" nunca é "dentro do raio". O selo diz a
+fonte. **Cobertura hoje: 4 de 1.424 baixas** (o rastro tem 58 pontos, de 1 técnico); cresce
+quando o APK estiver no campo e os técnicos derem ciência.
+
+**De onde a foto foi enviada.** `evidencia.envio_lat/lng/precisao`: o app manda a posição do
+celular no instante do envio, para câmera **e** galeria. É outra pergunta que `lat/lng` (onde
+a foto foi **tirada**) — da galeria, a do arquivo pode ser de outro dia ou não existir. Juntar
+as duas faria a foto da galeria mentir o lugar. *"ainda assim o sistema deve pegar a
+localização de onde ele está enviando aquelas fotos"* (Emanuel, 25/10).
+
+### D-217 · A prova do contrato, a pontuação e o expurgo (136, 137)
+
+*"ele precisa enviar 3 evidências em cada contrato concluído para gerar pontuação para ele
+(...) vai gerar pontuação apenas para a empresa, para o controlador COP, mas para o técnico
+individual no aplicativo não deve ser gerado"* — Emanuel, 25/10.
+
+**Decisões dele nesta sessão** (as outras opções foram oferecidas e recusadas):
+
+| O quê | Escolha | O que foi recusado |
+|---|---|---|
+| O que conta | **3 arquivos** (foto ou vídeo) por **contrato** | 3 por O.S.; só fotos; 3 de tipos diferentes |
+| Prazo para anexar | **até o fim do dia seguinte** (parâmetro) | manter a trava do dia; liberação caso a caso |
+| Galeria longe do cliente | **conta, e fica marcada** | não contar; travar o envio |
+| Expurgo do ADMIN | **o admin escolhe o escopo a cada lote** | sempre só do técnico; sempre de todos |
+| Cancelado / reagendado | **1 evidência** para parar de cobrar | 3, igual ao concluído; não cobrar |
+| Quando começa | **dos contratos novos em diante** (D-217b) | valer já, inclusive para trás |
+
+- A conta da **empresa não muda**: o serviço foi feito e é faturado. O que muda é a conta do
+  **técnico** — `producao_por_tecnico`, que é **uma só** e alimenta painel, ranking e central
+  (D-167). Só o expurgo com escopo **TODOS** mexe na conta da empresa.
+- **O prazo mudou uma das quatro travas do campo** (D-114): anexar **evidência** vai até o fim
+  do dia seguinte; baixar, mudar status, equipamento e contato continuam no dia.
+  `pode_anexar_na_visita` ganhou `p_evidencia` e a bateria do campo foi de 27 para **29
+  cenários** — o cenário antigo *"anexa em contrato de ONTEM → barrado"* passou a estar
+  errado, e virou três (no prazo → permitido; equipamento de ontem → barrado; anteontem →
+  barrado). Teste que falha quando a regra muda é teste funcionando.
+- **Expurgo por lote de WOs** (`expurgo_pontuacao`): aceita a WO inteira, só o número depois
+  do `|`, o contrato ou o ID da atividade, e **diz o que não encontrou**. Motivo obrigatório
+  (D-030). Devolver **carimba o desfazimento**; nada se apaga. Medido: 52,9076 pts no dia →
+  51,4428 com escopo TODOS → 52,9076 na devolução.
+- Os pontos que esperam foto **não viram zero**: viram `pontos_sem_prova`, com o prazo escrito
+  (regra 6). O painel do técnico mostra os dois, e o gráfico por dia soma o mesmo que o total
+  — a mesma tela não pode se contradizer (D-150).
+
+**D-217b · a regra vale dos contratos novos em diante.** *"deixa como estava, a regra
+funcionará a partir de novos contratos baixados"* (Emanuel, 25/10), **mudando a decisão da
+136**, que valia já. Sem corte, a regra apagava o passado: medido, **1.296 concluídos em 7
+dias, nenhum com 3 evidências** — o ranking inteiro iria a zero por trabalho feito sob outra
+regra. O corte é o **dia de atuação** (`evidencia_obriga_desde`, nasce em amanhã); antes dele
+a tela também **não cobra** prova, porque cobrar o que não muda nada é ruído.

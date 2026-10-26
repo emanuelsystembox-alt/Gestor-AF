@@ -431,6 +431,46 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 25/10/2026 (madrugada) — prova, lugar da baixa e expurgo (D-215 a D-217)
+
+Migrations **134 a 137**; web publicada; **app precisa de atualização pelo ar** (o envio do
+GPS e o recado da prova são JS — não exigem APK novo). Baterias **26/26** e **29/29** (dois
+cenários novos); nenhuma tabela sem RLS; nenhuma `SECURITY DEFINER` para o `anon`.
+
+### Resolvido nesta leva
+
+- **Sumiu do TOA em andamento** (D-215): a importação não mexe — marca, escreve no histórico,
+  avisa o técnico e acende sinal na central. A marca sai quando volta à planilha ou quando
+  alguém corrige o status à mão.
+- **Onde o técnico estava na baixa** (D-216): o rastro do celular cobre a baixa feita no TOA;
+  o selo diz a fonte. A coordenada da justificativa do TOA virou dado próprio — **não** é o
+  lugar da baixa (medido: 3,7 km em média, observações de deslocamento).
+- **De onde a foto foi enviada** (D-216): coluna nova, preenchida pelo app na câmera e na
+  galeria.
+- **3 evidências para pontuar** (D-217), com prazo até o fim do dia seguinte, e **dos
+  contratos novos em diante** (D-217b) — o passado pontua como sempre pontuou.
+- **Expurgo por lote de WOs** em Administração, com escopo por lote e motivo obrigatório.
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Avisar a equipe antes do corte** | `evidencia_obriga_desde` nasce em **26/10**. De lá em diante, contrato concluído sem 3 fotos não gera ponto para o técnico (gera para a empresa). Dá para adiar mudando o parâmetro. |
+| **Instalar a atualização do app** | A atualização pelo ar leva o envio do GPS e o recado "faltam N evidências". Quem não abrir o app não recebe. |
+| **Apagar evidência fora do dia** | O técnico passa a **anexar** até o fim do dia seguinte, mas **apagar** continua só no dia (D-204). Se ele anexar errado no dia seguinte, não consegue corrigir sozinho. |
+| **Prazo e mínimos** | 3 / 1 / 1 dia são parâmetros. Se a CLARO exigir foto por tipo de serviço, vira tabela nova. |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **O recado da prova no celular** | Compila e o `tsc` está limpo; não foi visto num aparelho. |
+| **O rastro cobrindo a baixa de verdade** | Hoje são 58 pontos de 1 técnico — 4 de 1.424 baixas. Só com o APK no campo dá para medir. |
+| **O aviso de sumiço chegando ao técnico** | O caminho foi provado no banco (aviso criado); ninguém viu no sino do celular. |
+| **Cenário de `expurgo_pontuacao` nas baterias** | Testado à mão como `authenticated`, não está em `testar_policies`. |
+
+---
+
 ## Pendente em 25/10/2026 (noite) — conversa do controle, tela de responder e abas (D-214)
 
 Migration **133**; só web (o aplicativo não precisa de versão nova: diretor e gerente somem

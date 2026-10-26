@@ -23,6 +23,9 @@ export interface Aviso {
     | 'MATERIAL'
     /** A importação deixou mais de um contrato em andamento (129). */
     | 'DOIS_ATIVOS'
+    /** O contrato sumiu da planilha do TOA estando em andamento (134).
+     *  Nada foi mexido: alguém tem de olhar o TOA e corrigir à mão. */
+    | 'SUMIU_TOA'
   titulo: string
   /** A observação que o controlador escreveu ao mudar o status. */
   detalhe: string | null
@@ -41,6 +44,9 @@ export const PESO_AVISO: Record<Aviso['tipo'], 'urgente' | 'atencao' | 'informa'
   CANCELADO_OPERADORA: 'urgente',
   // 129: dois em andamento — ele precisa baixar um antes de seguir.
   DOIS_ATIVOS: 'urgente',
+  // 134: o contrato sumiu do TOA no meio do serviço. Ele é quem sabe o
+  // que fez lá, e a correção é à mão.
+  SUMIU_TOA: 'urgente',
   SAIU: 'atencao',
   REABERTO: 'atencao',
   SITUACAO: 'atencao',

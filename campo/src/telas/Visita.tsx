@@ -167,6 +167,13 @@ export default function Visita({ route, navigation }: Props) {
   const { ehCampo, pode, tecnicoId, session } = useAuth()
 
   const [v, setV] = useState<Detalhe | null>(null)
+  /** 136/137: quantas evidências este contrato ainda precisa para
+   *  pontuar para ELE. A conta da empresa não muda — a dele, sim. */
+  const [prova, setProva] = useState<{
+    evidencias: number; minimo: number; falta: number
+    prazo_ate: string; no_prazo: boolean; cobra_prova: boolean
+    pontua_tecnico: boolean; expurgo: string | null
+  } | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [codigos, setCodigos] = useState<CodigoBaixa[]>([])
   const [conjunto, setConjunto] = useState<string | null>(null)
@@ -263,6 +270,16 @@ export default function Visita({ route, navigation }: Props) {
   )
 
   useEffect(() => { ondeEstou().then(setGps) }, [])
+
+  // A prova é relida junto com a visita: anexar uma foto muda o recado.
+  useEffect(() => {
+    if (!v?.id) { setProva(null); return }
+    let vivo = true
+    supabase.rpc('prova_das_visitas', { p_visitas: [v.id] }).then(({ data }) => {
+      if (vivo) setProva((data as typeof prova[] | null)?.[0] ?? null)
+    })
+    return () => { vivo = false }
+  }, [v?.id, v?.evidencia?.length, v?.situacao])
 
   // O bucket é privado: sem assinatura a miniatura volta 400 e a tela
   // mostra um quadrado cinza sem explicação.
@@ -833,6 +850,36 @@ export default function Visita({ route, navigation }: Props) {
             <Text style={e.pendenteTexto}>{pendentes} esperando sinal</Text>
           )}
         </View>
+
+        {/* ┌─ o que falta para ESTE contrato valer pontos ───────────┐
+            │ > "ele precisa enviar 3 evidências em cada contrato      │
+            │ >  concluído para gerar pontuação para ele" — Emanuel    │
+            │                                                          │
+            │ O recado é do técnico, e por isso fala do que ele PODE   │
+            │ fazer: quantas faltam e até quando. A conta da empresa   │
+            │ não muda — dizer isso evita a sensação de serviço        │
+            │ perdido.                                                 │
+            └──────────────────────────────────────────────────────────┘ */}
+        {prova?.cobra_prova && (
+          <View style={prova.no_prazo ? e.provaAviso : e.provaVencida}>
+            <Text style={e.provaTitulo}>
+              {prova.falta === prova.minimo
+                ? `Faltam as ${prova.minimo} evidências`
+                : `Falta${prova.falta > 1 ? 'm' : ''} ${prova.falta} de ${prova.minimo} evidências`}
+            </Text>
+            <Text style={e.provaTexto}>
+              {prova.no_prazo
+                ? `Anexe até ${new Date(prova.prazo_ate + 'T12:00').toLocaleDateString('pt-BR')} para este contrato valer pontos para você.`
+                : 'O prazo para anexar passou: este contrato não gera pontos para você.'}
+            </Text>
+          </View>
+        )}
+        {prova?.expurgo && (
+          <View style={e.provaVencida}>
+            <Text style={e.provaTitulo}>Pontuação expurgada pela administração</Text>
+            <Text style={e.provaTexto}>Fale com o seu supervisor.</Text>
+          </View>
+        )}
 
         {v.evidencia.length === 0 && (
           <Text style={e.vazioLinha}>
@@ -1487,6 +1534,19 @@ const e = StyleSheet.create({
   },
   pendenteTexto: { fontSize: 12, color: cor.ambar, fontWeight: '700', marginTop: 6 },
   vazioLinha: { fontSize: 13, color: cor.graf400, lineHeight: 19 },
+
+  // 136/137: o recado da prova. Âmbar enquanto dá para resolver,
+  // vermelho quando o prazo passou — a cor diz se ainda há o que fazer.
+  provaAviso: {
+    backgroundColor: cor.ambar50, borderRadius: raio.m, padding: 12,
+    borderLeftWidth: 4, borderLeftColor: cor.ambar, marginBottom: 10,
+  },
+  provaVencida: {
+    backgroundColor: cor.af50, borderRadius: raio.m, padding: 12,
+    borderLeftWidth: 4, borderLeftColor: cor.af600, marginBottom: 10,
+  },
+  provaTitulo: { fontSize: 14, fontWeight: '800', color: cor.tinta },
+  provaTexto: { fontSize: 13, color: cor.graf600, lineHeight: 19, marginTop: 3 },
   notinha: { fontSize: 12, color: cor.graf400, lineHeight: 17 },
 
   seq: { fontSize: 11, color: cor.graf300, fontWeight: '700' },
