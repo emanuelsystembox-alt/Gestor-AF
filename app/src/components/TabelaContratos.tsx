@@ -442,6 +442,9 @@ export function TabelaContratos({
                           "é onde estou vendo espaço" (Emanuel, 25/10). */}
                       <RelogioServico v={{
                         situacao: v.situacao, situacao_em: v.situacao_em,
+                        // 145: cancelado pela central e desatribuído não
+                        // têm tempo de execução — ninguém foi.
+                        semIda: origemCancelada(v) != null,
                         // 144: sem estes dois o deslocamento contava desde a
                         // IMPORTAÇÃO — o mesmo número em todos os contratos.
                         bloqueado_em: v.bloqueado_em,

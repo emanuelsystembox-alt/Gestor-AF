@@ -42,6 +42,10 @@ export interface DadosRelogio {
   finalizado_toa?: boolean
   /** Minutos aceitáveis de execução para o grupo de serviço. */
   meta?: number | null
+  /** Cancelado pela central ou Desatribuído: o TOA encerrou antes de o
+   *  técnico sair, então `fim − início` não é tempo de execução — é a
+   *  janela que o TOA tinha reservado (145). */
+  semIda?: boolean
 }
 
 const TERMINAIS = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
@@ -109,6 +113,15 @@ function ler(v: DadosRelogio, agora: number): Leitura | null {
     const m = desde(v.inicio) ?? (v.bloqueado_em ? desde(v.situacao_em) : null)
     return m == null ? null : { minutos: m, correndo: true, fase: 'EXECUCAO' }
   }
+  /*
+   * 145: "não sei por qual motivo os contratos recebem um relógio em
+   * execução para contratos cancelados, sendo que ninguém foi lá"
+   * (Emanuel, 26/10). Tem razão: em cancelado pela central e em
+   * desatribuído, `inicio` e `fim` são o horário PLANEJADO que o TOA
+   * reservou — contar isso como execução afirma um trabalho que não
+   * houve. Sem relógio, que é como a tela diz "não houve".
+   */
+  if (v.semIda) return null
   if (TERMINAIS.includes(v.situacao) && v.inicio && v.fim) {
     const m = Math.max(0, Math.round(
       (new Date(v.fim).getTime() - new Date(v.inicio).getTime()) / 60000))

@@ -91,6 +91,19 @@ export interface Visita {
  * com o mesmo nome dando horas diferentes é o pior dos dois mundos
  * (D-150), então aqui o fuso é o mesmo, fixo.
  */
+/**
+ * Os "Status da Atividade" do TOA que provam que o técnico CHEGOU (145).
+ *
+ * PENDENTE e EM ROTA têm `inicio`, mas é o horário que o TOA reservou:
+ * promessa, não chegada. CANCELADO entra só quando o TOA o marcou
+ * concluído — cancelado pela central ninguém foi ver.
+ */
+const CHEGOU_NO_TOA = new Set(['CONCLUIDO', 'NAO CONCLUIDO', 'INICIADO'])
+
+/** Mesma normalização do `norm_txt` do banco: sem acento, maiúsculo. */
+const normStatusToa = (s?: string | null) =>
+  (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase()
+
 function minutosEmManaus(iso: string): number {
   const t = new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Manaus', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -432,6 +445,12 @@ export function calcular(visitas: Visita[]) {
     // diferentes para o mesmo nome.
     if (v.tipo_atividade?.natureza !== 'PRODUTIVA') continue
     if (!v.inicio || !v.contrato || !v.tecnico?.matricula) continue
+    // 145: `inicio` preenchido NÃO é prova de chegada — o TOA o preenche
+    // com o horário PLANEJADO. Só conta o que ele ABRIU. Medido em 14
+    // dias: 292 PENDENTE (um deles às 20:27) e 28 EM ROTA entravam na
+    // média. Mesma lista do indicador (145), para as duas telas não
+    // darem horas diferentes para o mesmo nome.
+    if (!CHEGOU_NO_TOA.has(normStatusToa(v.status_toa))) continue
     const chave = `${v.tecnico.matricula}|${v.data_agendada}`
     const min = minutosEmManaus(v.inicio)
     const atual = primeiraDoDia.get(chave)

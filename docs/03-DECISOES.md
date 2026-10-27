@@ -8830,3 +8830,100 @@ os filtros acionados e os números conferidos contra SQL equivalente.
 **NÃO VERIFICADO:** o comportamento em tela estreita (celular) das colunas
 novas, e o painel de Equipes com filtro de contrato ligado ao mesmo tempo que
 o `fora_da_conta` — a conta deve fechar, mas não foi medida nessa combinação.
+
+### D-227 · Relógio só para quem foi, e a Primeira WO só para quem chegou (145)
+
+> Numerada 227 e não 226: outra sessão aplicou a migration 146 (humor do dia)
+> com D-226 já escrito dentro dela. Dois trabalhos em paralelo no mesmo dia.
+
+Três correções do Emanuel em 26/10, e as três são a mesma doença: **o TOA
+preenche hora de coisa que ainda não aconteceu**, e o sistema estava lendo
+essas horas como fato.
+
+---
+
+#### 1. Cancelado sem ida não tem tempo de execução
+
+> *"Não sei por qual motivo os contratos recebem um relógio em execução para
+> contratos cancelados, sendo que ninguém foi lá e o sistema já marcou o tempo
+> que ele passou executando (...) Os cancelados que eu falo é aqueles
+> desatribuídos ou cancelados pela central."*
+
+Tem razão. Em **cancelado pela central** e em **desatribuído (800)**, `inicio`
+e `fim` são a janela que o TOA tinha reservado — contar `fim − início` como
+execução afirma um trabalho que não houve. Agora não há relógio nenhum, que é
+como a tela diz "não houve".
+
+**A cancelada normal mantém o relógio**, e isso é deliberado: ali o técnico
+foi, e o tempo que ele gastou antes de cancelar é informação. Conferido na
+tela: CANCELADO_CENTRAL 10 linhas / 0 relógios, DESATRIBUÍDO 23 / 0, CANCELADA
+15 / 15.
+
+#### 2. A Primeira WO contava contrato que ninguém abriu
+
+> *"Ela já está contando contratos futuros que têm horário de início e fim,
+> porém eles nem tiveram status ainda."*
+
+A 140 usava `v.inicio is not null` como prova de chegada. Medido em 14 dias,
+por "Status da Atividade":
+
+| status do TOA | linhas | o que `inicio` é |
+|---|---|---|
+| CONCLUIDO | 1807 | real |
+| NAO CONCLUIDO | 44 | real |
+| INICIADO | 129 | real |
+| **PENDENTE** | **292** | **planejado** — e vai até **20:27** |
+| **EM ROTA** | **28** | **planejado** — está indo, não chegou |
+| CANCELADO | 160 | 116 com início; pela central, ninguém foi |
+
+Chegada passa a ser o que o TOA **abriu**. Efeito: 431 → 430 dias-técnico,
+**8 dias mudaram de hora**, o mais tarde caiu de 15:09 para 15:07. Pequeno no
+histórico fechado, **grande no dia em andamento** — que é onde ele viu o
+defeito, com a rota ainda cheia de PENDENTE. Conferido depois de aplicar: das
+430 linhas, 415 concluído, 13 não concluído, 2 iniciado, **zero PENDENTE e
+zero EM ROTA**.
+
+A mesma regra entrou no Dashboard (`metricas.ts`): as duas telas dizem a mesma
+hora para o mesmo nome, que era o motivo de o filtro já ser compartilhado.
+
+#### 3. Turno da tarde, com meta de 11:20
+
+> *"As equipes que entram à tarde, o horário padrão de estar no cliente é
+> 11h20 no máximo (...) precisa ver se ele trabalhou à tarde durante 7 dias,
+> com a primeira janela de 11 às 14. Se for mais de 7 dias, ele é da tarde."*
+
+Duas coisas o pedido não fechava, e ele escolheu com os números na mão:
+
+- **Janela de apuração: 30 dias.** Recusados: "últimos 7 corridos" (com 7 dias
+  no total, "mais de 7" nunca acontece) e "histórico inteiro" (marcaria para
+  sempre quem foi da tarde uma vez).
+- **Tarde = qualquer primeira janela a partir das 11:00**, não só a 11-14. O
+  dado tem 12:00-15:00 (4 dias), 14:00-17:00 (1) e 15:00-18:00 (3) — cobrar
+  08:20 de quem começa às 15h estaria errado.
+
+A classificação é **por técnico**, derivada do dado, nunca cadastrada. Olha a
+janela de **todo** contrato produtivo, inclusive os que ele não chegou a abrir:
+a escala é o que a CLARO mandou fazer, não o que ele conseguiu fazer. E é uma
+classificação por período, não por dia — por dia seriam 30 dias × N técnicos de
+releitura, e turno não muda de um dia para o outro.
+
+> ⚠ **Medido e dito na tela: hoje a regra não classifica ninguém.** O banco tem
+> **9 dias de histórico**; 12 técnicos têm algum dia de tarde e o máximo é 5.
+> Com corte em 7, zero. A regra está certa e passa a valer sozinha conforme o
+> histórico cresce — conferido baixando o corte para 2, que classifica 2
+> técnicos. A tela escreve isso em vez de deixar a coluna "manhã" sem
+> explicação.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos; `testar_policies()` 26/26 e
+`testar_campo()` 29/29; zero tabela sem RLS e zero `SECURITY DEFINER`
+alcançável pelo `anon` (as duas funções foram recriadas); Indicadores,
+Serviços e os três filtros de cancelamento abertos no navegador, com os
+números conferidos contra SQL.
+
+**NÃO VERIFICADO:** o comportamento da Primeira WO num dia **em andamento**
+com PENDENTE na rota — o dia de hoje já estava fechado quando a correção
+entrou. É justamente o caso que ele relatou; vale olhar amanhã de manhã.
+Também não foi medido o custo da CTE `janela_pri` num período longo com 30
+dias de lookback (no período de 14 dias não houve diferença perceptível).

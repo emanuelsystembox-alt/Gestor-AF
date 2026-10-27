@@ -347,6 +347,21 @@ exatamente, e foi o par que NÃO batia que mostrou o defeito. **Antes de substit
 uma conta do servidor por uma da tela, meça as duas sem filtro: ou elas batem, ou
 uma das duas está errada e vale saber qual.** Ver D-225.
 
+**`visita.inicio` preenchido NÃO prova que o técnico chegou.** O TOA manda o
+horário **planejado** da atividade muito antes de alguém sair: medido em 14 dias,
+**292 contratos PENDENTE e 28 EM ROTA** tinham `inicio` — um deles às **20:27** — e
+todos entravam na média de chegada do indicador Primeira WO. Quem abriu a atividade
+de verdade está no **"Status da Atividade"**: `CONCLUIDO`, `NAO CONCLUIDO` ou
+`INICIADO`. É o mesmo engano da D-103 (`fim` vem preenchido em atividade só
+INICIADA) do outro lado da visita. O defeito é quase invisível no histórico fechado
+(8 dias-técnico de 431 mudaram) e **grande no dia em andamento**, com a rota ainda
+cheia de PENDENTE. Ver D-227.
+
+**Cancelado pela central e Desatribuído têm `inicio` e `fim`, e não é execução.** É
+a janela que o TOA reservou. `fim − início` ali vira "o técnico passou 42 min
+executando" num contrato onde ninguém foi. Antes de medir duração de qualquer
+coisa, pergunte se ALGUÉM FOI — `origemCancelada()` responde. Ver D-227.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

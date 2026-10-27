@@ -34,12 +34,18 @@ interface PorDia {
   dia: string; hora: string; visita_id: string; contrato: string | null
   grupo: string | null; endereco: string | null
   minutos_depois: number; dentro: boolean
+  /** MANHA ou TARDE, derivado do dado pelo banco (145). */
+  turno?: string | null
+  /** A meta que valeu para ESTA linha: 08:20 de manhã, 11:20 à tarde. */
+  meta?: string | null
 }
 interface PorTecnico {
   tecnico_id: string; nome: string; equipe: string | null
   dias: number; media_hora: string; pior_hora: string; melhor_hora: string
   dias_dentro: number; dias_fora: number; pct_dentro: number
   media_atraso_min: number | null
+  turno?: string | null
+  meta?: string | null
 }
 
 const hhmm = (t: string | null) => (t ?? '').slice(0, 5) || '—'
@@ -64,6 +70,7 @@ export default function Indicadores() {
   })
   const [ate, setAte] = useState(hoje)
   const [meta, setMeta] = useState('08:20')
+  const [metaTarde, setMetaTarde] = useState('11:20')
   const [dias, setDias] = useState<PorDia[]>([])
   const [tecs, setTecs] = useState<PorTecnico[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -78,12 +85,14 @@ export default function Indicadores() {
       supabase.rpc('primeira_wo_dia', { p_de: de, p_ate: ate }),
       supabase.rpc('primeira_wo_tecnico', { p_de: de, p_ate: ate }),
       supabase.rpc('ler_parametro', { p_chave: 'primeira_wo_meta' }),
-    ]).then(([d, t, m]) => {
+      supabase.rpc('ler_parametro', { p_chave: 'primeira_wo_meta_tarde' }),
+    ]).then(([d, t, m, mt]) => {
       if (!vivo) return
       if (d.error || t.error) { setErro((d.error ?? t.error)!.message); setCarregando(false); return }
       setDias((d.data ?? []) as PorDia[])
       setTecs((t.data ?? []) as PorTecnico[])
       if (typeof m.data === 'string') setMeta(m.data)
+      if (typeof mt.data === 'string') setMetaTarde(mt.data)
       setCarregando(false)
     })
     return () => { vivo = false }
@@ -114,6 +123,9 @@ export default function Indicadores() {
       || (t.equipe ?? '').toLowerCase().includes(q)) : tecs
   }, [tecs, busca])
 
+  /** Quantos estão no turno da tarde, no que está na tela (145). */
+  const nTarde = useMemo(() => lista.filter(t => t.turno === 'TARDE').length, [lista])
+
   const porTecnico = useMemo(() => {
     const m = new Map<string, PorDia[]>()
     for (const d of dias) {
@@ -132,8 +144,24 @@ export default function Indicadores() {
             <p className="mt-0.5 text-sm text-graf-400">
               <strong className="text-graf-200">Primeira WO</strong> — que horas o técnico
               chega no primeiro cliente do dia. Meta: até{' '}
-              <strong className="text-graf-200">{hhmm(meta)}</strong>.
+              <strong className="text-graf-200">{hhmm(meta)}</strong> de manhã e{' '}
+              <strong className="text-graf-200">{hhmm(metaTarde)}</strong> à tarde.
             </p>
+            {/* 145: a classificação é derivada do dado, não cadastrada —
+                e quem lê precisa saber disso para não procurar onde
+                mudar. Só aparece quando existe alguém da tarde. */}
+            {nTarde > 0 ? (
+              <p className="mt-0.5 text-[11px] text-graf-400">
+                <strong className="text-graf-300">{nTarde}</strong> de {lista.length} no turno
+                da tarde — mais de 7 dias, nos 30 anteriores, com a primeira janela
+                começando 11:00 ou depois.
+              </p>
+            ) : lista.length > 0 && (
+              <p className="mt-0.5 text-[11px] text-graf-400">
+                Ninguém no turno da tarde: ninguém chegou a mais de 7 dias, nos 30
+                anteriores, com a primeira janela a partir das 11:00.
+              </p>
+            )}
           </div>
           <label className="text-[11px] text-graf-400">
             De
@@ -241,6 +269,7 @@ export default function Indicadores() {
                   <tr>
                     <th className="px-3 py-2 font-medium">Técnico</th>
                     <th className="px-3 py-2 font-medium">Equipe</th>
+                    <th className="px-3 py-2 font-medium">Turno</th>
                     <th className="px-3 py-2 text-right font-medium">Dias</th>
                     <th className="px-3 py-2 text-right font-medium">Chegada média</th>
                     <th className="px-3 py-2 text-right font-medium">Mais cedo</th>
@@ -265,6 +294,17 @@ export default function Indicadores() {
                             </span>
                           </td>
                           <td className="px-3 py-2 text-xs text-graf-400">{t.equipe ?? '—'}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {/* A meta anda junto do turno: sem ela a coluna
+                                diria "TARDE" sem dizer contra o que. */}
+                            <span title={`Meta deste técnico: ${hhmm(t.meta ?? null)}`}
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold
+                                          uppercase tracking-wide ${t.turno === 'TARDE'
+                                ? 'bg-violet-900/40 text-violet-300 ring-1 ring-violet-700/40'
+                                : 'bg-graf-800 text-graf-300'}`}>
+                              {t.turno === 'TARDE' ? 'tarde' : 'manhã'} · {hhmm(t.meta ?? null)}
+                            </span>
+                          </td>
                           <td className="tabular px-3 py-2 text-right text-xs">{t.dias}</td>
                           <td className="tabular px-3 py-2 text-right font-medium">{hhmm(t.media_hora)}</td>
                           <td className="tabular px-3 py-2 text-right text-xs text-emerald-300">{hhmm(t.melhor_hora)}</td>
