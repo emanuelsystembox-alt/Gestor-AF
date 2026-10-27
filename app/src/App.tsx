@@ -22,6 +22,9 @@ const Almoxarifado = lazy(() => import('./pages/Almoxarifado'))
 const Frota = lazy(() => import('./pages/Frota'))
 const Monitor = lazy(() => import('./pages/Monitor'))
 const Sincronismo = lazy(() => import('./pages/Sincronismo'))
+// 146: o que o técnico diz de si — humor do dia e ocorrências (D-226).
+const Humor = lazy(() => import('./pages/Humor'))
+const Ocorrencias = lazy(() => import('./pages/Ocorrencias'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -111,6 +114,10 @@ export default function App() {
           <Protegida exige="GESTAO"><Relatorios /></Protegida>} />
         <Route path="/controle/configuracoes" element={
           <Protegida exige="GESTAO"><Configuracoes /></Protegida>} />
+        <Route path="/controle/humor" element={
+          <Protegida exige="GESTAO"><Humor /></Protegida>} />
+        <Route path="/controle/ocorrencias" element={
+          <Protegida exige="GESTAO"><Ocorrencias /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
 

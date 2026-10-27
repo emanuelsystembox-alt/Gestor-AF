@@ -82,6 +82,17 @@ const FROTA: Modulo = {
     { para: '/frota', rotulo: 'Veículos e consumo', icone: 'frota', busca: 'carro abastecimento km' },
   ],
 }
+/** 146: o que o técnico diz de si — o humor do dia (só coordenação) e o
+ *  que falta ou quebrou, ferramental e carro (coordenação e supervisão).
+ *  Os itens dependem da permissão, não do papel (D-226). */
+const CAMPO_EQUIPE = (humor: boolean, ocorrencias: boolean): Modulo => ({
+  chave: 'campo-equipe', titulo: 'Equipe em campo', icone: 'clima', itens: [
+    ...(humor ? [{ para: '/controle/humor', rotulo: 'Humor das equipes', icone: 'clima' as const,
+                   busca: 'sentimento clima pesquisa feliz triste estressado' }] : []),
+    ...(ocorrencias ? [{ para: '/controle/ocorrencias', rotulo: 'Ocorrências do campo', icone: 'frota' as const,
+                         busca: 'ferramenta perdida defeito carro veiculo problema sinalizacao' }] : []),
+  ],
+})
 const AJUSTES: Modulo = {
   chave: 'ajustes', titulo: 'Ajustes', icone: 'configuracoes', itens: [
     { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes', busca: 'sub-falhas situacao parametros' },
@@ -109,6 +120,8 @@ function useModulos(): Modulo[] {
   if (!gestao && temPapel('ROBO')) return [ROBO]
   return [
     ...(gestao ? [OPERACAO] : []),
+    ...(gestao && (pode('campo.humor') || pode('campo.ocorrencias'))
+      ? [CAMPO_EQUIPE(pode('campo.humor'), pode('campo.ocorrencias'))] : []),
     ...(pode('almoxarifado.ver') ? [ALMOXARIFADO] : []),
     ...(pode('frota.ver') ? [FROTA] : []),
     ...(gestao ? [AJUSTES] : []),

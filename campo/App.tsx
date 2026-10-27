@@ -12,6 +12,7 @@ import { conferirFechamentoAnterior, instalarRedeDeErros } from './src/lib/diagn
 import { anotarQueDerrubou } from './src/lib/rastro'
 import { faxinarCache } from './src/lib/cache'
 import { AvisoRastro, useCienciaRastro } from './src/ui/AvisoRastro'
+import { PesquisaHumor, useHumorDoDia } from './src/ui/PesquisaHumor'
 import Entrar from './src/telas/Entrar'
 import Agenda from './src/telas/Agenda'
 import Visita from './src/telas/Visita'
@@ -40,6 +41,9 @@ function Aplicacao() {
   const { ciente, darCiencia } = useCienciaRastro(session?.user.id ?? null, ehTecnico)
   // O rastro do dia (096): só para login de técnico, e depois da ciência.
   useRastro(ehTecnico && ciente === true)
+  // 146: depois da ciência, a pergunta do dia — obrigatória, a partir das 6h.
+  // Só para quem é do campo: o controlador que também é técnico não responde.
+  const humor = useHumorDoDia(session?.user.id ?? null, ehTecnico && ehCampo && ciente === true)
 
   // 098: o app fechou no meio de um passo da última vez? Sobe ao banco
   // (precisa do login) — e, se foi ao ligar a rota em segundo plano, não
@@ -93,6 +97,7 @@ function Aplicacao() {
     </NavigationContainer>
     </Tropeco>
     <AvisoRastro visivel={ehTecnico && ciente === false} aoCiente={darCiencia} />
+    <PesquisaHumor visivel={humor.pendente} aoResponder={humor.responder} />
     </GuardaGps>
   )
 }

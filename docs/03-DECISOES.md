@@ -8927,3 +8927,91 @@ com PENDENTE na rota — o dia de hoje já estava fechado quando a correção
 entrou. É justamente o caso que ele relatou; vale olhar amanhã de manhã.
 Também não foi medido o custo da CTE `janela_pri` num período longo com 30
 dias de lookback (no período de 14 dias não houve diferença perceptível).
+
+---
+
+### D-226 · O humor do dia e as ocorrências do campo (146, 146b)
+
+> *"toda vez que o técnico logar depois das 6 horas da manhã, todos os dias
+> o sistema deve mostrar uma pesquisa de como o técnico se sente naquele dia
+> […] O técnico não poderá pular esta etapa […] uma parte no aplicativo que
+> sinalize […] que ele perdeu um ferramental, que ele está trabalhando com um
+> ferramental com problema […] o carro […] com problema na bomba de
+> combustível, o carro está esquentando […] como o técnico está se sentindo,
+> somente os coordenadores. E o que está faltando para o técnico,
+> coordenadores e supervisores. COPs e cargos mais abaixo não precisa
+> visualizar."* — Emanuel, 26/10
+
+#### Perguntado antes de escrever (26/10)
+
+| pergunta | resposta do Emanuel |
+|---|---|
+| a 5ª opção (a gravação dizia "estáred triste") | **Estressado**: Feliz · Indiferente · Desanimado · Triste · Estressado |
+| quem é "coordenador"? não havia papel nem perfil, e o cargo tinha 0 pessoas | **permissão + perfil novo** |
+| já existia "Sinalizar ferramenta" (091), respondido pelo almoxarifado | **ampliar o que existe**, não abrir outro canal |
+| a lista de problemas do carro (não havia nenhuma) | **a proposta, como está** |
+
+#### Quem vê — permissão, não papel
+
+Duas chaves novas em `permissao` (módulo CAMPO): **`campo.humor`** e
+**`campo.ocorrencias`**. O perfil de acesso **Coordenador** (papel
+SUPERVISOR, o de gestão mais próximo) nasce com as duas; **Supervisor** ganha
+só ocorrências; **Administrador** as duas (o ADMIN já tinha tudo por papel).
+COP, Controlador e Técnico, nenhuma. Mexe-se em Administração › perfis.
+
+Recusado: criar o papel COORDENADOR no enum. Papel abre a sala (D-055); a
+sala aqui é a mesma do supervisor, e um valor novo no enum teria de ser
+ensinado a `eh_gestao`, `equipes_visiveis`, `Protegida`, etc.
+
+O escopo é a **cidade** (`bases_visiveis()`), não a equipe supervisionada:
+o coordenador olha a cidade. Por isso as duas leituras são RPC
+`SECURITY DEFINER` (`humor_das_equipes`, `ocorrencias_do_campo`) com a
+permissão conferida dentro. O primeiro desenho lia a ocorrência por embed, e
+o RLS de `veiculo` (só `frota.ver`) e de `tecnico` (só equipes do supervisor)
+devolviam nulo: o coordenador veria **"sem carro no cadastro" onde há carro**.
+Pego antes de publicar; virou a 146b.
+
+#### O humor
+
+- **Uma resposta por técnico por dia local** (`hoje_local()`); a primeira
+  vale, não se edita.
+- **A partir das 6h**, depois da ciência do rastro. O app aberto que
+  atravessa as 6h ou a meia-noite pergunta na hora (relógio a cada minuto e a
+  cada volta do segundo plano).
+- **Só quem é do campo** responde (o controlador que também é técnico não).
+- **Não tem pular** — mas a resposta dada **sem sinal** não prende o técnico:
+  fica na fila do aparelho com o dia e a hora do toque, e sobe depois
+  (`registrar_humor` aceita hoje ou ontem). Obrigatório é responder; travar o
+  dia de trabalho por falta de 4G não foi pedido.
+- **"Sem resposta" só conta quem estava escalado** (equipe com visita no dia)
+  e fica fora das fatias do gráfico. Técnico de folga não é falta (D-117).
+- O texto da pergunta diz ao técnico **quem vê** (só a coordenação).
+
+#### As ocorrências
+
+`sinalizacao_material` ganhou `assunto` (FERRAMENTAL/VEICULO), os motivos
+**PERDIDO** e **DESGASTADO**, e `problema_id`/`veiculo_id`. O problema do
+carro é **cadastro** (`problema_veiculo`, 12 itens com "Outro" exigindo
+descrição), não CHECK. O carro é o do **nome** do técnico (condutor atual),
+achado pelo banco — e sem carro no nome a ocorrência entra assim mesmo.
+
+> ⚠ **Medido em 26/10: nenhum técnico tem carro no nome** (`veiculo_condutor`
+> sem condutor atual). Até a frota cadastrar, toda ocorrência de carro sai
+> "sem carro no cadastro" — verdade, não defeito.
+
+O almoxarifado continua vendo e respondendo **só o ferramental**, e a central
+dele conta só o ferramental. Coordenação e supervisão respondem tudo; a
+resposta volta ao técnico como aviso.
+
+**VERIFICADO:** `testar_policies()` 26/26, `testar_campo()` 29/29, zero
+tabela sem RLS, zero `SECURITY DEFINER` para o `anon`; como `authenticated`,
+numa transação desfeita: primeira resposta vale, resposta inválida recusada,
+técnico não lê o painel nem responde ocorrência, colega da mesma cidade não vê
+humor nem ocorrência do outro, admin vê 1 resposta e 60 escalados sem
+resposta, aviso chega, `VEICULO` pelo canal do ferramental recusado, "Outro"
+sem descrição recusado. `tsc` e build da web, `tsc` e `expo export` do app.
+
+**NÃO VERIFICADO:** as telas abertas com login (não entro com senha de
+ninguém) — as páginas carregaram no Vite sem erro, mas o desenho não foi
+visto; a folha do humor num celular; a fila sem sinal na prática. E não há
+cenário novo nas baterias para `campo.humor` — o teste foi avulso.

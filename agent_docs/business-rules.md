@@ -302,6 +302,20 @@ move nada e não levanta exceção (D-157).
 
 ---
 
+## Humor do dia e ocorrências do campo (146, D-226)
+
+**Todo dia, a partir das 6h, o técnico responde como está** (Feliz,
+Indiferente, Desanimado, Triste, Estressado) — sem pular, depois da ciência do
+rastro. Sem sinal, a resposta fica na fila e sobe depois: obrigatório é
+responder, não ter 4G. A primeira resposta do dia vale.
+
+**O humor é só da coordenação** (`campo.humor`); **ocorrências** (ferramental
+perdido/velho/com defeito/faltando e problema no carro) são da coordenação e
+da supervisão (`campo.ocorrencias`). COP e Controlador não veem. O
+almoxarifado continua respondendo só o ferramental.
+
+"Sem resposta" é só de quem estava escalado — folga não é falta.
+
 ## Frota (088, D-164)
 
 **O condutor é o TÉCNICO, pelo nome — nunca a equipe.** "Nada de equipe

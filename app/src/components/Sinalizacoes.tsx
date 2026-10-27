@@ -14,19 +14,40 @@ import { Alerta } from './ui'
  *
  * Recusar exige motivo (o banco recusa sem): "não" sem porquê faz o
  * técnico sinalizar de novo amanhã.
+ *
+ * 146 (D-226): o mesmo canal ganhou "perdi", "velho/desgastado" e o
+ * problema do CARRO. O almoxarifado continua vendo e respondendo só o
+ * ferramental (o RLS garante); a coordenação e a supervisão
+ * (`campo.ocorrencias`) veem e respondem tudo, em Ocorrências do campo.
  */
 
+type Tipo = 'FALTANDO' | 'PERDIDO' | 'DEFEITO' | 'DESGASTADO' | 'VEICULO'
+const TIPO: Record<Tipo, { rotulo: string; classe: string }> = {
+  FALTANDO:   { rotulo: 'Faltando',           classe: 'bg-amber-900/40 text-amber-300' },
+  PERDIDO:    { rotulo: 'Perdido',            classe: 'bg-af-900/40 text-af-300' },
+  DEFEITO:    { rotulo: 'Com defeito',        classe: 'bg-af-900/40 text-af-300' },
+  DESGASTADO: { rotulo: 'Velho / desgastado', classe: 'bg-amber-900/40 text-amber-300' },
+  VEICULO:    { rotulo: 'Carro',              classe: 'bg-sky-900/40 text-sky-300' },
+}
+
 interface Linha {
-  id: string; tipo: 'FALTANDO' | 'DEFEITO'; serial: string | null; descricao: string | null
+  id: string; assunto: 'FERRAMENTAL' | 'VEICULO'; tipo: Tipo; serial: string | null; descricao: string | null
   situacao: 'ABERTA' | 'ATENDIDA' | 'RECUSADA'; criado_em: string; resolvido_em: string | null
   resposta: string | null
-  tecnico: { nome: string; equipe: { codigo: string } | null } | null
-  item: { nome: string; codigo: string | null; tipo: string | null } | null
+  // 146b: a linha vem montada de `ocorrencias_do_campo` — o embed esbarrava
+  // no RLS de veiculo/tecnico e mostrava "sem carro" onde havia carro.
+  tecnico: string | null; equipe: string | null; item: string | null
+  problema: string | null; placa: string | null; modelo: string | null
 }
 
 const quando = (ts: string) => new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
-export function Sinalizacoes({ podeMexer }: { podeMexer: boolean }) {
+export function Sinalizacoes({ podeMexer, assunto = 'FERRAMENTAL' }: {
+  podeMexer: boolean
+  /** O almoxarifado lê só o ferramental; Ocorrências do campo lê tudo. */
+  assunto?: 'FERRAMENTAL' | 'TODOS'
+}) {
+  const [qual, setQual] = useState<'TODOS' | 'FERRAMENTAL' | 'VEICULO'>(assunto)
   const { recarregar: recarregarCentral } = useCentral()
   const [filtro, setFiltro] = useState<'ABERTA' | 'TODAS'>('ABERTA')
   const [linhas, setLinhas] = useState<Linha[] | null>(null)
@@ -37,18 +58,14 @@ export function Sinalizacoes({ podeMexer }: { podeMexer: boolean }) {
   const [ocupado, setOcupado] = useState(false)
 
   async function carregar() {
-    let q = supabase.from('sinalizacao_material')
-      .select(`id, tipo, serial, descricao, situacao, criado_em, resolvido_em, resposta,
-               tecnico:tecnico_id ( nome, equipe:equipe_id ( codigo ) ),
-               item:item_id ( nome, codigo, tipo )`)
-      .order('criado_em', { ascending: false }).limit(200)
-    if (filtro === 'ABERTA') q = q.eq('situacao', 'ABERTA')
-    const { data, error } = await q
+    const { data, error } = await supabase.rpc('ocorrencias_do_campo', {
+      p_assunto: qual === 'TODOS' ? null : qual, p_so_abertas: filtro === 'ABERTA',
+    })
     if (error) setErro(error.message)
     setLinhas((data ?? []) as unknown as Linha[])
   }
 
-  useEffect(() => { carregar() }, [filtro])
+  useEffect(() => { carregar() }, [filtro, qual])
 
   async function responder() {
     if (!respondendo) return
@@ -71,10 +88,21 @@ export function Sinalizacoes({ podeMexer }: { podeMexer: boolean }) {
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Sinalizações do campo</h2>
           <p className="mt-0.5 text-xs text-graf-400">
-            Ferramenta faltando ou com defeito, avisada pelo técnico no aplicativo. Responder
-            não entrega nada — a entrega continua sendo um romaneio.
+            {assunto === 'TODOS'
+              ? 'Ferramental perdido, velho ou com defeito, e problema no carro, avisados pelo técnico no aplicativo. A resposta chega a ele como aviso.'
+              : 'Ferramenta faltando, perdida, velha ou com defeito, avisada pelo técnico no aplicativo. Responder não entrega nada — a entrega continua sendo um romaneio.'}
           </p>
         </div>
+        {assunto === 'TODOS' && (
+          <div className="flex rounded-md bg-graf-900 p-0.5 text-xs" role="group" aria-label="Assunto">
+            {([['TODOS', 'Tudo'], ['FERRAMENTAL', 'Ferramental'], ['VEICULO', 'Carro']] as const).map(([k, r]) => (
+              <button key={k} onClick={() => setQual(k)} aria-pressed={qual === k}
+                className={`rounded px-2.5 py-1 ${qual === k ? 'bg-af-600 text-white' : 'text-graf-300'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex rounded-md bg-graf-900 p-0.5 text-xs">
           {(['ABERTA', 'TODAS'] as const).map(f => (
             <button key={f} onClick={() => setFiltro(f)} aria-pressed={filtro === f}
@@ -99,15 +127,18 @@ export function Sinalizacoes({ podeMexer }: { podeMexer: boolean }) {
           {linhas.map(l => (
             <li key={l.id} className="border-b border-graf-800 px-4 py-3">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                  l.tipo === 'DEFEITO' ? 'bg-af-900/40 text-af-300' : 'bg-amber-900/40 text-amber-300'}`}>
-                  {l.tipo === 'DEFEITO' ? 'Com defeito' : 'Faltando'}
+                <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${TIPO[l.tipo]?.classe ?? ''}`}>
+                  {TIPO[l.tipo]?.rotulo ?? l.tipo}
                 </span>
                 <span className="text-sm font-medium">
-                  {l.item?.nome ?? (l.serial ? `serial ${l.serial}` : l.descricao ?? '—')}
+                  {l.assunto === 'VEICULO'
+                    ? <>{l.problema ?? '—'}{' · '}
+                        {l.placa ? `${l.placa}${l.modelo ? ` (${l.modelo})` : ''}`
+                          : <span className="text-graf-400">sem carro no cadastro</span>}</>
+                    : l.item ?? (l.serial ? `serial ${l.serial}` : l.descricao ?? '—')}
                 </span>
                 <span className="text-xs text-graf-400">
-                  {l.tecnico?.nome ?? '—'}{l.tecnico?.equipe ? ` · equipe ${l.tecnico.equipe.codigo}` : ''} · {quando(l.criado_em)}
+                  {l.tecnico ?? '—'}{l.equipe ? ` · equipe ${l.equipe}` : ''} · {quando(l.criado_em)}
                 </span>
                 <span className={`ml-auto text-[11px] font-semibold ${
                   l.situacao === 'ABERTA' ? 'text-amber-300'
@@ -115,7 +146,7 @@ export function Sinalizacoes({ podeMexer }: { podeMexer: boolean }) {
                   {l.situacao === 'ABERTA' ? 'Aguardando' : l.situacao === 'ATENDIDA' ? 'Atendida' : 'Recusada'}
                 </span>
               </div>
-              {l.descricao && (l.item || l.serial) && (
+              {l.descricao && (l.item || l.serial || l.problema) && (
                 <p className="mt-1 text-sm italic text-graf-300">“{l.descricao}”</p>
               )}
               {l.resposta && <p className="mt-1 text-xs text-graf-400">Resposta: {l.resposta}</p>}

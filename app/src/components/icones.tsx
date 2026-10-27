@@ -66,6 +66,9 @@ const P = {
   // Sincronismo: as duas setas girando — o TOA entrando sozinho (111)
   sincronismo: <><path d="M19.5 8.5A8 8 0 0 0 5 7.2" /><path d="M5 3.5v3.7h3.7" />
                  <path d="M4.5 15.5A8 8 0 0 0 19 16.8" /><path d="M19 20.5v-3.7h-3.7" /></>,
+  // Clima do campo: o rosto — o humor do dia e as ocorrências (146)
+  clima: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+           <path d="M9 9.5h.01M15 9.5h.01" /></>,
 } as const
 
 export type NomeIcone = keyof typeof P

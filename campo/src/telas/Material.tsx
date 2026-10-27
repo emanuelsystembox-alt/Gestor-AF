@@ -32,12 +32,27 @@ type Props = NativeStackScreenProps<Pilha, 'Material'>
 
 interface ItemSaldo { item_id: string; codigo: string | null; nome: string; unidade: string | null; tipo: string | null; saldo: number }
 interface Serial { serial: string; tipo: string | null; modelo: string | null; condicao: string | null; dias: number | null }
+type TipoFerramental = 'FALTANDO' | 'PERDIDO' | 'DEFEITO' | 'DESGASTADO'
 interface Sinalizacao {
-  id: string; tipo: 'FALTANDO' | 'DEFEITO'; item: string | null; serial: string | null
+  id: string; assunto: 'FERRAMENTAL' | 'VEICULO'; tipo: TipoFerramental | 'VEICULO'
+  item: string | null; serial: string | null; problema: string | null; placa: string | null
   descricao: string | null; situacao: 'ABERTA' | 'ATENDIDA' | 'RECUSADA'
   criado_em: string; resolvido_em: string | null; resposta: string | null
 }
 interface ItemCatalogo { item_id: string; codigo: string | null; nome: string; tipo: string | null }
+interface Problema { id: string; rotulo: string; exige_descricao: boolean }
+
+/** 146: os motivos do ferramental — "perdi" e "velho" entraram (D-226). */
+const MOTIVO: Record<TipoFerramental | 'VEICULO', string> = {
+  FALTANDO: 'Faltando', PERDIDO: 'Perdido', DEFEITO: 'Com defeito',
+  DESGASTADO: 'Velho / desgastado', VEICULO: 'Carro',
+}
+const MOTIVOS_FORM: { tipo: TipoFerramental; rotulo: string }[] = [
+  { tipo: 'PERDIDO', rotulo: 'Perdi' },
+  { tipo: 'DEFEITO', rotulo: 'Com defeito' },
+  { tipo: 'DESGASTADO', rotulo: 'Velho / gasto' },
+  { tipo: 'FALTANDO', rotulo: 'Está faltando' },
+]
 
 type Gaveta = 'ferramental' | 'miscelanea' | 'equipamentos'
 const EH_FERRAMENTAL = (t: string | null) => t === 'FERRAMENTA' || t === 'EPI'
@@ -61,6 +76,7 @@ export default function Material({ navigation }: Props) {
   const [erro, setErro] = useState<string | null>(null)
   const [alvo, setAlvo] = useState<Alvo | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  const [carro, setCarro] = useState(false)
 
   const carregar = useCallback(async () => {
     setErro(null)
@@ -117,6 +133,10 @@ export default function Material({ navigation }: Props) {
             não aparece no saldo justamente porque falta. */}
         <Botao titulo="Sinalizar ferramenta que falta" tom="contorno"
           aoTocar={() => { setOk(null); setAlvo({ itemId: null, serial: null, nome: null }) }} />
+        {/* 146: o problema do carro mora no mesmo canal — quem responde é a
+            coordenação/supervisão, não o almoxarifado (D-226). */}
+        <Botao titulo="Problema no carro" tom="contorno"
+          aoTocar={() => { setOk(null); setCarro(true) }} />
 
         {carregando && <Carregando />}
 
@@ -190,14 +210,18 @@ export default function Material({ navigation }: Props) {
           return (
             <Cartao key={s.id} style={{ padding: 12, gap: 4 }}>
               <View style={e.linhaTopo}>
-                <Text style={e.sinalTipo}>{s.tipo === 'FALTANDO' ? 'Faltando' : 'Com defeito'}</Text>
+                <Text style={e.sinalTipo}>{MOTIVO[s.tipo] ?? s.tipo}</Text>
                 <View style={[e.chip, { backgroundColor: st.fundo }]}>
                   <Text style={[e.chipTexto, { color: st.texto }]}>{st.rotulo}</Text>
                 </View>
               </View>
-              <Text style={e.nome}>{s.item ?? s.serial ?? s.descricao ?? '—'}</Text>
-              {s.descricao && (s.item || s.serial) ? <Text style={e.miudo}>{s.descricao}</Text> : null}
-              {s.resposta ? <Text style={e.resposta}>Almoxarifado: “{s.resposta}”</Text> : null}
+              <Text style={e.nome}>
+                {s.assunto === 'VEICULO'
+                  ? `${s.problema ?? 'Problema'} · ${s.placa ?? 'sem carro no cadastro'}`
+                  : s.item ?? s.serial ?? s.descricao ?? '—'}
+              </Text>
+              {s.descricao && (s.item || s.serial || s.problema) ? <Text style={e.miudo}>{s.descricao}</Text> : null}
+              {s.resposta ? <Text style={e.resposta}>Resposta: “{s.resposta}”</Text> : null}
               <Text style={e.miudo}>{carimbo(s.criado_em)}</Text>
             </Cartao>
           )
@@ -207,6 +231,10 @@ export default function Material({ navigation }: Props) {
       {alvo && (
         <FormSinalizar alvo={alvo} fechar={() => setAlvo(null)}
           pronto={async msg => { setAlvo(null); setOk(msg); await carregar() }} />
+      )}
+      {carro && (
+        <FormVeiculo fechar={() => setCarro(false)}
+          pronto={async msg => { setCarro(false); setOk(msg); await carregar() }} />
       )}
       <BarraInferior ativa="Material" />
     </SafeAreaView>
@@ -219,7 +247,7 @@ function FormSinalizar({ alvo, fechar, pronto }: {
 }) {
   // Serial só quebra; item da lista pode faltar (sumiu) ou quebrar; a
   // ferramenta "que falta" só falta.
-  const [tipo, setTipo] = useState<'FALTANDO' | 'DEFEITO'>(alvo.serial ? 'DEFEITO' : alvo.itemId ? 'DEFEITO' : 'FALTANDO')
+  const [tipo, setTipo] = useState<TipoFerramental>(alvo.serial ? 'DEFEITO' : alvo.itemId ? 'DEFEITO' : 'FALTANDO')
   const [descricao, setDescricao] = useState('')
   const [busca, setBusca] = useState('')
   const [catalogo, setCatalogo] = useState<ItemCatalogo[] | null>(null)
@@ -253,7 +281,7 @@ function FormSinalizar({ alvo, fechar, pronto }: {
     })
     setEnviando(false)
     if (error) { setErro(error.message); return }
-    pronto('Sinalizado. O almoxarifado recebe o aviso agora, e a resposta chega na sua agenda.')
+    pronto('Sinalizado. O almoxarifado e a coordenação recebem agora, e a resposta chega na sua agenda.')
   }
 
   return (
@@ -264,13 +292,11 @@ function FormSinalizar({ alvo, fechar, pronto }: {
 
         {!alvo.serial && (
           <View style={e.escolha}>
-            {(['FALTANDO', 'DEFEITO'] as const).map(t => (
+            {MOTIVOS_FORM.map(({ tipo: t, rotulo }) => (
               <Pressable key={t} onPress={() => setTipo(t)}
                 accessibilityRole="radio" accessibilityState={{ checked: tipo === t }}
                 style={[e.opcao, tipo === t && e.opcaoAtiva]}>
-                <Text style={[e.opcaoTexto, tipo === t && { color: cor.branco }]}>
-                  {t === 'FALTANDO' ? 'Está faltando' : 'Está com defeito'}
-                </Text>
+                <Text style={[e.opcaoTexto, tipo === t && { color: cor.branco }]}>{rotulo}</Text>
               </Pressable>
             ))}
           </View>
@@ -296,10 +322,93 @@ function FormSinalizar({ alvo, fechar, pronto }: {
         </>)}
 
         <TextInput value={descricao} onChangeText={setDescricao} multiline maxLength={500}
-          placeholder={tipo === 'DEFEITO' ? 'O que aconteceu? (ex.: mola do alicate quebrou)' : 'Algo a mais? (ex.: preciso até amanhã)'}
+          placeholder={tipo === 'DEFEITO' ? 'O que aconteceu? (ex.: mola do alicate quebrou)'
+            : tipo === 'PERDIDO' ? 'Onde ou como? (ex.: ficou no cliente)'
+            : tipo === 'DESGASTADO' ? 'O que está gasto? (ex.: degrau da escada frouxo)'
+            : 'Algo a mais? (ex.: preciso até amanhã)'}
           placeholderTextColor={cor.graf500} style={[e.campo, { minHeight: 80, textAlignVertical: 'top' }]}
           accessibilityLabel="Descrição" />
 
+        {erro && <Aviso tipo="erro">{erro}</Aviso>}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }} aoTocar={fechar} />
+          <Botao titulo="Enviar" style={{ flex: 1 }} carregando={enviando} aoTocar={enviar} />
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+/**
+ * O problema do carro (146, D-226). O carro é o que está no NOME dele —
+ * o banco acha (`sinalizar_veiculo`), a tela só mostra qual é. Sem carro
+ * no cadastro a ocorrência entra mesmo assim: o defeito não fica sem
+ * registro por falta de cadastro.
+ */
+function FormVeiculo({ fechar, pronto }: { fechar: () => void; pronto: (msg: string) => void }) {
+  const [problemas, setProblemas] = useState<Problema[] | null>(null)
+  const [placa, setPlaca] = useState<string | null | undefined>(undefined)
+  const [escolhido, setEscolhido] = useState<Problema | null>(null)
+  const [descricao, setDescricao] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('problema_veiculo').select('id, rotulo, exige_descricao')
+      .eq('ativo', true).order('ordem')
+      .then(({ data, error }) => {
+        if (error) setErro(error.message)
+        setProblemas((data ?? []) as Problema[])
+      })
+    supabase.rpc('meu_veiculo').then(({ data }) => {
+      const v = (data ?? [])[0] as { placa: string | null } | undefined
+      setPlaca(v?.placa ?? null)
+    })
+  }, [])
+
+  async function enviar() {
+    setErro(null)
+    if (!escolhido) { setErro('Escolha o que está acontecendo com o carro.'); return }
+    if (escolhido.exige_descricao && !descricao.trim()) { setErro('Descreva o problema.'); return }
+    setEnviando(true)
+    const { error } = await supabase.rpc('sinalizar_veiculo', {
+      p_problema_id: escolhido.id, p_descricao: descricao.trim() || null,
+    })
+    setEnviando(false)
+    if (error) { setErro(error.message); return }
+    pronto('Enviado. A coordenação recebe agora, e a resposta chega na sua agenda.')
+  }
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={fechar}>
+      <Pressable style={e.veu} onPress={fechar} accessibilityLabel="Fechar" />
+      <View style={[e.folha, { maxHeight: '88%' }]}>
+        <Text style={e.folhaTitulo}>Problema no carro</Text>
+        <Text style={e.miudo}>
+          {placa === undefined ? 'Procurando o seu carro…'
+            : placa ? `Carro no seu nome: ${placa}`
+            : 'Nenhum carro no seu nome no cadastro — envie assim mesmo.'}
+        </Text>
+        <ScrollView contentContainerStyle={e.escolha}>
+          {problemas == null && <Text style={e.miudo}>Carregando a lista…</Text>}
+          {problemas?.map(p => {
+            const marcado = escolhido?.id === p.id
+            return (
+              <Pressable key={p.id} onPress={() => setEscolhido(p)}
+                accessibilityRole="radio" accessibilityState={{ checked: marcado }}
+                style={[e.opcao, marcado && e.opcaoAtiva]}>
+                <Text style={[e.opcaoTexto, { textAlign: 'center' }, marcado && { color: cor.branco }]}>
+                  {p.rotulo}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+        <TextInput value={descricao} onChangeText={setDescricao} multiline maxLength={500}
+          placeholder={escolhido?.exige_descricao ? 'Descreva o problema (obrigatório)'
+            : 'Algo a mais? (ex.: luz do painel acendeu ontem)'}
+          placeholderTextColor={cor.graf500} style={[e.campo, { minHeight: 70, textAlignVertical: 'top' }]}
+          accessibilityLabel="Descrição" />
         {erro && <Aviso tipo="erro">{erro}</Aviso>}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }} aoTocar={fechar} />
@@ -351,9 +460,10 @@ const e = StyleSheet.create({
     borderTopLeftRadius: 18, borderTopRightRadius: 18,
   },
   folhaTitulo: { fontSize: 17, fontWeight: '800', color: cor.tinta },
-  escolha: { flexDirection: 'row', gap: 8 },
+  // 146: quatro motivos — duas linhas de dois, alvo de toque inteiro.
+  escolha: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   opcao: {
-    flex: 1, minHeight: TOQUE, borderRadius: raio.m, borderWidth: 2, borderColor: cor.graf200,
+    flexGrow: 1, flexBasis: '45%', minHeight: TOQUE, borderRadius: raio.m, borderWidth: 2, borderColor: cor.graf200,
     alignItems: 'center', justifyContent: 'center',
   },
   opcaoAtiva: { backgroundColor: cor.tinta, borderColor: cor.tinta },
