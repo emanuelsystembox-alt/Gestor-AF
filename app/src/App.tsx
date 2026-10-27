@@ -25,6 +25,8 @@ const Sincronismo = lazy(() => import('./pages/Sincronismo'))
 // 146: o que o técnico diz de si — humor do dia e ocorrências (D-226).
 const Humor = lazy(() => import('./pages/Humor'))
 const Ocorrencias = lazy(() => import('./pages/Ocorrencias'))
+// 147: a celula de qualidade -- falar com o assinante atendido (D-228).
+const Qualidade = lazy(() => import('./pages/Qualidade'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -118,6 +120,8 @@ export default function App() {
           <Protegida exige="GESTAO"><Humor /></Protegida>} />
         <Route path="/controle/ocorrencias" element={
           <Protegida exige="GESTAO"><Ocorrencias /></Protegida>} />
+        <Route path="/controle/qualidade" element={
+          <Protegida exige="GESTAO"><Qualidade /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
 

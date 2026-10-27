@@ -69,6 +69,10 @@ const P = {
   // Clima do campo: o rosto — o humor do dia e as ocorrências (146)
   clima: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
            <path d="M9 9.5h.01M15 9.5h.01" /></>,
+  // Qualidade: o balão da conversa com o assinante, com a estrela da
+  // nota dentro — é disso que a célula trata (147)
+  qualidade: <><path d="M20 14.5a2 2 0 0 1-2 2H8l-4 3.5v-14a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />
+                <path d="m12 6.8 1.3 2.7 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4Z" /></>,
 } as const
 
 export type NomeIcone = keyof typeof P

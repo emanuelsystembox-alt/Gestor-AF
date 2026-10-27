@@ -9015,3 +9015,114 @@ sem descrição recusado. `tsc` e build da web, `tsc` e `expo export` do app.
 ninguém) — as páginas carregaram no Vite sem erro, mas o desenho não foi
 visto; a folha do humor num celular; a fila sem sinal na prática. E não há
 cenário novo nas baterias para `campo.humor` — o teste foi avulso.
+
+### D-228 · A célula de Qualidade: falar com o assinante depois do atendimento (147)
+
+> *"preciso que no painel lateral tenha um menu chamado qualidade. Essa célula
+> visa falar com os clientes atendidos e depois perguntar se foi normalizado, se
+> o técnico tratou bem o assinante, se o cliente está com algum problema (...)
+> inclusive que nota o assinante deu para o técnico (...) conforme ele vai
+> fechando o dia ali, falando com todos os assinantes, o ideal é sair um gráfico
+> de problemas normalizado, não normalizado (...) precisa ser um sistema bem
+> fácil de falar com esses clientes do dia"* — Emanuel, 26/10
+
+---
+
+#### O fato que mudou o desenho: **não existe telefone no sistema**
+
+Medido antes de escrever uma linha:
+
+- `visita.telefones` está vazio em **0 de 3.467** visitas — o export do TOA não
+  traz a coluna;
+- `contato_cliente` (o "melhor contato" da D-170, que o técnico informa no
+  encerramento) tem **3 linhas no banco inteiro, nenhuma com número**;
+- dos **226 concluídos** do dia, **zero** tinham por onde ligar.
+
+Ou seja: a célula, como pedida, não teria para quem ligar. Perguntado com esse
+número na mão, ele decidiu: **a qualidade digita o telefone** (pega no sistema
+da CLARO) e o sistema guarda no contrato. Funciona desde o primeiro dia, não
+depende de mudança no app do campo, e a base de contato cresce sozinha. Quando
+o "melhor contato" do campo começar a existir, a fila já o aproveita como
+sugestão — está no `coalesce`, sem mudar nada.
+
+**LGPD:** `telefone` é dado pessoal de assinante. Mora na tabela, com RLS por
+empresa e cidade visível, e nunca sai em planilha nem em print.
+
+#### As quatro escolhas dele
+
+1. **A fila é tudo onde o técnico FOI.** Concluídas, reagendamentos e canceladas
+   com ida — hoje **281**. Cancelado pela central e desatribuído ficam de fora
+   pela mesma razão da D-225: ninguém esteve lá, e perguntar ao assinante como
+   foi o atendimento que não houve é constrangimento, não qualidade.
+   **Reagendamento entra**, e foi deliberado: quem ficou sem atendimento é onde
+   costuma morar a reclamação.
+
+2. **Quatro perguntas**, nesta ordem — proposta minha como especialista, aprovada
+   por ele:
+
+   | # | pergunta | por quê |
+   |---|---|---|
+   | 1 | O serviço ficou funcionando? (Sim / Em parte / Não) | é o eixo normalizado |
+   | 2 | Que nota você dá para o técnico? | o que ele pediu |
+   | 3 | O técnico se identificou e tratou você com respeito? | **conduta é problema diferente de competência**, e tem dono diferente: um é treinamento, o outro é disciplina |
+   | 4 | Ficou alguma pendência? (texto livre) | é o campo acionável |
+
+   **Quatro é o teto, e isso é parte do desenho.** Pesquisa por telefone perde o
+   assinante depois de ~2 min; questionário longo derruba a taxa de resposta e o
+   time fecha menos contratos por dia — o oposto do que ele pediu. Foram
+   recusadas as versões de 6 perguntas (limpeza e horário) e de 3 (sem conduta).
+
+3. **Nota de 1 a 5**, não 0-10. Rápido de responder no telefone, e a média por
+   técnico entra direto no ranking que a casa já usa. O NPS 0-10 foi oferecido e
+   recusado.
+
+4. **Conduta separada da nota.** "Tratou bem" é pergunta própria e não um item
+   dentro da nota — senão um técnico grosseiro e competente e um educado e
+   incompetente dão a mesma média, e são dois problemas opostos.
+
+#### Não falado **não** é não normalizado (regra 6)
+
+`situacao` separa **PENDENTE** (ninguém ligou ainda) de NAO_ATENDE,
+NUMERO_ERRADO, RECUSOU e SEM_CONTATO. O percentual de normalização tem como
+denominador os **falados**. Dizer que 281 contratos estão com problema porque
+ninguém ligou seria mentira com cara de indicador — e a tela escreve "—", nunca
+0%, enquanto não houver resposta.
+
+#### A tela é uma FILA, não um relatório
+
+O pedido é operacional: alguém senta e liga até fechar o dia. Então:
+pendentes primeiro, um contrato aberto por vez, as quatro perguntas numa tela só
+sem rolagem, telefone e **link de WhatsApp com mensagem pronta** a um clique, e
+o contrato sai da aba "A falar" assim que é gravado. O painel fica em cima e
+muda a cada resposta — é o gráfico pedido, e serve de placar para quem trabalha
+a fila.
+
+Cada tentativa é contada (`tentativas`), com quem fez a última: o time precisa
+saber quantas vezes já ligou antes de desistir.
+
+#### Acesso
+
+Duas permissões: `qualidade.ver` e `qualidade.registrar`. Perfil novo
+**"Qualidade"** com o papel COP (entra no controle, enxerga as cidades dele) +
+`servicos.ver` — a célula **pergunta, não opera**: não baixa, não transfere, não
+exclui. Administrador recebe as duas; COP e Coordenador recebem só `ver`, para
+ler o painel.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos; `testar_policies()` 26/26 e
+`testar_campo()` 29/29; `pesquisa_qualidade` com RLS ligada e zero
+`SECURITY DEFINER` alcançável pelo `anon`. **Fluxo testado de ponta a ponta no
+navegador** com dado fictício e marca óbvia ("TESTE AUTOMATICO - APAGAR",
+telefone 92 99999-0000): telefone gravado, link do WhatsApp montado
+(`wa.me/5592999990000`), "Em parte" → 0,0% normalizado de 1 respondida, nota 4 →
+média 4,00, "Não" na conduta → 1 reclamação, abas de 281/0 para 280/1, barra do
+gráfico desenhada. **A linha de teste foi apagada e a tabela conferida vazia
+(0 linhas).**
+
+**NÃO VERIFICADO:** o desempenho da fila num período longo (`qualidade_fila`
+roda `tec1`-style por contrato? não — é um select só, mas não foi medido como
+`authenticated` em mês fechado); e o comportamento com dois colaboradores
+trabalhando a mesma fila ao mesmo tempo — o `unique (visita_id)` garante uma
+pesquisa por contrato, mas o segundo a gravar sobrescreve o primeiro sem aviso.
+Se a célula tiver mais de uma pessoa, vale decidir o que fazer nesse caso.

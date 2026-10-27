@@ -93,6 +93,15 @@ const CAMPO_EQUIPE = (humor: boolean, ocorrencias: boolean): Modulo => ({
                          busca: 'ferramenta perdida defeito carro veiculo problema sinalizacao' }] : []),
   ],
 })
+/** 147: a célula que fala com o assinante depois do atendimento. Módulo
+ *  próprio no menu porque é OUTRO time — não é quem despacha nem quem
+ *  executa, e o trabalho dele é uma fila do dia, não um relatório. */
+const QUALIDADE: Modulo = {
+  chave: 'qualidade', titulo: 'Qualidade', icone: 'qualidade', itens: [
+    { para: '/controle/qualidade', rotulo: 'Pesquisa pós-atendimento', icone: 'qualidade',
+      busca: 'qualidade pesquisa assinante cliente nota normalizado ligacao whatsapp' },
+  ],
+}
 const AJUSTES: Modulo = {
   chave: 'ajustes', titulo: 'Ajustes', icone: 'configuracoes', itens: [
     { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes', busca: 'sub-falhas situacao parametros' },
@@ -122,6 +131,7 @@ function useModulos(): Modulo[] {
     ...(gestao ? [OPERACAO] : []),
     ...(gestao && (pode('campo.humor') || pode('campo.ocorrencias'))
       ? [CAMPO_EQUIPE(pode('campo.humor'), pode('campo.ocorrencias'))] : []),
+    ...(gestao && pode('qualidade.ver') ? [QUALIDADE] : []),
     ...(pode('almoxarifado.ver') ? [ALMOXARIFADO] : []),
     ...(pode('frota.ver') ? [FROTA] : []),
     ...(gestao ? [AJUSTES] : []),
