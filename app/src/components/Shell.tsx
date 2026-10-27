@@ -2,8 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTema } from '../lib/tema'
-import { supabase, EM_ABERTO } from '../lib/supabase'
-import { isoLocal } from '../lib/formato'
+import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Avatar, Logo, Marca } from './ui'
 import { Icone, type NomeIcone } from './icones'
 import { useCentral, type Sinal } from '../lib/central'
@@ -147,32 +146,59 @@ function ativo(pathname: string, para: string) {
 }
 
 /**
- * Contratos EM ABERTO hoje, para o contador de Serviços.
+ * O VOLUME DO DIA por situação, para o selo de Serviços (150).
  *
- * Mesma conta da tela de Serviços: situação em `EM_ABERTO` e jornada
- * fora (Na Base / Refeição não é serviço — D-117 e business-rules).
+ * > "é bom colocar o volume de contratos conforme as cores ao lado de
+ * >  serviços pra saber o volume de cara, tire o cancelado central e
+ * >  desatribuído" — Emanuel, 26/10
+ *
+ * Antes o selo contava só os EM ABERTO (10 num dia de 343) — o número
+ * respondia "quanto falta", não "quanto é o dia". Agora é o dia inteiro,
+ * repartido pelas cores que a casa já usa para situação.
+ *
+ * A conta mora no banco (`volume_do_dia`), e por dois motivos: o menu
+ * existe em TODAS as telas e reconta a cada 2 min, então trazer as ~340
+ * linhas do dia só para contar sairia caro em toda navegação; e a regra
+ * de exclusão fica num lugar só.
+ *
+ * FORA DA CONTA: cancelado pela central, desatribuído e jornada —
+ * ninguém foi (D-225).
+ *
  * Enquanto não sabe, devolve `null` e o menu NÃO mostra número: um "0"
- * no carregamento seria afirmar que não há nada aberto.
+ * no carregamento seria afirmar que o dia está vazio.
  */
-function useAbertosHoje(ligado: boolean): number | null {
-  const [n, setN] = useState<number | null>(null)
+export interface VolumeDia {
+  total: number
+  fatias: { situacao: Situacao; qtd: number; cor: string; label: string }[]
+}
+
+function useVolumeHoje(ligado: boolean): VolumeDia | null {
+  const [v, setV] = useState<VolumeDia | null>(null)
   const local = useLocation()
 
   useEffect(() => {
     if (!ligado) return
     let vivo = true
     const contar = () => {
-      supabase.from('visita')
-        .select('id, tipo_atividade:tipo_atividade_id ( natureza )')
-        .eq('data_agendada', isoLocal())
-        .is('excluido_em', null)
-        .in('situacao', EM_ABERTO)
-        .then(({ data, error }) => {
-          if (!vivo) return
-          if (error) { setN(null); return }
-          const linhas = (data ?? []) as unknown as { tipo_atividade: { natureza: string } | null }[]
-          setN(linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA').length)
-        })
+      supabase.rpc('volume_do_dia').then(({ data, error }) => {
+        if (!vivo) return
+        if (error) { setV(null); return }
+        const linhas = (data ?? []) as { situacao: Situacao; qtd: number }[]
+        // A ordem é a do domínio (SITUACOES), não a da contagem: a barra
+        // tem de ficar parada entre um refresh e outro, senão o olho
+        // perde a referência de onde cada cor mora.
+        const fatias = SITUACOES
+          .map(st => {
+            const l = linhas.find(x => x.situacao === st)
+            return l && l.qtd > 0
+              ? { situacao: st, qtd: l.qtd,
+                  cor: SITUACAO_INFO[st]?.cor ?? '#64748b',
+                  label: SITUACAO_INFO[st]?.label ?? st }
+              : null
+          })
+          .filter(Boolean) as VolumeDia['fatias']
+        setV({ total: fatias.reduce((s, f) => s + f.qtd, 0), fatias })
+      })
     }
     contar()
     // A cada 2 min: o menu é olhado de relance, não precisa de Realtime
@@ -180,10 +206,92 @@ function useAbertosHoje(ligado: boolean): number | null {
     const t = setInterval(contar, 120_000)
     return () => { vivo = false; clearInterval(t) }
     // Recontar ao trocar de tela: quem volta de uma baixa quer ver o
-    // número já descontado.
+    // número já atualizado.
   }, [ligado, local.pathname])
 
-  return n
+  return v
+}
+
+/**
+ * As equipes EM ROTA hoje, repartidas pela frente (151).
+ *
+ * > "seria bom também mostrar aqui quantidade de técnico de VT rodando
+ * >  hoje e técnico de adesão, contar as equipes que estão com rota
+ * >  mais de 1 contrato em linha" — Emanuel, 26/10
+ *
+ * "Em rota" é equipe com MAIS DE UM contrato no dia, como ele pediu —
+ * uma visita solta não é rota. A frente sai do que a equipe está
+ * FAZENDO hoje (grupo predominante), não do cadastro de skill: a escala
+ * muda todo dia. Medido em 26/10: 54 equipes, 17 VT, 30 adesão, e só
+ * DUAS fazem as duas coisas — o predominante é retrato, não desempate.
+ */
+export interface Frentes {
+  total: number
+  vt: number
+  adesao: number
+  outras: number
+}
+
+function useFrentesHoje(ligado: boolean): Frentes | null {
+  const [f, setF] = useState<Frentes | null>(null)
+  const local = useLocation()
+
+  useEffect(() => {
+    if (!ligado) return
+    let vivo = true
+    const contar = () => {
+      supabase.rpc('equipes_em_rota').then(({ data, error }) => {
+        if (!vivo) return
+        if (error) { setF(null); return }
+        const l = (data ?? []) as { frente: string; equipes: number }[]
+        const de = (k: string) => l.find(x => x.frente === k)?.equipes ?? 0
+        const vt = de('VT'), adesao = de('ADESAO'), outras = de('OUTRAS')
+        setF({ vt, adesao, outras, total: vt + adesao + outras })
+      })
+    }
+    contar()
+    const t = setInterval(contar, 120_000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [ligado, local.pathname])
+
+  return f
+}
+
+/** VT e adesão lado a lado, sob o item de Equipes. Duas palavras curtas
+ *  em vez de barra: aqui a pergunta é "quantos de cada frente", e
+ *  proporção não responde isso. */
+function FrentesEmRota({ f }: { f: Frentes }) {
+  if (f.total === 0) return null
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]
+                     leading-tight text-graf-400">
+      <span title="Equipes cuja rota de hoje é predominantemente Visita Técnica">
+        <span className="tabular font-semibold text-graf-300">{f.vt}</span> VT
+      </span>
+      <span title="Equipes cuja rota de hoje é predominantemente Adesão">
+        <span className="tabular font-semibold text-graf-300">{f.adesao}</span> adesão
+      </span>
+      {f.outras > 0 && (
+        <span title="Rota sem predominância de VT nem de adesão: serviço, migração GPON, mudança de endereço">
+          <span className="tabular font-semibold text-graf-300">{f.outras}</span> outras
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** A barra de proporção do dia, sob o item de Serviços. Cor sozinha não
+ *  informa (D-011), então o `title` lista situação por situação. */
+function BarraVolume({ v }: { v: VolumeDia }) {
+  if (v.total === 0) return null
+  return (
+    <span aria-hidden title={v.fatias.map(f => `${f.label}: ${f.qtd}`).join('\n')}
+      className="mt-1 flex h-1 w-full overflow-hidden rounded-full bg-graf-800">
+      {v.fatias.map(f => (
+        <span key={f.situacao} style={{ flex: `${f.qtd} 0 0`, background: f.cor }} />
+      ))}
+    </span>
+  )
 }
 
 /** O número ao lado de um item do menu, e o que ele conta. */
@@ -219,10 +327,14 @@ const ALERTAS: {
 
 interface Contagem {
   n: number | null; titulo: string
-  /** A cor do selo. O número de Serviços conta contratos EM ABERTO, e
-   *  em aberto é AZUL na tela inteira (Emanuel, 25/10) — pintá-lo de
-   *  vermelho, que é a cor da marca, fazia parecer alerta. */
+  /** A cor do selo. Quando há `volume`, o selo é o TOTAL DO DIA e a cor
+   *  sai da barra abaixo dele — pintar o total de uma cor só diria que
+   *  o dia inteiro está num estado, que é o oposto do que ele quer ver. */
   cor?: string
+  /** 150: a repartição do dia por situação, desenhada sob o item. */
+  volume?: VolumeDia | null
+  /** 151: VT e adesão em rota, escritos sob o item de Equipes. */
+  frentes?: Frentes | null
 }
 
 function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
@@ -271,7 +383,7 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                 </>}
               </span>
             )
-            return (
+            const linha = (
               <NavLink key={i.para} to={i.para} onClick={aoNavegar}
                 title={recolhido ? (n != null ? `${i.rotulo} · ${n} ${c!.titulo}` : i.rotulo) : undefined}
                 aria-current={eh ? 'page' : undefined}
@@ -299,6 +411,20 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                   <span aria-hidden className="absolute right-2 top-1 h-1.5 w-1.5 rounded-full bg-af-500" />
                 )}
               </NavLink>
+            )
+            // 150: a barra de volume mora SOB o item, e só no menu
+            // aberto: recolhido não há largura para proporção nenhuma.
+            const temVolume = !!c?.volume && c.volume.total > 0
+            const temFrentes = !!c?.frentes && c.frentes.total > 0
+            if (recolhido || (!temVolume && !temFrentes)) return linha
+            return (
+              <div key={i.para}>
+                {linha}
+                <span className="block px-3">
+                  {temVolume && <BarraVolume v={c!.volume!} />}
+                  {temFrentes && <FrentesEmRota f={c!.frentes!} />}
+                </span>
+              </div>
             )
           })}
         </nav>
@@ -429,7 +555,8 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   const aberto = !recolhido || espiando
 
   const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
-  const abertos = useAbertosHoje(gestao)
+  const volume = useVolumeHoje(gestao)
+  const frentes = useFrentesHoje(gestao)
   const central = useCentral()
   // 139: um painel de cada vez — o do sino ou o de um dos quatro ícones.
   const [painel, setPainel] = useState<string | null>(null)
@@ -446,8 +573,24 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
   // resposta — sinalização de material, pedido de abastecimento. Sem a
   // central carregada, nulo: nada de "0" que ninguém mediu.
   const contagens: Record<string, Contagem> = {
-    '/controle/servicos': { n: abertos, titulo: 'em aberto hoje (sem jornada)',
-                            cor: 'var(--st-execucao)' },
+    // 150: o TOTAL do dia, e a barra de cores embaixo. Cancelado pela
+    // central, desatribuído e jornada ficam fora -- ninguém foi.
+    '/controle/servicos': {
+      n: volume?.total ?? null,
+      titulo: volume
+        ? `contratos hoje · ${volume.fatias.map(f => `${f.label} ${f.qtd}`).join(' · ')}`
+        : 'contratos hoje',
+      volume,
+    },
+    // 151: equipes com rota de mais de um contrato, por frente.
+    '/controle/equipes': {
+      n: frentes?.total ?? null,
+      titulo: frentes
+        ? `equipes em rota hoje (mais de um contrato) · ${frentes.vt} VT · `
+          + `${frentes.adesao} adesão${frentes.outras ? ` · ${frentes.outras} outras` : ''}`
+        : 'equipes em rota hoje',
+      frentes,
+    },
     // Selo de pedido só aparece quando há pedido: é chamada de atenção,
     // não inventário.
     '/almoxarifado': { n: central.dados?.material?.length || null, titulo: 'sinalização(ões) do campo aguardando' },

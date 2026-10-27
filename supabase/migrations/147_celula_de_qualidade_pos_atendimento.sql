@@ -1,3 +1,7 @@
+-- ATENCAO: a 148 REESTRUTUROU esta tabela horas depois (desfecho de nove
+-- estados no lugar de situacao + funcionou) e a 149 acrescentou o painel.
+-- Este arquivo fica como registro do que foi aplicado primeiro. Ver D-229.
+--
 -- 147 · A celula de QUALIDADE: falar com o assinante depois do atendimento
 --
 -- > "preciso que no painel lateral tenha um menu chamado qualidade. Essa

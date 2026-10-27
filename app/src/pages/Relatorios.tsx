@@ -9,13 +9,26 @@ import {
 import { Shell } from '../components/Shell'
 import { Alerta } from '../components/ui'
 import { isoLocal, pts } from '../lib/formato'
+import { useAuth } from '../lib/auth'
+import { linhasHumor, type HumorLinha } from '../lib/relatorioHumor'
 
 /**
- * Relatórios — por contrato e por O.S.
+ * Relatórios — por contrato, por O.S. e o humor das equipes.
  *
  * A montagem das linhas mora em `lib/relatorio.ts`; aqui é só a tela:
  * período, filtros, prévia e download. Ver lá o porquê de cada coluna
  * e por que a pontuação sai só na primeira O.S. do endereço.
+ *
+ * ┌─ 150 · o humor também se baixa ───────────────────────────────────┐
+ * │ > "faça o time conseguir baixar essa planilha depois se quiser no │
+ * │ >  relatórios, o humor dos técnicos" — Emanuel, 26/10             │
+ * │                                                                     │
+ * │ A aba só aparece para quem tem `campo.humor`, a MESMA permissão    │
+ * │ que abre a tela de Humor (146). Sem isso, qualquer um com          │
+ * │ `relatorios.ver` baixaria em planilha o que a tela esconde — e     │
+ * │ como o técnico se sente é dado sensível de empregado, não número   │
+ * │ de operação.                                                        │
+ * └─────────────────────────────────────────────────────────────────────┘
  */
 
 
@@ -23,7 +36,10 @@ import { isoLocal, pts } from '../lib/formato'
 export default function Relatorios() {
   const [de, setDe] = useState(isoLocal())
   const [ate, setAte] = useState(isoLocal())
-  const [tipo, setTipo] = useState<'contrato' | 'os'>('contrato')
+  const { pode } = useAuth()
+  const podeHumor = pode('campo.humor')
+  const [tipo, setTipo] = useState<'contrato' | 'os' | 'humor'>('contrato')
+  const [humor, setHumor] = useState<HumorLinha[]>([])
   const [formato, setFormato] = useState<'xlsx' | 'csv'>('xlsx')
   const [linhas, setLinhas] = useState<VisitaLinha[]>([])
   const [pontos, setPontos] = useState<Map<string, PontoVisita>>(new Map())
@@ -49,6 +65,19 @@ export default function Relatorios() {
   }, [])
 
   const [locais, setLocais] = useState<Map<string, LocalBaixa>>(new Map())
+
+  // O humor vem de uma RPC própria (146) e só é pedido quando a aba
+  // está escolhida: é dado sensível, não se carrega "por via das dúvidas".
+  useEffect(() => {
+    if (tipo !== 'humor' || !podeHumor || !de || !ate) return
+    let vivo = true
+    supabase.rpc('humor_das_equipes', { p_de: de, p_ate: ate }).then(({ data, error }) => {
+      if (!vivo) return
+      if (error) { setErro(error.message); return }
+      setHumor((data ?? []) as HumorLinha[])
+    })
+    return () => { vivo = false }
+  }, [tipo, podeHumor, de, ate])
 
   useEffect(() => {
     if (!de || !ate) return
@@ -101,10 +130,11 @@ export default function Relatorios() {
   const totalOS = filtradas.reduce((s, l) => s + l.ordem_servico.length, 0)
 
   const montado = useMemo(
-    () => tipo === 'contrato'
-      ? porContrato(filtradas, pontos, indicadores, locais)
-      : porOS(filtradas, pontos, indicadores, locais),
-    [filtradas, pontos, indicadores, tipo, locais])
+    () => tipo === 'humor' ? linhasHumor(humor)
+      : tipo === 'contrato'
+        ? porContrato(filtradas, pontos, indicadores, locais)
+        : porOS(filtradas, pontos, indicadores, locais),
+    [filtradas, pontos, indicadores, tipo, locais, humor])
 
   const somaPontos = useMemo(() => {
     let s = 0
@@ -137,7 +167,9 @@ export default function Relatorios() {
     }))
     ws['!freeze'] = { xSplit: 0, ySplit: 1 }
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, tipo === 'contrato' ? 'Por contrato' : 'Por O.S.')
+    XLSX.utils.book_append_sheet(wb, ws,
+      tipo === 'humor' ? 'Humor das equipes'
+        : tipo === 'contrato' ? 'Por contrato' : 'Por O.S.')
     XLSX.writeFile(wb, `${nome}.xlsx`)
   }
 
@@ -183,7 +215,9 @@ export default function Relatorios() {
             <div className="text-xs text-graf-400">
               <span className="mb-1 block">Tipo de relatório</span>
               <div className="flex rounded-md bg-graf-900 p-0.5">
-                {([['contrato', 'Por contrato'], ['os', 'Por O.S.']] as const).map(([t, rot]) => (
+                {([['contrato', 'Por contrato'], ['os', 'Por O.S.'],
+                   ...(podeHumor ? [['humor', 'Humor das equipes'] as const] : []),
+                  ] as const).map(([t, rot]) => (
                   <button key={t} onClick={() => setTipo(t)}
                     className={`rounded px-3 py-1 text-[11px] font-medium transition ${
                       tipo === t ? 'bg-af-600 text-white' : 'text-graf-400 hover:text-graf-200'}`}>

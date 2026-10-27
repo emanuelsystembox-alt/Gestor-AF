@@ -9126,3 +9126,199 @@ roda `tec1`-style por contrato? não — é um select só, mas não foi medido c
 trabalhando a mesma fila ao mesmo tempo — o `unique (visita_id)` garante uma
 pesquisa por contrato, mas o segundo a gravar sobrescreve o primeiro sem aviso.
 Se a célula tiver mais de uma pessoa, vale decidir o que fazer nesse caso.
+
+### D-229 · A Qualidade reescrita no padrão da central que ele já opera (148, 149)
+
+> *"precisa melhorar nessa central de qualidade. Te mandei a tela de outra
+> central de qualidade que eu fiz, precisa fazer igual ou bem melhor do que
+> essa. A nossa não tem filtro, tá bem simples. E as palavras parece meio
+> amadoras (...) precisa usar palavras mais técnicas e mais bonitas para o
+> sistema (...) depois mostrar um gráfico do mês, qual é o login que está
+> ativando"* — Emanuel, 26/10, com quatro telas da central dele
+
+A D-228 entregou a célula funcionando; esta a põe no padrão da que ele já
+opera. **A aritmética da tela dele foi conferida antes de escrever uma linha**,
+e é dela que saíram as definições:
+
+- `441 + 44 + 1 + 11 + 3 = 500` e `441/500 = 88,2%` = a Conformidade dele.
+  Logo **rede externa fica FORA do denominador** — é planta da CLARO, não
+  execução da AFLINE. O card dele diz isso com todas as letras: *"19 rede
+  externa (fora da conta)"*.
+- `876 − 288 (não atendeu) − 56 (sem número) = 532` e `532/876 = 60,7%` = o
+  Contato. Logo **contatado é todo mundo com quem se FALOU**, inclusive quem
+  recusou responder.
+
+---
+
+#### 1. Um DESFECHO, não duas perguntas
+
+A 147 tinha "situação do contato" **e** "funcionou?" para o mesmo fato — o que
+deixa combinação impossível representável (FALADO com funcionou nulo). Os nove
+estados dele resolvem com um campo só, e são o vocabulário dele, palavra por
+palavra:
+
+| desfecho | conclusivo? | contato? |
+|---|---|---|
+| Normalizado | sim | sim |
+| Serviço com falha | sim | sim |
+| Problema crítico (sem serviço) | sim | sim |
+| Sem ativo | sim | sim |
+| Deseja cancelamento | sim | sim |
+| **Rede externa** | **não — fora da conformidade** | sim |
+| Cliente não quis responder | não | sim |
+| Não atendeu | não | não |
+| Sem número / número inválido | não | não |
+
+A tabela tinha **zero linhas**, então a reestruturação saiu de graça. Cada botão
+carrega a dica de **quando usar** — a central é operada por gente que entra hoje.
+
+#### 2. As palavras
+
+Saíram "falados", "não consegui", "A falar". Entraram **Desfecho do contato**,
+**Normalizados**, **Problemas**, **Rede externa**, **Sem apuração**,
+**Pendentes**; **Cobertura**, **Contato**, **Conformidade**, **Satisfação**;
+**Produção por analista**, **Meta dia a dia**, **Observações registradas**.
+
+#### 3. Os cinco filtros
+
+**Tipo de serviço · Situação · Código de baixa · Janela · LOG**, mais a busca
+por contrato, cliente, endereço, equipe, técnico ou telefone. As opções saem do
+**período inteiro**, não do que sobrou — lista que encolhe conforme se filtra
+deixa a pessoa sem caminho de volta. O filtro roda **no cliente**, e isso é
+deliberado: são ~300 linhas, e ida ao servidor a cada clique custaria mais que
+a consulta inteira. Medido: 281 → 93 (VT) → 1 (VT + LOG 3+) → 2 (VT + baixa
+409), e "Limpar filtros" devolve 281.
+
+#### 4. O painel
+
+Seis cartões (Cobertura, Contato, Conformidade, Nota média, Satisfação,
+Problemas), **Produção por analista** (hoje/meta, média/dia, dias na meta,
+avaliados, contatados, problemas, conformidade, nota, último registro),
+**Meta dia a dia** (grade analista × dia, verde quem bateu), **Equipes com mais
+problemas**, **Por tipo de serviço** e **Observações registradas** com filtro
+"só problemas".
+
+A produção é contada pelo **dia em que se ligou**, não pelo dia do contrato: o
+analista trabalha hoje a fila de ontem, e a meta é do dia dele.
+
+#### 5. Não existe card de NPS, e isso é deliberado
+
+A central dele mostra "NPS interno 84" — e lá a nota é de **0 a 10**. Oferecida
+a troca, **ele preferiu manter 1 a 5**. NPS é *definido* em 0-10 (promotores
+9-10 menos detratores 0-6); fazer a mesma conta em 1-5 e chamar de NPS seria dar
+nome errado a um número. No lugar entra **Satisfação = % de notas 4 e 5**, que é
+honesto nesta escala e mede a mesma coisa. **Esta é a única diferença de
+conteúdo em relação à central dele, e é de propósito.**
+
+#### 6. A meta de 70/dia é parâmetro
+
+`qualidade_meta_diaria`, nasce em 70 (igual à central dele) e o ADMIN muda sem
+precisar de commit — mesmo padrão das metas de TEC1 e Primeira WO.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos; `testar_policies()` 26/26 e
+`testar_campo()` 29/29; RLS ligada e **zero `SECURITY DEFINER` alcançável pelo
+`anon`** (nove funções novas/recriadas, e função recriada nasce com a ACL
+aberta). Os cinco filtros exercitados no navegador. Sete desfechos gravados com
+marca óbvia de teste e a aritmética conferida contra a lógica dele —
+conformidade 3/5 = 60%, contato 6/7 = 85,7%, satisfação 4/6 = 66,7%, rede
+externa fora da conta, cobertura 7/281 = 2,5%. **As sete linhas foram apagadas e
+a tabela conferida vazia.** E o md5 do corpo das **nove funções no arquivo bate
+com o que está vivo no banco** — a conferência da D-160, feita antes de commitar
+e não depois.
+
+**Defeito encontrado e corrigido no caminho:** `base.nome` **já traz a UF**
+("Manaus - AM"), e `concat_ws(' - ', nome, uf)` escrevia "Manaus - AM - AM" na
+coluna Operação.
+
+**NÃO VERIFICADO:** o desempenho de `qualidade_fila` num mês fechado como
+`authenticated` — as cinco funções do painel a chamam, então um período longo
+custa cinco varreduras. No dia (281 linhas) não houve atraso perceptível, mas
+vale medir antes de alguém abrir "o mês" com a operação inteira. E segue em
+aberto da D-228: **dois analistas na mesma fila** — o segundo a gravar
+sobrescreve o primeiro sem aviso.
+
+### D-230 · O menu diz o volume do dia, e o humor vira planilha (150, 151)
+
+Três pedidos curtos do Emanuel em 26/10, entre uma tela e outra.
+
+---
+
+#### 1. O selo de Serviços mostra o volume do dia, por cor
+
+> *"é bom colocar o volume de contratos conforme as cores ao lado de serviços
+> pra saber o volume de cara, tire o cancelado central e desatribuído"*
+
+O selo contava só os **em aberto** — 10 num dia de 343. O número respondia
+*"quanto falta"*, não *"quanto é o dia"*. Agora é o **total do dia** (291) com
+uma barra de 1 px sob o item, repartida pelas cores de situação que a casa já
+usa, e o `title` lista situação por situação — cor sozinha não informa (D-011).
+
+Fora da conta, como ele pediu: **cancelado pela central, desatribuído e
+jornada**. Mesma regra da D-225 — ninguém foi, não é volume de trabalho. O 291
+bate exatamente com o que o painel de Equipes já mostrava.
+
+**A conta mora no banco** (`volume_do_dia`), e não na tela, por dois motivos: o
+menu existe em **todas** as telas e reconta a cada 2 min e a cada navegação —
+trazer as ~340 linhas do dia só para contar sairia caro em cada clique; e a
+regra de exclusão fica num lugar só. Volta uma linha por situação.
+
+A ordem das fatias é a do domínio, não a da contagem: a barra precisa ficar
+parada entre um refresh e outro, senão o olho perde onde cada cor mora.
+
+#### 2. O selo de Equipes diz quantas rodam VT e quantas rodam adesão
+
+> *"seria bom também mostrar aqui quantidade de técnico de VT rodando hoje e
+> técnico de adesão, contar as equipes que estão com rota mais de 1 contrato
+> em linha"*
+
+**"Em rota" = mais de um contrato no dia**, como ele definiu — uma visita solta
+não é rota. Hoje: **54 equipes, 17 VT, 30 adesão, 7 outras.**
+
+**A frente sai do que a equipe está FAZENDO hoje**, não do cadastro: `tecnico.skill`
+é cadastro e envelhece, a escala muda todo dia. A regra é o grupo de serviço
+**predominante** da rota. Medido antes de escrever: das 54 equipes, apenas
+**duas** fazem VT e adesão no mesmo dia — ou seja, o predominante quase nunca é
+desempate, é retrato fiel.
+
+As 7 "outras" não fazem nem VT nem adesão (serviço, migração GPON, mudança de
+endereço) e **não são empurradas para um dos dois**. Empate de verdade cai ali
+também: inventar critério de desempate seria o sistema decidindo no lugar de
+quem opera (D-088).
+
+Aqui a escolha foi **palavra, não barra**: a pergunta é "quantos de cada
+frente", e proporção não responde isso.
+
+#### 3. O humor das equipes vira planilha em Relatórios
+
+> *"faça o time conseguir baixar essa planilha depois se quiser no relatórios,
+> o humor dos técnicos"*
+
+Terceira aba em Relatórios, ao lado de "Por contrato" e "Por O.S.", em Excel ou
+CSV. Sete colunas: Dia, Técnico, Equipe, Cidade, Como está, **Pede atenção** e
+Respondeu às. A ordem é a da tela — dia mais recente primeiro e, dentro do dia,
+**quem não está bem na frente**: a planilha é lida para agir.
+
+**A aba só existe para quem tem `campo.humor`** — a mesma permissão que abre a
+tela de Humor (146). Sem essa trava, qualquer pessoa com `relatorios.ver`
+baixaria em planilha o que a tela esconde, e **como o técnico se sente é dado
+sensível de empregado**, não número de operação. Os dados só são pedidos quando
+a aba é escolhida, pelo mesmo motivo.
+
+"Sem resposta" vai **escrito**, não como célula vazia: vazio no Excel passa por
+erro de exportação, e aqui é informação — o técnico tinha visita no dia e não
+respondeu (regra 6).
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos; `testar_policies()` 26/26 e
+`testar_campo()` 29/29; as duas RPCs novas fechadas ao `anon`. No navegador: o
+selo de Serviços em **291** com cinco fatias proporcionais e o `title` completo;
+o de Equipes em **54 · 17 VT · 30 adesão · 7 outras**; e o relatório de humor
+com **61 linhas, 7 colunas**, abrindo pelo único técnico que respondeu "Triste".
+
+**NÃO VERIFICADO:** a aba de humor **sem** a permissão `campo.humor` — a trava é
+a mesma expressão que a tela de Humor usa, mas não foi exercitada com um usuário
+sem a chave. E o menu recolhido não mostra barra nem frentes (não há largura);
+isso é deliberado, mas quem trabalha com o menu fechado perde a leitura.
