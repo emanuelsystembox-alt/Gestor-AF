@@ -1,4 +1,4 @@
-# Estado do projeto — 08/09/2026 (pendências atualizadas em 25/10/2026)
+# Estado do projeto — 08/09/2026 (pendências atualizadas em 26/10/2026)
 
 > Se você está assumindo o projeto agora, comece pelo **`HANDOFF.md`** na
 > raiz. Este documento é o inventário; aquele é o mapa.
@@ -428,6 +428,56 @@ falta o olho de quem usa.
 | **`tecnico.foto_url` sem uso** | Substituída por `perfil.foto_path` (D-180); pode sair numa migration. |
 | **TEC1 "Sem tratamento"** | Fora da conta por decisão (D-187). Se a importação do fim do dia virar garantida, dá para seguir o livro. |
 | Página **`/campo`** da web; **"Esqueci minha senha"** por e-mail | D-172: alinhar ou aposentar a página; e-mail exige SMTP. |
+
+---
+
+## Pendente em 26/10/2026 — humor do dia e ocorrências do campo (D-226)
+
+Migrations **146 e 146b**; web publicada e conferida por md5; app publicado pelo ar
+(`eas update`, canal preview, runtime 0.5.0) e **APK 0.5.0 novo** gerado na EAS
+(build `3dafa32c`). Baterias **26/26** e **29/29**; nenhuma tabela sem RLS; nenhuma
+`SECURITY DEFINER` para o `anon`. Commit `1cc6599`.
+
+### Resolvido nesta leva
+
+- **Pergunta do humor obrigatória** todo dia a partir das 6h, depois da ciência do rastro:
+  Feliz · Indiferente · Desanimado · Triste · Estressado. Sem sinal, vai para a fila do
+  aparelho e sobe depois.
+- **Ocorrências do campo**: o "Sinalizar" da 091 ganhou Perdi, Velho/desgastado e o
+  **problema no carro** (12 itens, "Outro" com descrição obrigatória).
+- **Quem vê**: permissões `campo.humor` e `campo.ocorrencias`; perfil **Coordenador**
+  (as duas), Supervisor (só ocorrências), Administrador (as duas). COP, Controlador e
+  Técnico, nenhuma.
+- Web: **Equipe em campo › Humor das equipes** e **› Ocorrências do campo**.
+
+### Depende do Emanuel
+
+| O quê | Por quê |
+|---|---|
+| **Dar o perfil Coordenador a alguém** | Ninguém tem. Até lá, só o ADMIN vê o humor. Muda-se em Administração, no cadastro do usuário. |
+| **Cadastrar o condutor de cada carro** | Medido em 26/10: `veiculo_condutor` não tem **nenhum** condutor atual. Toda ocorrência de carro sai "sem carro no cadastro" até a frota declarar o condutor na tela de Frota. |
+| **Avisar os técnicos** | A pergunta aparece sozinha a partir de amanhã 6h e não dá para pular. O texto diz que só a coordenação vê — vale repetir de viva voz. |
+| **A Frota responde problema de carro?** | Hoje **não**: só quem tem `campo.ocorrencias`. Se a frota tiver de ver/responder, é dar a permissão ao perfil Frota (Administração) — sem código. |
+| **O que fazer com quem está mal** | O sistema mostra; não avisa ninguém nem abre nada sozinho. Se "estressado 3 dias seguidos" tiver de virar alerta, é regra a definir. |
+
+### Construção que ficou para depois
+
+| O quê | Por quê |
+|---|---|
+| **Tela para cadastrar problema de carro** | `problema_veiculo` é cadastro, mas sem tela: acrescentar ou desligar item hoje é por SQL. |
+| **Contador de ocorrências no menu/sino** | A central conta só o ferramental para o almoxarifado (146). Coordenação e supervisão não têm o número "aguardando" ao lado do item do menu. |
+| **Cenários nas baterias** | O teste de `campo.humor` e `campo.ocorrencias` foi avulso, como `authenticated`, numa transação desfeita. Não está em `testar_policies()`. |
+| **Arquivo da 146 × banco** | O arquivo tem comentários dentro de `resolver_sinalizacao` que a versão aplicada não tem. O código é o mesmo; o `md5` do `prosrc` vai diferir se alguém conferir com comentário (traps.md). |
+
+### Verificação que ninguém fez ainda
+
+| O quê | Por quê |
+|---|---|
+| **As duas telas da web, com login** | Carregaram no Vite sem erro e o build está no ar; o desenho não foi visto. |
+| **A folha do humor num celular** | Inclusive: não fechar com o "voltar", aparecer depois do aviso do GPS, aparecer sozinha quando o app aberto passa das 6h. |
+| **A fila sem sinal** | Responder em modo avião, voltar a rede e conferir a linha em `humor_diario` com a hora do toque. |
+| **O APK 0.5.0 novo instalado** | Gerado sem erro; ninguém instalou. |
+| **"Sem resposta" no primeiro dia** | Hoje (26/10) aparecem 60 escalados sem resposta, porque a pergunta ainda não existia de manhã. O número de 26/10 não é falta. |
 
 ---
 
