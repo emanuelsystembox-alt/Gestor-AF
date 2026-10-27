@@ -25,7 +25,8 @@ export function SeloLog({ valor, titulo }: {
   if (n == null) {
     return (
       <span title={`A linha do TOA não trouxe a coluna "Contador de log" para este contrato.${titulo ? ` ${titulo}` : ''}`}
-        className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-medium text-graf-300">
+        className="inline-flex shrink-0 items-center whitespace-nowrap rounded bg-graf-800
+                   px-1.5 py-0.5 text-[10px] font-medium leading-none text-graf-300">
         log ?
       </span>
     )
@@ -44,17 +45,19 @@ export function SeloLog({ valor, titulo }: {
     return (
       <span title={dica}
         style={{ background: '#000' }}
-        className="rounded px-1.5 py-0.5 text-[10px] font-bold tabular text-white
+        className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded
+                   px-1.5 py-0.5 text-[10px] font-bold leading-none text-white
                    ring-1 ring-amber-500/70">
-        LOG {n}
+        LOG <span className="tabular">{n}</span>
       </span>
     )
   }
 
   return (
     <span title={dica}
-      className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-medium tabular text-graf-300">
-      LOG {n}
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded bg-graf-800
+                 px-1.5 py-0.5 text-[10px] font-medium leading-none text-graf-300">
+      LOG <span className="tabular">{n}</span>
     </span>
   )
 }

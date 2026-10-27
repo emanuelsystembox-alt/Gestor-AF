@@ -8705,3 +8705,128 @@ testado contra o PostgREST (parseia, sem PGRST100, e o RLS devolve vazio ao anô
 componentes renderizados de verdade no navegador, com os cinco contratos de hoje, cada um
 com o seu tempo. **Não verificado:** as telas inteiras logadas (Dashboard, Serviços, Equipes)
 — não tenho login, e os números do card saíram de SQL equivalente, não da tela.
+
+### D-225 · Os seis acertos de 26/10: LOG filtrável, a Rota com nome e filtros, e o que ninguém foi fazer (144, 145)
+
+Seis pedidos do Emanuel na mesma mensagem, depois de ver a D-224 no ar.
+
+---
+
+**1. O selo do LOG estava torto, e a janela não filtrava.** *"o símbolo do log
+ficou feio (...) não consigo filtrar nessa própria janela o que é 1, log 2,
+log 3, deve dar essa opção"*. O selo quebrava em duas linhas ("LOG" em cima,
+o número embaixo) porque não tinha `whitespace-nowrap` nem `inline-flex`. E a
+janela agora tem **dois filtros que se combinam** — valor do LOG e grupo de
+serviço. A contagem de cada chip é feita **sobre o outro filtro já aplicado**,
+para a soma dos chips sempre bater com a lista; e um grupo que ficaria vazio
+na combinação simplesmente não é oferecido. Conferido na tela: LOG 2 → 9
+linhas (todas 2), + VISITA TECNICA → 8, LOG 5 → 1.
+
+**2. A tabela de Serviços espremia a coluna que mais tem conteúdo.** *"está
+com quebra de texto, talvez reduza a coluna grupo pra ficar mais ajustado"*.
+A causa: **Grupo tinha `whitespace-nowrap` e por isso não encolhia** — ficava
+do tamanho de "RETORNO DE CREDENCIADA" em toda linha, e a coluna de O.S.
+quebrava a descrição do tipo **uma palavra por linha**. Agora Grupo tem teto
+(`w-36`) e quebra, Endereço caiu de 320 para 224 px, e a O.S. tem piso de
+26 rem — medido depois: 429 px, com "48 · VISITA TECNICA - VIRTUA" numa linha
+só.
+
+**3. O LOG estava EMBAIXO da área, não ao lado.** Medido no navegador: "MA1"
+(25 px) + "LOG 0" (41 px) + espaçamentos = **96 px**, e a coluna tinha 66. Foi
+para `w-28` (112 px) com `flex-nowrap`. Não é chute: é a medida.
+
+**4. A Rota não sabia o nome de ninguém.** *"suba o nome do técnico também,
+não tem o nome, só login, e número"*. `rota_do_dia` lia o nome em
+`dados_origem->>'Recurso'` — a coluna que **só um dos dois formatos de export
+do TOA traz** (D-091). Medido: **0 de 482** visitas do dia têm essa coluna, e
+por isso as 61 faixas diziam todas "sem nome no TOA". O nome estava do lado:
+**482 de 482** têm `tecnico_responsavel_id`. O cadastro passa a vir primeiro e
+o "Recurso" fica de reserva. O nome virou a primeira linha da faixa e o login
+desceu — sem sumir, que é por ele que a faixa casa com o TOA.
+
+> Armadilha: **a matrícula do técnico É o login do TOA** (medido: Z597207 nos
+> dois). Escrever as duas deu "Z597207Z597207" na tela. Em Serviços o mesmo
+> efeito roubava metade do nome por truncagem — lá a matrícula foi para a dica.
+
+**5. O cartão da Rota dizia a situação só por cor.** *"é bom mostrar se o
+contrato está se deslocando, solicitação de ticket, cancelado, reagendado"*.
+Agora a **palavra** está no cartão, abreviada com palavra inteira (nunca com
+reticências: "Em desloca…" não informa). E `rota_do_dia` passou a trazer
+`status_toa` e `desatribuido`, então o cartão distingue "CANCELADA" de
+"CANC. CENTRAL" e "DESATRIBUÍDO" — para quem despacha são coisas diferentes:
+numa o técnico foi, na outra não.
+
+**6. A Rota não tinha filtros.** *"deve ter os filtros de equipes, tipo de
+serviço, igual ao no menu serviços"*. Três filtros (equipe, grupo, situação)
+que se combinam, com as opções saindo do **dia inteiro** e não do que sobrou —
+lista de filtro que encolhe conforme se filtra deixa a pessoa sem caminho de
+volta. O corte acontece **uma vez, na porta**, e faixas, mapa e resumo saem
+dele: a lição da 131, de que filtro que muda a lista mas não os números faz a
+mesma tela afirmar duas coisas. Conferido: 342 → 114 (VT) → 73 (VT +
+Concluída), faixas 54 → 19 → 17.
+
+---
+
+#### O que apareceu sem ninguém procurar: o resumo da Rota contava jornada
+
+Medindo as duas contas lado a lado, sem filtro, para garantir que o recálculo
+não divergisse do servidor:
+
+| | `rota_resumo` | pelas paradas |
+|---|---|---|
+| km no dia | 937 | **937** |
+| bairros | 50 | **50** |
+| retornos | 79 | **79** |
+| pulverizados | 19 | **19** |
+| **visitas** | 482 | **342** |
+| **técnicos** | 61 | **54** |
+
+As quatro parcelas calculadas batem exatamente. A diferença é a **JORNADA**:
+`rota_resumo` conta Refeição e Na Base como visita, e os 7 logins que só
+fizeram jornada como técnico em rota. *"Jornada não entra em produtividade"*
+é regra de ouro do projeto, e esta tela já separa a jornada "na porta" de
+propósito — o cartão é que nunca tinha recebido o recado.
+
+O cartão passa a dizer **342 visitas · 126 de jornada fora da conta**, e
+"Técnicos · com parada produtiva". Não é segunda implementação de regra:
+`km_desde_anterior` e `voltou_ao_bairro` continuam vindo calculados do
+servidor, parada por parada; a tela só soma.
+
+---
+
+#### Cancelado pela central não conta para a equipe (144b)
+
+> *"cancelado pela central que o técnico nem chegou a ir no contrato, não é
+> bom nem contabilizar o número do contrato pra equipe, deve mostrar quando
+> expandir, porém não entra na contagem"* — Emanuel, 26/10
+
+Perguntado e **decidido por ele entre três opções**: sai de **tudo que julga a
+equipe** — contratos, O.S., situações, pontos, TEC1, tempos e régua de
+períodos. E o **Desatribuído (800)** recebe o mesmo tratamento, também por
+decisão dele: o técnico igualmente não foi, e a D-223 já tinha tirado os dois
+da conta de quebra pela mesma razão.
+
+A mudança é de **uma linha no lugar certo**: `v` é o funil por onde tudo
+passa em `painel_equipes`. Tirar ali tira de tudo, e não há segunda cópia da
+regra para divergir depois.
+
+`fora_da_conta` volta como número e a tela escreve **"NINGUÉM FOI · N
+cancelado(s) pela central ou desatribuído(s), fora de todas as contas"** no
+cartão expandido. Número que encolhe calado parece defeito — e a lista de
+contratos continua mostrando todos eles, porque sumir com eles seria trocar um
+erro por outro.
+
+Medido em 26/10: **291 contratos contra 343**, com **52 fora** em 35 das 68
+equipes. A função e o SQL de conferência dão o mesmo número.
+
+---
+
+**VERIFICADO:** `tsc --noEmit` e `npm run build` limpos; `testar_policies()`
+26/26 e `testar_campo()` 29/29; zero tabela sem RLS e zero `SECURITY DEFINER`
+alcançável pelo `anon` (as duas funções foram **recriadas**, e função recriada
+nasce com a ACL aberta); as seis telas abertas e dirigidas no navegador, com
+os filtros acionados e os números conferidos contra SQL equivalente.
+
+**NÃO VERIFICADO:** o comportamento em tela estreita (celular) das colunas
+novas, e o painel de Equipes com filtro de contrato ligado ao mesmo tempo que
+o `fora_da_conta` — a conta deve fechar, mas não foi medida nessa combinação.

@@ -266,7 +266,13 @@ function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
  * linha, nao a decima — e por ela que se abre a tela.
  */
 function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
-  const voltaram = useMemo(() => linhas
+  // 145: "nao consigo filtrar nessa propria janela o que e 1, log 2,
+  // log 3, deve dar essa opcao" (Emanuel, 26/10). Dois filtros, que se
+  // combinam: o valor do LOG e o grupo de servico. Nulo = todos.
+  const [soLog, setSoLog] = useState<number | null>(null)
+  const [soGrupo, setSoGrupo] = useState<string | null>(null)
+
+  const todos = useMemo(() => linhas
     .filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
     .map(v => ({ v, n: lerLog(v.contador_log) }))
     .filter((x): x is { v: Visita; n: number } => x.n != null && x.n > 0)
@@ -274,16 +280,36 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
       || (a.v.tipo_servico?.nome ?? '').localeCompare(b.v.tipo_servico?.nome ?? '')),
   [linhas])
 
+  const grupoDe = (v: Visita) => v.tipo_servico?.nome ?? 'Sem grupo de serviço'
+
+  /** Quantos de cada LOG — a contagem do chip é sobre o OUTRO filtro
+   *  aplicado, para a soma dos chips sempre bater com a lista. */
+  const porLog = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const { v, n } of todos) {
+      if (soGrupo && grupoDe(v) !== soGrupo) continue
+      m.set(n, (m.get(n) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => a[0] - b[0])
+  }, [todos, soGrupo])
+
   const porGrupo = useMemo(() => {
     const m = new Map<string, { qtd: number; graves: number }>()
-    for (const { v, n } of voltaram) {
-      const g = v.tipo_servico?.nome ?? 'Sem grupo de servico'
+    for (const { v, n } of todos) {
+      if (soLog != null && n !== soLog) continue
+      const g = grupoDe(v)
       const t = m.get(g) ?? { qtd: 0, graves: 0 }
       t.qtd++; if (n >= LOG_GRAVE) t.graves++
       m.set(g, t)
     }
     return [...m.entries()].sort((a, b) => b[1].qtd - a[1].qtd)
-  }, [voltaram])
+  }, [todos, soLog])
+
+  const voltaram = useMemo(() => todos.filter(({ v, n }) =>
+    (soLog == null || n === soLog) && (soGrupo == null || grupoDe(v) === soGrupo)),
+  [todos, soLog, soGrupo])
+
+  const filtrando = soLog != null || soGrupo != null
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
@@ -299,11 +325,15 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
       <div className="card-controle mt-10 w-full max-w-6xl overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 border-b border-graf-800 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">LOG · {voltaram.length} contrato(s) que ja voltaram</h2>
+            <h2 className="text-sm font-semibold">
+              LOG · {voltaram.length} contrato(s) que já voltaram
+              {filtrando && <span className="ml-1 font-normal text-graf-400">
+                de {todos.length}</span>}
+            </h2>
             <p className="mt-0.5 text-[11px] text-graf-500">
-              O &ldquo;Contador de log&rdquo; e da CLARO e vem na planilha do TOA: quantas vezes o
-              contrato ja voltou para a agenda. Conta o historico inteiro dela, inclusive o que
-              nunca passou por aqui — por isso pode divergir da nossa reincidencia.
+              O &ldquo;Contador de log&rdquo; é da CLARO e vem na planilha do TOA: quantas vezes o
+              contrato já voltou para a agenda. Conta o histórico inteiro dela, inclusive o que
+              nunca passou por aqui — por isso pode divergir da nossa reincidência.
             </p>
           </div>
           <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
@@ -311,35 +341,70 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
           </button>
         </div>
 
-        {voltaram.length === 0 ? (
+        {todos.length === 0 ? (
           <p className="px-4 py-6 text-sm text-graf-400">
-            Nenhum contrato com LOG acima de 0 no periodo e nos filtros.
+            Nenhum contrato com LOG acima de 0 no período e nos filtros.
           </p>
         ) : (<>
+          {/* ---- filtrar por valor do LOG ---- */}
           <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
-            <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">Por grupo de servico</span>
+            <span className="mr-1 w-28 text-[11px] uppercase tracking-wide text-graf-400">Por LOG</span>
+            <button onClick={() => setSoLog(null)}
+              className={`rounded px-2 py-0.5 text-xs ${soLog == null
+                ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+              Todos <span className="tabular opacity-80">{porLog.reduce((t, [, q]) => t + q, 0)}</span>
+            </button>
+            {porLog.map(([n, qtd]) => (
+              <button key={n} onClick={() => setSoLog(soLog === n ? null : n)}
+                aria-pressed={soLog === n}
+                className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs ${soLog === n
+                  ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                <SeloLog valor={n} />
+                <span className="tabular">{qtd}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ---- filtrar por grupo de servico ---- */}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 w-28 text-[11px] uppercase tracking-wide text-graf-400">Por grupo</span>
+            <button onClick={() => setSoGrupo(null)}
+              className={`rounded px-2 py-0.5 text-xs ${soGrupo == null
+                ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+              Todos
+            </button>
             {porGrupo.map(([g, t]) => (
-              <span key={g} className="rounded bg-graf-800 px-2 py-0.5 text-xs text-graf-200">
-                {g} <strong className="tabular text-af-400">{t.qtd}</strong>
+              <button key={g} onClick={() => setSoGrupo(soGrupo === g ? null : g)}
+                aria-pressed={soGrupo === g}
+                className={`rounded px-2 py-0.5 text-xs ${soGrupo === g
+                  ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                {g} <strong className="tabular">{t.qtd}</strong>
                 {t.graves > 0 && (
                   <span className="tabular ml-1 text-amber-400"
                     title={`${t.graves} com LOG ${LOG_GRAVE} ou mais`}>({t.graves} ≥ {LOG_GRAVE})</span>
                 )}
-              </span>
+              </button>
             ))}
           </div>
-          <div className="overflow-x-auto">
+          {voltaram.length === 0 && (
+            <p className="px-4 py-6 text-sm text-graf-400">
+              Nenhum contrato com esta combinação de filtros.{' '}
+              <button onClick={() => { setSoLog(null); setSoGrupo(null) }}
+                className="text-af-400 underline-offset-2 hover:underline">Limpar os filtros</button>
+            </p>
+          )}
+          <div className={`overflow-x-auto ${voltaram.length === 0 ? 'hidden' : ''}`}>
             <table className="w-full text-sm">
               <thead className="border-b border-graf-800 bg-graf-900 text-left text-[11px] uppercase tracking-wide text-graf-400">
                 <tr>
                   <th className="px-3 py-2 font-medium">LOG</th>
-                  <th className="px-3 py-2 font-medium">Grupo de servico</th>
+                  <th className="px-3 py-2 font-medium">Grupo de serviço</th>
                   <th className="px-3 py-2 font-medium">Contrato</th>
-                  <th className="px-3 py-2 font-medium">Tecnico</th>
+                  <th className="px-3 py-2 font-medium">Técnico</th>
                   <th className="px-3 py-2 font-medium">Equipe</th>
-                  <th className="px-3 py-2 font-medium">Area</th>
-                  <th className="px-3 py-2 font-medium">Situacao</th>
-                  <th className="px-3 py-2 font-medium">Cod. de baixa</th>
+                  <th className="px-3 py-2 font-medium">Área</th>
+                  <th className="px-3 py-2 font-medium">Situação</th>
+                  <th className="px-3 py-2 font-medium">Cód. de baixa</th>
                 </tr>
               </thead>
               <tbody>
@@ -358,7 +423,7 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        {v.tecnico?.nome ?? <span className="text-graf-400">sem tecnico</span>}
+                        {v.tecnico?.nome ?? <span className="text-graf-400">sem técnico</span>}
                       </td>
                       <td className="px-3 py-2">{v.equipe?.codigo ?? <span className="text-graf-400">—</span>}</td>
                       <td className="px-3 py-2">{v.area?.codigo ?? <span className="text-graf-400">—</span>}</td>
@@ -366,7 +431,7 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                       <td className="px-3 py-2">
                         {baixa
                           ? <><span className="tabular font-medium">{baixa.codigo}</span> <span className="text-graf-300">{baixa.descricao}</span></>
-                          : <span className="text-graf-400">sem codigo</span>}
+                          : <span className="text-graf-400">sem código</span>}
                       </td>
                     </tr>
                   )

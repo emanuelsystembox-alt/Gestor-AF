@@ -114,6 +114,11 @@ interface EquipePainel {
    *  tempos e periodos (084). Contratos, O.S. e Situacao contam com
    *  eles. Ausente enquanto a 084 nao estiver aplicada. */
   desconexoes?: number
+  /** Cancelado pela central + Desatribuido (800): o tecnico nem chegou a
+   *  ir, entao eles saem de TUDO que julga a equipe -- contratos, O.S.,
+   *  situacoes, pontos, TEC1, tempos e periodos (144). Continuam na
+   *  lista expandida. Ausente enquanto a 144 nao estiver aplicada. */
+  fora_da_conta?: number
 }
 
 /** A contagem de TEC1 da equipe. `pct` é NULO quando nenhuma O.S. entrou
@@ -1332,6 +1337,22 @@ export default function Equipes() {
                                               title="Contratos de DESCONEXÃO não entram em pontos, TEC1, tempos nem períodos desta equipe. Contratos, O.S. e Situação contam com eles.">
                                               {e.desconexoes} desconexão(ões) fora
                                               das contas e dos períodos
+                                            </dd>
+                                          </>}
+
+                                          {/* 144: "cancelado pela central que o
+                                              técnico nem chegou a ir (...) não
+                                              entra na contagem" (Emanuel, 26/10).
+                                              Some de TUDO acima — por isso a linha
+                                              existe: número que encolhe calado
+                                              parece defeito. A lista abaixo
+                                              continua mostrando os contratos. */}
+                                          {(e.fora_da_conta ?? 0) > 0 && <>
+                                            <dt className="text-graf-600">NINGUÉM FOI</dt>
+                                            <dd className="min-w-0 text-graf-400"
+                                              title="Cancelado pela central e Desatribuído (código 800): o TOA encerrou antes de o técnico sair. Não entram em contratos, O.S., situações, pontos, TEC1, tempos nem períodos — mas continuam na lista de contratos abaixo.">
+                                              {e.fora_da_conta} cancelado(s) pela central
+                                              ou desatribuído(s), fora de todas as contas
                                             </dd>
                                           </>}
 

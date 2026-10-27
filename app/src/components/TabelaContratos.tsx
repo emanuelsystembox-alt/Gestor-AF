@@ -318,11 +318,25 @@ export function TabelaContratos({
           <th className="px-3 py-2 font-medium">Contrato</th>
           <th className="px-3 py-2 font-medium">Janela</th>
           <th className="px-3 py-2 font-medium">Situação</th>
-          <th className="px-3 py-2 font-medium">Grupo</th>
-          <th className="px-3 py-2 font-medium">Endereço</th>
+          {/* ┌─ 145 · a largura e disputada, e quem perdia era a O.S. ──┐
+              │ "esta com quebra de texto, talvez reduza a coluna grupo   │
+              │  pra ficar mais ajustado" (Emanuel, 26/10). Grupo estava  │
+              │ com `whitespace-nowrap` e por isso NAO ENCOLHIA: ficava   │
+              │ do tamanho de "RETORNO DE CREDENCIADA" em toda linha, e   │
+              │ a coluna de O.S. -- que e a mais larga de conteudo --     │
+              │ era espremida ate a descricao do tipo quebrar UMA PALAVRA │
+              │ POR LINHA. Agora Grupo tem teto e quebra; a O.S. tem piso.│
+              └───────────────────────────────────────────────────────────┘ */}
+          <th className={`px-3 py-2 font-medium ${detalhada ? 'w-36' : ''}`}>Grupo</th>
+          <th className={`px-3 py-2 font-medium ${detalhada ? 'w-56' : ''}`}>Endereço</th>
           {mostra.equipe && <th className="px-3 py-2 font-medium">Equipe</th>}
-          {mostra.area && <th className="px-3 py-2 font-medium">Área</th>}
-          <th className={`px-3 py-2 font-medium ${detalhada ? '' : 'text-center'}`}>
+          {/* 145: 96 px e o que "MA1 + LOG 0" ocupa lado a lado, medido no
+              navegador; com os 66px que a coluna tinha, o selo caia para a
+              linha de baixo -- que e exatamente o que ele nao queria. */}
+          {mostra.area && (
+            <th className={`px-3 py-2 font-medium ${detalhada ? 'w-28' : ''}`}>Área</th>
+          )}
+          <th className={`px-3 py-2 font-medium ${detalhada ? 'w-[28rem]' : 'text-center'}`}>
             {detalhada ? 'Ordens de serviço' : 'O.S.'}
           </th>
           {/* "Data e baixa": a celula tem duas coisas -- a data agendada
@@ -573,7 +587,7 @@ export function TabelaContratos({
                 )}
               </td>
 
-              <td className="whitespace-nowrap px-3 py-2 align-top text-xs">
+              <td className={`px-3 py-2 align-top text-xs ${detalhada ? '' : 'whitespace-nowrap'}`}>
                 {v.tipo_servico?.nome
                   ?? (jornada ? <span className="text-graf-400">Jornada</span>
                               : <span className="text-graf-600">—</span>)}
@@ -590,7 +604,7 @@ export function TabelaContratos({
                 </div>
               </td>
 
-              <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-80' : 'max-w-72 truncate'}`}
+              <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-56' : 'max-w-72 truncate'}`}
                   title={v.logradouro ?? ''}>
                 <div className={detalhada ? '' : 'truncate'}>
                   {v.logradouro ?? <span className="text-graf-600">—</span>}
@@ -606,8 +620,18 @@ export function TabelaContratos({
                   {v.equipe
                     ? equipeRotulo(v.equipe.codigo, v.equipe.nome)
                     : <span className="text-af-400/70">sem equipe</span>}
+                  {/* 145: "em equipe adicione o nome do tecnico tambem
+                      (...) e bom saber quem e o 33" (Emanuel, 26/10). A
+                      matricula sozinha nao diz quem e ninguem. */}
                   {v.tecnico && (
-                    <span className="ml-1.5 text-xs text-graf-500">{v.tecnico.matricula}</span>
+                    /* A matrícula fica só na dica: ela é o próprio login do
+                       TOA, já visível na célula, e escrita aqui roubava
+                       metade do nome por truncagem. O nome é o que ele
+                       pediu — "é bom saber quem é o 33". */
+                    <div className="max-w-44 truncate text-[11px] text-graf-400"
+                         title={`${v.tecnico.nome} · matrícula ${v.tecnico.matricula}`}>
+                      {v.tecnico.nome}
+                    </div>
                   )}
                   {/* O supervisor mostrado é o DECLARADO do técnico deste
                       contrato. Só cai no nome da planilha quando ninguém
@@ -631,21 +655,23 @@ export function TabelaContratos({
 
               {mostra.area && (
                 <td className="px-3 py-2 align-top text-xs text-graf-400">
-                  {v.area?.apelido ?? '—'}
                   {/* 144: "ao lado da área vamos colocar uma tag (...) chamada
                       LOG" (Emanuel, 26/10). Jornada não é contrato e não tem
-                      LOG — ali o selo seria um "?" em toda linha, sem informar. */}
-                  {!jornada && (
-                    <div className="mt-1">
+                      LOG — ali o selo seria um "?" em toda linha, sem informar.
+                      145: AO LADO mesmo — empilhado ele engordava a linha e
+                      ficava torto contra o código da área. */}
+                  <div className="flex flex-nowrap items-center gap-1.5">
+                    <span className="whitespace-nowrap">{v.area?.apelido ?? '—'}</span>
+                    {!jornada && (
                       <SeloLog valor={v.contador_log}
                         titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </td>
               )}
 
               {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}
-              <td className={`px-3 py-2 align-top ${detalhada ? 'min-w-[20rem]' : 'tabular text-center'}`}>
+              <td className={`px-3 py-2 align-top ${detalhada ? 'min-w-[26rem]' : 'tabular text-center'}`}>
                 {!detalhada ? (
                   v.ordem_servico.length > 0
                     ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
@@ -676,7 +702,10 @@ export function TabelaContratos({
                           <span className="tabular font-semibold text-graf-200">
                             {o.numero_os ?? '—'}
                           </span>
-                          <span className="min-w-0 flex-1 text-graf-400">
+                          {/* `basis-auto`: com `flex-1` puro a descricao
+                              aceitava largura zero e quebrava palavra por
+                              palavra quando a coluna apertava (145). */}
+                          <span className="min-w-0 flex-1 basis-auto text-graf-400">
                             {o.tipo_os ? `${o.tipo_os.codigo} · ${o.tipo_os.descricao}` : '—'}
                           </span>
                           {/* O produto pendente anda junto da O.S. — é o

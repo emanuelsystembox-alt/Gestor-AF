@@ -324,6 +324,29 @@ filho na raiz do `return`, e o Babel estoura *"Unexpected token, expected ','"*.
 antes do `return`, em `//`. Foi carregar a página que pegou (D-224) — "compila" não é
 "funciona", e "compilou antes" não é "compila".
 
+**`whitespace-nowrap` numa coluna de tabela não é "não quebra": é "não ENCOLHE".**
+A coluna Grupo de Serviços ficava do tamanho de "RETORNO DE CREDENCIADA" em toda
+linha, e quem pagava era a coluna de O.S., a mais larga de conteúdo — a descrição
+do tipo quebrava **uma palavra por linha**. O sintoma aparece longe da causa: o
+texto picado está numa coluna, o `nowrap` está em outra. Em tabela larga, dê TETO
+às colunas curtas (`w-36`) e PISO à que carrega o conteúdo. Ver D-225.
+
+**A matrícula do técnico É o login do TOA.** Medido: `tecnico.matricula` =
+`Z597207` e o login do TOA da faixa = `Z597207`. Escrever os dois lado a lado deu
+"Z597207Z597207" na Rota, e em Serviços roubou metade do nome por truncagem. Antes
+de mostrar matrícula e login juntos, compare — e, se forem iguais, escolha um.
+Ver D-225.
+
+**`rota_resumo` conta JORNADA como visita.** O cartão "VISITAS" da Rota dizia 482
+onde há 342 paradas produtivas, e "TÉCNICOS" 61 onde 54 têm parada produtiva: os 7
+logins que só fizeram Refeição e Na Base entravam como técnico em rota. A própria
+tela já separa a jornada "na porta", de propósito — o cartão é que não tinha
+recebido o recado. Só apareceu porque as duas contas foram medidas lado a lado
+antes de trocar a fonte do resumo; km, bairros, retornos e pulverizados batiam
+exatamente, e foi o par que NÃO batia que mostrou o defeito. **Antes de substituir
+uma conta do servidor por uma da tela, meça as duas sem filtro: ou elas batem, ou
+uma das duas está errada e vale saber qual.** Ver D-225.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

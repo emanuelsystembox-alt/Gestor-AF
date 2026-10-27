@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACAO_INFO, SITUACOES, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
@@ -46,6 +46,8 @@ interface Parada {
   contrato: string | null
   login: string
   tecnico: string | null
+  /** 144: a matricula, para a faixa dizer QUEM é e nao so o login. */
+  tecnico_matricula: string | null
   equipe: string | null
   /** A CHAVE para agir. `equipe` é o código, rótulo; quem `transferir_visita`
    *  aceita é o id (075). */
@@ -63,6 +65,10 @@ interface Parada {
   janela_inicio: string | null
   janela_fim: string | null
   situacao: Situacao
+  /** "Status da Atividade" do TOA e o selo 800 — juntos dizem se o
+   *  cancelamento veio da central ou foi desatribuicao nossa (144). */
+  status_toa: string | null
+  desatribuido: boolean | null
   tipo_servico: string | null
   /** Aderência à janela, calculada pelo SERVIDOR (D-047). A tela não
    *  recalcula: uma segunda regra divergiria da primeira. */
@@ -102,6 +108,10 @@ interface Resumo {
  * servidor falarem o mesmo número — se um dia mudar, muda nos dois.
  */
 const LIMITE_SALTO_KM = 10
+
+/** Mesma casca de `select` de Serviços — nenhum controle novo (D-011). */
+const selRota = 'rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs ' +
+                'text-graf-200 focus:border-af-600 focus:outline-none'
 
 /**
  * Encerrado: não se arrasta. Espelha `situacoes_terminais()` (035) — o
@@ -149,6 +159,33 @@ function duracao(min: number): string {
  * não estiver no de/para aparece inteiro, truncado pelo CSS: melhor uma
  * palavra cortada do que um rótulo errado.
  */
+/**
+ * O rotulo curto da situacao no cartao da parada (144).
+ *
+ * > "e bom mostrar se o contrato esta se deslocando, solicitacao de
+ * >  ticket, cancelado, reagendado, alem do codigo vamos colocar esses
+ * >  status tambem" — Emanuel, 26/10
+ *
+ * O cartao tem ~110 px: "Em deslocamento" nao cabe e truncado vira
+ * "Em desloca…", que nao informa. Entao abrevia-se com PALAVRA INTEIRA,
+ * nunca com reticencias — e o titulo do cartao continua trazendo o nome
+ * cheio, que e de onde sai a leitura de tela.
+ *
+ * A cor NAO entra aqui: ela ja e a borda esquerda do cartao, e repetir
+ * a mesma cor em dois lugares nao acrescenta — o que faltava era a
+ * PALAVRA. Divergencia com simbolo e texto, nunca so cor.
+ */
+const APELIDO_SITUACAO: Record<string, string> = {
+  ENTRADA: 'NA ENTRADA',
+  ATRIBUIDA: 'ATRIBUÍDA',
+  EM_DESLOCAMENTO: 'DESLOCANDO',
+  EM_EXECUCAO: 'EXECUTANDO',
+  CONCLUIDA: 'CONCLUÍDA',
+  CANCELADA: 'CANCELADA',
+  REAGENDAMENTO: 'REAGENDADO',
+  COM_IMPEDIMENTO: 'TICKET',
+}
+
 const APELIDO_SERVICO: Record<string, string> = {
   'VISITA TECNICA': 'VT',
   'MUDANCA DE ENDERECO': 'MUD. END.',
@@ -165,7 +202,9 @@ export default function Rota() {
   // HOJE. Abria no último dia com visita, e a rota de ontem sob a data
   // de hoje é a pior das confusões numa tela de despacho (lib/dia.ts).
   const [data, setData] = useState(isoLocal())
-  const [paradas, setParadas] = useState<Parada[]>([])
+  /** O dia inteiro, como veio do servidor. O que a tela usa é `paradas`,
+   *  logo abaixo — o mesmo conjunto depois dos filtros (144). */
+  const [paradasDoDia, setParadas] = useState<Parada[]>([])
   /** Refeicao, Na Base: o que explica o buraco na sequencia do dia. */
   const [jornadas, setJornadas] = useState<Parada[]>([])
   const [bairros, setBairros] = useState<BairroLinha[]>([])
@@ -174,6 +213,11 @@ export default function Rota() {
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)   // login em foco
+  // 144: "deve ter os filtros de equipes, tipo de servico, igual ao no
+  // menu servicos" (Emanuel, 26/10). Tres filtros que se combinam.
+  const [fEquipe, setFEquipe] = useState('TODAS')
+  const [fGrupo, setFGrupo] = useState('TODOS')
+  const [fSituacao, setFSituacao] = useState('TODAS')
   const outroDia = useDiaAnteriorComMovimento(data)
 
   /** A transferência em curso: o que está sendo movido e para onde.
@@ -218,6 +262,84 @@ export default function Rota() {
     return recarregar()
   }, [data, recarregar])
 
+  /** As opcoes saem do DIA INTEIRO, nao do que sobrou: lista de filtro
+   *  que encolhe conforme se filtra deixa a pessoa sem caminho de volta. */
+  const opcoes = useMemo(() => ({
+    equipes: [...new Set(paradasDoDia.map(p => p.equipe).filter(Boolean) as string[])].sort(),
+    grupos: [...new Set(paradasDoDia.map(p => p.tipo_servico).filter(Boolean) as string[])].sort(),
+    situacoes: [...new Set(paradasDoDia.map(p => p.situacao))]
+      .sort((a, b) => SITUACOES.indexOf(a) - SITUACOES.indexOf(b)),
+  }), [paradasDoDia])
+
+  /*
+   * ┌─ 144 · o filtro vale para a TELA INTEIRA ───────────────────────┐
+   * │ A 131 ja tinha resolvido isto em Equipes: filtro que muda a      │
+   * │ lista mas nao os numeros faz a mesma tela afirmar duas coisas.   │
+   * │ Aqui `paradas` alimenta as faixas, o mapa e o resumo — entao o   │
+   * │ corte acontece UMA VEZ, na porta, e todo o resto vem dele.       │
+   * │                                                                   │
+   * │ A JORNADA nao e filtrada: ela explica o buraco entre um contrato │
+   * │ e o seguinte, e sumir com a Refeicao ao filtrar por grupo faria  │
+   * │ a faixa mentir sobre o tempo parado.                             │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const paradas = useMemo(() => paradasDoDia.filter(p =>
+    (fEquipe === 'TODAS' || p.equipe === fEquipe)
+    && (fGrupo === 'TODOS' || p.tipo_servico === fGrupo)
+    && (fSituacao === 'TODAS' || p.situacao === fSituacao)),
+  [paradasDoDia, fEquipe, fGrupo, fSituacao])
+
+  const filtrando = fEquipe !== 'TODAS' || fGrupo !== 'TODOS' || fSituacao !== 'TODAS'
+
+  /*
+   * ┌─ 144 · o resumo passa a sair das paradas, e por que ────────────┐
+   * │ Com filtro o servidor nao tem como responder, entao a tela tinha │
+   * │ de contar o que esta vendo. Medindo as duas contas lado a lado   │
+   * │ no dia 26/10, SEM filtro, apareceu outra coisa:                  │
+   * │                                                                    │
+   * │   km 937 = 937 · bairros 50 = 50 · retornos 79 = 79 ·            │
+   * │   pulverizados 19 = 19   ← identicos, parcela por parcela        │
+   * │   VISITAS  482 (servidor) contra 342 (paradas)                   │
+   * │   TECNICOS  61 (servidor) contra  54 (paradas)                   │
+   * │                                                                    │
+   * │ A diferenca e a JORNADA: `rota_resumo` conta Refeicao e Na Base  │
+   * │ como visita, e os 7 logins que so fizeram jornada como tecnico   │
+   * │ em rota. "Jornada nao entra em produtividade" e regra de ouro do │
+   * │ projeto, e esta propria tela ja separa a jornada "na porta" de   │
+   * │ proposito -- o cartao e que nao tinha recebido o recado.         │
+   * │                                                                    │
+   * │ Entao o resumo sai SEMPRE daqui: um numero so, certo com e sem   │
+   * │ filtro. Nao e segunda implementacao de regra -- `km_desde_ante-  │
+   * │ rior` e `voltou_ao_bairro` continuam vindo calculados do         │
+   * │ servidor, parada por parada; aqui so se somam. E a jornada nao   │
+   * │ some da tela: ela aparece na faixa e no rodape do cartao.        │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const resumoFiltrado = useMemo(() => {
+    const porBairro = new Map<string, Set<string>>()
+    for (const p of paradas) {
+      if (!p.bairro) continue
+      porBairro.set(p.bairro, (porBairro.get(p.bairro) ?? new Set()).add(p.login))
+    }
+    return {
+      visitas: paradas.length,
+      tecnicos: new Set(paradas.map(p => p.login)).size,
+      bairros: porBairro.size,
+      km_total: paradas.reduce((t, p) => t + (p.km_desde_anterior ?? 0), 0),
+      retornos: paradas.filter(p => p.voltou_ao_bairro).length,
+      bairros_pulverizados: [...porBairro.values()].filter(s => s.size >= 5).length,
+    }
+  }, [paradas])
+
+  const vis = resumoFiltrado
+  /** Quantas atividades de jornada ficaram fora da conta — só dos
+   *  logins que sobraram no filtro, senão o rodapé falaria de gente que
+   *  não está na tela. */
+  const nJornada = useMemo(() => {
+    const logins = new Set(paradas.map(p => p.login))
+    return jornadas.filter(j => logins.has(j.login)).length
+  }, [jornadas, paradas])
+
   /** Uma faixa por LOGIN do TOA, na ordem de quem mais rodou. */
   const faixas = useMemo(() => {
     const m = new Map<string, Parada[]>()
@@ -230,6 +352,7 @@ export default function Rota() {
           jornada: jornadas.filter(j => j.login === login)
             .sort((a, b) => (a.inicio ?? '').localeCompare(b.inicio ?? '')),
           nome: ps.find(p => p.tecnico)?.tecnico ?? null,
+          matricula: ps.find(p => p.tecnico_matricula)?.tecnico_matricula ?? null,
           equipe: ps.find(p => p.equipe)?.equipe ?? null,
           equipeId: ps.find(p => p.equipe_id)?.equipe_id ?? null,
           km: ps.reduce((s, p) => s + (p.km_desde_anterior ?? 0), 0),
@@ -321,17 +444,62 @@ export default function Rota() {
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
+        {/* ====== filtros (144) ======
+            Mesma gramática de Serviços: `select` em fila, com a contagem
+            do que sobrou e um botão de limpar que só aparece quando há o
+            que limpar. */}
+        {paradasDoDia.length > 0 && (
+          <div className="card-controle flex flex-wrap items-center gap-2 p-3">
+            <select value={fEquipe} onChange={e => setFEquipe(e.target.value)}
+              aria-label="Filtrar por equipe" className={selRota}>
+              <option value="TODAS">Toda equipe</option>
+              {opcoes.equipes.map(c => (
+                <option key={c} value={c}>{equipeRotulo(c)}</option>))}
+            </select>
+
+            <select value={fGrupo} onChange={e => setFGrupo(e.target.value)}
+              aria-label="Filtrar por grupo de serviço" className={selRota}>
+              <option value="TODOS">Todo grupo de serviço</option>
+              {opcoes.grupos.map(g => (
+                <option key={g} value={g}>{g}</option>))}
+            </select>
+
+            <select value={fSituacao} onChange={e => setFSituacao(e.target.value)}
+              aria-label="Filtrar por situação" className={selRota}>
+              <option value="TODAS">Toda situação</option>
+              {opcoes.situacoes.map(st => (
+                <option key={st} value={st}>
+                  {SITUACAO_INFO[st]?.label ?? st}</option>))}
+            </select>
+
+            {filtrando && (
+              <>
+                <span className="tabular text-[11px] text-graf-400">
+                  {paradas.length} de {paradasDoDia.length} parada(s)
+                </span>
+                <button
+                  onClick={() => { setFEquipe('TODAS'); setFGrupo('TODOS'); setFSituacao('TODAS') }}
+                  className="rounded-md border border-graf-700 px-2 py-1 text-[11px]
+                             text-graf-300 hover:border-af-600 hover:text-af-400">
+                  Limpar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ====== resumo ====== */}
         {resumo && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {[
-              ['Visitas', String(resumo.visitas), null],
-              ['Técnicos', String(resumo.tecnicos), null],
-              ['Bairros', String(resumo.bairros), null],
-              ['Km no dia', num(resumo.km_total, 0), 'em linha reta'],
-              ['Retornos', String(resumo.retornos),
-                resumo.retornos ? 'voltou a bairro já visitado' : null],
-              ['Bairros pulverizados', String(resumo.bairros_pulverizados),
+              ['Visitas', String(vis.visitas),
+                nJornada > 0 ? `${nJornada} de jornada fora da conta` : null],
+              ['Técnicos', String(vis.tecnicos), 'com parada produtiva'],
+              ['Bairros', String(vis.bairros), null],
+              ['Km no dia', num(vis.km_total, 0), 'em linha reta'],
+              ['Retornos', String(vis.retornos),
+                vis.retornos ? 'voltou a bairro já visitado' : null],
+              ['Bairros pulverizados', String(vis.bairros_pulverizados),
                 '5+ técnicos no mesmo bairro'],
             ].map(([rot, val, nota], i) => (
               <div key={rot as string} className="card-controle p-3">
@@ -348,6 +516,20 @@ export default function Rota() {
 
         {carregando ? (
           <p className="py-16 text-center text-graf-400" role="status">Carregando o dia…</p>
+        ) : paradas.length === 0 && filtrando ? (
+          /* 144: "o dia nao tem rota" e "o filtro nao achou nada" sao
+             coisas diferentes -- dizer a primeira no lugar da segunda
+             manda a pessoa trocar de data quando basta limpar o filtro. */
+          <Vazio titulo="Nenhuma parada neste filtro"
+            descricao={`O dia tem ${paradasDoDia.length} parada(s), mas nenhuma passa nos filtros escolhidos.`}
+            acao={
+              <button
+                onClick={() => { setFEquipe('TODAS'); setFGrupo('TODOS'); setFSituacao('TODAS') }}
+                className="rounded-lg border border-graf-700 px-4 py-2 text-sm
+                           text-graf-300 hover:border-af-600 hover:text-af-400">
+                Limpar os filtros
+              </button>
+            } />
         ) : paradas.length === 0 ? (
           <Vazio titulo="Sem rota para este dia"
             descricao="Nenhuma visita produtiva com login de técnico nesta data."
@@ -404,12 +586,26 @@ export default function Rota() {
                         <span aria-hidden className="h-7 w-1 shrink-0 rounded-full"
                           style={{ background: corEquipe(t.equipe) }} />
                         <span className="min-w-0">
-                          <span className="tabular block truncate text-xs font-semibold
+                          {/* 144: "suba o nome do tecnico tambem, nao tem o
+                              nome, so login, e numero" (Emanuel, 26/10). O
+                              login e endereco de maquina; quem despacha fala
+                              com uma PESSOA. O nome vira a primeira linha e o
+                              login desce, sem sumir -- e por ele que a faixa
+                              casa com o TOA. */}
+                          <span className="block truncate text-xs font-semibold
                                            text-graf-100 group-hover:text-af-400">
-                            {t.login}
+                            {t.nome ?? <span className="font-normal text-graf-400">
+                              sem tecnico cadastrado</span>}
                           </span>
-                          <span className="block truncate text-[11px] text-graf-400">
-                            {t.nome ?? 'sem nome no TOA'}
+                          <span className="tabular block truncate text-[11px] text-graf-400">
+                            {t.login}
+                            {/* Na AFLINE a matrícula COSTUMA ser o próprio
+                                login do TOA (medido: Z597207 nos dois). Só
+                                escreve quando for outra coisa — repetir o
+                                mesmo código duas vezes não informa nada. */}
+                            {t.matricula && t.matricula !== t.login && (
+                              <span className="ml-1.5 text-graf-500">{t.matricula}</span>
+                            )}
                             {t.equipe && (
                               <span className="ml-1.5 text-graf-400">
                                 · {equipeRotulo(t.equipe)}
@@ -684,6 +880,25 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
     ? APELIDO_SERVICO[p.tipo_servico] ?? p.tipo_servico
     : null
 
+  /*
+   * 144: de onde veio o cancelamento. Mesma regra de `origemCancelada`
+   * (filtroContratos), agora resolvida no banco porque a Rota nao
+   * carrega as O.S. — "Cancelada" e "Cancelado pela central" sao coisas
+   * diferentes para quem despacha: numa o tecnico foi, na outra nao.
+   */
+  const situacaoTxt = p.situacao === 'CANCELADA' && p.desatribuido
+    ? 'DESATRIBUÍDO'
+    : p.situacao === 'CANCELADA'
+      && (p.status_toa ?? '').trim().toUpperCase() === 'CANCELADO'
+      ? 'CANC. CENTRAL'
+      : APELIDO_SITUACAO[p.situacao] ?? SITUACAO_INFO[p.situacao]?.label ?? p.situacao
+  const situacaoCheia = p.situacao === 'CANCELADA' && p.desatribuido
+    ? 'Desatribuído — sumiu do TOA e ninguém foi (código 800)'
+    : p.situacao === 'CANCELADA'
+      && (p.status_toa ?? '').trim().toUpperCase() === 'CANCELADO'
+      ? 'Cancelado pela central — o TOA encerrou antes de o técnico sair'
+      : SITUACAO_INFO[p.situacao]?.label ?? p.situacao
+
   // Tempo entre o fim da anterior e o início desta. Só descreve; não
   // julga — não existe regra de quanto é "parado demais", e inventar uma
   // seria escrever meta que ninguém combinou.
@@ -704,7 +919,7 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
     servico ?? 'sem grupo de serviço',
     janela ? `janela ${janela}` : 'sem janela',
     `${hhmm(p.inicio) ?? 'sem início'}${encerrou ? ` até ${encerrou}` : ', em curso'}`,
-    SITUACAO_INFO[p.situacao]?.label ?? p.situacao,
+    situacaoCheia,
     p.baixa_codigos
       ? `baixa ${p.baixa_origem === 'AFLINE' ? 'da AFLINE' : 'da operadora'}`
         + ` ${p.baixa_codigos}`
@@ -769,7 +984,19 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
             {encerrou ?? <span className="font-normal text-graf-400">em curso</span>}
           </span>
 
-          <span className="mt-1 flex items-center gap-1">
+          {/* 144: a SITUACAO em palavra. Antes so a borda esquerda do
+              cartao dizia, por cor -- e cor sozinha nao e informacao. */}
+          <span className="mt-1 block">
+            <span title={situacaoCheia}
+              className="inline-block max-w-full truncate rounded-sm px-1 text-[8px]
+                         font-bold uppercase tracking-wide"
+              style={{ background: `color-mix(in oklab, ${cor} 22%, transparent)`,
+                       color: cor }}>
+              {situacaoTxt}
+            </span>
+          </span>
+
+          <span className="mt-0.5 flex items-center gap-1">
             <span className="min-w-0 truncate rounded-sm bg-graf-800 px-1 text-[8px]
                              font-semibold uppercase tracking-wide text-graf-300">
               {servico ?? 'sem grupo'}
