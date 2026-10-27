@@ -185,7 +185,29 @@ export function calcular(visitas: Visita[]) {
   // D-011/D-001: jornada NUNCA entra no denominador de produtividade.
   // "Na Base" e "Refeição" somaram 94 dos 349 apontamentos do dia 04/09 —
   // deixá-los dentro derruba a taxa de conclusão artificialmente.
-  const produtivas = visitas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+  /*
+   * ┌─ 152 · o que ninguém foi fazer sai de TODAS as contas ───────────┐
+   * │ > "cancelado pela central e desatribuído (...) ambos não entram  │
+   * │ >  na porcentagem de conclusão e não entram em nada dos dados    │
+   * │ >  mostrados nessa tela do dashboard. Mas é bom a pessoa ver o   │
+   * │ >  que foi cancelado pela central e o que foi desatribuído"      │
+   * │ >  — Emanuel, 26/10                                              │
+   * │                                                                    │
+   * │ A D-223 já os tinha tirado da QUEBRA e a D-225 da conta da        │
+   * │ equipe; faltava o Dashboard, que ainda os somava em "visitas      │
+   * │ produtivas" e portanto no denominador da conclusão, no TEC1, nas  │
+   * │ improdutivas e no LOG. Medido em 26/10: 343 viravam 291.          │
+   * │                                                                    │
+   * │ Eles NÃO somem da tela: a matriz ganhou duas colunas só para      │
+   * │ eles, fora do total e fora do % concluído. Ver é diferente de     │
+   * │ contar.                                                            │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const naoJornada = visitas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+  const foraDaConta = naoJornada.filter(v => origemCancelada(v) != null)
+  const produtivas = naoJornada.filter(v => origemCancelada(v) == null)
+  const canceladoCentral = foraDaConta.filter(v => origemCancelada(v) === 'CANCELADO_CENTRAL').length
+  const desatribuido = foraDaConta.filter(v => origemCancelada(v) === 'DESATRIBUIDO').length
   const jornada = visitas.filter(v => v.tipo_atividade?.natureza === 'JORNADA')
 
   const concluidas = produtivas.filter(v => v.situacao === 'CONCLUIDA')
@@ -210,10 +232,11 @@ export function calcular(visitas: Visita[]) {
    * │    antes de o técnico ir. Cobrar isso de quem executa é errado.  │
    * └───────────────────────────────────────────────────────────────────┘
    */
-  const foraDaQuebra = new Set(
-    produtivas.filter(v => origemCancelada(v) != null).map(v => v.id))
+  // 152: `produtivas` já exclui cancelado pela central e desatribuído,
+  // então o filtro que a D-223 fazia aqui virou redundante -- e deixá-lo
+  // seria a mesma regra escrita duas vezes, para divergir um dia.
   const osImprodutivas = produtivas.flatMap(v =>
-    foraDaQuebra.has(v.id) ? [] : v.ordem_servico.filter(o =>
+    v.ordem_servico.filter(o =>
       o.codigo_baixa?.natureza === 'IMPRODUTIVA'
       && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
       && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'))
@@ -554,6 +577,8 @@ export function calcular(visitas: Visita[]) {
     osSucesso: osSucesso.length,
     osImprodutivas: osImprodutivas.length,
     nossas,
+    // 152: aparecem na matriz, não entram em conta nenhuma.
+    foraDaConta: foraDaConta.length, canceladoCentral, desatribuido,
     logComRetorno, logGraves, logSemInfo, logMedidos, logRetornos, pctLog,
     taxaConclusao,
     porSituacao,

@@ -220,10 +220,24 @@ function useVolumeHoje(ligado: boolean): VolumeDia | null {
  * >  mais de 1 contrato em linha" — Emanuel, 26/10
  *
  * "Em rota" é equipe com MAIS DE UM contrato no dia, como ele pediu —
- * uma visita solta não é rota. A frente sai do que a equipe está
- * FAZENDO hoje (grupo predominante), não do cadastro de skill: a escala
- * muda todo dia. Medido em 26/10: 54 equipes, 17 VT, 30 adesão, e só
- * DUAS fazem as duas coisas — o predominante é retrato, não desempate.
+ * uma visita solta não é rota.
+ *
+ * ┌─ 151b · a frente é o que a pessoa É, não o que ela faz hoje ─────┐
+ * │ A primeira versão classificava pelo GRUPO PREDOMINANTE da rota, e │
+ * │ sete equipes caíam em "outras". Fui ver: SEIS DAS SETE estavam em │
+ * │ migração GPON pura, e as sete têm técnico cadastrado como ADESÃO. │
+ * │                                                                     │
+ * │ A pergunta é que estava errada. "Técnico de VT" e "técnico de      │
+ * │ adesão" é o que a pessoa É; migração GPON, serviço e reinstalação  │
+ * │ são trabalho que um técnico de adesão também faz numa terça.       │
+ * │                                                                     │
+ * │ E a resposta já estava no cadastro: `tecnico.skill` — que por       │
+ * │ sinal é a chave da meta e da faixa de comissão (D-094). Derivar da │
+ * │ rota era recalcular o que já estava declarado, e errado.           │
+ * │                                                                     │
+ * │ Medido depois da troca: 43 adesão, 11 VT, ZERO outras. E bate com  │
+ * │ a coluna Segmento de Administração, que lê a mesma skill.          │
+ * └─────────────────────────────────────────────────────────────────────┘
  */
 export interface Frentes {
   total: number
@@ -265,15 +279,17 @@ function FrentesEmRota({ f }: { f: Frentes }) {
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]
                      leading-tight text-graf-400">
-      <span title="Equipes cuja rota de hoje é predominantemente Visita Técnica">
+      <span title="Equipes em rota cujo técnico é do segmento MANUTENÇÃO (visita técnica)">
         <span className="tabular font-semibold text-graf-300">{f.vt}</span> VT
       </span>
-      <span title="Equipes cuja rota de hoje é predominantemente Adesão">
+      <span title="Equipes em rota cujo técnico é do segmento ADESÃO (instalação)">
         <span className="tabular font-semibold text-graf-300">{f.adesao}</span> adesão
       </span>
       {f.outras > 0 && (
-        <span title="Rota sem predominância de VT nem de adesão: serviço, migração GPON, mudança de endereço">
-          <span className="tabular font-semibold text-graf-300">{f.outras}</span> outras
+        /* Só sobra quem está em rota SEM técnico ativo na equipe — e
+           isso é cadastro para arrumar, não uma terceira frente. */
+        <span title="Equipes em rota sem técnico ativo cadastrado: sem segmento para ler">
+          <span className="tabular font-semibold text-af-300">{f.outras}</span> sem técnico
         </span>
       )}
     </span>

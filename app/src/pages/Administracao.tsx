@@ -35,6 +35,28 @@ import { ImportarCadastro } from '../components/ImportarCadastro'
 const PAPEIS = ['ADMIN', 'COP', 'CONTROLADOR', 'SUPERVISOR',
                 'TECNICO', 'ALMOXARIFE', 'FROTA', 'ROBO'] as const
 
+/**
+ * O SEGMENTO do técnico (152).
+ *
+ * > "preciso ter essa visão se é técnico de adesão ou de visita técnica
+ * >  (...) e depois dizer qual é o segmento dele, se é instalação ou
+ * >  manutenção" — Emanuel, 26/10
+ *
+ * Não precisou de campo novo: o cadastro já tem `tecnico.skill`, e ela
+ * é a MESMA coisa — ADESÃO é instalação, MANUTENÇÃO é visita técnica.
+ * Medido em 26/10: 55 em ADESÃO e 12 em MANUTENÇÃO, os 67 técnicos.
+ *
+ * E não é rótulo: é por ela que o técnico acha a meta e a faixa de
+ * comissão (D-094). Por isso o selo diz as DUAS palavras — a do
+ * cadastro e a da operação —, para quem lê não precisar traduzir.
+ */
+const SEGMENTOS: { v: string; curto: string; longo: string; cor: string }[] = [
+  { v: 'ADESÃO',     curto: 'Adesão',     longo: 'Adesão · instalação',           cor: '#16a34a' },
+  { v: 'MANUTENÇÃO', curto: 'Manutenção', longo: 'Manutenção · visita técnica',   cor: '#2563eb' },
+]
+const SEGMENTO_DE: Record<string, (typeof SEGMENTOS)[number]> =
+  Object.fromEntries(SEGMENTOS.map(x => [x.v, x]))
+
 /** Como o filtro da aba Usuários chama cada papel. */
 const ROTULO_PAPEL: Record<(typeof PAPEIS)[number], string> = {
   ADMIN: 'Admin', COP: 'COP', CONTROLADOR: 'Controlador', SUPERVISOR: 'Supervisor',
@@ -135,6 +157,10 @@ interface Usuario {
   tecnico: {
     matricula: string; nome: string
     equipe_id: string | null
+    /** O SEGMENTO do técnico: ADESÃO (instalação) ou MANUTENÇÃO (visita
+     *  técnica). Não é rótulo — é por ela que o técnico acha
+     *  `meta_tecnico` e `faixa_comissao` (D-094). */
+    skill: string | null
     equipe: { codigo: string; nome: string; supervisor_nome: string | null } | null
     /** O supervisor DECLARADO deste técnico (068). Vale mais que o nome
      *  que vem da planilha na equipe dele. */
@@ -174,6 +200,8 @@ export default function Administracao() {
   // à parte: "gerente" é cargo (COORDENADOR, SUPERVISOR), não papel.
   const [filtroPapel, setFiltroPapel] = useState('')
   const [filtroCargo, setFiltroCargo] = useState('')
+  // 152: o mini-filtro de segmento, que só faz sentido entre técnicos.
+  const [filtroSegmento, setFiltroSegmento] = useState('')
 
   // criação
   const [criando, setCriando] = useState(false)
@@ -261,7 +289,7 @@ export default function Administracao() {
                  cargo_id, perfil_acesso_id, base_id,
                  cargo:cargo_id ( nome ),
                  perfil_acesso:perfil_acesso_id ( nome, papel ),
-                 tecnico:tecnico_id ( matricula, nome, equipe_id,
+                 tecnico:tecnico_id ( matricula, nome, equipe_id, skill,
                                       equipe:equipe_id ( codigo, nome, supervisor_nome ),
                                       supervisor:supervisor_id ( nome ) )`)
         .order('nome'),
@@ -836,10 +864,13 @@ export default function Administracao() {
     return usuarios.filter(u =>
       (!filtroPapel || doTipo(u, filtroPapel)) &&
       (!filtroCargo || (filtroCargo === 'SEM' ? !u.cargo_id : u.cargo_id === filtroCargo)) &&
+      (!filtroSegmento || (filtroSegmento === 'SEM'
+        ? !!u.tecnico && !u.tecnico.skill
+        : u.tecnico?.skill === filtroSegmento)) &&
       (!t || [u.nome, u.email, u.apelido, u.cargo?.nome,
         u.perfil_acesso?.nome].some(x => x?.toLowerCase().includes(t))))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuarios, busca, filtroPapel, filtroCargo, papeisPorUsuario])
+  }, [usuarios, busca, filtroPapel, filtroCargo, filtroSegmento, papeisPorUsuario])
 
   const [nomeCargo, setNomeCargo] = useState('')
 
@@ -929,13 +960,50 @@ export default function Administracao() {
                     {rot}<span className="tabular ml-1 opacity-70">{n}</span>
                   </button>
                 ))}
-                {(filtroPapel || filtroCargo || busca) && (
-                  <button onClick={() => { setFiltroPapel(''); setFiltroCargo(''); setBusca('') }}
+                {(filtroPapel || filtroCargo || filtroSegmento || busca) && (
+                  <button onClick={() => {
+                    setFiltroPapel(''); setFiltroCargo(''); setFiltroSegmento(''); setBusca('')
+                  }}
                     className="ml-1 text-xs text-af-400 underline-offset-2 hover:underline">
                     Limpar filtros
                   </button>
                 )}
               </div>
+
+              {/* ┌─ 152 · o mini-filtro de segmento ──────────────────────┐
+                  │ > "quando eu filtrar técnicos, é bom ter um mini       │
+                  │ >  filtro (...) para saber se é técnico de adesão ou   │
+                  │ >  técnico de visita técnica" — Emanuel, 26/10         │
+                  │                                                         │
+                  │ Só aparece quando a lista é de TÉCNICOS: segmento de   │
+                  │ um controlador não existe, e oferecer o filtro ali     │
+                  │ seria prometer um recorte que não tem resposta.        │
+                  └─────────────────────────────────────────────────────────┘ */}
+              {filtroPapel === 'TECNICO' && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group"
+                  aria-label="Filtrar por segmento do técnico">
+                  <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">Segmento</span>
+                  {([['', 'Todos', usuarios.filter(u => doTipo(u, 'TECNICO')).length] as const,
+                     ...SEGMENTOS.map(sg => [sg.v, sg.longo,
+                       usuarios.filter(u => doTipo(u, 'TECNICO') && u.tecnico?.skill === sg.v).length,
+                     ] as const),
+                     ['SEM', 'Sem segmento',
+                      usuarios.filter(u => doTipo(u, 'TECNICO') && !!u.tecnico && !u.tecnico.skill).length,
+                     ] as const,
+                    ]).map(([v, rot, n]) => (
+                    <button key={v || 'todos'} onClick={() => setFiltroSegmento(v)}
+                      aria-pressed={filtroSegmento === v}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                        filtroSegmento === v
+                          ? 'border-af-500 bg-af-600 text-white'
+                          : n === 0
+                            ? 'border-graf-800 text-graf-400 hover:bg-graf-800'
+                            : 'border-graf-700 text-graf-200 hover:bg-graf-800'}`}>
+                      {rot}<span className="tabular ml-1 opacity-70">{n}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {criando && (
                 <div className="mt-3 space-y-3 border-t border-graf-800 pt-3">
@@ -1241,6 +1309,9 @@ export default function Administracao() {
                         <th className="px-3 py-2 font-medium">Supervisor</th>
                         <th className="px-3 py-2 font-medium">Perfil de acesso</th>
                         <th className="px-3 py-2 font-medium">Papéis (o que o banco lê)</th>
+                        {/* 152: o segmento ao lado dos papéis, que é onde a
+                            pergunta "quem é essa pessoa" termina. */}
+                        <th className="px-3 py-2 font-medium">Segmento</th>
                         <th className="px-3 py-2 font-medium">Situação</th>
                         <th className="px-3 py-2"></th>
                       </tr>
@@ -1428,6 +1499,41 @@ export default function Administracao() {
                                 </div>
                               ) : <span className="text-xs text-af-400/70">sem papel</span>}
                             </td>
+
+                            {/* 152: o SEGMENTO. Só existe para quem é
+                                técnico — em controlador a célula fica
+                                vazia, e não "sem segmento", que afirmaria
+                                uma falta de cadastro que não existe. */}
+                            <td className="px-3 py-2">
+                              {!u.tecnico ? (
+                                <span className="text-graf-700">—</span>
+                              ) : u.tecnico.skill && SEGMENTO_DE[u.tecnico.skill] ? (
+                                <span
+                                  title={`${SEGMENTO_DE[u.tecnico.skill].longo}. É por este segmento `
+                                       + 'que o técnico acha a meta e a faixa de comissão (D-094).'}
+                                  style={{ color: SEGMENTO_DE[u.tecnico.skill].cor,
+                                           backgroundColor: 'color-mix(in oklab, '
+                                             + SEGMENTO_DE[u.tecnico.skill].cor + ' 16%, transparent)' }}
+                                  className="inline-block whitespace-nowrap rounded px-1.5 py-0.5
+                                             text-[10px] font-semibold">
+                                  {SEGMENTO_DE[u.tecnico.skill].curto}
+                                </span>
+                              ) : u.tecnico.skill ? (
+                                <span title="Skill fora das duas conhecidas — confira o cadastro do técnico"
+                                  className="inline-block rounded bg-graf-800 px-1.5 py-0.5
+                                             text-[10px] text-graf-300">{u.tecnico.skill}</span>
+                              ) : (
+                                /* Sem skill o técnico fica sem meta e sem
+                                   faixa de comissão, e o "a receber" zera
+                                   EM SILÊNCIO (D-094). Por isso é alerta. */
+                                <span title="Técnico sem segmento: fica sem meta e sem faixa de comissão (D-094)"
+                                  className="inline-block rounded bg-af-900/40 px-1.5 py-0.5
+                                             text-[10px] font-semibold text-af-300">
+                                  sem segmento
+                                </span>
+                              )}
+                            </td>
+
                             <td className="px-3 py-2">
                               <button onClick={() => alternarSituacao(u)}
                                 disabled={ocupado || euMesmo}

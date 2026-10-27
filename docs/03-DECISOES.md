@@ -9322,3 +9322,110 @@ com **61 linhas, 7 colunas**, abrindo pelo único técnico que respondeu "Triste
 a mesma expressão que a tela de Humor usa, mas não foi exercitada com um usuário
 sem a chave. E o menu recolhido não mostra barra nem frentes (não há largura);
 isso é deliberado, mas quem trabalha com o menu fechado perde a leitura.
+
+### D-231 · O que ninguém foi fazer sai de TODAS as contas, e o segmento do técnico aparece (151b, 152)
+
+---
+
+#### 1. A matriz do Dashboard contradizia a régua logo acima dela
+
+A régua separava *"Cancelada 14 · Cancelado pela central 29 · Auditar 23"*. A
+matriz, dois centímetros abaixo, juntava os três numa coluna **"CANCELADA 66"**
+— a mesma tela afirmando duas coisas sobre o mesmo dia. É o defeito da D-150
+outra vez: a matriz lia `visita.situacao` e a régua lia `situacaoDeTela`.
+
+Perguntado o que fazer, ele foi além da consistência:
+
+> *"a gente pode botar aí o cancelado pela central e o desatribuído. Ambos não
+> entram na porcentagem de conclusão e não entram em nada dos dados mostrados
+> nessa tela do dashboard. Mas é bom a pessoa ver o que foi cancelado pela
+> central e o que foi desatribuído."* — Emanuel, 26/10
+
+Então as duas saíram de **tudo** o que o Dashboard calcula — `produtivas` em
+`calcular()`, e por tabela: taxa de conclusão, TEC1, improdutivas, LOG, matriz,
+pontos. A D-223 já os tinha tirado da quebra e a D-225 da conta da equipe;
+faltava o Dashboard.
+
+**E aparecem assim mesmo**, em duas colunas depois do total, atrás de uma borda
+— a posição já diz que não entram na conta à esquerda, antes de alguém ler o
+rodapé. **Ver é diferente de contar.**
+
+O efeito medido em 26/10 é grande e visível:
+
+| | antes | depois |
+|---|---|---|
+| Visitas produtivas | 343 | **291** |
+| Taxa de conclusão | 65,9% | **77,7%** |
+
+O denominador perdeu 52 contratos que ninguém foi atender. **Número que encolhe
+calado parece defeito**, então a régua passou a escrever *"52 sem ida fora da
+conta (29 da central, 23 desatribuído)"* — e o cabeçalho da matriz, que dizia
+"343 contratos produtivos" enquanto a última linha dizia 291, passou a ler o
+mesmo total da tabela.
+
+O filtro redundante que a D-223 fazia dentro de `osImprodutivas` saiu: com
+`produtivas` já limpo, mantê-lo seria a mesma regra escrita duas vezes.
+
+#### 2. O segmento do técnico, na tela de Administração
+
+> *"quando eu filtrar técnicos, é bom ter um mini filtro (...) para saber se é
+> técnico de adesão ou técnico de visita técnica (...) e depois dizer qual é o
+> segmento dele, se é instalação ou manutenção"*
+
+**Não precisou de campo novo.** O cadastro já tem `tecnico.skill`, e é
+exatamente isso: **ADESÃO é instalação, MANUTENÇÃO é visita técnica**. Medido:
+**55 em ADESÃO e 12 em MANUTENÇÃO**, os 67 técnicos da tela.
+
+Entrou uma coluna **Segmento**, ao lado de Papéis — que é onde a pergunta "quem
+é essa pessoa" termina —, e um **mini-filtro** que só aparece quando a lista é
+de técnicos: segmento de controlador não existe, e oferecer o filtro ali seria
+prometer um recorte sem resposta.
+
+Técnico **sem** skill sai marcado em vermelho, e não em cinza: sem ela ele fica
+sem meta e sem faixa de comissão, e o "a receber" zera **em silêncio** (D-094).
+Hoje são zero, e a tela precisa continuar dizendo isso no dia em que não forem.
+
+#### 3. As "7 outras" do selo de Equipes eram a pergunta errada
+
+A D-230 classificava a equipe pelo **grupo predominante da rota do dia**, e sete
+caíam em "outras". Ele pediu para entender de onde vinham. Vim ver:
+
+| Equipe | Técnico | Skill | Contratos | Grupos da rota |
+|---|---|---|---|---|
+| 017 | RENATA GUIMARAES ARAUJO | ADESÃO | 6 | GPON, REINSTALACAO, SERVICO |
+| 066 | JOSIAS COSTA DOS SANTOS | ADESÃO | 5 | MIGRACAO GPON |
+| 001 | CRISTIANO ALVES BARBOSA | ADESÃO | 5 | GPON, RETORNO DE CREDENCIADA |
+| 027 | RODRIGO MACEDO DA SILVA | ADESÃO | 4 | MIGRACAO GPON |
+| 024 | THIAGO LUIZ FERREIRA DA SILVA | ADESÃO | 4 | MIGRACAO GPON |
+| 028 | HERISSON OLIVEIRA BRANDAO | ADESÃO | 4 | MIGRACAO GPON |
+| 022 | ANDRÉ SANTOS FERREIRA | ADESÃO | 2 | MIGRACAO GPON |
+
+**Seis das sete são migração GPON pura, e as sete têm técnico cadastrado como
+ADESÃO.** Não era que elas não tivessem frente — **a pergunta é que estava
+errada**. "Técnico de VT" e "técnico de adesão" é o que a pessoa **é**; migração
+GPON, serviço e reinstalação são trabalho que um técnico de adesão também faz
+numa terça-feira.
+
+E a resposta já estava declarada no cadastro, na mesma `tecnico.skill` do item
+2. **Derivar da rota era recalcular o que já estava declarado — e recalcular
+errado.** Depois da troca: **43 adesão, 11 VT, zero outras**, e o número passa a
+bater com a coluna Segmento de Administração, que lê a mesma skill.
+
+"OUTRAS" continua no retorno da função, agora com outro sentido: equipe em rota
+**sem técnico ativo**. Hoje é zero — mas "não sei" não se escreve como adesão.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos; `testar_policies()` 26/26 e
+`testar_campo()` 29/29. No navegador: matriz com as colunas separadas e total
+291 batendo com a soma das cinco primeiras colunas (2+8+226+14+41); régua em 291
+com a nota das 52; Administração com a coluna Segmento e o filtro exercitado
+(67 → 12 manutenção → 55 adesão → 70 ao limpar); selo de Equipes em 54 = 11 + 43.
+
+**NÃO VERIFICADO e que vale olhar:** o rótulo do desatribuído é **"Auditar"** na
+tela (vem de `ORIGEM_CANCELADA_INFO`), enquanto ele o chama de "desatribuído" —
+ficou como está porque o rótulo já é usado nos filtros de Serviços e renomear
+mexe em mais telas. E, medido de passagem, **6 dos 67 técnicos estão cadastrados
+como ADESÃO mas trabalharam predominantemente em VT nos últimos 30 dias**; como
+a skill é a chave da meta e da comissão (D-094), esses seis estão sendo medidos
+contra a meta errada. A tela não acusa isso ainda.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { supabase, SITUACAO_INFO } from '../lib/supabase'
 import type { Metricas, Visita } from '../lib/metricas'
 import {
   SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela, type SituacaoDeTela,
@@ -35,12 +35,6 @@ import { SeloLog } from './SeloLog'
  * └──────────────────────────────────────────────────────────────────┘
  */
 
-interface VisitaMin {
-  id: string
-  situacao: Situacao
-  tipo_servico: { nome: string } | null
-  tipo_atividade: { nome: string; natureza: string } | null
-}
 interface Ponto { visita_id: string; pontos_claro: number | null; achou: boolean }
 
 const num = (n: number, casas = 0) =>
@@ -489,6 +483,16 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
             <span className="tabular">{num(m.os)}</span> O.S. dentro delas
             {m.jornada > 0 && <> · <span className="tabular">{num(m.jornada)}</span> de
               jornada fora da conta</>}
+            {/* 152: o número caiu de 343 para 291 quando os dois menus de
+                cancelamento saíram das contas. Número que encolhe calado
+                parece defeito — então a régua diz quantos e por quê. */}
+            {m.foraDaConta > 0 && (
+              <span className="block" title="Cancelado pela central e desatribuído: o TOA encerrou antes de o técnico sair. Aparecem na matriz abaixo, em colunas próprias, mas não entram em conta nenhuma.">
+                <span className="tabular">{num(m.foraDaConta)}</span> sem ida fora da conta
+                {' '}(<span className="tabular">{num(m.canceladoCentral)}</span> da central,{' '}
+                <span className="tabular">{num(m.desatribuido)}</span> desatribuído)
+              </span>
+            )}
           </>}
         />
 
@@ -624,7 +628,10 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
 // ================================================================== //
 
 export function MatrizGrupos({ linhas, de, ate, onCSV }: {
-  linhas: VisitaMin[]
+  // 152: a Visita inteira, e não mais a mínima: `origemCancelada`
+  // precisa do `status_toa` e da baixa da AFLINE para separar os dois
+  // menus de cancelamento.
+  linhas: Visita[]
   de: string
   ate: string
   onCSV: () => void
@@ -650,9 +657,33 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
   const produtivas = useMemo(
     () => linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA'), [linhas])
 
+  /*
+   * ┌─ 152 · a matriz lia `situacao`; a régua acima lia `situacaoDeTela` ─┐
+   * │ A régua, dois centímetros acima, já separava "Cancelada 14 ·       │
+   * │ Cancelado pela central 29 · Auditar 23". A matriz juntava os três  │
+   * │ numa coluna "CANCELADA 66" — a MESMA TELA afirmando duas coisas    │
+   * │ sobre o mesmo dia, que é o defeito da D-150 outra vez.             │
+   * │                                                                      │
+   * │ Agora as duas leem pela mesma função. O TOTAL continua 343: aqui a  │
+   * │ matriz mostra ONDE o volume está, e some com 52 contratos seria     │
+   * │ esconder trabalho que existiu. Quem não quer vê-los filtra na       │
+   * │ régua. (No selo do menu eles saem mesmo — lá a pergunta é "quanto   │
+   * │ de trabalho tem hoje", e ninguém foi. Ver D-230.)                   │
+   * └──────────────────────────────────────────────────────────────────────┘
+   */
+  const sitDe = (v: Visita): SituacaoDeTela =>
+    situacaoDeTela({ ...v, status_toa: v.status_toa ?? null })
+
+  /** As duas que APARECEM mas não CONTAM (152). Ver é diferente de contar. */
+  const FORA: SituacaoDeTela[] = ['CANCELADO_CENTRAL', 'DESATRIBUIDO']
+  const foraDaConta = (st: SituacaoDeTela) => FORA.includes(st)
+
   const porSituacao = useMemo(() => {
-    const c = new Map<string, number>()
-    for (const v of produtivas) c.set(v.situacao, (c.get(v.situacao) ?? 0) + 1)
+    const c = new Map<SituacaoDeTela, number>()
+    for (const v of produtivas) {
+      const st = sitDe(v)
+      c.set(st, (c.get(st) ?? 0) + 1)
+    }
     return c
   }, [produtivas])
 
@@ -666,23 +697,38 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
         : v.tipo_atividade?.nome ?? '(sem tipo)'
       if (!m.has(g)) m.set(g, { volume: new Map(), pontos: new Map() })
       const linha = m.get(g)!
-      linha.volume.set(v.situacao, (linha.volume.get(v.situacao) ?? 0) + 1)
+      const st = sitDe(v)
+      linha.volume.set(st, (linha.volume.get(st) ?? 0) + 1)
       const p = pontos.get(v.id) ?? 0
-      linha.pontos.set(v.situacao, (linha.pontos.get(v.situacao) ?? 0) + p)
+      linha.pontos.set(st, (linha.pontos.get(st) ?? 0) + p)
     }
     return [...m.entries()]
       .map(([grupo, d]) => ({
         grupo,
-        total: [...d.volume.values()].reduce((a, b) => a + b, 0),
-        totalPontos: [...d.pontos.values()].reduce((a, b) => a + b, 0),
+        // 152: o total NÃO soma cancelado pela central nem desatribuído
+        // -- eles têm coluna para serem vistos, não para contarem.
+        total: [...d.volume.entries()]
+          .filter(([st]) => !foraDaConta(st as SituacaoDeTela))
+          .reduce((a, [, n]) => a + n, 0),
+        totalPontos: [...d.pontos.entries()]
+          .filter(([st]) => !foraDaConta(st as SituacaoDeTela))
+          .reduce((a, [, n]) => a + n, 0),
         volume: d.volume, pontosPorSit: d.pontos,
       }))
       .sort((a, b) => (aba === 'volume' ? b.total - a.total : b.totalPontos - a.totalPontos))
   }, [produtivas, pontos, aba, eixo])
 
-  // Só as situações que aparecem, na ordem do domínio.
+  // Só as situações que aparecem, na ordem do domínio — a mesma ordem
+  // e os mesmos rótulos da régua, inclusive os dois menus de
+  // cancelamento que a 152 passou a separar.
   const colunas = useMemo(
-    () => SITUACOES.filter(s => porSituacao.has(s)), [porSituacao])
+    () => SITUACOES_DE_TELA.filter(s => porSituacao.has(s) && !foraDaConta(s)),
+    [porSituacao])
+  /** As duas de fora vão DEPOIS do total, separadas por uma borda: a
+   *  posição já diz que não entram na conta à esquerda. */
+  const colunasFora = useMemo(
+    () => SITUACOES_DE_TELA.filter(s => porSituacao.has(s) && foraDaConta(s)),
+    [porSituacao])
 
   const totalPontos = [...pontos.values()].reduce((a, b) => a + b, 0)
   const semPontuacao = produtivas.filter(v => !pontos.has(v.id)).length
@@ -735,8 +781,12 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
         </div>
 
         <span className="ml-auto flex items-center gap-3 text-xs text-graf-500">
+          {/* 152: o número aqui tem de ser o MESMO do total da tabela
+              logo abaixo. `produtivas.length` contava os 52 de fora e
+              dizia 343 onde a última linha dizia 291 — a mesma tabela
+              com dois totais. */}
           {aba === 'volume'
-            ? `${num(produtivas.length)} contratos produtivos`
+            ? `${num(tabela.reduce((a, l) => a + l.total, 0))} contratos produtivos`
             : <>
                 <strong className="tabular text-emerald-400">{num(totalPontos, 2)}</strong>
                 {' '}pontos CLARO
@@ -758,8 +808,8 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
               </th>
               {colunas.map(s => (
                 <th key={s} className="px-2 py-2 text-right font-medium">
-                  <span style={{ color: SITUACAO_INFO[s]?.cor }}>
-                    {SITUACAO_INFO[s]?.label ?? s}
+                  <span style={{ color: infoSituacaoDeTela(s).cor }}>
+                    {infoSituacaoDeTela(s).label}
                   </span>
                 </th>
               ))}
@@ -767,6 +817,19 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
                 {aba === 'volume' ? 'Contratos' : 'Pontos'}
               </th>
               <th className="px-3 py-2 text-right font-medium">% concl.</th>
+              {/* 152: as duas que NÃO contam vêm DEPOIS do total, atrás de
+                  uma borda — a posição já diz que não entram na conta à
+                  esquerda, antes de alguém ler o rodapé. */}
+              {colunasFora.map((st, i) => (
+                <th key={st}
+                  className={`px-2 py-2 text-right font-medium ${
+                    i === 0 ? 'border-l border-graf-700' : ''}`}>
+                  <span style={{ color: infoSituacaoDeTela(st).cor }}
+                    title="Fora de todas as contas desta tela: ninguém foi ao cliente">
+                    {infoSituacaoDeTela(st).label}
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -802,6 +865,19 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
                           {p.toFixed(1).replace('.', ',')}%
                         </span>}
                   </td>
+                  {colunasFora.map((st, i) => {
+                    const v = aba === 'volume'
+                      ? l.volume.get(st) ?? 0
+                      : l.pontosPorSit.get(st) ?? 0
+                    return (
+                      <td key={st}
+                        className={`tabular px-2 py-2 text-right text-graf-400 ${
+                          i === 0 ? 'border-l border-graf-700' : ''}`}>
+                        {v ? num(v, aba === 'volume' ? 0 : 2)
+                           : <span className="text-graf-700">—</span>}
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
@@ -812,27 +888,54 @@ export function MatrizGrupos({ linhas, de, ate, onCSV }: {
                   ? l.volume.get(s) ?? 0 : l.pontosPorSit.get(s) ?? 0), 0)
                 return (
                   <td key={s} className="tabular px-2 py-2 text-right"
-                      style={{ color: SITUACAO_INFO[s]?.cor }}>
+                      style={{ color: infoSituacaoDeTela(s).cor }}>
                     {v ? num(v, aba === 'volume' ? 0 : 2) : '—'}
                   </td>
                 )
               })}
               <td className="tabular px-3 py-2 text-right">
-                {aba === 'volume' ? num(produtivas.length) : num(totalPontos, 2)}
+                {aba === 'volume'
+                  ? num(tabela.reduce((a, l) => a + l.total, 0))
+                  : num(tabela.reduce((a, l) => a + l.totalPontos, 0), 2)}
               </td>
               <td className="tabular px-3 py-2 text-right">
                 {(() => {
-                  const base = aba === 'volume' ? produtivas.length : totalPontos
+                  const base = aba === 'volume'
+                    ? tabela.reduce((a, l) => a + l.total, 0)
+                    : tabela.reduce((a, l) => a + l.totalPontos, 0)
                   const conc = tabela.reduce((s, l) => s + (aba === 'volume'
                     ? l.volume.get('CONCLUIDA') ?? 0
                     : l.pontosPorSit.get('CONCLUIDA') ?? 0), 0)
                   return base ? `${((conc / base) * 100).toFixed(1).replace('.', ',')}%` : '—'
                 })()}
               </td>
+              {colunasFora.map((st, i) => {
+                const v = tabela.reduce((soma, l) => soma + (aba === 'volume'
+                  ? l.volume.get(st) ?? 0 : l.pontosPorSit.get(st) ?? 0), 0)
+                return (
+                  <td key={st}
+                    className={`tabular px-2 py-2 text-right ${
+                      i === 0 ? 'border-l border-graf-700' : ''}`}
+                    style={{ color: infoSituacaoDeTela(st).cor }}>
+                    {v ? num(v, aba === 'volume' ? 0 : 2) : '—'}
+                  </td>
+                )
+              })}
             </tr>
           </tbody>
         </table>
       </div>
+
+      {colunasFora.length > 0 && (
+        <p className="border-t border-graf-800 px-4 py-2 text-[11px] leading-snug text-graf-500">
+          <strong className="text-graf-400">
+            {colunasFora.map(st => infoSituacaoDeTela(st).label).join(' e ')}
+          </strong>{' '}
+          aparecem para serem vistos, mas <strong className="text-graf-400">não entram
+          em conta nenhuma</strong> desta tela — nem no total, nem no % concluído, nem
+          nos cartões acima. Ninguém foi ao cliente (Emanuel, 26/10).
+        </p>
+      )}
 
       {aba === 'pontos' && (
         <p className="border-t border-graf-800 px-4 py-2 text-[11px] leading-snug text-graf-500">
