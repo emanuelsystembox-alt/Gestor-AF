@@ -131,6 +131,7 @@ tarefa pedir.
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
+| `docs/12-VPS-ERP.md` | a VPS na Hostinger (Chrome 24 h, Portainer) — montada, sem uso ainda |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |
 | `docs/01` `02` `05` `07` | mapeamento, domínio, concorrente, telas |
 | `supabase/README.md` | ordem das migrations e conferências |
