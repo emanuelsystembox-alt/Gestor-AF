@@ -324,7 +324,7 @@ export default function Administracao() {
       supabase.from('equipe').select('id, supervisor_nome'),
       supabase.from('tecnico').select('equipe_id').eq('situacao', 'ATIVO'),
       supabase.from('tecnico')
-        .select(`id, matricula, nome, situacao, equipe_id, foto_url,
+        .select(`id, matricula, nome, situacao, equipe_id, foto_url, usuario_id,
                  base:base_id ( nome, regiao ),
                  supervisor:supervisor_id ( nome ),
                  equipe:equipe_id ( codigo, nome, supervisor_nome,

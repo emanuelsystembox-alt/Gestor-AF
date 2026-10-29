@@ -373,6 +373,23 @@ vem na linha mesmo quando o embed não vem. **Antes de escrever "—" para um em
 pergunte se o ponteiro existe — se existir, o que falta é ESCOPO, não cadastro, e a
 tela tem de dizer qual dos dois.** Ver D-232.
 
+**Cabeçalho de planilha casado por NOME sem normalizar a CAIXA ignora a coluna em
+silêncio.** `lerPreenchida()` casa `norm(titulo) === norm(celula)`, e `norm` só tira
+acento e `*` — não faz upper/lower. Na planilha de 29/10 havia `"EQUIPE"` (coluna
+acrescentada à mão) e `"Equipe"` (a do modelo, vazia): a primeira NÃO casou, a segunda
+casou vazia, e as 14 pessoas entraram **sem equipe**. Só coluna OBRIGATÓRIA ausente
+gera aviso; as outras somem caladas. Ver D-233.
+
+**Importação em duas etapas deixa cadastro pela METADE quando a segunda não termina.**
+`importar_cadastro_cidade` grava áreas, equipes, técnicos e login do TOA numa
+transação; os ACESSOS são criados depois, num laço na tela, pessoa a pessoa
+(`admin-usuarios` precisa da `service_role`). Em 29/10 a etapa 1 gravou 14 técnicos de
+São Luís e a etapa 2 **não rodou nenhuma vez** — zero chamadas a `/functions/` em 24 h
+de log, e a conta mais nova do sistema era de dois dias antes. O técnico fica ativo,
+sem login, fora da aba Usuários e fora do aplicativo do campo. É a mesma família da
+armadilha "trabalho de fundo dentro de uma tela para quando a pessoa sai dela". Ver
+D-233.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

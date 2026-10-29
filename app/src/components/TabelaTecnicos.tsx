@@ -23,6 +23,10 @@ import { equipeRotulo } from '../lib/formato'
 export interface TecnicoLinha {
   id: string; matricula: string; nome: string; situacao: string
   equipe_id: string | null
+  /** O ACESSO da pessoa (`tecnico.usuario_id`). Nulo = o técnico existe no
+   *  cadastro mas não tem login — não entra no sistema nem no aplicativo
+   *  do campo, e não aparece na aba Usuários. Ver D-233. */
+  usuario_id: string | null
   foto_url: string | null
   base: { nome: string; regiao: string | null } | null
   /** O supervisor DECLARADO (068) — vale mais que o da planilha. */
@@ -51,6 +55,9 @@ export function TabelaTecnicos({ tecnicos, podeEditar, ocupado, aoMudarSituacao 
             <th className="px-3 py-2 font-medium">Equipe</th>
             <th className="px-3 py-2 font-medium">Área</th>
             <th className="px-3 py-2 font-medium">Supervisor</th>
+            {/* 153: "por que estão no lado do técnico e por que não aparecem
+                no usuário?" (Emanuel, 29/10). A tela não dizia. Agora diz. */}
+            <th className="px-3 py-2 font-medium">Acesso</th>
             <th className="px-3 py-2 font-medium">Situação</th>
             {podeEditar && <th className="px-3 py-2 text-right font-medium">Ação</th>}
           </tr>
@@ -114,6 +121,32 @@ export function TabelaTecnicos({ tecnicos, podeEditar, ocupado, aoMudarSituacao 
                   </span>
                 ) : <span className="text-graf-600">sem supervisor</span>}
               </td>
+
+              {/* ┌─ 153 · técnico sem acesso some da aba Usuários ──────┐
+                  │ > "por que estão no lado do técnico, e por que não    │
+                  │ >  aparecem no usuário?" — Emanuel, 29/10             │
+                  │                                                        │
+                  │ Porque `tecnico.usuario_id` está nulo: o cadastro do  │
+                  │ técnico e o ACESSO são duas coisas, e a importação de │
+                  │ cidade grava o primeiro numa transação e cria o       │
+                  │ segundo num passo seguinte, pessoa a pessoa. Se esse  │
+                  │ passo não termina, fica metade — e a tela não dizia   │
+                  │ qual metade. Agora diz, e em vermelho: sem acesso o   │
+                  │ técnico não entra no sistema nem no aplicativo.       │
+                  └────────────────────────────────────────────────────────┘ */}
+              <td className="px-3 py-2 text-xs">
+                {t.usuario_id ? (
+                  <span title="Tem login: aparece na aba Usuários e entra no aplicativo do campo"
+                    className="whitespace-nowrap text-emerald-400">tem login</span>
+                ) : (
+                  <span title="Cadastrado como técnico, mas SEM login. Não entra no sistema, não aparece na aba Usuários e não usa o aplicativo do campo. Crie o acesso em Novo usuário ou reimporte a planilha da cidade."
+                    className="inline-block whitespace-nowrap rounded bg-af-900/40 px-1.5 py-0.5
+                               font-semibold text-af-300">
+                    sem acesso
+                  </span>
+                )}
+              </td>
+
               <td className="px-3 py-2 text-xs">
                 <span className={t.situacao === 'ATIVO' ? 'text-emerald-400' : 'text-graf-500'}>
                   {t.situacao.toLowerCase()}

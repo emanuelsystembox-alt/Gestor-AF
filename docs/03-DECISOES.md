@@ -9494,3 +9494,92 @@ e "Adesão" em Manaus na mesma linha; aba Técnicos com os 14 de São Luís
 de tela. E a decisão de **dar login aos 14 de São Luís** continua com ele: eles
 estão cadastrados e ativos, mas sem acesso ninguém daquela praça entra no
 sistema nem aparece no aplicativo do campo.
+
+### D-233 · Técnico sem acesso: por que São Luís não apareceu em Usuários (153)
+
+> *"por que estão no lado do técnico, e por que não aparecem no usuário?"*
+> — Emanuel, 29/10
+
+---
+
+#### O cadastro do técnico e o ACESSO são duas coisas, e só a primeira é atômica
+
+A importação de cidade (D-176) faz o trabalho em **duas etapas de natureza
+diferente**:
+
+1. `importar_cadastro_cidade` — **uma transação**: áreas, equipes, técnicos e
+   o vínculo de login do TOA. Ou tudo, ou nada.
+2. **Um laço na tela**, pessoa a pessoa, chamando a Edge Function
+   `admin-usuarios` (a `service_role` só existe no servidor) e depois
+   `vincular_tecnico_ao_usuario`.
+
+A etapa 1 é instantânea e já comitou. A etapa 2 são N chamadas de rede dentro
+de um componente React — e **se ela não termina, o cadastro fica pela metade**:
+técnico existe, acesso não.
+
+Foi exatamente isso em 29/10 às 18:10. Medido:
+
+- **14 técnicos** de São Luís criados (equipes 100–114, MANUTENÇÃO, ATIVO) e
+  14 vínculos de login do TOA;
+- **0 contas** criadas — a conta mais nova do sistema é de 27/10, de Manaus;
+- **0 chamadas a `/functions/`** nas 24 h de log. O único evento de auth no dia
+  foi o login dele às 18:17.
+
+Ou seja: a etapa 2 **não rodou uma vez sequer**. E os 14 e-mails da planilha não
+existem em `perfil`, então a função teria devolvido `acesso = 'CRIAR'` para
+todos — não foi "já existia".
+
+#### E a tela não dizia qual metade faltava
+
+A aba **Técnicos** mostrava matrícula, nome, operação, equipe, área, supervisor
+e situação — **nada sobre acesso**. Os 14 apareciam "ativos", iguais aos de
+Manaus, e sumiam da aba Usuários sem explicação.
+
+Entrou a coluna **Acesso**: *tem login* em verde, **sem acesso** em vermelho,
+com a dica do que isso significa (não entra no sistema, não aparece em
+Usuários, não usa o aplicativo do campo) e do que fazer.
+
+#### Duas armadilhas da planilha, encontradas no caminho
+
+A planilha usada era a de **Manaus** (`Listas!Z2 = MAN`) com as **duas cidades
+na mesma aba Pessoas** — 73 linhas, 59 de Manaus e 14 de São Luís. A tela
+**avisa** quando a cidade da planilha difere da escolhida (`cidadeDiferente`),
+mas o aviso não trava.
+
+E ela tinha **duas colunas acrescentadas à mão no começo**: `B = "LOGIN"` e
+`C = "EQUIPE"`. O leitor casa pelo **nome** do cabeçalho, então coluna extra não
+desloca nada — **mas a comparação distingue maiúscula de minúscula**
+(`norm()` só tira acento e `*`). Resultado: `"EQUIPE"` não casou com `"Equipe"`,
+e a coluna de equipe lida foi a `O`, **que estava vazia**. As 14 pessoas foram
+importadas sem equipe.
+
+> **Armadilha:** cabeçalho de planilha casado por nome sem normalizar a caixa
+> ignora a coluna **em silêncio** quando ela não é obrigatória. Só as
+> obrigatórias geram aviso. Ver também a duplicata: duas colunas com o mesmo
+> nome em caixas diferentes e a tela não acusa nenhuma das duas.
+
+#### O que foi entregue
+
+Uma planilha nova, só com São Luís, `Z2 = SLS` e os cabeçalhos exatos do
+modelo, para ele importar e criar os 14 acessos pela tela — que é o caminho que
+gera o relatório de senhas.
+
+> A criação das 14 contas por script foi **recusada pelo classificador de
+> segurança do ambiente**, e com razão: criar contas em lote por console não é
+> o caminho da casa. A tela existe para isso.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos. No navegador, logado: em Manaus
+os 67 mostram *tem login*; em São Luís os 14 mostram **sem acesso**. A planilha
+gerada foi relida com o mesmo formato que `lerPreenchida()` espera — 4 abas,
+cabeçalhos conferidos, 14 pessoas, `Listas!Z2 = SLS`.
+
+**NÃO VERIFICADO:** a importação da planilha nova (quem importa é ele, e é a
+etapa que cria conta). E **a causa raiz continua de pé**: se o laço da etapa 2
+for interrompido outra vez, o cadastro volta a ficar pela metade. O conserto
+seria a etapa 2 virar trabalho retomável — a tela deveria saber dizer "faltam N
+acessos" e oferecer continuar. Fica proposto, não feito.
+
+**O script que gerou a planilha NÃO foi commitado**: ele carrega nome e e-mail
+pessoal de 14 funcionários, e isso não entra no Git.
