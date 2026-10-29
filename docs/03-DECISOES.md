@@ -9429,3 +9429,68 @@ mexe em mais telas. E, medido de passagem, **6 dos 67 técnicos estão cadastrad
 como ADESÃO mas trabalharam predominantemente em VT nos últimos 30 dias**; como
 a skill é a chave da meta e da comissão (D-094), esses seis estão sendo medidos
 contra a meta errada. A tela não acusa isso ainda.
+
+### D-232 · A cidade do cadastro na tela de Administração, e o "—" que escondia a cidade ativa (153)
+
+> *"ajuste as colunas, coloque a cidade de onde o técnico é depois do cargo,
+> preciso saber onde o time de são luis foi cadastrado"* — Emanuel, 29/10
+
+Entrou a coluna **Cidade** logo depois de Cargo, com `perfil.base_id` — a
+cidade em que o **acesso** foi cadastrado. A busca também passou a encontrar
+por ela, então "são luís" na caixa já filtra.
+
+---
+
+#### O que a pergunta dele revelou
+
+Procurando o time de São Luís, o dado respondeu três coisas:
+
+1. **Os 14 técnicos de São Luís existem e estão certos**: `tecnico.base_id` =
+   São Luís - MA, operação "São Luís - MA NORTE", equipes **100 a 114**, todos
+   **MANUTENÇÃO** e **ATIVO**.
+2. **Nenhum deles tem login** (`usuario_id` nulo nos 14). Por isso não aparecem
+   na aba *Usuários* — aparecem na aba **Técnicos**, que é onde moram os
+   técnicos sem acesso.
+3. **Os 71 acessos do sistema estão todos em Manaus.** Nenhum perfil foi
+   cadastrado em São Luís ainda.
+
+#### E um defeito de leitura que só aparece com duas cidades
+
+Com a cidade ativa em **São Luís**, a coluna Segmento mostrava **"—"** para os
+67 técnicos de Manaus, como se nenhum deles fosse técnico — e a linha "LOGIN
+TOA · roteando para" sumia junto.
+
+A causa: **`perfil` NÃO filtra por cidade ativa, mas `tecnico` filtra**
+(policy `tecnico_leitura` com `bases_visiveis()`, D-180). Então a tela trazia
+os 71 acessos de Manaus e o embed `tecnico:tecnico_id(...)` vinha **nulo** —
+RLS fazendo exatamente o que deve, e a tela interpretando como "não é técnico".
+
+Não era defeito de dado: conferido no banco, `ADAILTON` tem `tecnico_id`
+preenchido e skill `ADESÃO`.
+
+A correção é pequena e usa o que sobrevive ao RLS: **`perfil.tecnico_id`**. Ele
+vem na linha mesmo quando o embed não vem, e denuncia a diferença — a coluna
+agora escreve **"outra cidade"**, com a dica de trocar a cidade no topo.
+
+Provado o ciclo completo no navegador: em São Luís, `ADAILTON` → "outra
+cidade"; trocando para Manaus, a mesma linha volta com "LOGIN TOA Z597207 ·
+roteando para 026 - EQUIPE" e Segmento **"Adesão"**. A cidade foi devolvida
+para São Luís ao fim do teste.
+
+> **Armadilha nova:** quando uma tela junta tabela que filtra por cidade ativa
+> com tabela que não filtra, o embed vem nulo e **parece dado faltando**.
+> `perfil` x `tecnico` é o par; deve haver outros. Antes de escrever "—" para
+> um embed nulo, pergunte se existe o PONTEIRO — se existir, o que falta é
+> escopo, não cadastro, e a tela tem de dizer qual dos dois.
+
+---
+
+**VERIFICADO:** `tsc` e `npm run build` limpos. No navegador, logado e com as
+duas cidades: coluna Cidade depois de Cargo nos 71; "outra cidade" em São Luís
+e "Adesão" em Manaus na mesma linha; aba Técnicos com os 14 de São Luís
+(matrícula, equipe 100–114, ativo). Cidade ativa devolvida ao estado original.
+
+**NÃO VERIFICADO:** nenhuma migration foi aplicada nesta tarefa — é mudança só
+de tela. E a decisão de **dar login aos 14 de São Luís** continua com ele: eles
+estão cadastrados e ativos, mas sem acesso ninguém daquela praça entra no
+sistema nem aparece no aplicativo do campo.

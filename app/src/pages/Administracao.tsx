@@ -151,6 +151,12 @@ interface Usuario {
   foto_path: string | null
   cargo_id: string | null; perfil_acesso_id: string | null; base_id: string | null
   cargo: { nome: string } | null
+  /** A cidade em que o ACESSO foi cadastrado (`perfil.base_id`). Não é a
+   *  mesma coisa que a cidade do técnico — ver a coluna Cidade (153). */
+  base: { nome: string } | null
+  /** O ponteiro para o técnico. Existe mesmo quando o EMBED vem nulo,
+   *  porque `tecnico` filtra pela cidade ativa e `perfil` não (153). */
+  tecnico_id: string | null
   perfil_acesso: { nome: string; papel: string | null } | null
   /** Preenchido quando o acesso responde por um técnico — é o que liga
    *  a pessoa à agenda dela (`tecnico.usuario_id`, que o RLS lê). */
@@ -286,7 +292,8 @@ export default function Administracao() {
       supabase.from('perfil')
         .select(`id, nome, email, apelido, ativo, atualizado_em, whatsapp,
                  cpf, rg, data_nascimento, matricula_ponto, data_contratacao, foto_path,
-                 cargo_id, perfil_acesso_id, base_id,
+                 cargo_id, perfil_acesso_id, base_id, tecnico_id,
+                 base:base_id ( nome ),
                  cargo:cargo_id ( nome ),
                  perfil_acesso:perfil_acesso_id ( nome, papel ),
                  tecnico:tecnico_id ( matricula, nome, equipe_id, skill,
@@ -867,7 +874,7 @@ export default function Administracao() {
       (!filtroSegmento || (filtroSegmento === 'SEM'
         ? !!u.tecnico && !u.tecnico.skill
         : u.tecnico?.skill === filtroSegmento)) &&
-      (!t || [u.nome, u.email, u.apelido, u.cargo?.nome,
+      (!t || [u.nome, u.email, u.apelido, u.cargo?.nome, u.base?.nome,
         u.perfil_acesso?.nome].some(x => x?.toLowerCase().includes(t))))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarios, busca, filtroPapel, filtroCargo, filtroSegmento, papeisPorUsuario])
@@ -1306,6 +1313,10 @@ export default function Administracao() {
                       <tr>
                         <th className="px-3 py-2 font-medium">Pessoa</th>
                         <th className="px-3 py-2 font-medium">Cargo</th>
+                        {/* 153: "coloque a cidade de onde o técnico é depois
+                            do cargo, preciso saber onde o time de São Luís
+                            foi cadastrado" (Emanuel, 29/10). */}
+                        <th className="px-3 py-2 font-medium">Cidade</th>
                         <th className="px-3 py-2 font-medium">Supervisor</th>
                         <th className="px-3 py-2 font-medium">Perfil de acesso</th>
                         <th className="px-3 py-2 font-medium">Papéis (o que o banco lê)</th>
@@ -1434,6 +1445,18 @@ export default function Administracao() {
                                 </select>
                               ) : u.cargo?.nome ?? <span className="text-graf-600">—</span>}
                             </td>
+
+                            {/* A cidade do CADASTRO DO ACESSO. Quem decide o
+                                que a pessoa enxerga é ela mais as cidades
+                                marcadas em "Cidades que acessa" (D-180) — por
+                                isso a dica diz de onde o número vem. */}
+                            <td className="px-3 py-2 text-xs">
+                              {u.base?.nome
+                                ? <span title="Cidade em que este ACESSO foi cadastrado (perfil.base_id). O que a pessoa enxerga é esta mais as marcadas em Cidades que acessa."
+                                    className="whitespace-nowrap text-graf-300">{u.base.nome}</span>
+                                : <span title="Acesso sem cidade de cadastro"
+                                    className="text-af-400/70">sem cidade</span>}
+                            </td>
                             {/* ┌─ quem responde por este técnico ───────────┐
                                 │ > "no anexo 2 deve ter supervisor            │
                                 │ >  responsável ao lado do técnico em uma    │
@@ -1505,7 +1528,22 @@ export default function Administracao() {
                                 vazia, e não "sem segmento", que afirmaria
                                 uma falta de cadastro que não existe. */}
                             <td className="px-3 py-2">
-                              {!u.tecnico ? (
+                              {/* ┌─ 153 · "—" mudo escondia a cidade ativa ──┐
+                                  │ `perfil` NÃO filtra por cidade ativa, mas │
+                                  │ `tecnico` filtra (D-180). Com São Luís    │
+                                  │ ativa, os 71 acessos de Manaus apareciam  │
+                                  │ e os técnicos deles vinham NULOS — a      │
+                                  │ coluna dizia "—" como se a pessoa não     │
+                                  │ fosse técnica. `tecnico_id` sobrevive ao  │
+                                  │ RLS e denuncia a diferença.               │
+                                  └────────────────────────────────────────────┘ */}
+                              {!u.tecnico && u.tecnico_id ? (
+                                <span title="Esta pessoa É técnica, mas o cadastro dela é de outra cidade — troque a cidade no topo para ver o segmento."
+                                  className="inline-block whitespace-nowrap rounded bg-graf-800
+                                             px-1.5 py-0.5 text-[10px] text-graf-300">
+                                  outra cidade
+                                </span>
+                              ) : !u.tecnico ? (
                                 <span className="text-graf-700">—</span>
                               ) : u.tecnico.skill && SEGMENTO_DE[u.tecnico.skill] ? (
                                 <span

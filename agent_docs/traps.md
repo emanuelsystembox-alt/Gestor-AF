@@ -362,6 +362,17 @@ a janela que o TOA reservou. `fim − início` ali vira "o técnico passou 42 mi
 executando" num contrato onde ninguém foi. Antes de medir duração de qualquer
 coisa, pergunte se ALGUÉM FOI — `origemCancelada()` responde. Ver D-227.
 
+**Embed de tabela que filtra por CIDADE ATIVA, dentro de tabela que não filtra,
+vem NULO e parece dado faltando.** `perfil` não tem `bases_visiveis()` na policy;
+`tecnico` tem (D-180). Com São Luís ativa, a tela de Administração listava os 71
+acessos de Manaus e o embed `tecnico:tecnico_id(...)` vinha nulo nos 67 — a coluna
+Segmento escrevia **"—"** como se nenhum deles fosse técnico, e a linha "LOGIN TOA ·
+roteando para" sumia junto. No banco estava tudo certo (`tecnico_id` preenchido,
+skill `ADESÃO`). O que salva é o **PONTEIRO**, que sobrevive ao RLS: `perfil.tecnico_id`
+vem na linha mesmo quando o embed não vem. **Antes de escrever "—" para um embed nulo,
+pergunte se o ponteiro existe — se existir, o que falta é ESCOPO, não cadastro, e a
+tela tem de dizer qual dos dois.** Ver D-232.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.
