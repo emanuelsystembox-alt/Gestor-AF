@@ -9583,3 +9583,46 @@ acessos" e oferecer continuar. Fica proposto, não feito.
 
 **O script que gerou a planilha NÃO foi commitado**: ele carrega nome e e-mail
 pessoal de 14 funcionários, e isso não entra no Git.
+
+### D-234 · A tela nunca gravou a cidade do ACESSO (154)
+
+> *"renan é de São Luís, cadastrei errado, troca por favor"* — Emanuel, 29/10
+
+Não dava para trocar. E o defeito era maior do que o pedido.
+
+**O campo "Operação (cidade)" do Editar cadastro nunca escreveu
+`perfil.base_id`.** O valor dele só era usado dentro de `if (login)`, indo para
+`cadastrar_tecnico_avulso` — ou seja, gravava **`tecnico.base_id`** (onde o
+técnico trabalha) e nunca a cidade do acesso. O `update` do `perfil`, logo
+acima, não tinha a coluna.
+
+E, para quem **não é técnico**, o campo ainda vinha `disabled={!f.login_toa}`,
+com o aviso *"precisa do login TOA"*. O Renan é COORDENADOR: campo travado,
+decorativo, e a tela respondendo **"RENAN BRASIL YOUNG atualizado"** com a
+cidade intacta — medido duas vezes, `atualizado_em` mudando e `base_id` parado
+em Manaus.
+
+A trava fazia sentido para **equipe e skill**, que são mesmo do técnico. Para a
+cidade, não: **`perfil.base_id` é o escopo de visão** (D-180) e vale para
+coordenador, COP e controlador igual. O próprio arquivo já dizia isso em dois
+comentários (*"a cidade do cadastro vale sempre"*, *"o `perfil.base_id` é escopo
+de visão"*) — era a gravação que faltava.
+
+**Corrigido:** o `update` do perfil passou a incluir `base_id`; o campo deixou
+de depender do login do TOA (equipe e skill continuam dependendo); e as
+"Cidades que acessa" passaram a comparar com a cidade **nova**, não com a que
+estava quando a janela abriu — senão trocar a cidade e marcar a antiga na mesma
+gravação deixaria a marca de fora.
+
+> **Armadilha:** mensagem de sucesso que confirma o que a tela **tentou**, e não
+> o que o banco **gravou**. Aqui o `update` do perfil voltou sem erro — porque
+> os outros campos foram — e a tela disse "atualizado". Quem confere pela faixa
+> verde nunca descobre. A conferência que vale é reler a linha.
+
+**VERIFICADO:** `tsc` e `npm run build` limpos. Trocado pela tela, logado, e
+conferido no banco: `RENAN BRASIL YOUNG` saiu de `Manaus - AM` para
+**`São Luís - MA`**.
+
+**Fica para ele decidir:** o Renan não tem nenhuma cidade marcada em "Cidades
+que acessa", então agora ele enxerga **só São Luís** — deixou de ver Manaus. Se
+precisar das duas, é marcar Manaus ali.

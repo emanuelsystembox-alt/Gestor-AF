@@ -286,6 +286,24 @@ export function EditarUsuarioModal({
       matricula_ponto: f.matricula_ponto.trim() || null,
       cargo_id: f.cargo_id || null,
       perfil_acesso_id: f.perfil_acesso_id || null,
+      /*
+       * ┌─ 154 · a tela nunca gravou a cidade do ACESSO ─────────────┐
+       * │ > "renan é de São Luís, cadastrei errado, troca por favor"  │
+       * │ >  — Emanuel, 29/10                                         │
+       * │                                                              │
+       * │ Não dava. O campo "Operação (cidade)" só alimentava          │
+       * │ `cadastrar_tecnico_avulso`, dentro de `if (login)` — ou      │
+       * │ seja, escrevia `tecnico.base_id` e NUNCA `perfil.base_id`.   │
+       * │ Para quem não é técnico ele ficava desabilitado e decorativo:│
+       * │ a tela dizia "atualizado" e a cidade não mudava.             │
+       * │                                                              │
+       * │ E `perfil.base_id` é o ESCOPO DE VISÃO (D-180), que vale     │
+       * │ para todo mundo — coordenador, COP, controlador. O próprio   │
+       * │ arquivo já dizia isso duas vezes nos comentários; era a      │
+       * │ gravação que faltava.                                        │
+       * └──────────────────────────────────────────────────────────────┘
+       */
+      base_id: f.base_id || null,
       ativo: f.ativo,
     }).eq('id', usuario.id)
     if (ep) { setErro(traduzir(ep.message)); setOcupado(false); return }
@@ -299,7 +317,11 @@ export function EditarUsuarioModal({
     }
 
     // ---- 2a. as cidades que acessa ----
-    const entram = [...cidades].filter(id => !cidadesAntes.has(id) && id !== usuario.base_id)
+    // 154: contra a cidade NOVA, não a que estava quando a janela abriu —
+    // senão trocar a cidade e marcar a antiga em "Cidades que acessa" na
+    // mesma gravação deixaria a marca de fora.
+    const baseNova = f.base_id || null
+    const entram = [...cidades].filter(id => !cidadesAntes.has(id) && id !== baseNova)
     const saem = [...cidadesAntes].filter(id => !cidades.has(id))
     if (entram.length) {
       const { error } = await supabase.from('usuario_base').insert(
@@ -312,7 +334,7 @@ export function EditarUsuarioModal({
       if (error) recados.push(`cidades não retiradas: ${traduzir(error.message)}`)
     }
     if (entram.length || saem.length) {
-      recados.push(`acessa ${cidades.size + (usuario.base_id ? 1 : 0)} cidade(s)`)
+      recados.push(`acessa ${cidades.size + (baseNova ? 1 : 0)} cidade(s)`)
     }
 
     // ---- 2b. supervisor da planilha ----
@@ -517,17 +539,17 @@ export function EditarUsuarioModal({
               Operação e campo
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Operação e equipe são do TÉCNICO. Sem login do TOA não há
-                  técnico em quem gravar — e o seletor ficava aberto sem
-                  fazer nada ao salvar, que é pior que estar travado. */}
+              {/* 154: a CIDADE é de todo mundo — é o escopo de visão
+                  (`perfil.base_id`, D-180). Estava travada atrás do login
+                  do TOA junto com equipe e skill, que essas sim são do
+                  técnico, e por isso um coordenador não tinha como ter a
+                  cidade corrigida. Equipe e skill continuam travadas. */}
               <label className="text-xs text-graf-400">
                 <span className="mb-1 block">
                   Operação (cidade)
-                  {!f.login_toa.trim() && (
-                    <span className="ml-1 text-graf-600">— precisa do login TOA</span>
-                  )}
+                  <span className="ml-1 text-graf-600">— o que a pessoa enxerga</span>
                 </span>
-                <select value={f.base_id} className={campo} disabled={!f.login_toa.trim()}
+                <select value={f.base_id} className={campo}
                   onChange={e => setF(x => ({ ...x, base_id: e.target.value, equipe_id: '' }))}>
                   <option value="">— sem operação —</option>
                   {operacoesPorRegiao.map(([regiao, lista]) => (

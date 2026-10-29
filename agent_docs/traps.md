@@ -390,6 +390,20 @@ sem login, fora da aba Usuários e fora do aplicativo do campo. É a mesma famí
 armadilha "trabalho de fundo dentro de uma tela para quando a pessoa sai dela". Ver
 D-233.
 
+**Faixa verde de sucesso confirma o que a tela TENTOU, não o que o banco GRAVOU.**
+O Editar cadastro mandava `update perfil` sem a coluna `base_id` (a cidade só ia para
+`cadastrar_tecnico_avulso`, dentro de `if (login)`). O update voltava sem erro —
+porque os outros campos iam — e a tela escrevia "FULANO atualizado" com a cidade
+intacta. Medido duas vezes: `atualizado_em` mudava e `base_id` ficava parado. Depois
+de salvar algo que importa, **releia a linha**, não a faixa. Ver D-234.
+
+**Campo desabilitado por uma condição que não é a dele.** O select de cidade vinha
+`disabled={!f.login_toa}` junto com equipe e skill. Equipe e skill são do TÉCNICO; a
+cidade é `perfil.base_id`, o ESCOPO DE VISÃO, que vale para coordenador, COP e
+controlador também. Resultado: quem não é técnico não tinha como ter a cidade
+corrigida, e o campo ficava decorativo. Antes de agrupar campos atrás de uma trava,
+confira se todos pertencem mesmo à mesma entidade. Ver D-234.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.
