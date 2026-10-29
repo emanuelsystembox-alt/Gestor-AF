@@ -394,6 +394,22 @@ D-233.
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.
 
+**E o build NÃO é reprodutível: rebuildar e comparar md5 com o ar acusa diferença
+que não existe.** `vite.config.ts` carimba `em: new Date().toISOString()` em
+`__VERSAO__` (é de propósito: o rodapé mostra versão e data sem ninguém lembrar de
+mudar número). Com isso o chunk que carrega a versão muda de hash a cada build, o
+`index.html` muda junto porque referencia o nome dele, e a comparação byte a byte
+falha. Medido em 29/10, dois builds seguidos SEM tocar no código: **439 bytes
+diferentes em 431.431**, e todos eram nome de arquivo de chunk — `formato-*.js`
+manteve o hash idêntico. Conferir deploy assim leva a republicar à toa, ou pior, a
+achar que uma entrega não subiu.
+
+Conferência que vale: ou compare o `dist` **que foi publicado** (sem rebuildar), ou
+— melhor, porque é imune ao carimbo — **procure no ar a frase que a entrega
+acrescentou**: baixe o `index.js` do ar, leia os chunks que ele referencia e
+`grep` por um texto novo ("sem acesso", "outra cidade"). Isso responde "o que eu
+escrevi está lá?", que é a pergunta de verdade. Ver D-234.
+
 ---
 
 ## Google Maps (Rota do dia)
