@@ -10273,3 +10273,15 @@ e `expo export` do app.
 **NÃO VERIFICADO:** o login do Renan aberto de verdade no navegador (testado no
 banco como ele, não pela tela). O app com o papel COORDENADOR só chega aos
 celulares com o `eas update`.
+
+**158d (31/10) — o que ficou para trás.** *"login do renan não aparece a
+quantidade de equipes? qual o motivo?"* Os selos do menu (Serviços 0, Equipes 0)
+vinham de `volume_do_dia` e `equipes_em_rota`, que ainda diziam `eh_gestor() or
+equipes_visiveis()` — só ADMIN e COP passavam. Procurando o padrão no texto de
+todas as funções, apareceram mais três de leitura: `impacto_quebra` (Dashboard),
+`material_do_toa` e `miscelanea_do_contrato` (as duas últimas sem filtro de
+cidade). As cinco passaram a `(ve_cidade_inteira() and base na cidade ativa) or
+equipe legível`. Medido como cada um: Renan, Kayra (COP) e Flavio veem o mesmo —
+61 contratos, 9 equipes em São Luís. Conversa e mensagem ficaram de fora de
+propósito (D-236). **A lição:** a 158b trocou o escopo pelas telas que eu sabia que
+o Renan usava; o certo era ter procurado o padrão em todas as funções já ali.
