@@ -502,6 +502,29 @@ export default function Monitor() {
       .slice(0, 8)
   }, [referencia, comEstado])
 
+  /*
+   * 155f: "Todos os técnicos" nos próximos.
+   * > "é bom também o sistema ter uma opção ao lado de todos os técnicos
+   * >  (...) para a gente saber todas as equipes onde elas estão de uma
+   * >  única vez" — Emanuel, 29/10
+   * Escolher "todos" tira a seleção (o mapa volta a mostrar a cidade
+   * inteira, cada um na última posição) e lista todo mundo abaixo, com
+   * equipe, o que está fazendo e há quanto tempo é a posição. Quem nunca
+   * mandou ponto no dia vai para o fim, ESCRITO — some da lista seria
+   * afirmar que ele não existe.
+   */
+  const [verTodos, setVerTodos] = useState(false)
+  // Escolher um técnico na lista de cima sai do "todos": a pergunta
+  // passou a ser "quem está perto DELE".
+  useEffect(() => { if (sel) setVerTodos(false) }, [sel])
+  const todos = useMemo(() => {
+    const com = comEstado.filter(x => x.t.ultimo_lat != null && x.t.ultimo_lng != null)
+      .sort((a, b) => (a.t.equipe_codigo ?? '').localeCompare(b.t.equipe_codigo ?? '')
+        || a.t.nome.localeCompare(b.t.nome))
+    const sem = comEstado.filter(x => x.t.ultimo_lat == null || x.t.ultimo_lng == null)
+    return { com, sem }
+  }, [comEstado])
+
   const kmTotal = tecnicos.reduce((s, t) => s + Number(t.km), 0)
   const foraTotal = tecnicos.reduce((s, t) => s + t.baixas_fora, 0)
   const baixasTotal = tecnicos.reduce((s, t) => s + t.baixas_campo, 0)
@@ -877,11 +900,18 @@ export default function Monitor() {
               Técnicos próximos
             </h3>
             <span className="text-xs text-graf-400">de</span>
-            <select value={refContrato}
+            <select value={verTodos ? '__TODOS__' : refContrato}
               onFocus={abrirProximosDeContrato}
-              onChange={e => setRefContrato(e.target.value)}
+              onChange={e => {
+                if (e.target.value === '__TODOS__') {
+                  setVerTodos(true); setSel(null); setRefContrato('')
+                } else {
+                  setVerTodos(false); setRefContrato(e.target.value)
+                }
+              }}
               className="max-w-64 rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs">
               <option value="">{selecionado ? `${selecionado.nome} (selecionado)` : 'escolha um técnico na lista…'}</option>
+              <option value="__TODOS__">Todos os técnicos — onde cada um está</option>
               {(contratosDia ?? []).map(c => (
                 <option key={c.id} value={c.id}>
                   contrato {c.contrato ?? '—'} · {c.bairro ?? 'sem bairro'} · {SITUACAO_INFO[c.situacao]?.label ?? c.situacao}
@@ -892,10 +922,47 @@ export default function Monitor() {
               <span className="text-[11px] text-graf-400">(abra a lista para escolher um contrato do dia)</span>
             )}
           </div>
-          {!referencia ? (
+          {verTodos && !referencia ? (
+            <>
+              <p className="mt-2 text-xs text-graf-400">
+                <strong className="text-graf-200">{todos.com.length}</strong> técnico(s) com posição no
+                dia, por equipe — no mapa, cada um na última posição.
+                {todos.sem.length > 0 && <> <strong className="text-graf-200">{todos.sem.length}</strong> sem
+                  nenhum ponto hoje (no fim da lista).</>}
+              </p>
+              <ol className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+                {[...todos.com, ...todos.sem].map(({ t, e }) => (
+                  <li key={t.tecnico_id}>
+                    <button onClick={() => { setSel(t.tecnico_id); setVerTodos(false) }}
+                      className="flex w-full items-center gap-2 rounded-md border border-graf-800 px-2.5 py-1.5
+                                 text-left hover:border-af-600">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COR_ESTADO[e] }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-medium text-graf-100">{t.nome}</span>
+                        <span className="block truncate text-[10px] text-graf-400">
+                          {t.equipe_codigo ? equipeRotulo(t.equipe_codigo, t.equipe_nome) : 'sem equipe'}
+                          {' · '}
+                          {t.situacao_ativa
+                            ? `${SITUACAO_INFO[t.situacao_ativa]?.label ?? ''}${t.contrato_ativo ? ` ctt ${t.contrato_ativo}` : ''}`
+                            : 'livre'}
+                        </span>
+                      </span>
+                      <span className="tabular shrink-0 text-[11px] text-graf-300">
+                        {t.ultimo_em ? (ehHoje ? haQuanto(t.ultimo_em, agora) : hhmm(t.ultimo_em))
+                          : <span className="text-graf-500">sem ponto</span>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </>
+          ) : !referencia ? (
             <p className="mt-2 text-xs text-graf-400">
               Escolha um técnico na lista ou um contrato: a tela ordena os outros pela distância da
-              última posição de cada um — para mandar quem está mais perto.
+              última posição de cada um — para mandar quem está mais perto. Ou escolha
+              {' '}<button onClick={() => { setVerTodos(true); setSel(null); setRefContrato('') }}
+                className="text-af-400 underline underline-offset-2">todos os técnicos</button>{' '}
+              para ver onde cada equipe está.
             </p>
           ) : proximos.length === 0 ? (
             <p className="mt-2 text-xs text-graf-400">Nenhum outro técnico com posição neste dia.</p>
@@ -941,6 +1008,15 @@ const ROTULO_MOTIVO: Record<string, string> = {
 // o mapa
 // ---------------------------------------------------------------------------
 const RECADO_CHAVE = 'recusou'
+
+/** O que aconteceu com o contrato, em UM caractere, para caber no balão
+ *  do mapa (155f). A cor já é a da situação; o símbolo é para quem não
+ *  distingue cor, e para ler sem legenda. */
+const SIMBOLO_SITUACAO: Partial<Record<Situacao, string>> = {
+  CONCLUIDA: '✓', CANCELADA: '✕', REAGENDAMENTO: '↻',
+  EM_EXECUCAO: '▶', EM_DESLOCAMENTO: '➜', COM_IMPEDIMENTO: '!',
+  ENTRADA: '•', ATRIBUIDA: '•',
+}
 
 function MapaMonitor({ tecnicos, selecionado, trilha, contratos, locais, paradas, replay, referencia,
                        aoSelecionar, corDe, legenda, cercas, desenho, aoMudarDesenho, aoMapaPronto }: {
@@ -1136,15 +1212,60 @@ function MapaMonitor({ tecnicos, selecionado, trilha, contratos, locais, paradas
       limites.extend(pos); temLimite = true
       const cor = corParaMapa(SITUACAO_INFO[ct.situacao]?.cor)
       const l = locais.get(ct.id)
-      guarda(new google.maps.Marker({
+      const rotuloSit = SITUACAO_INFO[ct.situacao]?.label ?? ct.situacao
+      /*
+       * ┌─ 155f · o contrato vira BALÃO, não quadradinho ───────────────┐
+       * │ > "melhore mais as localizações dos contratos do técnico.     │
+       * │ >  Fica uma bolinha meio transparente (...) um pequeno        │
+       * │ >  balãozinho onde ele mostra junto com as cores o que        │
+       * │ >  aconteceu com o contrato" — Emanuel, 29/10                 │
+       * │                                                                │
+       * │ Era um quadrado de 12 px a 90% de opacidade: no mapa da       │
+       * │ cidade inteira ele some entre as ruas, e só a cor dizia a     │
+       * │ situação — cor sozinha não é informação (144). Agora é um     │
+       * │ alfinete opaco, com a ponta no endereço, a cor da situação e  │
+       * │ o SÍMBOLO dela dentro (✓ concluída, ✕ cancelada, ↻            │
+       * │ reagendada…). O clique abre o detalhe: contrato, bairro,      │
+       * │ janela e onde baixou.                                          │
+       * └────────────────────────────────────────────────────────────────┘
+       */
+      const balao = guarda(new google.maps.Marker({
         position: pos, map: m, zIndex: 25,
-        title: `ctt ${ct.contrato ?? '—'} · ${ct.bairro ?? ''} · ${SITUACAO_INFO[ct.situacao]?.label ?? ct.situacao}`,
+        title: `ctt ${ct.contrato ?? '—'} · ${ct.bairro ?? ''} · ${rotuloSit}`,
+        label: { text: SIMBOLO_SITUACAO[ct.situacao] ?? '•', color: '#ffffff',
+                 fontSize: '11px', fontWeight: '800' },
         icon: {
-          path: 'M -6,-6 6,-6 6,6 -6,6 z', scale: 1,
-          fillColor: cor, fillOpacity: 0.9,
-          strokeColor: '#ffffff', strokeWeight: 1.5,
+          // Um alfinete: a ponta (0,0) é o endereço, a cabeça fica em cima.
+          path: 'M 0,0 C -2,-8 -9,-12 -9,-19 A 9,9 0 1 1 9,-19 C 9,-12 2,-8 0,0 Z',
+          scale: 1.15, anchor: new google.maps.Point(0, 0),
+          labelOrigin: new google.maps.Point(0, -19),
+          fillColor: cor, fillOpacity: 1,
+          strokeColor: '#ffffff', strokeWeight: 2,
         },
       }))
+      balao.addListener('click', () => {
+        const janela = ct.janela_inicio
+          ? `${ct.janela_inicio.slice(0, 5)}–${(ct.janela_fim ?? '').slice(0, 5) || '?'}` : 'sem janela'
+        const ondeBaixou = !l ? 'sem registro de onde baixou'
+          : l.fora_do_raio == null ? 'endereço sem coordenada — não dá para medir'
+          : `${l.fora_do_raio ? 'FORA' : 'dentro'} do raio · ${textoDistancia(l.distancia_m)} do endereço`
+            + (l.fonte === 'RASTRO' ? ' (rastro do celular)' : ' (baixa pelo app)')
+        const caixa = document.createElement('div')
+        caixa.style.cssText = 'font:12px system-ui,sans-serif;color:#111827;max-width:240px'
+        const linha = (txt: string, estilo = '') => {
+          const d = document.createElement('div'); d.textContent = txt
+          if (estilo) d.style.cssText = estilo
+          caixa.appendChild(d)
+        }
+        // textContent, não innerHTML: bairro e contrato vêm da planilha.
+        linha(`Contrato ${ct.contrato ?? '—'}`, 'font-weight:700;margin-bottom:2px')
+        linha(rotuloSit, `display:inline-block;padding:1px 6px;border-radius:4px;color:#fff;background:${cor};font-weight:700;font-size:11px;margin-bottom:4px`)
+        linha(ct.bairro ?? 'sem bairro')
+        linha(`janela ${janela}`, 'color:#4b5563')
+        linha(ondeBaixou, `color:${l?.fora_do_raio ? '#b91c1c' : '#4b5563'};margin-top:2px`)
+        info.setContent(caixa)
+        info.open({ map: m, anchor: balao })
+      })
       if (l) {
         const fora = l.fora_do_raio === true
         guarda(new google.maps.Circle({
@@ -1306,7 +1427,7 @@ function MapaMonitor({ tecnicos, selecionado, trilha, contratos, locais, paradas
         ))}
         {selecionado && <>
           <span>━ trilha</span><span className="text-orange-300">┅ buraco</span>
-          <span>■ contrato</span><span>B baixa</span><span>P parada</span>
+          <span>📍 contrato (cor da situação)</span><span>B baixa</span><span>P parada</span>
         </>}
       </div>
     </div>

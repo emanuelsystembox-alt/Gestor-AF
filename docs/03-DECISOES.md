@@ -9885,6 +9885,76 @@ margem dos dois lados. Equipe subiu para 24rem, porque o bloco de detalhe
 quebrava ("+1 SEM / REGRA" em duas linhas). Conferido em 1900 × 950, a largura da
 tela dele.
 
+#### 10. Onde o técnico estava quando baixou no TOA
+
+> *"quando o técnico baixar no TOA e o usuário importar em nosso sistema o
+> contrato, nós temos que pegar a melhor geolocalização do técnico naquele
+> momento para saber se ele está baixando dentro da residência ou não (...) a
+> gente deve consultar essa geo para saber se estava lá próximo ou o horário
+> executado (...) tem que ser a melhor regra possível"*
+
+**A regra já existia** (`local_da_baixa`, 135): baixa no TOA, importada depois,
+cruza com o rastro do celular. Mas escolhia UM ponto — o mais perto da HORA da
+baixa, ±10 min. Dois defeitos:
+
+1. **Um instante só.** Parado, o app manda ponto a cada 5 min; sem sinal ou em
+   segundo plano, os ±10 min em volta da baixa ficam vazios. Medido nos 9
+   contratos com rastro: **em 2 a regra antiga não achou ponto nenhum**, e havia
+   ponto durante a execução.
+2. **Mais perto no tempo não é o mais confiável.** O técnico baixa no TOA muitas
+   vezes já no carro, a uma quadra: o ponto da hora da baixa pode estar fora do
+   raio com ele tendo passado 40 min dentro da casa.
+
+**A regra nova (155h)** pergunta "ele ESTEVE no endereço enquanto executava?":
+janela da execução inteira (início − 10 min até fim + 10 min), vale o ponto
+**mais perto do cliente** entre os de precisão até 100 m. Até 200 m é dentro.
+Sem ponto na execução = "sem registro", nunca "dentro". Baixa dada pelo app
+continua usando a coordenada do próprio registro. Cancelado pela central sai
+da conta (a janela dele é reserva, não execução — D-227).
+
+**Menor OU IGUAL a 200 m.** Ele disse primeiro "abaixo de 200" e eu troquei `>`
+por `>=` (155i); minutos depois corrigiu: *"a regra é menor ou igual, não
+exatamente abaixo"*. A 155j desfez — a regra certa era a que já estava. Ficam os
+dois arquivos, porque a 155i está no histórico do banco.
+
+**O aplicativo não precisa mudar** — conferido no código, não na documentação:
+`campo/src/lib/rastro.ts` manda um ponto a cada **2 min no mínimo e 5 min no
+máximo**, com precisão `Balanced` (rede + GPS, que poupa bateria). Isso já é o
+"de 5 em 5 minutos" que ele sugeriu, com folga: um atendimento de 30 min deixa
+6 pontos. E o segundo plano desliga sozinho quando não há contrato produtivo em
+aberto (D-170) — fora da rota não gasta bateria.
+
+**Um ponto de atenção, medido:** a precisão mediana dos 93 pontos que existem é
+**exatamente 100 m** — é a assinatura do modo `Balanced`. Com raio de 200 m
+funciona, mas um ponto de ±100 m não separa "dentro da casa" de "na rua de
+trás". Se, quando o time começar a usar, muitos contratos caírem como "sem
+registro" ou na beira do raio, o remédio é o app pedir precisão ALTA só
+enquanto houver contrato em execução. É mudança de app, e fica registrada como
+proposta, não feita. O corte de precisão é parâmetro (`rastro_precisao_max_m`).
+
+**Não pôde ser validado:** os 93 pontos são de 2 celulares em teste, não de
+técnicos no endereço — os 9 contratos aparecem a 5,8–9,9 km do cliente nas duas
+regras. A regra está certa no papel; o primeiro dia de uso real é que prova.
+
+#### 11. Monitoramento: o contrato vira balão, e "todos os técnicos"
+
+> *"fica uma bolinha meio transparente. Eu botei um pequeno balãozinho onde ele
+> mostra junto com as cores o que aconteceu com o contrato (...) e na hora de
+> selecionar o técnico próximo, é bom também ter uma opção de todos os técnicos
+> (...) para saber todas as equipes onde elas estão de uma única vez"*
+
+O contrato era um quadrado de 12 px a 90% de opacidade — some entre as ruas, e
+só a cor dizia a situação (cor sozinha não é informação, 144). Agora é um
+**alfinete** opaco com a ponta no endereço, a cor da situação e o **símbolo**
+dentro (✓ concluída, ✕ cancelada, ↻ reagendada, ▶ em execução…). O clique abre
+contrato, situação, bairro, janela e onde baixou. O texto vai por `textContent`,
+não `innerHTML`: bairro e contrato vêm da planilha.
+
+Em Técnicos próximos entrou **"Todos os técnicos — onde cada um está"**: tira a
+seleção (o mapa volta à cidade inteira) e lista todo mundo por equipe, com o que
+está fazendo e há quanto tempo é a posição. Quem não mandou ponto no dia vai para
+o fim, escrito — hoje, 1 com posição e 57 sem, porque o app ainda não está em uso.
+
 ---
 
 **VERIFICADO:** `tsc --noEmit` e `npm run build` limpos. `testar_policies()`
@@ -9895,7 +9965,10 @@ alcançável pelo `anon`. No navegador, logado: Dashboard com o card novo e o mo
 e as colunas alinhadas; Rota com os 6 filtros e os dois tempos no cartão;
 Indicadores com a grade de 67 técnicos × 15 dias e 2 no turno da tarde;
 Monitoramento com 58 técnicos só de Manaus, a busca filtrando lista e mapa, e a
-animação aparecendo na lista e no mapa durante a carga. Todas as
+animação aparecendo na lista e no mapa durante a carga; o balão do contrato
+abrindo o detalhe no clique; "todos os técnicos" listando os 58. No banco: o
+local da baixa com a regra da execução e até 200 m (menor ou igual) nas duas
+funções que medem o raio. Todas as
 medições de banco foram feitas como `authenticated`, nunca como dono (D-081).
 
 **NÃO VERIFICADO:** o ritmo por janela foi medido sobre o dia inteiro de hoje,

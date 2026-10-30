@@ -14,7 +14,11 @@ import { supabase } from './supabase'
  * endereço, a distância acompanha.
  *
  * Desde a 135 há DUAS fontes: o registro do campo (APP) e, para a baixa
- * feita no TOA, o ponto do RASTRO mais próximo da hora do encerramento.
+ * feita no TOA, o RASTRO do celular. Desde a 155h o ponto do rastro é o
+ * MAIS PERTO DO CLIENTE durante a execução inteira (início − 10 min até
+ * fim + 10 min), e não mais o mais perto da hora da baixa: o técnico
+ * baixa no TOA muitas vezes já no carro, e a pergunta é se ele ESTEVE
+ * lá. Até 200 m (menor ou igual) é dentro — Emanuel, 29/10.
  *
  * Três ausências que NÃO são "dentro do raio" (regra 6):
  *   · sem linha aqui          → não houve registro do campo nem ponto de
@@ -38,9 +42,11 @@ export interface LocalBaixa {
   registros: number
   registros_fora: number
   /** De onde saiu a posição (135): APP = registro do campo com GPS;
-   *  RASTRO = o ponto do rastro mais próximo da hora da baixa no TOA. */
+   *  RASTRO = o ponto do rastro mais perto do cliente durante a
+   *  execução, quando a baixa foi no TOA (155h). */
   fonte: 'APP' | 'RASTRO'
-  /** Quantos minutos separam esse ponto da hora da baixa. Só no RASTRO. */
+  /** Quantos minutos separam esse ponto da hora da baixa. Só no RASTRO.
+   *  No RASTRO, `registros` é quantos pontos houve na execução. */
   minutos_do_ponto: number | null
 }
 

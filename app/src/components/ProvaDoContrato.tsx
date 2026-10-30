@@ -86,12 +86,13 @@ export function ProvaDoContrato({ prova, local, geoToa, raio = 200, compacto }: 
         <span className="text-[10px] uppercase tracking-wide text-graf-500">Onde baixou</span>
         {local ? <SeloLocal local={local} /> : (
           <span className="text-xs text-graf-400">
-            sem leitura — nenhum registro do campo e nenhum ponto do rastro perto da hora da baixa
+            sem leitura — nenhum registro do campo e nenhum ponto do rastro durante a execução
           </span>
         )}
         {local?.fonte === 'RASTRO' && (
           <span className="text-[11px] text-graf-400">
-            posição do rastro do celular
+            ponto do rastro mais perto do cliente durante a execução
+            {local.registros > 0 && <> · de {local.registros} ponto(s)</>}
             {local.minutos_do_ponto != null && <> · {local.minutos_do_ponto} min da hora do TOA</>}
           </span>
         )}

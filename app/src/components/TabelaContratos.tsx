@@ -228,8 +228,9 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
   // passar por registro do campo.
   const doRastro = local.fonte === 'RASTRO'
   const deOnde = doRastro
-    ? `Posição do RASTRO do celular${local.minutos_do_ponto != null
-        ? `, ${local.minutos_do_ponto} min da hora que o TOA encerrou` : ''}`
+    ? `O ponto do RASTRO do celular mais perto do cliente durante a execução`
+      + ` (${local.registros} ponto(s)`
+      + `${local.minutos_do_ponto != null ? `, ${local.minutos_do_ponto} min da hora que o TOA encerrou` : ''})`
     : 'Registro do campo com GPS'
   const titulo = semEndereco
     ? `${deOnde}, mas o endereço veio do TOA sem coordenada — não dá para medir.${prec ? ' Precisão do GPS:' + prec : ''}`
