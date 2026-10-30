@@ -446,6 +446,14 @@ cair em cidades diferentes. O cenário "supervisor lê a cidade" deu 0 na primei
 rodada: era o teste, não a regra. Persona de teste nasce onde está o dado que ela
 vai tocar (156c). Ver D-236.
 
+**Permissão marcada sem ESCOPO não vale nada — e a tela não acusa.** O controlador
+via só as equipes da carteira (031), e `carteira` tinha 0 linhas: todo controlador
+via zero contrato. O Renan tinha todas as caixas de Serviços marcadas e nenhuma
+funcionava, porque a RPC conferia a permissão e depois recusava por "não é da sua
+equipe". Antes de conceder poder por permissão, conte quantas linhas o escopo do
+papel alcança COM O DADO DE HOJE (`select count(*) from visita` como a pessoa). Ver
+D-238.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

@@ -33,7 +33,7 @@ import { ImportarCadastro } from '../components/ImportarCadastro'
  */
 
 // ROBO (110): o usuário do sincronismo com o TOA — só importa (D-189).
-const PAPEIS = ['ADMIN', 'COP', 'CONTROLADOR', 'SUPERVISOR',
+const PAPEIS = ['ADMIN', 'COP', 'COORDENADOR', 'CONTROLADOR', 'SUPERVISOR',
                 'TECNICO', 'ALMOXARIFE', 'FROTA', 'ROBO'] as const
 
 /**
@@ -60,7 +60,8 @@ const SEGMENTO_DE: Record<string, (typeof SEGMENTOS)[number]> =
 
 /** Como o filtro da aba Usuários chama cada papel. */
 const ROTULO_PAPEL: Record<(typeof PAPEIS)[number], string> = {
-  ADMIN: 'Admin', COP: 'COP', CONTROLADOR: 'Controlador', SUPERVISOR: 'Supervisor',
+  ADMIN: 'Admin', COP: 'COP', COORDENADOR: 'Coordenador', CONTROLADOR: 'Controlador',
+  SUPERVISOR: 'Supervisor',
   TECNICO: 'Técnico', ALMOXARIFE: 'Almoxarife', FROTA: 'Frota', ROBO: 'Robô',
 }
 
@@ -912,12 +913,6 @@ export default function Administracao() {
           </p>
         </div>
 
-        {!souAdmin && (
-          <Alerta tipo="aviso">
-            Você está vendo esta tela, mas <strong>não tem papel ADMIN</strong>. O banco
-            vai recusar qualquer alteração — e é assim que tem que ser.
-          </Alerta>
-        )}
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
 

@@ -8,7 +8,7 @@ import { esquecerAntifraude } from './antifraude'
 import { esquecerPosicao } from './gps'
 
 export type Papel =
-  | 'ADMIN' | 'COP' | 'CONTROLADOR' | 'SUPERVISOR'
+  | 'ADMIN' | 'COP' | 'COORDENADOR' | 'CONTROLADOR' | 'SUPERVISOR'
   | 'TECNICO' | 'ALMOXARIFE' | 'FROTA'
 
 export interface Perfil {
@@ -125,7 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { vivo = false }
   }, [usuarioId])
 
-  const temPapel = (...p: Papel[]) => p.some(x => papeis.includes(x))
+  // 158b: o COORDENADOR tem tudo o que o CONTROLADOR tem (a mesma conta
+  // de `tem_papel` no banco e na web).
+  const temPapel = (...p: Papel[]) => p.some(x => papeis.includes(x)
+    || (x === 'CONTROLADOR' && papeis.includes('COORDENADOR')))
   const ehGestor = temPapel('ADMIN', 'COP')
 
   const valor: Ctx = {

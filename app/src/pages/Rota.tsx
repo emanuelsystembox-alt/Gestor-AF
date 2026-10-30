@@ -222,8 +222,10 @@ export default function Rota() {
      se o ADMIN conceder `servicos.transferir` no perfil dele (Emanuel,
      30/10). É a mesma conta do `transferir_visita` no banco -- aqui ela só
      tira o arrastar de quem levaria "sem permissão" ao soltar. */
-  const { temPapel, pode } = useAuth()
-  const podeMover = temPapel('ADMIN', 'COP', 'CONTROLADOR') || pode('servicos.transferir')
+  // 158b: quem é da gestão E tem a chave -- a mesma conta do banco. Antes
+  // COP e controlador moviam sem a chave, e tirar dela não mudava nada.
+  const { ehGestor, temPapel, pode } = useAuth()
+  const podeMover = (ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && pode('servicos.transferir')
   // 156: o contrato abre por cima da Rota, com X para voltar.
   const abrirContrato = useAbrirContrato()
   // HOJE. Abria no último dia com visita, e a rota de ontem sob a data

@@ -10216,3 +10216,60 @@ no teste, nada gravado.
 RPC foi testada, no banco). O menu da web ainda decide quase tudo por papel —
 dar `servicos.transferir` a um supervisor libera o arrastar na Rota (156), mas
 a maioria das permissões finas vale nas RPCs, não no menu.
+
+---
+
+### D-238 · Toda a gestão vê a cidade; o que faz, a permissão decide. E o papel COORDENADOR (158)
+
+> *"o renan não consegue ver nada da rota sendo que já dei todas as permissões
+> de serviço e alteração (...) tem que ter ADMIN, COP, o resto que está aí e mais
+> coordenador agora (...) todos conseguem olhar a rota, porém tem as permissões
+> que precisam funcionar"* — Emanuel, 30/10
+
+**O defeito.** O CONTROLADOR só enxergava as equipes da CARTEIRA dele (031).
+Medido: `carteira` tem **0 linhas** e nenhuma equipe tem `controlador_id` — todo
+controlador do sistema via **zero** contrato. O Renan (CONTROLADOR, São Luís)
+tinha todas as permissões de Serviços marcadas, e nenhuma valia: a permissão diz
+O QUE se faz; o escopo dizia que não havia ONDE. O mesmo defeito do supervisor
+(D-236), em outro papel.
+
+**O modelo daqui em diante:**
+- **Onde:** toda a gestão — ADMIN, COP, COORDENADOR, CONTROLADOR, SUPERVISOR — vê
+  a cidade ativa inteira (`ve_cidade_inteira()` = `eh_gestao()`). Almoxarife e
+  Frota continuam nos módulos deles.
+- **O que:** a permissão. Nas RPCs dos contratos, a trava de papel virou "é da
+  gestão", e quem decide é `tem_permissao(...)`; o escopo de baixar, anexar,
+  registrar etapa e escrever a observação passou a ser a cidade
+  (`equipes_legiveis()`) para a gestão, e a equipe para o técnico.
+- **Transferir** passou a exigir a chave também de COP e controlador. Antes era
+  papel **OU** chave — e o "ou" deixava qualquer login com a chave transferir,
+  até técnico. Medido (desfeito): Renan sem a chave → recusado; técnico com a
+  chave → recusado; Flavio (supervisor) com a chave → transfere.
+- **COORDENADOR** é papel novo e tem tudo o que o CONTROLADOR tem:
+  `tem_papel('CONTROLADOR')` responde sim para ele (e `temPapel` na web e no app,
+  a mesma conta). Uma linha em vez de reescrever as ~30 funções e as policies que
+  perguntam CONTROLADOR.
+
+**O que não mudou, de propósito:** a escrita direta pela API (`visita_gestao`,
+policy ALL) continua em `equipes_visiveis()` — abrir a visão por ela abriria a
+escrita (D-236). Medido: Renan e Flavio, `UPDATE visita` direto → 0 linha. O site
+não escreve em `visita` direto; toda ação passa por RPC.
+
+**Quem perde algo com a regra nova:** a Victoria tem papel COP mas perfil
+**Coordenador**, que não tem "Transferir equipe" nem "Editar contrato". Antes ela
+transferia pelo papel; agora precisa da chave (perfil COP, ou a exceção na tela).
+
+**De passagem:** a faixa "Você está vendo esta tela, mas não tem papel ADMIN"
+saiu da Administração (Emanuel: "não precisa disso").
+
+**VERIFICADO:** como o Renan, desfeito: 200 contratos visíveis, 103 paradas na
+rota de hoje, 15 equipes, transfere e anexa. As exceções gravadas por você pela
+tela entre 18:32 e 18:35 (Renan, Flavio, Klebean, Kayra, Valéria) confirmam que o
+"Salvar cadastro" grava permissões — o que a D-237 deixou sem verificar.
+`testar_policies()` 33/33 (cenário novo: controlador sem carteira lê a cidade),
+`testar_campo()` 29/29, zero definer para o anon. `tsc` e `build` do site; `tsc`
+e `expo export` do app.
+
+**NÃO VERIFICADO:** o login do Renan aberto de verdade no navegador (testado no
+banco como ele, não pela tela). O app com o papel COORDENADOR só chega aos
+celulares com o `eas update`.

@@ -27,8 +27,9 @@ export function ObservacaoCop({ visitaId, texto, em, por, aoMudar }: {
   por: string | null
   aoMudar: () => void
 }) {
-  const { temPapel, pode } = useAuth()
-  const podeEscrever = temPapel('ADMIN', 'COP', 'CONTROLADOR') || pode('servicos.editar')
+  // 158b: gestão E "Editar contrato" -- a mesma conta de `definir_observacao_cop`.
+  const { ehGestor, temPapel, pode } = useAuth()
+  const podeEscrever = (ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')) && pode('servicos.editar')
   const [editando, setEditando] = useState(false)
   const [rascunho, setRascunho] = useState(texto ?? '')
   const [salvando, setSalvando] = useState(false)
