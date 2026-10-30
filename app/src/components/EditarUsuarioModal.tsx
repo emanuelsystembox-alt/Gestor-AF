@@ -461,7 +461,7 @@ export function EditarUsuarioModal({
     if (/perfil_contratacao_plausivel/.test(msg)) return 'O banco recusou a data de contratação.'
     if (/perfil_email_forma/.test(msg)) return 'O banco recusou o e-mail.'
     if (/row-level security|violates row|permission denied/i.test(msg))
-      return 'O banco recusou: seu usuário não tem papel ADMIN. A barreira é do RLS, não da tela.'
+      return 'O banco recusou: este login está fora do que você gerencia (ou seu perfil não inclui "Gerenciar usuários").'
     return msg
   }
 
@@ -533,7 +533,7 @@ export function EditarUsuarioModal({
                 <p className="mt-1 text-[11px] text-graf-400">
                   {fotoErro
                     ? <span className="text-af-300">{fotoErro}</span>
-                    : 'A foto vale na hora, sem esperar o Salvar. Só o ADMIN troca.'}
+                    : 'A foto vale na hora, sem esperar o Salvar. Só quem gerencia usuários troca.'}
                 </p>
               </div>
             </div>
@@ -688,11 +688,14 @@ export function EditarUsuarioModal({
               <div className="flex flex-wrap gap-1">
                 {papeisPossiveis.map(p => {
                   const marcado = papeis.includes(p)
+                  // 159: o papel ADMIN só o ADMIN dá (o banco recusa o resto).
+                  const travado = p === 'ADMIN' && !temPapel('ADMIN')
                   return (
-                    <button key={p} type="button" aria-pressed={marcado}
+                    <button key={p} type="button" aria-pressed={marcado} disabled={travado}
+                      title={travado ? 'O papel ADMIN só o ADMIN dá' : undefined}
                       onClick={() => setPapeis(ps =>
                         marcado ? ps.filter(x => x !== p) : [...ps, p])}
-                      className={`rounded px-2 py-1 text-[11px] font-medium ring-1 ${marcado
+                      className={`rounded px-2 py-1 text-[11px] font-medium ring-1 disabled:opacity-40 ${marcado
                         ? 'bg-af-600/20 text-af-300 ring-af-600/40'
                         : 'bg-graf-900 text-graf-500 ring-graf-700'}`}>
                       {p}

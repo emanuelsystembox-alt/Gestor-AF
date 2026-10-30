@@ -182,6 +182,10 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-
 export default function Administracao() {
   const { perfil, temPapel, pode } = useAuth()
   const souAdmin = temPapel('ADMIN')
+  // 159: "Gerenciar usuários" vale sem ser ADMIN -- mas nunca sobre um
+  // ADMIN nem sobre si mesmo. A mesma conta de `pode_gerir_usuario` no
+  // banco; aqui ela só apaga o botão que levaria a uma recusa.
+  const gereUsuarios = souAdmin || pode('admin.usuarios')
 
   const [aba, setAba] = useState<'usuarios' | 'tecnicos' | 'metas' | 'perfis' | 'cargos' | 'exclusoes' | 'expurgo' | 'importar'>('usuarios')
   const [exclusoes, setExclusoes] = useState<Exclusao[]>([])
@@ -495,7 +499,7 @@ export default function Administracao() {
 
   function traduzir(msg: string): string {
     if (/row-level security|violates row|permission denied/i.test(msg))
-      return 'O banco recusou: seu usuário não tem papel ADMIN. A barreira é do RLS, não da tela.'
+      return 'O banco recusou: este login está fora do que você gerencia (ou seu perfil não inclui "Gerenciar usuários").'
     if (/duplicate key/i.test(msg)) return 'Já existe um registro com esse nome.'
     return msg
   }
@@ -808,6 +812,17 @@ export default function Administracao() {
     setOcupado(false)
   }
 
+  function podeGerir(u: Usuario): boolean {
+    if (souAdmin) return true
+    return pode('admin.usuarios') && u.id !== perfil?.id
+      && !(papeisPorUsuario.get(u.id) ?? []).includes('ADMIN')
+  }
+  function motivoNaoGere(u: Usuario): string {
+    if (!pode('admin.usuarios')) return 'Seu perfil não inclui "Gerenciar usuários"'
+    if (u.id === perfil?.id) return 'O seu próprio login: peça a outro administrador'
+    return 'Login ADMIN: só outro ADMIN edita'
+  }
+
   async function novaSenha(u: Usuario) {
     setOcupado(true); setErro(null); setOk(null); setSenhaGerada(null)
     const { data, error } = await supabase.functions.invoke('admin-usuarios', {
@@ -958,8 +973,10 @@ export default function Administracao() {
                   <option value="SEM">Sem cargo ({usuarios.filter(u => !u.cargo_id).length})</option>
                 </select>
                 <button onClick={() => { setCriando(!criando); setSenhaGerada(null) }}
+                  disabled={!gereUsuarios && !criando}
+                  title={gereUsuarios ? undefined : 'Seu perfil não inclui "Gerenciar usuários"'}
                   className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
-                             hover:bg-af-500">
+                             hover:bg-af-500 disabled:opacity-40">
                   {criando ? 'Cancelar' : 'Novo usuário'}
                 </button>
               </div>
@@ -1625,15 +1642,16 @@ export default function Administracao() {
                                       cadastro tem quinze (D-128). */}
                                   <button
                                     onClick={() => setEditandoJanela(u)}
-                                    disabled={!souAdmin}
-                                    title={souAdmin ? 'Editar o cadastro inteiro'
-                                                    : 'Só ADMIN edita cadastro'}
+                                    disabled={!podeGerir(u)}
+                                    title={podeGerir(u) ? 'Editar o cadastro inteiro'
+                                                        : motivoNaoGere(u)}
                                     className="rounded border border-graf-700 px-2.5 py-1
                                                text-[11px] text-graf-400 hover:border-af-600
                                                hover:text-af-400 disabled:opacity-40">
                                     Editar
                                   </button>
-                                  <button onClick={() => novaSenha(u)} disabled={ocupado}
+                                  <button onClick={() => novaSenha(u)} disabled={ocupado || !podeGerir(u)}
+                                    title={podeGerir(u) ? undefined : motivoNaoGere(u)}
                                     className="rounded border border-graf-700 px-2.5 py-1
                                                text-[11px] text-graf-400 hover:border-af-600
                                                hover:text-af-400 disabled:opacity-50">

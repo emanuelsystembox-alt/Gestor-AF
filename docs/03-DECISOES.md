@@ -10285,3 +10285,56 @@ equipe legível`. Medido como cada um: Renan, Kayra (COP) e Flavio veem o mesmo 
 61 contratos, 9 equipes em São Luís. Conversa e mensagem ficaram de fora de
 propósito (D-236). **A lição:** a 158b trocou o escopo pelas telas que eu sabia que
 o Renan usava; o certo era ter procurado o padrão em todas as funções já ali.
+
+---
+
+### D-239 · "Gerenciar usuários" vale sem ser ADMIN — mas nunca vira ADMIN (159)
+
+> *"concedi o renan cargo para mexer e editar os dados do administrador porém
+> ele ainda não consegue por que? já liberei na permissão"* — Emanuel, 31/10
+
+**O defeito.** A administração de usuários foi construída em cima do **papel
+ADMIN**: as policies de escrita de `perfil`, `usuario_papel` e `usuario_base`, o
+gatilho que protege as colunas do perfil, `definir_papeis`, a foto, a Edge
+Function que cria login e troca senha, e o botão Editar. A permissão
+`admin.usuarios` só abria a tela de permissões (157). E a coluna "Papéis" dizia
+**"sem papel"** para 18 de 19 logins na tela do Renan, porque ele não podia LER os
+papéis dos outros — desconhecido escrito como zero.
+
+**O modelo.** Quem tem `admin.usuarios` gerencia os logins da empresa, **das
+cidades que acessa**, que **não são ADMIN**, e **não o próprio**
+(`pode_gerir_usuario`, uma conta só, usada pelo banco, pela Edge Function e pela
+tela). E nunca entrega o que o faria ADMIN por tabela:
+- o papel ADMIN, só o ADMIN dá;
+- perfil de acesso com permissão do módulo Administração, só o ADMIN atribui (a
+  mesma trava da 157a para as exceções);
+- e-mail e empresa continuam só do ADMIN.
+
+**Por que as travas.** Sem elas, "gerenciar usuários" seria um ADMIN com outro
+nome: trocar a senha do ADMIN e entrar como ele, ou dar a si mesmo o papel.
+
+**A Edge Function** (`admin-usuarios`, versão 3) deixou de conferir o papel e
+passou a perguntar ao banco **como quem chamou** (cliente com o JWT dele, não com a
+service_role): `pode_gerir_usuario` para trocar senha, `pode_criar_usuario` para
+criar. A fonte entrou no repositório (`supabase/functions/admin-usuarios/`) — não
+estava.
+
+**De passagem:** as RPCs de equipe do Editar cadastro (supervisor das equipes,
+técnicos do supervisor, skill, vínculo, técnico avulso, equipe própria) tinham a
+trava `eh_gestor()` (ADMIN/COP) antes da permissão; viraram "é da gestão", o modelo
+da D-238. E `definir_permissoes_usuario` passou a exigir `pode_gerir_usuario` — antes
+alcançava qualquer login da empresa, de qualquer cidade.
+
+**Medido como o Renan (desfeito):** lê 91 papéis; edita um técnico de São Luís (1
+linha); edita um ADMIN (0 linha); perfil Administrador → recusado; papel ADMIN →
+recusado; dar SUPERVISOR a um técnico → ok; rebaixar um ADMIN → recusado; mudar o
+próprio papel → recusado; exceção de permissão num ADMIN → recusado; criar login
+com perfil Administrador → "O papel ADMIN só o ADMIN dá"; criar técnico em São Luís
+→ ok. `testar_policies()` 33/33, `testar_campo()` 29/29, zero definer para o anon.
+
+**NÃO VERIFICADO:** a Edge Function chamada de verdade por um não-ADMIN (criar e
+trocar senha) — a regra que ela consulta foi testada no banco, a chamada HTTP não.
+Os cenários acima não entraram em `testar_policies()` (foram feitos à mão).
+`admin.cargos` e `admin.empresa` continuam "sem efeito ainda": cargos, perfis de
+acesso e dados da empresa seguem só do ADMIN — abrir perfis de acesso a outro
+login deixaria ele pôr permissão de Administração num perfil e atribuí-lo.

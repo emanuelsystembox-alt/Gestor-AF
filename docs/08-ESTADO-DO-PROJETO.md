@@ -431,6 +431,57 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 31/10/2026 — permissões, Coordenador e gerenciar usuários (D-235 a D-239)
+
+Migrations 155 a 159. Site publicado; app do técnico **não** publicado.
+
+### Resolvido nesta leva
+- Permissões por login (exceções em cima do perfil) no Editar cadastro (157, D-237).
+- Toda a gestão vê a cidade; a permissão decide o que faz; papel COORDENADOR (158, D-238).
+- Selos do menu e três leituras que ficaram na regra velha (158d).
+- "Gerenciar usuários" vale sem ser ADMIN, com travas contra virar ADMIN (159, D-239).
+- Observação do COP, casa do cliente, VT por equipe, grupos no chat (156, D-236).
+
+### Depende do Emanuel
+- **As permissões "sem efeito ainda"** (a tela marca): ver Serviços/Equipes/
+  Importação/Relatórios/Configurações, executar importação, cadastrar/excluir em
+  Configurações, tabela de pontuação, cargos, dados da empresa, desatribuir
+  pontuação. Para cada uma: esconde o menu, barra a ação, ou as duas? Cuidado: o
+  perfil Coordenador não tem `importacao.ver/executar` nem `configuracoes.ver` —
+  ligar essas chaves tira a Importação da Victoria.
+- **Victoria**: papel COP, perfil Coordenador. Desde a 158 transferir exige a chave,
+  que o perfil Coordenador não tem — ou troca o perfil, ou marca a exceção.
+- **Flavio (supervisor)** recebeu "Gerenciar usuários" em 30/10. Desde a 159 isso
+  vale: ele edita logins de São Luís (não ADMIN). Confirmar que é a intenção.
+- **Renan** tem `admin.cargos` e `admin.empresa` marcados; não fazem nada (só ADMIN).
+- **Papel Coordenador**: só o Renan tem. Marcar em quem é coordenador.
+- **VT por equipe**: a régua é Status do TOA (CONCLUÍDO × NÃO CONCLUÍDO) e dá ~100%
+  para quase todos (529 × 7 em 14 dias). Se precisar separar quem resolveu, trocar
+  para código produtivo × improdutivo.
+- **Publicar o app** (`eas update`): observação do COP, casa do cliente, grupos e o
+  Coordenador só chegam aos celulares assim.
+
+### Construção que ficou para depois
+- Cenários da 159 em `testar_policies()` (gestor de usuários não edita ADMIN, não dá
+  papel ADMIN, não se edita) — hoje testados só à mão.
+- **Escrita direta pela API**: a policy `visita_gestao` (ALL) deixa ADMIN/COP
+  alterarem `visita` direto, sem passar pela permissão da RPC. O site não usa esse
+  caminho, mas ele existe. Fechar exige listar o que ainda escreve direto.
+- `carteira` tem 0 linhas e nenhuma equipe tem `controlador_id`: o conceito de
+  carteira do controlador está morto desde a 158. Decidir se some.
+- Funções de ESCRITA com `eh_gestor() or ...` sem filtro de cidade (conversa,
+  mensagem, avisos) — ficaram de fora de propósito, mas ninguém revisou uma a uma.
+- Importação da planilha de cidade: a etapa 2 (criar os acessos) não retoma se a
+  tela fechar no meio (D-233).
+- GPS de alta precisão durante a execução, no app (proposto, não feito).
+
+### Verificação que ninguém fez ainda
+- O login do Renan aberto pela tela (rota, selos, Editar, Nova senha) — tudo foi
+  testado no banco como ele, não no navegador dele.
+- A Edge Function `admin-usuarios` chamada por um não-ADMIN de verdade.
+- Nada do app desta leva rodou num celular (compila e empacota).
+- O supervisor com "Transferir" arrastando na Rota pela tela.
+
 ## Pendente em 26/10/2026 — humor do dia e ocorrências do campo (D-226)
 
 Migrations **146 e 146b**; web publicada e conferida por md5; app publicado pelo ar
