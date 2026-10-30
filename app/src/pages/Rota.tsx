@@ -1,11 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, SITUACOES, type Situacao } from '../lib/supabase'
 import { equipeRotulo, isoLocal } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { useTema } from '../lib/tema'
+import { useAuth } from '../lib/auth'
+import { useAbrirContrato } from '../components/LinkContrato'
 import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
          temChaveDoMapa } from '../lib/mapaGoogle'
 
@@ -217,7 +218,14 @@ const APELIDO_SERVICO: Record<string, string> = {
 }
 
 export default function Rota() {
-  const navegar = useNavigate()
+  /* 156a: quem MOVE a rota é COP e controlador, por papel; supervisor só
+     se o ADMIN conceder `servicos.transferir` no perfil dele (Emanuel,
+     30/10). É a mesma conta do `transferir_visita` no banco -- aqui ela só
+     tira o arrastar de quem levaria "sem permissão" ao soltar. */
+  const { temPapel, pode } = useAuth()
+  const podeMover = temPapel('ADMIN', 'COP', 'CONTROLADOR') || pode('servicos.transferir')
+  // 156: o contrato abre por cima da Rota, com X para voltar.
+  const abrirContrato = useAbrirContrato()
   // HOJE. Abria no último dia com visita, e a rota de ontem sob a data
   // de hoje é a pior das confusões numa tela de despacho (lib/dia.ts).
   const [data, setData] = useState(isoLocal())
@@ -738,7 +746,8 @@ export default function Rota() {
                               primeiro={i === 0}
                               arrastando={arrastando === p.visita_id}
                               onArrastar={setArrastando}
-                              onAbrir={() => navegar(`/controle/visita/${p.visita_id}`)}
+                              podeMover={podeMover}
+                              onAbrir={() => abrirContrato(p.visita_id)}
                               onMover={() => { setMover({ parada: p, destinoLogin: null })
                                                setMotivo('') }} />
                           </Fragment>
@@ -915,11 +924,13 @@ function ChipJornada({ j }: { j: Parada }) {
  * trecho: ninguém sabe de onde o técnico saiu (o TOA não manda a base).
  */
 function Trecho({ parada: p, anterior, primeiro, arrastando,
-                  onArrastar, onAbrir, onMover }: {
+                  onArrastar, onAbrir, onMover, podeMover }: {
   parada: Parada
   anterior: Parada | null
   primeiro: boolean
   arrastando: boolean
+  /** 156a: sem permissão de transferir, o cartão não arrasta nem oferece mover. */
+  podeMover: boolean
   onArrastar: (id: string | null) => void
   onAbrir: () => void
   onMover: () => void
@@ -927,7 +938,7 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
   const encerrou = p.finalizado_toa ? hhmm(p.fim) : null
   const km = p.km_desde_anterior
   const salto = km != null && km >= LIMITE_SALTO_KM
-  const movel = !TERMINAIS.includes(p.situacao)
+  const movel = podeMover && !TERMINAIS.includes(p.situacao)
   const cor = SITUACAO_INFO[p.situacao]?.cor ?? '#64748b'
   const servico = p.tipo_servico
     ? APELIDO_SERVICO[p.tipo_servico] ?? p.tipo_servico

@@ -117,6 +117,14 @@ export default function Conversa({ navigation }: NativeStackScreenProps<Pilha, '
   return (
     <SafeAreaView style={e.tela} edges={['top']}>
       <CabecalhoAba titulo="Conversa com o controle" subtitulo="Quem estiver com a sua equipe responde" />
+      {/* 156g: os grupos que a coordenação montou -- "evitando o uso do
+          WhatsApp" (Emanuel, 30/10). Uma faixa só, ao alcance do polegar. */}
+      <Pressable onPress={() => navigation.navigate('Grupos')} accessibilityRole="button"
+        accessibilityLabel="Abrir os grupos"
+        style={({ pressed }) => [e.faixaGrupos, pressed && { opacity: 0.85 }]}>
+        <Text style={e.faixaGruposTexto}>👥  Grupos da equipe</Text>
+        <Text style={e.faixaGruposSeta}>›</Text>
+      </Pressable>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={rolagem}
@@ -255,6 +263,12 @@ export default function Conversa({ navigation }: NativeStackScreenProps<Pilha, '
 }
 
 const e = StyleSheet.create({
+  faixaGrupos: {
+    flexDirection: 'row', alignItems: 'center', minHeight: TOQUE, paddingHorizontal: 16,
+    backgroundColor: cor.branco, borderBottomWidth: 1, borderBottomColor: cor.graf100,
+  },
+  faixaGruposTexto: { flex: 1, fontSize: 15, fontWeight: '800', color: cor.tinta },
+  faixaGruposSeta: { fontSize: 24, color: cor.graf500 },
   tela: { flex: 1, backgroundColor: cor.graf50 },
   lista: { padding: 12, paddingBottom: 16 },
   vazio: { padding: 24, alignItems: 'center' },

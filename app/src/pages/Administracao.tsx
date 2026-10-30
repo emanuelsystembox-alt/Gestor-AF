@@ -10,6 +10,7 @@ import {
   type ErrosCadastro,
 } from '../lib/validacao'
 import { useAuth } from '../lib/auth'
+import { useCidades } from '../lib/cidade'
 import { Shell } from '../components/Shell'
 import { ExpurgoPontuacao } from '../components/ExpurgoPontuacao'
 import { Alerta, Avatar, Vazio } from '../components/ui'
@@ -184,7 +185,25 @@ export default function Administracao() {
   const [aba, setAba] = useState<'usuarios' | 'tecnicos' | 'metas' | 'perfis' | 'cargos' | 'exclusoes' | 'expurgo' | 'importar'>('usuarios')
   const [exclusoes, setExclusoes] = useState<Exclusao[]>([])
   const [buscaExc, setBuscaExc] = useState('')
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  /*
+   * ┌─ 156 · a lista é da CIDADE que está no topo ──────────────────────┐
+   * │ > "na hora que eu filtrar São Luís, principalmente na senha do     │
+   * │ >  admin (...) mostre somente os logins daquela cidade. Não deve   │
+   * │ >  misturar as coisas" — Emanuel, 30/10                            │
+   * │                                                                    │
+   * │ `perfil` não filtra por cidade no banco — e não deve: o ADMIN      │
+   * │ precisa enxergar todo mundo para dar acesso, e a 153 mostrou que   │
+   * │ esconder perfil por RLS faz "—" aparecer onde o dado existe. Então │
+   * │ o corte é de TELA: todos chegam, a lista mostra os da cidade ativa,│
+   * │ e diz quantos ficaram de fora — sumir calado seria a D-232.        │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const [todosUsuarios, setUsuarios] = useState<Usuario[]>([])
+  const { ativa: cidadeAtiva } = useCidades()
+  const usuarios = useMemo(() => cidadeAtiva
+    ? todosUsuarios.filter(u => u.base_id === cidadeAtiva.id) : todosUsuarios,
+  [todosUsuarios, cidadeAtiva])
+  const deOutraCidade = todosUsuarios.length - usuarios.length
   /** foto_path → URL assinada (103). */
   const [fotos, setFotos] = useState<Map<string, string>>(new Map())
   /** A foto escolhida no "Novo usuário" — sobe depois que o acesso nasce. */
@@ -1300,6 +1319,13 @@ export default function Administracao() {
               )}
             </div>
 
+            {deOutraCidade > 0 && cidadeAtiva && (
+              <p className="px-1 text-[11px] text-graf-400">
+                Mostrando os acessos de <strong className="text-graf-200">{cidadeAtiva.nome}</strong>.
+                {' '}<span className="tabular">{deOutraCidade}</span> de outras cidades ficam de fora —
+                troque a cidade no topo para vê-los.
+              </p>
+            )}
             <div className="card-controle overflow-hidden">
               {visiveis.length === 0 ? (
                 (filtroPapel || filtroCargo || busca.trim())

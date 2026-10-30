@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useCentral } from '../lib/central'
 import { useAuth } from '../lib/auth'
 import { Avatar } from './ui'
+import { GruposChat } from './GruposChat'
 
 /**
  * A caixa de conversas do controle (091, 133).
@@ -84,6 +85,8 @@ export function ChatControle() {
   const [busca, setBusca] = useState('')
   const fim = useRef<HTMLDivElement>(null)
   const caixa = useRef<HTMLTextAreaElement>(null)
+  const [modoChat, setModoChat] = useState<'CONVERSAS' | 'GRUPOS'>('CONVERSAS')
+  const [naoLidasGrupos, setNaoLidasGrupos] = useState(0)
 
   /** Alguma conversa escolhida? A tela do celular depende disso. */
   const escolhida = chatTecnico ?? chatPessoa
@@ -253,8 +256,29 @@ export function ChatControle() {
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Conversas">
       <div className="absolute inset-0 bg-black/40" onClick={fecharChat} />
-      <div className="sup-controle absolute inset-y-0 right-0 flex w-full max-w-3xl border-l
+      <div className="sup-controle absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col border-l
                       border-graf-800 bg-graf-950 shadow-2xl">
+        {/* 156g: duas chaves no topo. Os GRUPOS (todos os membros escrevem)
+            não se misturam com as conversas a dois -- cada um é uma caixa. */}
+        <div className="flex shrink-0 gap-1 border-b border-graf-800 px-2 pt-2">
+          {([['CONVERSAS', 'Conversas'], ['GRUPOS', 'Grupos']] as const).map(([k, r]) => (
+            <button key={k} onClick={() => setModoChat(k)} aria-pressed={modoChat === k}
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-sm transition ${
+                modoChat === k ? 'border-af-500 font-medium text-graf-100'
+                               : 'border-transparent text-graf-400 hover:text-graf-200'}`}>
+              {r}
+              {k === 'GRUPOS' && naoLidasGrupos > 0 && (
+                <span className="tabular rounded-full bg-af-600 px-1.5 text-[10px] font-bold text-white">
+                  {naoLidasGrupos}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex min-h-0 flex-1">
+        {modoChat === 'GRUPOS' ? (
+          <GruposChat fechar={fecharChat} aoMudarNaoLidas={setNaoLidasGrupos} />
+        ) : (<>
         {/* ---------- a caixa de entrada ---------- */}
         <aside className={`flex w-full flex-col border-r border-graf-800 sm:w-72 ${
           escolhida ? 'hidden sm:flex' : 'flex'}`}>
@@ -459,6 +483,8 @@ export function ChatControle() {
             </form>
           )}
         </section>
+        </>)}
+        </div>
       </div>
     </div>
   )

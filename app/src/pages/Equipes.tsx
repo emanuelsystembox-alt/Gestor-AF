@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
@@ -24,6 +24,7 @@ import {
   SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela,
   type FiltroContrato,
 } from '../lib/filtroContratos'
+import { LinkContrato, useAbrirContrato } from '../components/LinkContrato'
 
 /**
  * Equipes de campo.
@@ -325,7 +326,6 @@ export default function Equipes() {
 
   // O contrato abre em JANELA, como em Serviços (D-056) — e não numa
   // página separada. Era a última diferença entre as duas telas.
-  const navegar = useNavigate()
   /*
    * ┌─ 155 · o contrato abre na PÁGINA, não mais numa janela ──────────┐
    * │ > "o sistema deve desconsiderar essa tela menor. O ideal é       │
@@ -337,9 +337,11 @@ export default function Equipes() {
    * │ um endereço para guardar nos favoritos.                           │
    * └────────────────────────────────────────────────────────────────────┘
    */
+  // 156: abre POR CIMA da lista (janela com X), levando a lista de fundo.
+  const abrirContratoPorCima = useAbrirContrato()
   const abrirContrato = useCallback((visitaId: string, acao?: AcaoContrato) => {
-    navegar(`/controle/visita/${visitaId}`, acao ? { state: { acao } } : undefined)
-  }, [navegar])
+    abrirContratoPorCima(visitaId, acao)
+  }, [abrirContratoPorCima])
 
   // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
   // O menu do contrato — o mesmo de Serviços, por portal (ver MenuContrato).
@@ -535,6 +537,21 @@ export default function Equipes() {
     recarregar()
   }
 
+  /*
+   * 156: chegar DIRETO no técnico, vindo do sino ("abaixo do ritmo").
+   * O sinal sabe o técnico, não a equipe; a equipe vem do cadastro dele.
+   * Abre a linha e rola até ela -- uma vez só: depois de aberta, o
+   * controlador fecha e navega como quiser sem a tela puxá-lo de volta.
+   */
+  const [params] = useSearchParams()
+  const tecnicoAlvo = params.get('tecnico')
+  const [equipeAlvo, setEquipeAlvo] = useState<string | null>(null)
+  useEffect(() => {
+    if (!tecnicoAlvo) return
+    supabase.from('tecnico').select('equipe_id').eq('id', tecnicoAlvo).maybeSingle()
+      .then(({ data: t }) => setEquipeAlvo((t as { equipe_id: string | null } | null)?.equipe_id ?? null))
+  }, [tecnicoAlvo])
+
   async function abrir(e: EquipePainel) {
     if (aberta === e.equipe_id) { setAberta(null); return }
     setAberta(e.equipe_id)
@@ -671,6 +688,18 @@ export default function Equipes() {
   const painelVisto = useMemo(() => (chaveFiltro && painelDoFiltro?.chave === chaveFiltro
     ? painel.map(e => painelDoFiltro.mapa.get(e.equipe_id) ?? e)
     : painel), [painel, painelDoFiltro, chaveFiltro])
+
+  // 156: o técnico que veio do sino -- depois que o painel existe.
+  useEffect(() => {
+    if (!equipeAlvo) return
+    const e = painelVisto.find(x => x.equipe_id === equipeAlvo)
+    if (!e) return
+    setEquipeAlvo(null)
+    if (aberta !== e.equipe_id) abrir(e)
+    requestAnimationFrame(() => document.getElementById(`equipe-${e.equipe_id}`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipeAlvo, painelVisto])
 
   // As opções saem do que o dia TEM -- janela que ninguém tem não é
   // opção, e o status do TOA sai escrito como veio.
@@ -1175,7 +1204,7 @@ export default function Equipes() {
                           const exp = aberta === e.equipe_id
                           return (
                             <Fragment key={e.equipe_id}>
-                              <tr onClick={() => abrir(e)}
+                              <tr onClick={() => abrir(e)} id={`equipe-${e.equipe_id}`}
                                   className={`linha-equipe cursor-pointer border-b border-graf-800
                                               align-top ${exp ? 'aberta' : ''}`}>
                                 {/* A seta e um BOTAO de verdade: a linha inteira
@@ -1612,13 +1641,13 @@ export default function Equipes() {
                                         }
                                         renderAcoes={v => (
                                           <div className="flex items-center justify-end gap-1">
-                                            <Link to={`/controle/visita/${v.id}`}
+                                            <LinkContrato to={`/controle/visita/${v.id}`}
                                               onClick={ev => ev.stopPropagation()}
                                               className="rounded border border-graf-700 px-2 py-0.5
                                                          text-[11px] text-graf-400
                                                          hover:border-af-600 hover:text-af-400">
                                               abrir
-                                            </Link>
+                                            </LinkContrato>
                                             <button
                                               onClick={ev => {
                                                 ev.stopPropagation()

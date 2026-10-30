@@ -409,7 +409,10 @@ export function ContratoModal({
              Equipamento estão logo abaixo, na própria VisitaDetalhe — e era
              exatamente essa a reclamação ("duas telas que mostram a mesma
              informação"). Marcadores não existe lá, então fica. */}
-        <div className="flex gap-1 border-b border-graf-800 px-5 pt-2">
+        {/* 156: na página cheia a aba some de vez -- os marcadores viraram
+            um cartão próprio ao lado das O.S. (MarcadoresDoContrato), porque
+            atrás de uma aba ninguém os achou (Emanuel, 30/10). */}
+        {!pagina && <div className="flex gap-1 border-b border-graf-800 px-5 pt-2">
           {(pagina
             ? [['marcadores', `Marcadores (${marcados.length})`]] as const
             : [['detalhe', 'Detalhe'],
@@ -424,7 +427,7 @@ export function ContratoModal({
               {rot}
             </button>
           ))}
-        </div>
+        </div>}
 
         <div className={pagina
           ? 'space-y-4 p-5'
@@ -925,7 +928,7 @@ export function ContratoModal({
 
           {/* 155: na página cheia este bloco é o que duplicava a tela de
               baixo. Só Marcadores sobrevive, e só quando pedido. */}
-          {(!pagina || aba === 'marcadores') && (!v ? (
+          {!pagina && (!v ? (
             <p className="py-10 text-center text-sm text-graf-400">Carregando contrato…</p>
           ) : aba === 'detalhe' ? (
             <>

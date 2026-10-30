@@ -65,6 +65,12 @@ export interface LinhaAgenda {
    *  etiqueta GPON (D-188) — o que a coluna GRUPO da central mostra (125). */
   tipo_atividade: string | null
   tecnologia: string | null
+  /** 156e: a nota do COP ("cliente só às 14h") e a casa marcada na porta. */
+  observacao_cop: string | null
+  observacao_cop_em: string | null
+  casa_lat: number | null
+  casa_lng: number | null
+  casa_marcado_em: string | null
 }
 
 interface Producao {
@@ -518,6 +524,14 @@ export default function Agenda({ navigation }: Props) {
               <Text style={e.tipoAtividade}>{l.tipo_atividade}</Text>
             )}
 
+            {/* 156e: a nota do COP já no cartão -- é ela que diz se vale a
+                pena ir agora ("cliente só às 14h"). Inteira, sem cortar. */}
+            {!!l.observacao_cop && (
+              <View style={e.obsCop}>
+                <Text style={e.obsCopTexto}>💬 {l.observacao_cop}</Text>
+              </View>
+            )}
+
             {/* O que o controlador vê na linha do contrato, o técnico vê
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
                 muda como ele trata o cliente. */}
@@ -642,6 +656,11 @@ function LinhaFicha({ rotulo, valor, forte }: { rotulo: string; valor: string; f
 }
 
 const e = StyleSheet.create({
+  obsCop: {
+    backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc',
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 6,
+  },
+  obsCopTexto: { fontSize: 14, lineHeight: 19, color: '#0c4a6e', fontWeight: '700' },
   placar: { flexDirection: 'row', padding: 14 },
   placarCelula: { flex: 1, gap: 2 },
   placarDivisor: { width: 1, backgroundColor: cor.graf100, marginHorizontal: 12 },

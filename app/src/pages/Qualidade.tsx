@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
@@ -10,6 +9,7 @@ import {
   SITUACAO_CONTRATO, linkWhatsApp, formataTel, pct, num1, num2,
   type Triagem,
 } from '../lib/qualidade'
+import { LinkContrato } from '../components/LinkContrato'
 
 /**
  * A central de QUALIDADE (147, reescrita na 148/149).
@@ -460,8 +460,8 @@ function Registro({ l, podeRegistrar, aoSalvar }: {
             {l.tentativas} registro(s){l.analista ? ` · último por ${l.analista}` : ''}
           </span>
         )}
-        <Link to={`/controle/visita/${l.visita_id}`}
-          className="text-af-400 underline-offset-2 hover:underline">abrir o contrato →</Link>
+        <LinkContrato to={`/controle/visita/${l.visita_id}`}
+          className="text-af-400 underline-offset-2 hover:underline">abrir o contrato →</LinkContrato>
       </div>
 
       {/* ---- contato ---- */}
@@ -819,10 +819,10 @@ function AbaPainel({ de, ate }: { de: string; ate: string }) {
                     style={{ background: 'var(--color-graf-800)', color: d?.cor ?? 'var(--color-graf-400)' }}>
                     {d?.r ?? '—'}
                   </span>
-                  <Link to={`/controle/visita/${o.visita_id}`}
+                  <LinkContrato to={`/controle/visita/${o.visita_id}`}
                     className="tabular font-medium underline-offset-2 hover:text-af-400 hover:underline">
                     {o.contrato}
-                  </Link>
+                  </LinkContrato>
                   <span className="text-graf-500">
                     {[o.equipe && equipeRotulo(o.equipe), o.operacao, o.grupo, o.analista]
                       .filter(Boolean).join(' · ')}

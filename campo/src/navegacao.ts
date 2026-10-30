@@ -20,6 +20,10 @@ export type Pilha = {
   Geo: undefined
   /** A conversa com um colega, aberta pelo Geo-Rota (130). */
   ConversaColega: { id: string; nome: string; equipe: string | null }
+  /** Os grupos de que o técnico é membro (156g), abertos pela Conversa. */
+  Grupos: undefined
+  /** Um grupo: todos os membros leem e escrevem (156g). */
+  ConversaGrupo: { id: string; nome: string }
   /** Meu estoque: ferramental, miscelânea, seriais; e sinalizar (091). */
   Material: undefined
   /** Pedir abastecimento do carro que está no meu nome (091). */

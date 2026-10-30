@@ -432,6 +432,20 @@ vazia — porque esses contratos não contam para a equipe (D-225). Tudo correto
 parecia defeito. Quando um filtro legítimo pode zerar a lista, a tela escreve o
 porquê ao lado. Ver D-235.
 
+**Policy `ALL` é de ler E de escrever: abrir a visão por ela abre a escrita.**
+`visita_gestao` é `for all` e usa `equipes_visiveis()`. Para o supervisor "ver a
+cidade", pôr o papel dentro de `equipes_visiveis()` teria dado a ele `UPDATE visita
+set equipe_id = …` direto pela API — mover a rota, que ele não pode. Antes de
+alargar uma função de escopo, liste as policies que a usam e o `cmd` de cada uma
+(`pg_policies`): se alguma for `ALL`, `UPDATE` ou `DELETE`, o escopo de leitura
+precisa de função própria (`equipes_legiveis()`, 156a). Ver D-236.
+
+**Teste que cria persona em "qualquer cidade" mede o vazio.** `_prepara_teste_policy`
+pegava `base limit 1` e `visita limit 1` — duas escolhas independentes, que podiam
+cair em cidades diferentes. O cenário "supervisor lê a cidade" deu 0 na primeira
+rodada: era o teste, não a regra. Persona de teste nasce onde está o dado que ela
+vai tocar (156c). Ver D-236.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

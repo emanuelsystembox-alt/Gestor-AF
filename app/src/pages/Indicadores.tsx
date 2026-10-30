@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar } from '../components/ui'
 import { isoLocal } from '../lib/formato'
 import { SeletorBuckets } from '../components/SeletorBuckets'
+import { VtPorEquipe } from '../components/VtPorEquipe'
+import { LinkContrato } from '../components/LinkContrato'
 
 /**
  * Indicadores (140).
@@ -106,6 +107,7 @@ export default function Indicadores() {
   const [equipesDisp, setEquipesDisp] = useState<string[]>([])
   const [bucketsDisp, setBucketsDisp] = useState<{ nome: string; qtd: number }[]>([])
   const [verGrade, setVerGrade] = useState(false)
+  const [indicador, setIndicador] = useState<'WO' | 'VT'>('WO')
   const [grade, setGrade] = useState<NaGrade[]>([])
   const [carregandoGrade, setCarregandoGrade] = useState(false)
 
@@ -271,17 +273,25 @@ export default function Indicadores() {
             className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs" />
         </div>
 
-        {/* A aba existe com um indicador só: o segundo não vira tela nova. */}
+        {/* A aba existia com um indicador só para o segundo não virar tela
+            nova -- e o segundo chegou: VT por equipe (156f), "ao lado da
+            primeira WO" (Emanuel, 30/10). Os filtros de cima valem para os dois. */}
         <div className="flex gap-1 border-b border-graf-800">
-          <span className="-mb-px border-b-2 border-af-500 px-3 py-2 text-sm font-medium text-graf-100">
-            Primeira WO
-          </span>
-          <span className="px-3 py-2 text-sm text-graf-600">mais indicadores em breve</span>
+          {([['WO', 'Primeira WO'], ['VT', 'VT por equipe']] as const).map(([k, r]) => (
+            <button key={k} onClick={() => setIndicador(k)} aria-pressed={indicador === k}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${indicador === k
+                ? 'border-af-500 font-medium text-graf-100'
+                : 'border-transparent text-graf-400 hover:text-graf-200'}`}>
+              {r}
+            </button>
+          ))}
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
 
-        {carregando ? (
+        {indicador === 'VT' ? (
+          <VtPorEquipe de={de} ate={ate} equipe={equipe === 'TODAS' ? null : equipe} buckets={buckets} />
+        ) : carregando ? (
           <p className="py-12 text-center text-graf-400">Carregando…</p>
         ) : dias.length === 0 ? (
           <Alerta tipo="info">
@@ -404,12 +414,12 @@ export default function Indicadores() {
                             return (
                               <td key={d} className="tabular px-1 py-1.5 text-center">
                                 {!x ? <span className="text-graf-700">·</span> : (
-                                  <Link to={`/controle/visita/${x.visita_id}`}
+                                  <LinkContrato to={`/controle/visita/${x.visita_id}`}
                                     title={`${x.contrato ?? 'contrato'} · ${x.dentro
                                       ? 'dentro da meta' : `${x.min} min acima da meta`}`}
                                     className={x.dentro ? 'text-emerald-300' : 'text-af-300'}>
                                     {x.hora}
-                                  </Link>
+                                  </LinkContrato>
                                 )}
                               </td>
                             )
@@ -547,7 +557,7 @@ export default function Indicadores() {
                                 {(porTecnico.get(t.tecnico_id) ?? [])
                                   .slice().sort((a, b) => a.dia.localeCompare(b.dia))
                                   .map(d => (
-                                    <Link key={d.dia} to={`/controle/visita/${d.visita_id}`}
+                                    <LinkContrato key={d.dia} to={`/controle/visita/${d.visita_id}`}
                                       title={`${d.grupo ?? ''} · contrato ${d.contrato ?? '—'} · ${d.endereco ?? ''}`}
                                       className={`rounded-md border px-2 py-1 text-[11px] ${
                                         d.dentro ? 'border-emerald-700/50 bg-emerald-900/25 text-emerald-200'
@@ -555,7 +565,7 @@ export default function Indicadores() {
                                       <span className="block text-[10px] uppercase opacity-70">{diaBr(d.dia)}</span>
                                       <span className="tabular font-semibold">{hhmm(d.hora)}</span>
                                       {!d.dentro && <span className="ml-1 opacity-80">+{d.minutos_depois}</span>}
-                                    </Link>
+                                    </LinkContrato>
                                   ))}
                               </div>
                             </td>

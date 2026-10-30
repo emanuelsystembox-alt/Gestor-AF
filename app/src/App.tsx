@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { CentralProvider } from './lib/central'
 import Login from './pages/Login'
@@ -79,14 +79,52 @@ function Raiz() {
   return <Navigate to="/campo" replace />
 }
 
-export default function App() {
+/**
+ * O contrato em JANELA, por cima da lista de onde veio (156).
+ *
+ * > "eu cliquei em cima do contrato, ele abre essa página um pouco
+ * >  maior, mas aí deve ter um X na ponta, no canto superior direito, para
+ * >  eu voltar para onde eu estava" — Emanuel, 30/10
+ *
+ * O padrão é o da "rota com fundo": a URL continua `/controle/visita/:id`
+ * — dá para copiar e mandar —, mas quem chegou de uma lista leva no
+ * estado da navegação a tela de FUNDO, e as rotas desenham a lista atrás
+ * e o contrato por cima. Link aberto direto (sem fundo) cai na página
+ * cheia de sempre. X, clique fora e Esc fazem a mesma coisa: voltar.
+ */
+function JanelaContrato() {
+  const navegar = useNavigate()
+  // A rolagem da lista atrás não pode andar com a roda do mouse na janela.
+  useEffect(() => {
+    const antes = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = antes }
+  }, [])
   return (
-    <AuthProvider>
-      {/* A central fica ACIMA das rotas: um canal de Realtime a sessão
-          inteira, e não um por página (091). */}
-      <CentralProvider>
-      <Suspense fallback={<Carregando />}>
-      <Routes>
+    <div className="sup-controle fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
+                    bg-black/60 p-3 backdrop-blur-[1px] sm:p-6"
+      onClick={() => navegar(-1)}>
+      <div className="relative w-full max-w-[96rem] rounded-xl border border-graf-700 bg-graf-950 shadow-2xl"
+        role="dialog" aria-modal="true" aria-label="Contrato"
+        onClick={e => e.stopPropagation()}>
+        <button onClick={() => navegar(-1)} title="Fechar e voltar (Esc)" aria-label="Fechar"
+          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full
+                     border border-graf-700 bg-graf-900 text-lg leading-none text-graf-300
+                     hover:border-af-600 hover:text-af-400">
+          ✕
+        </button>
+        <VisitaDetalhe emJanela />
+      </div>
+    </div>
+  )
+}
+
+function Rotas() {
+  const local = useLocation()
+  const fundo = (local.state as { fundo?: Location } | null)?.fundo
+  return (
+    <>
+      <Routes location={fundo ?? local}>
         <Route path="/" element={<Raiz />} />
         <Route path="/entrar" element={<Login />} />
 
@@ -137,6 +175,24 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {fundo && (
+        <Routes>
+          <Route path="/controle/visita/:id" element={
+            <Protegida exige="GESTAO"><JanelaContrato /></Protegida>} />
+        </Routes>
+      )}
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      {/* A central fica ACIMA das rotas: um canal de Realtime a sessão
+          inteira, e não um por página (091). */}
+      <CentralProvider>
+      <Suspense fallback={<Carregando />}>
+      <Rotas />
       </Suspense>
       </CentralProvider>
     </AuthProvider>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Visita } from '../lib/metricas'
 import { SITUACAO_INFO } from '../lib/supabase'
 import { Pill } from './ui'
@@ -37,6 +37,44 @@ import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
  *  assinante para cada linha da lista — que a tabela não usa. As aspas
  *  preservam o espaço da chave: o supabase-js só apaga espaço FORA
  *  delas. */
+/**
+ * O 💬 da observação do COP, na linha do contrato (156e).
+ *
+ * Abre um balão PEQUENO no clique, sem sair da lista — o controlador quer
+ * ler a nota, não abrir o contrato. Posição `absolute` dentro da célula e
+ * não `fixed`: na tabela, um ancestral com transform faria o `fixed` abrir
+ * longe do clique (D-169). O clique não sobe para a linha.
+ */
+function BalaoObservacao({ texto, em }: { texto: string; em: string | null }) {
+  const [aberto, setAberto] = useState(false)
+  return (
+    <span className="relative inline-flex">
+      <button type="button" aria-expanded={aberto}
+        aria-label="Ver a observação do COP para o técnico"
+        title={texto}
+        onClick={e => { e.stopPropagation(); setAberto(a => !a) }}
+        className="rounded px-1 text-[12px] leading-none ring-1 ring-sky-600/50 hover:bg-sky-900/40">
+        💬
+      </button>
+      {aberto && (
+        <span role="dialog" onClick={e => e.stopPropagation()}
+          className="absolute left-0 top-full z-30 mt-1 w-64 rounded-md border border-sky-700/60
+                     bg-graf-900 p-2.5 text-left text-xs normal-case text-graf-100 shadow-xl">
+          <span className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+            Observação do COP
+            {em && <span className="font-normal normal-case text-graf-400">
+              {new Date(em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>}
+            <button type="button" onClick={() => setAberto(false)} aria-label="Fechar"
+              className="ml-auto text-graf-400 hover:text-graf-100">✕</button>
+          </span>
+          <span className="block whitespace-pre-wrap">{texto}</span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
@@ -47,6 +85,7 @@ export const SELECT_CONTRATO = `
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
   contador_log:dados_origem->>"Contador de log",
+  observacao_cop, observacao_cop_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade, meta_execucao_min ),
   area:area_id ( codigo, apelido ),
@@ -116,6 +155,9 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
    *  a agenda (144). Nulo = a linha não trouxe a coluna — jornada nunca
    *  traz. Nulo NÃO é zero. */
   contador_log?: string | null
+  /** 156e: a nota do COP para o técnico. A lista só mostra que existe. */
+  observacao_cop?: string | null
+  observacao_cop_em?: string | null
   node: string | null
   /** 'GPON' quando a linha do TOA tem sinal de GPON (109, D-188). Nulo =
    *  não identificada — NÃO quer dizer HFC. */
@@ -524,6 +566,11 @@ export function TabelaContratos({
                     <span title="Rota fixada — a importação do TOA não muda a equipe deste contrato"
                           className="text-[10px] text-sky-400">⚲</span>
                   )}
+                  {/* 156e: "um balãozinho de mensagem onde diz que esse
+                      contrato tem uma observação do controlador (...) quem
+                      clicar em cima, ele pode mostrar exatamente a
+                      observação" (Emanuel, 30/10). */}
+                  {v.observacao_cop && <BalaoObservacao texto={v.observacao_cop} em={v.observacao_cop_em ?? null} />}
                 </div>
                 {/* De onde veio o cancelamento (Emanuel, 24/10: "eu preciso
                     saber a origem"): desatribuído (800) ou pela central. */}

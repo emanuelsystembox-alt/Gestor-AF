@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl,
   ScrollView, StyleSheet, Text, TextInput, View,
@@ -133,6 +133,15 @@ interface Detalhe {
   /** Quando a varredura leu o material deste contrato no TOA (117). */
   toa_varrido_em: string | null
   tecnologia: string | null
+  /** 156e: a nota do COP para o técnico ("cliente só às 14h"). */
+  observacao_cop: string | null
+  observacao_cop_em: string | null
+}
+
+/** 156e: a casa que um técnico marcou na porta deste cliente. */
+interface Casa {
+  lat: number; lng: number; precisao_m: number | null; marcado_em: string
+  marcado_por: string | null; marcas: number; distancia_toa_m: number | null
 }
 /** Uma peça que está na mão do técnico (`minha_carga`, 086-B). */
 interface PecaNaMao { serial: string; tipo: string | null; modelo: string | null }
@@ -142,6 +151,7 @@ const SELECT = `
   logradouro, complemento, bairro, cep, lat, lng,
   janela_inicio, janela_fim, situacao, data_agendada, observacao,
   ouvidoria, tec1, segmentacao:segmentacao_id ( nome ), toa_varrido_em, tecnologia,
+  observacao_cop, observacao_cop_em,
   tipo_atividade:tipo_atividade_id ( nome ),
   tipo_servico:tipo_servico_id ( nome ),
   ordem_servico (
@@ -305,6 +315,50 @@ export default function Visita({ route, navigation }: Props) {
     q.order('ordem').then(({ data }) => setSubFalhas((data ?? []) as SubFalha[]))
   }, [codEscolhido, conjunto])
 
+  /*
+   * ┌─ 156e · a CASA DO CLIENTE ───────────────────────────────────────┐
+   * │ > "na hora que o técnico baixar no aplicativo, o sistema deve    │
+   * │ >  informar para ele setar a localização do cliente (...) quando │
+   * │ >  for um outro técnico lá, a gente já sabe onde é"              │
+   * │ >  — Emanuel, 30/10                                              │
+   * │                                                                   │
+   * │ É uma PERGUNTA, que ele pode pular (decisão do Emanuel). Aparece │
+   * │ uma vez por contrato, depois da primeira baixa — e só depois da   │
+   * │ pergunta do melhor contato, para não empilhar duas janelas.      │
+   * │ Quem decide se pode marcar é o banco (só o técnico, só hoje,     │
+   * │ nunca com GPS simulado); a tela só pergunta na hora certa.       │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const [casa, setCasa] = useState<Casa | null>(null)
+  const [perguntaCasa, setPerguntaCasa] = useState(false)
+  const [marcandoCasa, setMarcandoCasa] = useState(false)
+  const [recadoCasa, setRecadoCasa] = useState<string | null>(null)
+  const jaPerguntouCasa = useRef(false)
+
+  const lerCasa = useCallback(async () => {
+    const { data } = await supabase.rpc('casa_do_cliente', { p_visitas: [id] })
+    setCasa(((data ?? []) as Casa[])[0] ?? null)
+  }, [id])
+  useEffect(() => { lerCasa() }, [lerCasa])
+
+  async function marcarCasa() {
+    setMarcandoCasa(true); setRecadoCasa(null)
+    // Posição FRESCA: a casa é marcada uma vez e serve aos próximos
+    // técnicos; ponto de um minuto atrás pode ser da esquina.
+    const g = await ondeEstou(15 * 1000)
+    if (!g.ok) { setRecadoCasa(g.recado); setMarcandoCasa(false); return }
+    const { data, error } = await supabase.rpc('marcar_casa_cliente', {
+      p_visita: id, p_lat: g.posicao.lat, p_lng: g.posicao.lng,
+      p_precisao: g.posicao.precisao, p_simulado: false,
+    })
+    setMarcandoCasa(false)
+    if (error) { setRecadoCasa(error.message); return }
+    const d = (data as { distancia_toa_m: number | null } | null)?.distancia_toa_m
+    setRecadoCasa(`Casa marcada${d != null ? ` — ${d} m do ponto que o TOA tinha` : ''}. Obrigado!`)
+    await lerCasa()
+    setTimeout(() => { setPerguntaCasa(false); setRecadoCasa(null) }, 1800)
+  }
+
   const ehHoje = v?.data_agendada === isoLocal()
   const encerrada = v ? ehTerminal(v.situacao) : false
   /** O campo mexe no que é de hoje e ainda não fechou. */
@@ -418,7 +472,14 @@ export default function Visita({ route, navigation }: Props) {
       p_precisao: c.precisao,
     })
     if (error) setErro(error.message)
-    else { fecharBaixa(); await recarregar() }
+    else {
+      fecharBaixa(); await recarregar()
+      // 156e: uma vez por contrato, depois da primeira baixa.
+      if (!jaPerguntouCasa.current && ehCampo) {
+        jaPerguntouCasa.current = true
+        setPerguntaCasa(true)
+      }
+    }
     setSalvando(false)
   }
 
@@ -662,6 +723,18 @@ export default function Visita({ route, navigation }: Props) {
       >
         {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
+        {/* 156e: a observação do COP vem PRIMEIRO -- é o que muda a ida
+            ("cliente só às 14h"). Antes do status e antes do endereço. */}
+        {!!v.observacao_cop && (
+          <View style={e.obsCop} accessibilityRole="summary">
+            <Text style={e.obsCopTitulo}>
+              💬 Observação do COP{v.observacao_cop_em
+                ? ` · ${carimbo(v.observacao_cop_em)}` : ''}
+            </Text>
+            <Text style={e.obsCopTexto}>{v.observacao_cop}</Text>
+          </View>
+        )}
+
         {encerrada && (
           <Aviso tipo="ok">
             Contrato {rotuloSituacao(v.situacao).toLowerCase()}. Você ainda
@@ -712,14 +785,31 @@ export default function Visita({ route, navigation }: Props) {
             {v.bairro}{v.cep ? ` · ${v.cep}` : ''}
           </Text>
 
+          {/* 156e: a casa que um colega marcou na porta. Vale mais que o
+              ponto do TOA, que é aproximado -- e o mapa vai para ela. */}
+          {casa && (
+            <Text style={e.casaLinha}>
+              📍 Casa marcada por {casa.marcado_por ?? 'um técnico'} em {carimbo(casa.marcado_em).slice(0, 5)}
+              {casa.distancia_toa_m != null ? ` · ${casa.distancia_toa_m} m do ponto do TOA` : ''}
+            </Text>
+          )}
+
           <View style={{ gap: 8, marginTop: 14 }}>
-            {v.lat != null && v.lng != null && (
+            {(casa || (v.lat != null && v.lng != null)) && (
               <Botao
-                titulo="Abrir rota no mapa"
+                titulo={casa ? 'Abrir rota até a casa marcada' : 'Abrir rota no mapa'}
                 tom="contorno"
                 aoTocar={() => Linking.openURL(
-                  `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`,
+                  `https://www.google.com/maps/dir/?api=1&destination=${
+                    casa ? `${casa.lat},${casa.lng}` : `${v.lat},${v.lng}`}`,
                 )}
+              />
+            )}
+            {ehCampo && ehHoje && (
+              <Botao
+                titulo={casa ? '📍 Corrigir: a casa é aqui' : '📍 Marcar a casa do cliente aqui'}
+                tom="discreto"
+                aoTocar={() => { setRecadoCasa(null); setPerguntaCasa(true) }}
               />
             )}
             {/* Ligar antes de sair evita a improdutiva mais comum:
@@ -1208,6 +1298,27 @@ export default function Visita({ route, navigation }: Props) {
           Não fecha tocando fora nem no "voltar": a pergunta pede um SIM
           ou um NÃO — "o ideal é que todos apertem sim" (Emanuel, 27/09),
           e o NÃO também é resposta, gravada. */}
+      <Modal visible={perguntaCasa && perguntaContato === null} animationType="fade" transparent
+        onRequestClose={() => setPerguntaCasa(false)}>
+        <View style={e.centroModal}>
+          <View style={e.caixaContato}>
+            <Text style={e.folhaTitulo}>Você está na casa do cliente?</Text>
+            <Text style={e.perguntaContato}>
+              {casa
+                ? `${casa.marcado_por ?? 'Um técnico'} já marcou a casa em ${carimbo(casa.marcado_em).slice(0, 5)}. Se a casa é aqui, marque de novo para confirmar.`
+                : 'Marque onde o cliente mora. O próximo técnico chega direto, sem procurar.'}
+            </Text>
+            {!!recadoCasa && <Aviso tipo={recadoCasa.startsWith('Casa marcada') ? 'ok' : 'atencao'}>{recadoCasa}</Aviso>}
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+              <Botao titulo="Agora não" tom="contorno" grande style={{ flex: 1 }}
+                desativado={marcandoCasa} aoTocar={() => { setPerguntaCasa(false); setRecadoCasa(null) }} />
+              <Botao titulo="📍 Marcar aqui" tom="sucesso" grande style={{ flex: 1.4 }}
+                carregando={marcandoCasa} aoTocar={marcarCasa} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={perguntaContato !== null} animationType="fade" transparent
         onRequestClose={() => {}}>
         <KeyboardAvoidingView style={e.centroModal}
@@ -1502,6 +1613,13 @@ export default function Visita({ route, navigation }: Props) {
 }
 
 const e = StyleSheet.create({
+  obsCop: {
+    backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc',
+    borderRadius: raio.m, padding: 12, gap: 4,
+  },
+  obsCopTitulo: { fontSize: 13, fontWeight: '800', color: '#075985' },
+  obsCopTexto: { fontSize: 16, lineHeight: 22, color: cor.tinta, fontWeight: '600' },
+  casaLinha: { fontSize: 13, color: '#047857', fontWeight: '700', marginTop: 8 },
   tela: { flex: 1, backgroundColor: cor.graf50 },
   cabecalho: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

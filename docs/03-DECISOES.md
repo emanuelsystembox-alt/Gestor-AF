@@ -9981,3 +9981,169 @@ vista no navegador, e o atalho desmarca o filtro e mostra as equipes.
 **Correção de rota minha, no caminho:** achei um aviso de chave duplicada no
 console de Indicadores e dei como sendo meu; era pré-existente — um `<>` sem
 chave no `lista.map`, que agora é `<Fragment key=…>`.
+
+---
+
+### D-236 · Supervisor só olhando, observação do COP, casa do cliente, VT por equipe e grupos (156)
+
+> Onze pedidos de 30/10. Três eram defeito (supervisor sem rota, cidades
+> misturadas, marcadores sumidos); os outros, coisa nova — três delas no
+> aplicativo.
+
+---
+
+#### 1. O supervisor via ZERO rota — e a correção óbvia abria escrita
+
+> *"supervisor tem o acesso de supervisor, mas não consegue olhar rota nenhuma
+> do dia"*
+
+O supervisor enxerga as equipes que têm `supervisor_id` = ele. Medido: **nenhuma
+equipe da empresa, em cidade nenhuma, tem supervisor declarado**. Flavio e
+Klebean (São Luís) viam zero. Decisão dele: **vê a cidade inteira, só olhando**.
+
+A correção óbvia — pôr o supervisor dentro de `equipes_visiveis()` — teria sido
+um furo: a policy `visita_gestao` é `ALL` (ler **e** alterar e apagar) e usa essa
+função. O supervisor ganharia `UPDATE visita set equipe_id = …` direto pela API,
+que é exatamente "mover a rota".
+
+A leitura ganhou escopo próprio (`ve_cidade_inteira()`, `equipes_legiveis()`),
+trocado **só** nas policies de SELECT e nas funções que só leem. Escrita
+intocada. Mensagens e rastro ficaram de fora — são conversa e dado pessoal.
+
+**Mover a rota:** `transferir_visita` decidia por papel e ignorava a permissão
+`servicos.transferir`, então "conceder ao supervisor" não funcionaria. Agora vale
+papel (COP, controlador) **ou** a permissão concedida. A Rota só oferece arrastar
+a quem pode.
+
+Medido como o Flavio: 103 paradas de São Luís, 15 equipes; `UPDATE` direto 0
+linha; transferir recusado. Três cenários novos em `testar_policies()` (29/29).
+
+**A bateria tinha um defeito escondido:** as personas de teste nasciam na
+"primeira cidade da tabela" e o contrato de teste era "qualquer um" — podiam ser
+de cidades diferentes. O cenário novo deu 0 na primeira rodada: era o teste, não
+a regra. Agora nascem na cidade do contrato (156c).
+
+#### 2. Cidades misturadas: Administração e conversas internas
+
+> *"quando eu mude de cidade, mostre somente os logins daquela cidade. Não deve
+> misturar"*
+
+`perfil` não filtra cidade no banco — e não deve: o ADMIN precisa ver todo mundo
+para dar acesso, e a D-232 mostrou o que esconder perfil por RLS faz. O corte é de
+tela, com aviso: em São Luís, 19 acessos e "71 de outras cidades ficam de fora".
+
+A lista de conversas internas (gestão com gestão) passou a ser da cidade ativa,
+com a mesma regra de `pessoas_da_gestao` (156d). A conversa com técnico já tinha
+ido na 155g.
+
+#### 3. Observação do COP — coluna própria, uma porta só
+
+> *"um campo de observação COP (...) o cliente estará somente às 14 horas (...)
+> essas informações precisam ir também para o aplicativo"*
+
+**Não** reaproveitei `visita.observacao`: está vazia nos 5.531 contratos de 30
+dias, mas é escrita por funções que a importação também chama. Nota do COP
+apagada pela planilha das 14h mandaria o técnico na hora errada.
+
+Coluna própria; só `definir_observacao_cop` escreve (COP, controlador, ou quem
+tiver `servicos.editar`); um gatilho recusa qualquer outra escrita — RLS não
+protege coluna (D-050). O aviso ao técnico vai pelo **funil** (`visita_evento` →
+`aviso_do_evento`), como todo aviso desde a 059; o CHECK de `aviso.tipo` foi
+ampliado na mesma migration (armadilha da 091).
+
+No site: cartão entre Atendimento e Prova e lugar; 💬 ao lado da situação na lista,
+que abre a nota sem sair dela. No app: faixa azul no topo do contrato e no cartão
+da agenda, e o aviso no sino.
+
+#### 4. Casa do cliente — marcada na porta, vale para o próximo
+
+> *"na hora que o técnico baixar no aplicativo, o sistema deve informar para ele
+> setar a localização do cliente (...) quando for um outro técnico lá, a gente já
+> sabe onde é"*
+
+Decisão dele: **pergunta, pode pular.** Depois da primeira baixa do contrato (e
+depois da pergunta do melhor contato, para não empilhar janelas), o app pergunta
+"Você está na casa do cliente?". Também há um botão "Marcar a casa aqui" no
+endereço.
+
+A chave é **contrato + endereço** (logradouro e bairro normalizados): mudança de
+endereço é casa nova, e a marca da casa velha não pode mandar o técnico para lá.
+Toda marca fica guardada; vale a mais recente; a tela diz quantas há. Só o
+técnico marca, só no contrato de hoje, nunca com GPS simulado — a mesma trava da
+baixa. O "abrir rota no mapa" do app vai para a casa marcada quando existe.
+
+Testado (desfeito no fim): simulado recusado; marca a 33 m do ponto do TOA; a
+agenda do app traz a casa; a tabela é invisível por SELECT direto.
+
+#### 5. Marcadores voltaram — ao lado das O.S.
+
+Na 155 eles foram para uma ABA da barra de ações, e ninguém achou. Agora são um
+cartão sempre aberto, à direita das O.S., como ele pediu.
+
+#### 6. O contrato abre POR CIMA da lista, com X
+
+> *"eu cliquei em cima do contrato, ele abre essa página um pouco maior, mas aí
+> deve ter um X (...) para eu voltar para onde eu estava"*
+
+"Rota com fundo": a URL continua `/controle/visita/:id` (dá para copiar e mandar
+— link aberto direto cai na página cheia), mas quem chega de uma lista leva a
+tela de fundo no estado da navegação, e o contrato abre numa janela larga por
+cima. X, clique fora e Esc voltam; o botão "‹ Voltar" ganhou nome.
+
+#### 7. Abaixo do ritmo → direto no técnico
+
+O sino de ritmo e de "quebrou" abre Equipes com `?tecnico=`; a tela acha a equipe
+dele, abre a linha e rola até ela — uma vez só.
+
+#### 8. VT por equipe
+
+> *"preciso de todos os logins abertos e mostre quanto é que ele concluiu na
+> linha dele (...) o executado e o não executado"*
+
+Regra escolhida por ele: o "Status da Atividade" do TOA — executado = CONCLUÍDO,
+não executado = NÃO CONCLUÍDO, o resto fora. Todo técnico de manutenção ativo da
+cidade, dia a dia, com dias, executados, não executados, média por dia e % de
+execução.
+
+**O que o dado mostra, e a tela escreve:** em 14 dias, técnicos de manutenção
+tiveram **529 CONCLUÍDO contra 7 NÃO CONCLUÍDO**. No TOA, "concluído" inclui a VT
+fechada com código improdutivo. Com esta regra a média de execução fica perto de
+100% para quase todos (em São Luís hoje: 100% para os 14). O que separa um técnico
+do outro é **quanto ele fecha por dia** — por isso essa coluna vem primeiro, e a
+tela diz o porquê. Se a régua tiver de separar quem resolveu de quem só fechou, a
+alternativa é "código produtivo × improdutivo" — é uma troca de regra, não de tela.
+
+#### 9. Grupos no chat
+
+> *"o coordenador consiga criar grupos dentro do chat (...) evitando o uso do
+> WhatsApp"*
+
+Decisão dele: **todos os membros escrevem**. O grupo é de uma cidade; quem lê é só
+quem é membro — nem o ADMIN abre grupo do qual não participa (o mesmo princípio da
+conversa interna, 133). Nenhuma escrita direta: as RPCs carimbam o autor. Criar e
+mexer em membros: permissão nova `chat.grupos` (Administrador, Coordenador, COP).
+Técnico sem login não entra (não tem como ler). `grupo_mensagem` vai para o
+Realtime — é magra, sem dado de assinante.
+
+No site: chave "Conversas | Grupos" na gaveta do chat. No app: faixa "Grupos da
+equipe" na Conversa, lista e conversa.
+
+Testado (desfeito no fim): COP cria, técnico lê e escreve, supervisor de fora lê
+0 e não escreve, ADMIN de fora lê 0, insert direto barrado, supervisor não cria.
+
+---
+
+**VERIFICADO:** `tsc` e `build` do site; `tsc` e `expo export` do app (pacote de 3
+MB gerado). `testar_policies()` 29/29, `testar_campo()` 29/29, zero tabela sem RLS,
+zero definer para o anon. Toda regra nova testada no banco como `authenticated`,
+dentro de transação desfeita. No navegador: o contrato abre por cima de Serviços
+com X e volta; observação e casa do cliente na página; o 💬 na lista (com nota
+fictícia injetada só na leitura, escrita bloqueada — nenhuma nota real foi
+gravada); VT por equipe com 14 técnicos; Administração em São Luís com 19 e o
+aviso dos 71; a gaveta com Grupos e os 19 candidatos da cidade; Equipes abrindo a
+equipe 113 pelo `?tecnico=`.
+
+**NÃO VERIFICADO:** nada do aplicativo rodou num celular — compila e empacota, mas
+a pergunta da casa, a faixa da observação e os grupos só foram vistos no código.
+E o app só chega aos técnicos quando a atualização for publicada (`eas update`),
+o que não fiz. Nenhum grupo real foi criado no teste do site.

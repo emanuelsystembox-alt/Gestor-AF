@@ -53,6 +53,10 @@ function destino(s: Sinal): string | null {
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
   // 097: GPS e cerca abrem o técnico no Monitoramento.
   if ((s.tipo === 'GPS' || s.tipo === 'CERCA') && s.tecnico_id) return `/controle/monitor?tecnico=${s.tecnico_id}`
+  // 156: "abaixo do ritmo (...) quando eu clicar em cima, ele deve abrir
+  // aquela aba de equipes para eu já ir direto no técnico" (Emanuel, 30/10).
+  // Quebrou vai junto: é sobre o dia do técnico, não sobre um contrato.
+  if ((s.tipo === 'RITMO' || s.tipo === 'QUEBROU') && s.tecnico_id) return `/controle/equipes?tecnico=${s.tecnico_id}`
   return null
 }
 

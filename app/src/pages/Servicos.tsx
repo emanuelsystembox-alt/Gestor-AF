@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, EM_ABERTO, SITUACAO_INFO } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
@@ -23,6 +23,7 @@ import {
   TabelaContratos, SELECT_CONTRATO,
   type ContratoLinha, type PontoVisita,
 } from '../components/TabelaContratos'
+import { LinkContrato, useAbrirContrato } from '../components/LinkContrato'
 
 const SELECT = SELECT_CONTRATO
 
@@ -86,7 +87,6 @@ export default function Servicos() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   // O contrato abre em JANELA, nao em linha expandida (D-056).
-  const navegar = useNavigate()
   /*
    * ┌─ 155 · o contrato abre na PÁGINA, não mais numa janela ──────────┐
    * │ > "o sistema deve desconsiderar essa tela menor. O ideal é       │
@@ -98,9 +98,11 @@ export default function Servicos() {
    * │ um endereço para guardar nos favoritos.                           │
    * └────────────────────────────────────────────────────────────────────┘
    */
+  // 156: abre POR CIMA da lista (janela com X), levando a lista de fundo.
+  const abrirContratoPorCima = useAbrirContrato()
   const abrirContrato = useCallback((visitaId: string, acao?: AcaoContrato) => {
-    navegar(`/controle/visita/${visitaId}`, acao ? { state: { acao } } : undefined)
-  }, [navegar])
+    abrirContratoPorCima(visitaId, acao)
+  }, [abrirContratoPorCima])
 
   // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
   // Cadastro manual: o serviço que não veio do TOA precisa entrar
@@ -815,11 +817,11 @@ export default function Servicos() {
               }
               renderAcoes={v => (
                 <div className="flex items-center justify-end gap-1">
-                  <Link to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
+                  <LinkContrato to={`/controle/visita/${v.id}`} onClick={e => e.stopPropagation()}
                     className="rounded border border-graf-700 px-2 py-0.5 text-[11px]
                                text-graf-400 hover:border-af-600 hover:text-af-400">
                     abrir
-                  </Link>
+                  </LinkContrato>
                   <button
                     onClick={e => {
                       e.stopPropagation()

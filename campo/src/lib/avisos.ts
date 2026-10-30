@@ -26,6 +26,8 @@ export interface Aviso {
     /** O contrato sumiu da planilha do TOA estando em andamento (134).
      *  Nada foi mexido: alguém tem de olhar o TOA e corrigir à mão. */
     | 'SUMIU_TOA'
+    /** A nota do COP no contrato ("cliente só às 14h", 156e). */
+    | 'OBSERVACAO'
   titulo: string
   /** A observação que o controlador escreveu ao mudar o status. */
   detalhe: string | null
@@ -48,6 +50,9 @@ export const PESO_AVISO: Record<Aviso['tipo'], 'urgente' | 'atencao' | 'informa'
   // que fez lá, e a correção é à mão.
   SUMIU_TOA: 'urgente',
   SAIU: 'atencao',
+  // 156e: a nota do COP muda a ida (horário do cliente, portaria) --
+  // atenção, não urgência: nada foi cancelado.
+  OBSERVACAO: 'atencao',
   REABERTO: 'atencao',
   SITUACAO: 'atencao',
   CHEGOU: 'informa',

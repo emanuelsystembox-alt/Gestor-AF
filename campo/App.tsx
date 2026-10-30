@@ -25,6 +25,8 @@ import Material from './src/telas/Material'
 import Abastecer from './src/telas/Abastecer'
 import GeoRota from './src/telas/GeoRota'
 import ConversaColega from './src/telas/ConversaColega'
+import Grupos from './src/telas/Grupos'
+import ConversaGrupo from './src/telas/ConversaGrupo'
 import { Carregando } from './src/ui/componentes'
 import { cor } from './src/ui/tema'
 import type { Pilha } from './src/navegacao'
@@ -89,6 +91,8 @@ function Aplicacao() {
         <Stack.Screen name="Romaneios" component={Romaneios} />
         <Stack.Screen name="Transferir" component={Transferir} />
         <Stack.Screen name="ConversaColega" component={ConversaColega} />
+        <Stack.Screen name="Grupos" component={Grupos} />
+        <Stack.Screen name="ConversaGrupo" component={ConversaGrupo} />
         <Stack.Screen
           name="Captura" component={Captura}
           options={{ animation: 'fade', presentation: 'fullScreenModal' }}

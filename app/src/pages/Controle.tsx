@@ -12,6 +12,7 @@ import { isoLocal, equipeRotulo } from '../lib/formato'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { SEM_BUCKET } from '../lib/filtroContratos'
 import { QuebraPorAgrupamento, tabelaQuebra } from '../components/QuebraPorAgrupamento'
+import { LinkContrato } from '../components/LinkContrato'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -431,10 +432,10 @@ export default function Controle() {
                             {mot.itens.map((it, i) => (
                               <tr key={`${it.visita_id}-${i}`} className="border-t border-graf-800/60">
                                 <td className="px-3 py-1.5">
-                                  <Link to={`/controle/visita/${it.visita_id}`}
+                                  <LinkContrato to={`/controle/visita/${it.visita_id}`}
                                     className="tabular text-af-400 underline underline-offset-2">
                                     {it.contrato ?? '—'}
-                                  </Link>
+                                  </LinkContrato>
                                   {it.os && (
                                     <span className="tabular ml-1.5 text-graf-600"
                                       title={it.oss > 1

@@ -12,6 +12,8 @@ import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { ProvaDoContrato } from '../components/ProvaDoContrato'
 import { ConversaTecnico } from '../components/ConversaTecnico'
 import { lerLog } from '../lib/log'
+import { ObservacaoCop } from '../components/ObservacaoCop'
+import { MarcadoresDoContrato } from '../components/MarcadoresDoContrato'
 import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
 import type { AcaoContrato } from '../components/MenuContrato'
 
@@ -72,6 +74,9 @@ interface Det {
   inicio: string | null; fim: string | null; tempo_deslocamento: string | null
   situacao: Situacao; bloqueado_em: string | null; origem: string
   observacao: string | null; criado_em: string
+  /** 156e: a nota do COP para o técnico — coluna própria, uma porta só. */
+  observacao_cop: string | null; observacao_cop_em: string | null
+  autor_obs: { nome: string } | null
   tipo_atividade: { nome: string; natureza: string } | null
   tipo_servico: { nome: string } | null
   segmentacao: { nome: string } | null
@@ -88,6 +93,7 @@ const SELECT = `
   tipo_residencia, telefones, logradouro, complemento, bairro, cidade, uf, cep,
   lat, lng, node, data_agendada, janela_inicio, janela_fim, inicio, fim,
   tempo_deslocamento, situacao, bloqueado_em, origem, observacao, criado_em,
+  observacao_cop, observacao_cop_em, autor_obs:observacao_cop_por ( nome ),
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
   segmentacao:segmentacao_id ( nome ),
@@ -138,7 +144,18 @@ function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: b
   )
 }
 
-export default function VisitaDetalhe() {
+/**
+ * A casca da página: com o menu lateral (Shell) quando é página cheia,
+ * e sem nada quando abre em JANELA por cima da lista (156) — a janela já
+ * tem a moldura dela. Componente de módulo, e não função dentro do
+ * render: definida lá dentro, ela seria um componente NOVO a cada render
+ * e remontaria a página inteira (o mesmo defeito da D-085).
+ */
+function Casca({ janela, children }: { janela: boolean; children: React.ReactNode }) {
+  return janela ? <>{children}</> : <Shell>{children}</Shell>
+}
+
+export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean } = {}) {
   const { id } = useParams<{ id: string }>()
   const navegar = useNavigate()
   /* 155: o menu do botão direito escolhe a ação ANTES de abrir — e agora
@@ -247,6 +264,24 @@ export default function VisitaDetalhe() {
   useEffect(() => { carregar() }, [id])
 
   /*
+   * 156e: a CASA DO CLIENTE — onde um técnico, na porta, marcou que o
+   * cliente mora. O ponto do TOA é aproximado; este foi visto. Vale a
+   * marca mais recente do mesmo contrato NO MESMO ENDEREÇO (mudança de
+   * endereço é casa nova).
+   */
+  const [casa, setCasa] = useState<{
+    lat: number; lng: number; precisao_m: number | null; marcado_em: string
+    marcado_por: string | null; marcas: number; distancia_toa_m: number | null
+  } | null>(null)
+  useEffect(() => {
+    if (!id) return
+    supabase.rpc('casa_do_cliente', { p_visitas: [id] }).then(({ data }) => {
+      const c = ((data ?? []) as NonNullable<typeof casa>[])[0]
+      setCasa(c ?? null)
+    })
+  }, [id])
+
+  /*
    * ┌─ 155 · o que a janela do contrato precisava para funcionar ──────┐
    * │ A janela menor saiu (Emanuel, 29/10) e os comandos dela vieram   │
    * │ para cá — mas eles dependem de quatro listas que Serviços        │
@@ -313,13 +348,13 @@ export default function VisitaDetalhe() {
     }
   }, [v])
 
-  if (carregando) return <Shell><p className="p-12 text-center text-graf-400">Carregando…</p></Shell>
+  if (carregando) return <Casca janela={emJanela}><p className="p-12 text-center text-graf-400">Carregando…</p></Casca>
   if (!v) return (
-    <Shell><div className="p-4">
+    <Casca janela={emJanela}><div className="p-4">
       <Alerta tipo="erro">{erro}</Alerta>
       <Link to="/controle/servicos" className="mt-4 inline-block text-af-400 underline">
         Voltar para Serviços</Link>
-    </div></Shell>
+    </div></Casca>
   )
 
   const abas: [Aba, string, number?][] = [
@@ -400,13 +435,16 @@ export default function VisitaDetalhe() {
   )
 
   return (
-    <Shell>
+    <Casca janela={emJanela}>
       <div className="pagina-entra space-y-3 p-4">
         {/* ---------- cabeçalho ---------- */}
         <div className="flex flex-wrap items-start gap-3">
+          {/* 156: "é bom ter um botão de voltar para ele voltar aonde eu
+              estava" (Emanuel, 30/10). Era só um "‹" sem nome. */}
           <button onClick={() => navegar(-1)}
-            className="-ml-1 rounded-md px-2 py-1 text-xl leading-none text-graf-400 hover:text-graf-100"
-            title="Voltar (Esc)" aria-label="Voltar">‹</button>
+            className="-ml-1 flex items-center gap-1 rounded-md border border-graf-700 px-2.5 py-1
+                       text-xs text-graf-300 hover:border-af-600 hover:text-af-400"
+            title="Voltar para onde você estava (Esc)" aria-label="Voltar">‹ Voltar</button>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold">
@@ -508,12 +546,34 @@ export default function VisitaDetalhe() {
                 </div>
                 <Campo r="Telefones" v={v.telefones?.length
                   ? v.telefones.join(' · ') : null} />
-                <Campo r="Coordenadas" v={v.lat && v.lng
+                <Campo r="Coordenadas (TOA)" v={v.lat && v.lng
                   ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`}
                        target="_blank" rel="noopener noreferrer"
                        className="tabular text-af-400 underline underline-offset-2">
                       {v.lat}, {v.lng}
                     </a> : null} />
+                {/* 156e: a casa que o técnico marcou na porta. Sem marca é
+                    "ainda não marcada" — não é "igual ao TOA". */}
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <Campo r="Casa do cliente (marcada pelo técnico)" v={casa
+                    ? <span>
+                        <a href={`https://www.google.com/maps?q=${casa.lat},${casa.lng}`}
+                           target="_blank" rel="noopener noreferrer"
+                           className="tabular text-emerald-400 underline underline-offset-2">
+                          {casa.lat.toFixed(5)}, {casa.lng.toFixed(5)}
+                        </a>
+                        <span className="ml-2 text-xs text-graf-400">
+                          {casa.marcado_por ?? 'técnico'} ·{' '}
+                          {new Date(casa.marcado_em).toLocaleDateString('pt-BR')}
+                          {casa.precisao_m != null && ` · GPS ±${Math.round(Number(casa.precisao_m))} m`}
+                          {casa.distancia_toa_m != null && ` · ${casa.distancia_toa_m} m do ponto do TOA`}
+                          {casa.marcas > 1 && ` · ${casa.marcas} marcas neste endereço`}
+                        </span>
+                      </span>
+                    : <span className="text-xs text-graf-400">
+                        ainda não marcada — o técnico marca pelo aplicativo, na porta do cliente
+                      </span>} />
+                </div>
               </dl>
             </section>
 
@@ -554,13 +614,20 @@ export default function VisitaDetalhe() {
               )}
             </section>
 
+            {/* 156e: entre o Atendimento e a Prova, como ele pediu. */}
+            <ObservacaoCop visitaId={v.id} texto={v.observacao_cop} em={v.observacao_cop_em}
+              por={v.autor_obs?.nome ?? null} aoMudar={carregar} />
+
             <ProvaDoContrato prova={prova} local={local} geoToa={geoToa} />
 
             {/* O equipamento e a miscelânea do TOA (117) saíram daqui para a
                 aba Equipamento (133, Emanuel 25/10): o Detalhe é do contrato,
                 e a lista de peças empurrava as O.S. para baixo da dobra. */}
 
-            {/* ---------- ordens de serviço ---------- */}
+            {/* ---------- ordens de serviço + marcadores ----------
+                156: os marcadores ficam ao lado direito das O.S. ("podem
+                ficar ao lado de OS, no lado direito" — Emanuel, 30/10). */}
+            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <section className="card-controle overflow-hidden">
               <div className="flex flex-wrap items-baseline gap-3 border-b border-graf-800 px-4 py-3">
                 <h2 className="text-sm font-semibold">
@@ -639,6 +706,8 @@ export default function VisitaDetalhe() {
                 regra de pontuação for definida — ver <code>docs/06-PONTUACAO.md</code>.
               </p>
             </section>
+            <MarcadoresDoContrato visitaId={v.id} />
+            </div>
 
             {/* ---------- responder ao técnico / mudar status ---------- */}
             {/* A tela cheia disso é a aba Responder: lá a conversa, as fotos
@@ -1039,6 +1108,6 @@ export default function VisitaDetalhe() {
           </section>
         )}
       </div>
-    </Shell>
+    </Casca>
   )
 }

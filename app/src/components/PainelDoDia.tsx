@@ -8,6 +8,7 @@ import {
 } from '../lib/filtroContratos'
 import { LOG_GRAVE, lerLog } from '../lib/log'
 import { SeloLog } from './SeloLog'
+import { LinkContrato } from './LinkContrato'
 
 /**
  * As duas peças de abertura do Dashboard: a **régua do dia** e a
@@ -213,9 +214,9 @@ function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                         {supervisorDe(v) ?? <span className="text-graf-400">não definido</span>}
                       </td>
                       <td className="px-3 py-2">
-                        <Link to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
+                        <LinkContrato to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
                           {v.contrato ?? v.wo_numero ?? '—'}
-                        </Link>
+                        </LinkContrato>
                         <div className="text-[11px] text-graf-400">
                           {o.numero_os}{o.tipo_os ? ` · ${o.tipo_os.codigo} ${o.tipo_os.descricao}` : ''}
                         </div>
@@ -418,9 +419,9 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                       <td className="px-3 py-2"><SeloLog valor={n} /></td>
                       <td className="px-3 py-2">{v.tipo_servico?.nome ?? <span className="text-graf-400">sem grupo</span>}</td>
                       <td className="px-3 py-2">
-                        <Link to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
+                        <LinkContrato to={`/controle/visita/${v.id}`} className="font-medium underline-offset-2 hover:text-af-400 hover:underline">
                           {v.contrato ?? v.wo_numero ?? '—'}
-                        </Link>
+                        </LinkContrato>
                         <div className="text-[11px] text-graf-500">
                           {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
                         </div>
@@ -582,10 +583,10 @@ function SemEvidencia({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => 
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Link to={`/controle/visita/${v.id}`}
+                      <LinkContrato to={`/controle/visita/${v.id}`}
                         className="tabular text-af-400 underline underline-offset-2">
                         {v.contrato ?? v.wo_numero ?? '—'}
-                      </Link>
+                      </LinkContrato>
                     </td>
                     <td className="px-3 py-2 text-graf-300">{v.tipo_servico?.nome ?? '—'}</td>
                     <td className="px-3 py-2 text-graf-300">
