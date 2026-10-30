@@ -88,6 +88,18 @@ interface Parada {
    *  `ordem` NULA, sem km e fora de toda contagem. */
   natureza: 'PRODUTIVA' | 'JORNADA' | string
   tipo_atividade: string | null
+  /** 155e: o supervisor DECLARADO, com o da planilha como reserva (068). */
+  supervisor: string | null
+  /** 155e: o bucket do TOA da última importação que trouxe o contrato. */
+  toa_bucket: string | null
+  /** 155e: deslocamento MEDIDO PELO TOA, em minutos. Não é conta nossa:
+   *  medir pelo nosso relógio cairia no `situacao_em` da importação,
+   *  que é igual para a planilha inteira (D-224). */
+  desloc_min: number | null
+  /** 155e: execução em minutos, só de quem ABRIU a atividade no TOA e
+   *  não é cancelamento da central nem desatribuição (D-227). Nulo =
+   *  não dá para saber — e nulo não é zero. */
+  exec_min: number | null
 }
 interface BairroLinha {
   bairro: string; visitas: number; tecnicos: number; equipes: number
@@ -175,6 +187,13 @@ function duracao(min: number): string {
  * a mesma cor em dois lugares nao acrescenta — o que faltava era a
  * PALAVRA. Divergencia com simbolo e texto, nunca so cor.
  */
+/** A faixa combinada com o cliente, em texto: "08h-11h". Nulo quando o
+ *  TOA não mandou janela (a jornada, e o "Imediata" da 115). */
+function janelaChave(p: { janela_inicio: string | null; janela_fim: string | null }): string | null {
+  if (!p.janela_inicio || !p.janela_fim) return null
+  return `${p.janela_inicio.slice(0, 2)}h-${p.janela_fim.slice(0, 2)}h`
+}
+
 const APELIDO_SITUACAO: Record<string, string> = {
   ENTRADA: 'NA ENTRADA',
   ATRIBUIDA: 'ATRIBUÍDA',
@@ -218,6 +237,10 @@ export default function Rota() {
   const [fEquipe, setFEquipe] = useState('TODAS')
   const [fGrupo, setFGrupo] = useState('TODOS')
   const [fSituacao, setFSituacao] = useState('TODAS')
+  // 155e: "devemos aplicar os filtros de bucket, supervisor, janela"
+  const [fBucket, setFBucket] = useState('TODOS')
+  const [fSupervisor, setFSupervisor] = useState('TODOS')
+  const [fJanela, setFJanela] = useState('TODAS')
   const outroDia = useDiaAnteriorComMovimento(data)
 
   /** A transferência em curso: o que está sendo movido e para onde.
@@ -269,6 +292,11 @@ export default function Rota() {
     grupos: [...new Set(paradasDoDia.map(p => p.tipo_servico).filter(Boolean) as string[])].sort(),
     situacoes: [...new Set(paradasDoDia.map(p => p.situacao))]
       .sort((a, b) => SITUACOES.indexOf(a) - SITUACOES.indexOf(b)),
+    buckets: [...new Set(paradasDoDia.map(p => p.toa_bucket).filter(Boolean) as string[])].sort(),
+    supervisores: [...new Set(paradasDoDia.map(p => p.supervisor).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    // A janela é a faixa combinada com o cliente: 08–11, 11–14, 14–17…
+    janelas: [...new Set(paradasDoDia.map(p => janelaChave(p)).filter(Boolean) as string[])].sort(),
   }), [paradasDoDia])
 
   /*
@@ -286,10 +314,14 @@ export default function Rota() {
   const paradas = useMemo(() => paradasDoDia.filter(p =>
     (fEquipe === 'TODAS' || p.equipe === fEquipe)
     && (fGrupo === 'TODOS' || p.tipo_servico === fGrupo)
-    && (fSituacao === 'TODAS' || p.situacao === fSituacao)),
-  [paradasDoDia, fEquipe, fGrupo, fSituacao])
+    && (fSituacao === 'TODAS' || p.situacao === fSituacao)
+    && (fBucket === 'TODOS' || p.toa_bucket === fBucket)
+    && (fSupervisor === 'TODOS' || p.supervisor === fSupervisor)
+    && (fJanela === 'TODAS' || janelaChave(p) === fJanela)),
+  [paradasDoDia, fEquipe, fGrupo, fSituacao, fBucket, fSupervisor, fJanela])
 
   const filtrando = fEquipe !== 'TODAS' || fGrupo !== 'TODOS' || fSituacao !== 'TODAS'
+    || fBucket !== 'TODOS' || fSupervisor !== 'TODOS' || fJanela !== 'TODAS'
 
   /*
    * ┌─ 144 · o resumo passa a sair das paradas, e por que ────────────┐
@@ -472,13 +504,34 @@ export default function Rota() {
                   {SITUACAO_INFO[st]?.label ?? st}</option>))}
             </select>
 
+            <select value={fBucket} onChange={e => setFBucket(e.target.value)}
+              aria-label="Filtrar por bucket do TOA" className={selRota}>
+              <option value="TODOS">Todo bucket</option>
+              {opcoes.buckets.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+
+            <select value={fSupervisor} onChange={e => setFSupervisor(e.target.value)}
+              aria-label="Filtrar por supervisor" className={`max-w-52 ${selRota}`}>
+              <option value="TODOS">Todo supervisor</option>
+              {opcoes.supervisores.map(sv => <option key={sv} value={sv}>{sv}</option>)}
+            </select>
+
+            <select value={fJanela} onChange={e => setFJanela(e.target.value)}
+              aria-label="Filtrar por janela" className={selRota}>
+              <option value="TODAS">Toda janela</option>
+              {opcoes.janelas.map(j => <option key={j} value={j}>{j}</option>)}
+            </select>
+
             {filtrando && (
               <>
                 <span className="tabular text-[11px] text-graf-400">
                   {paradas.length} de {paradasDoDia.length} parada(s)
                 </span>
                 <button
-                  onClick={() => { setFEquipe('TODAS'); setFGrupo('TODOS'); setFSituacao('TODAS') }}
+                  onClick={() => {
+                    setFEquipe('TODAS'); setFGrupo('TODOS'); setFSituacao('TODAS')
+                    setFBucket('TODOS'); setFSupervisor('TODOS'); setFJanela('TODAS')
+                  }}
                   className="rounded-md border border-graf-700 px-2 py-1 text-[11px]
                              text-graf-300 hover:border-af-600 hover:text-af-400">
                   Limpar
@@ -942,8 +995,16 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
           </span>
           <span className={`my-0.5 h-px w-full ${
             salto ? 'bg-af-500' : 'bg-graf-700'}`} />
-          <span className="text-[8px] leading-tight text-graf-400">
-            {salto ? '⚑' : parado != null ? duracao(parado) : 'km'}
+          {/* 155e: o tempo do trecho passa a ser o DESLOCAMENTO que o TOA
+              mediu. O "parado" (fim da anterior até o início desta) fica
+              como reserva: ele inclui a espera, não só a viagem. */}
+          <span className="text-[8px] leading-tight text-graf-400"
+            title={p.desloc_min != null
+              ? `${p.desloc_min} min de deslocamento, medido pelo TOA`
+              : parado != null ? `${Math.round(parado)} min entre o fim da anterior e o início desta` : undefined}>
+            {salto ? '⚑'
+              : p.desloc_min != null ? duracao(p.desloc_min)
+              : parado != null ? duracao(parado) : 'km'}
           </span>
         </span>
       )}
@@ -973,9 +1034,22 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
           {/* A janela é o COMBINADO; a execução é o que houve. As duas
               juntas, e distintas pelo peso — o controlador compara as
               duas o tempo todo, e separá-las em telas diferentes era
-              obrigá-lo a decorar uma. */}
-          <span className="tabular mt-0.5 block text-[9px] leading-tight text-graf-400">
-            {janela ?? 'sem janela'}
+              obrigá-lo a decorar uma.
+
+              155e: a janela e o tempo de execução dividem a mesma linha.
+              Era uma linha só para a janela, e o cartão ganhou uma altura
+              inteira para três caracteres. */}
+          <span className="tabular mt-0.5 flex items-baseline justify-between gap-1
+                           text-[9px] leading-tight text-graf-400">
+            <span className="truncate">{janela ?? 'sem janela'}</span>
+            {/* Nulo não é zero: contrato que ninguém abriu não mostra
+                duração nenhuma (D-227). */}
+            {p.exec_min != null && (
+              <span className="shrink-0 font-semibold text-graf-300"
+                title={`${p.exec_min} min executando (do início ao fim da atividade no TOA)`}>
+                {duracao(p.exec_min)}
+              </span>
+            )}
           </span>
           <span className="tabular block text-[10px] font-semibold leading-tight
                            text-graf-200">
@@ -985,18 +1059,18 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
           </span>
 
           {/* 144: a SITUACAO em palavra. Antes so a borda esquerda do
-              cartao dizia, por cor -- e cor sozinha nao e informacao. */}
-          <span className="mt-1 block">
+              cartao dizia, por cor -- e cor sozinha nao e informacao.
+              155e: ela subiu para a linha do grupo de serviço -- eram
+              duas linhas com uma etiqueta cada, e o cartão inteiro
+              existia para caber nelas. */}
+          <span className="mt-1 flex items-center gap-1">
             <span title={situacaoCheia}
-              className="inline-block max-w-full truncate rounded-sm px-1 text-[8px]
+              className="shrink-0 truncate rounded-sm px-1 text-[8px]
                          font-bold uppercase tracking-wide"
               style={{ background: `color-mix(in oklab, ${cor} 22%, transparent)`,
                        color: cor }}>
               {situacaoTxt}
             </span>
-          </span>
-
-          <span className="mt-0.5 flex items-center gap-1">
             <span className="min-w-0 truncate rounded-sm bg-graf-800 px-1 text-[8px]
                              font-semibold uppercase tracking-wide text-graf-300">
               {servico ?? 'sem grupo'}

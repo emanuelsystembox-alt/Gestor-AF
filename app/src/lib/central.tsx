@@ -27,9 +27,26 @@ export interface ItemAjuda {
   equipe: string | null; desde: string; observacao: string | null
 }
 export interface ItemTec1 { tecnico_id: string; nome: string; equipe: string | null; qtd: number }
+/**
+ * Um corte do ritmo (155d). Deixou de ser PONTO e passou a ser
+ * CONTRATO EXECUTADO por janela: adesão 2/1/2 (5 no dia), VT 3/1/3
+ * (7 no dia), conferido de hora em hora.
+ */
 export interface CorteRitmo {
-  corte: number; fracao: number; sem_meta: number
-  abaixo: { tecnico_id: string; nome: string; equipe: string | null; pontos: number; esperado: number }[]
+  corte: number
+  /** Era a fração da jornada, da conta por pontos. Hoje o esperado já
+   *  vem pronto por técnico, e isto fica nulo. */
+  fracao: number | null
+  /** Técnicos cuja skill não tem janela cadastrada: SEM META, não "abaixo". */
+  sem_meta: number
+  /** Executados cuja hora de fechamento não é confiável (D-224). */
+  sem_hora?: number
+  abaixo: {
+    tecnico_id: string; nome: string; equipe: string | null
+    frente: string | null
+    feitos: number; esperado: number; total_dia: number
+    detalhe: string
+  }[]
 }
 export interface ItemQuebrou {
   tecnico_id: string; nome: string; equipe: string | null; quebradas: number; pontos_perdidos: number

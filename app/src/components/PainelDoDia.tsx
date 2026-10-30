@@ -44,6 +44,15 @@ const num = (n: number, casas = 0) =>
 const META = 85
 /** Meta do TEC1 no livro oficial da CLARO ("Indicadores COP - TEC1", item 4). */
 const META_TEC1 = 94
+/**
+ * A partir de quanto a cobertura de evidência deixa de pedir ação (155).
+ *
+ * NÃO é meta da CLARO nem da AFLINE: ninguém combinou número nenhum, e
+ * nenhuma foto é obrigatória para baixar (D-115). É só o limiar da COR
+ * do card — por isso a tela não escreve "meta" em lugar nenhum. No dia
+ * em que virar exigência, isto vira cadastro, como a meta da Primeira WO.
+ */
+const META_EVIDENCIA = 90
 
 // ================================================================== //
 //  A RÉGUA
@@ -440,6 +449,163 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
   )
 }
 
+// ================================================================== //
+//  SEM EVIDENCIA -- clicar no card abre quem nao registrou
+// ================================================================== //
+
+/**
+ * Os contratos sem NENHUMA foto ou vídeo do nosso app (155).
+ *
+ * > "clicando em cima do card, o sistema deverá mostrar quais contratos
+ * >  não receberam evidência" — Emanuel, 29/10
+ *
+ * Sai do mesmo conjunto que o card conta — as produtivas filtradas, que
+ * já excluem Auditar e Cancelado pela central. O card diz 12 e a lista
+ * tem 12, sempre.
+ *
+ * A coluna SITUAÇÃO é a primeira de propósito: contrato em aberto sem
+ * foto é trabalho que ainda pode ser feito; contrato CONCLUÍDO sem foto
+ * é evidência que não existe mais. São duas conversas diferentes, e
+ * misturá-las numa lista só faria o supervisor cobrar quem está em rota.
+ */
+function SemEvidencia({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
+  const [soGrupo, setSoGrupo] = useState<string | null>(null)
+  const [soFechados, setSoFechados] = useState(false)
+
+  const grupoDe = (v: Visita) => v.tipo_servico?.nome ?? 'Sem grupo de serviço'
+  const fechado = (v: Visita) =>
+    ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'].includes(v.situacao)
+
+  const porGrupo = useMemo(() => {
+    const m = new Map<string, { qtd: number; fechados: number }>()
+    for (const v of linhas) {
+      if (soFechados && !fechado(v)) continue
+      const g = grupoDe(v)
+      const t = m.get(g) ?? { qtd: 0, fechados: 0 }
+      t.qtd++; if (fechado(v)) t.fechados++
+      m.set(g, t)
+    }
+    return [...m.entries()].sort((a, b) => b[1].qtd - a[1].qtd)
+  }, [linhas, soFechados])
+
+  const lista = useMemo(() => linhas
+    .filter(v => (soGrupo == null || grupoDe(v) === soGrupo) && (!soFechados || fechado(v)))
+    // Os encerrados primeiro: é onde a evidência não volta mais.
+    .sort((a, b) => Number(fechado(b)) - Number(fechado(a))
+      || (a.tecnico?.nome ?? '').localeCompare(b.tecnico?.nome ?? '', 'pt-BR')),
+  [linhas, soGrupo, soFechados])
+
+  const fechados = linhas.filter(fechado).length
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [aoFechar])
+
+  // Portal pelo mesmo motivo do TEC1 e do LOG (D-169/D-173).
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
+      role="dialog" aria-modal="true" aria-label="Contratos sem evidência" onClick={aoFechar}>
+      <div className="card-controle mt-10 w-full max-w-6xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-graf-800 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">
+              {lista.length} contrato(s) sem evidência
+              {(soGrupo || soFechados) && (
+                <span className="ml-1 font-normal text-graf-400">de {linhas.length}</span>
+              )}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-graf-500">
+              Evidência é a foto ou o vídeo que o técnico envia pelo <strong>nosso</strong> aplicativo
+              — não o <em>Set PDF</em> do TOA. Auditar e Cancelado pela central ficam fora desta
+              conta: ninguém foi ao endereço.
+            </p>
+          </div>
+          <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
+            Fechar
+          </button>
+        </div>
+
+        {linhas.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-graf-400">
+            Todo contrato do período tem pelo menos uma evidência.
+          </p>
+        ) : (<>
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 w-28 text-[11px] uppercase tracking-wide text-graf-400">Por grupo</span>
+            <button onClick={() => setSoGrupo(null)}
+              className={`rounded px-2 py-0.5 text-xs ${soGrupo == null
+                ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+              Todos
+            </button>
+            {porGrupo.map(([g, t]) => (
+              <button key={g} onClick={() => setSoGrupo(soGrupo === g ? null : g)}
+                aria-pressed={soGrupo === g}
+                className={`rounded px-2 py-0.5 text-xs ${soGrupo === g
+                  ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                {g} <strong className="tabular">{t.qtd}</strong>
+              </button>
+            ))}
+            <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-graf-300"
+              title="Concluída, cancelada ou reagendada: o contrato fechou e a foto não vem mais">
+              <input type="checkbox" checked={soFechados} className="accent-af-600"
+                onChange={e => setSoFechados(e.target.checked)} />
+              Só os já encerrados <span className="tabular text-graf-500">({fechados})</span>
+            </label>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-graf-800 bg-graf-900 text-left text-[11px] uppercase tracking-wide text-graf-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Situação</th>
+                  <th className="px-3 py-2 font-medium">Contrato</th>
+                  <th className="px-3 py-2 font-medium">Grupo de serviço</th>
+                  <th className="px-3 py-2 font-medium">Técnico</th>
+                  <th className="px-3 py-2 font-medium">Equipe</th>
+                  <th className="px-3 py-2 font-medium">Área</th>
+                  <th className="px-3 py-2 font-medium">Encerrou</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lista.map(v => (
+                  <tr key={v.id} className="border-b border-graf-800/60 hover:bg-graf-850">
+                    <td className="px-3 py-2">
+                      <span style={{ color: SITUACAO_INFO[v.situacao]?.cor }}>
+                        {SITUACAO_INFO[v.situacao]?.label ?? v.situacao}
+                      </span>
+                      {!fechado(v) && (
+                        <span className="ml-1.5 text-[10px] text-graf-400" title="Ainda dá tempo de registrar">
+                          em aberto
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Link to={`/controle/visita/${v.id}`}
+                        className="tabular text-af-400 underline underline-offset-2">
+                        {v.contrato ?? v.wo_numero ?? '—'}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-graf-300">{v.tipo_servico?.nome ?? '—'}</td>
+                    <td className="px-3 py-2 text-graf-300">
+                      {v.tecnico?.nome ?? <span className="text-graf-400">sem técnico</span>}
+                    </td>
+                    <td className="px-3 py-2 text-graf-400">{v.equipe?.codigo ?? '—'}</td>
+                    <td className="px-3 py-2 text-graf-400">{v.area?.codigo ?? '—'}</td>
+                    <td className="tabular px-3 py-2 text-graf-400">{hora(v.fim)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+      </div>
+    </div>,
+    document.querySelector('.sup-controle') ?? document.body,
+  )
+}
+
 export function ReguaDoDia({ m, de, ate, linhas }: {
   m: Metricas
   /** As visitas FILTRADAS, as mesmas de onde `m` saiu — a lista do TEC1
@@ -452,6 +618,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
 }) {
   const [verTec1, setVerTec1] = useState(false)
   const [verLog, setVerLog] = useState(false)
+  const [verEvid, setVerEvid] = useState(false)
   const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.produtivas) - m.concluidas)
   const naMeta = m.taxaConclusao >= META
 
@@ -491,6 +658,44 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
                 <span className="tabular">{num(m.foraDaConta)}</span> sem ida fora da conta
                 {' '}(<span className="tabular">{num(m.canceladoCentral)}</span> da central,{' '}
                 <span className="tabular">{num(m.desatribuido)}</span> desatribuído)
+              </span>
+            )}
+          </>}
+        />
+
+        {/* ┌─ 155 · evidência, e só a NOSSA ─────────────────────────┐
+             │ > "contratos com evidências versus contratos sem         │
+             │ >  evidências e a porcentagem" — Emanuel, 29/10          │
+             │                                                           │
+             │ O número é de CONTRATO, como o LOG: a pergunta é "este   │
+             │ atendimento tem prova?", não "quantas fotos subiram".    │
+             │ Quantas subiram fica na linha de apoio, que é onde       │
+             │ importa pouco.                                            │
+             └───────────────────────────────────────────────────────────┘ */}
+        <Celula
+          valor={m.pctEvidencia.toFixed(1).replace('.', ',')} sufixo="%"
+          rotulo="Contratos com evidência"
+          aoClicar={m.semEvidencia > 0 ? () => setVerEvid(true) : undefined}
+          dica={m.semEvidencia > 0
+            ? `Ver os ${m.semEvidencia} contratos sem nenhuma foto ou vídeo do nosso aplicativo`
+            : undefined}
+          chamada="ver quem não registrou"
+          cor={m.comEvidencia === 0 ? 'var(--color-graf-500)'
+            : m.pctEvidencia >= META_EVIDENCIA ? 'var(--st-concluida)' : 'var(--st-reagendamento)'}
+          alerta={m.semEvidencia > 0}
+          apoio={<>
+            <span className="tabular">{num(m.comEvidencia)}</span> com ·{' '}
+            <span className="tabular">{num(m.semEvidencia)}</span> sem ·{' '}
+            <span className="tabular">{num(m.evidenciasTotal)}</span> arquivo(s)
+            {m.semEvidenciaAberto > 0 && (
+              <span className="block" title="Contrato que ainda não encerrou: a foto ainda pode vir">
+                <span className="tabular">{num(m.semEvidenciaAberto)}</span> dos sem
+                {' '}ainda estão em aberto
+              </span>
+            )}
+            {m.comEvidencia === 0 && (
+              <span className="block text-graf-400">
+                nenhuma foto do nosso aplicativo no período
               </span>
             )}
           </>}
@@ -619,6 +824,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
       )}
       {verTec1 && <Tec1Perdido linhas={linhas} aoFechar={() => setVerTec1(false)} />}
       {verLog && <LogRetornos linhas={linhas} aoFechar={() => setVerLog(false)} />}
+      {verEvid && <SemEvidencia linhas={m.listaSemEvidencia} aoFechar={() => setVerEvid(false)} />}
     </section>
   )
 }

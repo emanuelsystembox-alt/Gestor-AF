@@ -273,19 +273,36 @@ export default function Monitor() {
   /** Equipes ociosas pela regra da tela de Equipes (D-026). Só hoje. */
   const [ociosas, setOciosas] = useState<Set<string>>(new Set())
 
+  /*
+   * ┌─ 155f · a lista não espera mais quem é ocioso ────────────────────┐
+   * │ > "se tiver um delay na hora de fazer o filtro, deixe aplicado a  │
+   * │ >  animação para o usuário aguardar" — Emanuel, 29/10             │
+   * │                                                                    │
+   * │ Medido como `authenticated` em 29/10: `monitor_tecnicos` leva     │
+   * │ 86 ms; `painel_equipes` leva 1,18 s. As duas iam no mesmo         │
+   * │ `Promise.all`, então a lista inteira esperava 1,2 s por uma       │
+   * │ informação que só pinta o selo "ocioso". Agora a lista aparece    │
+   * │ com o que é dela, e o ocioso chega depois, sozinho.               │
+   * │                                                                    │
+   * │ A animação continua, para o resto da espera: o mapa e a lista     │
+   * │ ficam esmaecidos com o indicador por cima enquanto carrega.       │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
   const carregar = useCallback(async () => {
     const meu = ++pedido.current
     setCarregando(true); setErro(null)
-    const [r, p, c] = await Promise.all([
+    supabase.rpc('painel_equipes', { p_data: data }).then(({ data: p }) => {
+      if (meu !== pedido.current) return
+      setOciosas(new Set(((p ?? []) as { equipe_id: string; ocioso: boolean | null }[])
+        .filter(x => x.ocioso).map(x => x.equipe_id)))
+    })
+    const [r, c] = await Promise.all([
       supabase.rpc('monitor_tecnicos', { p_data: data }),
-      supabase.rpc('painel_equipes', { p_data: data }),
       supabase.from('cerca').select(SELECT_CERCA).is('arquivado_em', null).order('nome'),
     ])
     if (meu !== pedido.current) return
     setCercas((c.data ?? []) as unknown as Cerca[])
     const { data: d, error } = r
-    setOciosas(new Set(((p.data ?? []) as { equipe_id: string; ocioso: boolean | null }[])
-      .filter(x => x.ocioso).map(x => x.equipe_id)))
     if (error) setErro(error.message)
     else setTecnicos((d ?? []) as TecMonitor[])
     setCarregando(false)
@@ -551,7 +568,19 @@ export default function Monitor() {
                 </button>
               )}
             </div>
-            <ul className="min-h-0 flex-1 overflow-y-auto">
+            <ul className={`relative min-h-0 flex-1 overflow-y-auto transition-opacity ${
+              carregando ? 'opacity-40' : ''}`} aria-busy={carregando}>
+              {carregando && (
+                <li className="pointer-events-none sticky top-0 z-10 flex justify-center py-3"
+                  aria-live="polite">
+                  <span className="flex items-center gap-2 rounded-full bg-graf-900/90 px-3 py-1.5
+                                   text-xs text-graf-200 ring-1 ring-graf-700">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2
+                                     border-graf-600 border-t-af-500" />
+                    Carregando técnicos…
+                  </span>
+                </li>
+              )}
               {!carregando && visiveis.length === 0 && (
                 <li className="p-4">
                   <Vazio titulo="Ninguém aqui"
@@ -651,8 +680,21 @@ export default function Monitor() {
             </ul>
           </section>
 
-          {/* ====== o mapa ====== */}
-          <section className="card-controle sobe sobe-3 overflow-hidden">
+          {/* ====== o mapa ======
+              155f: enquanto carrega, o mapa fica esmaecido com o indicador
+              por cima — o mesmo da lista, para a espera ter uma cara só. */}
+          <section className="card-controle sobe sobe-3 relative overflow-hidden" aria-busy={carregando}>
+            {carregando && (
+              <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center
+                              bg-graf-950/40 backdrop-blur-[1px]">
+                <span className="flex items-center gap-2 rounded-full bg-graf-900/90 px-3 py-1.5
+                                 text-xs text-graf-200 ring-1 ring-graf-700">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2
+                                   border-graf-600 border-t-af-500" />
+                  Atualizando o mapa…
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2 border-b border-graf-800 px-3 py-1.5 text-[11px]">
               <span className="text-graf-400">Cor no mapa:</span>
               {(['SINAL', 'TRABALHO'] as const).map(c => (
@@ -669,7 +711,10 @@ export default function Monitor() {
             <MapaMonitor
               corDe={pintura.corDe}
               legenda={pintura.legenda}
-              tecnicos={comEstado}
+              // 155f: os FILTRADOS. Recebia `comEstado` (todos), então
+              // filtrar a lista não mexia no mapa — "quando fizer o filtro,
+              // deve ser filtrado os técnicos" (Emanuel, 29/10).
+              tecnicos={visiveis}
               selecionado={selecionado}
               trilha={trilha}
               contratos={contratosDele}

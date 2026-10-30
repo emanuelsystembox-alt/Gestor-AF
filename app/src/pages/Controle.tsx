@@ -49,7 +49,8 @@ const SELECT = `
                                    responsavel_quebra, agrupamento_quebra, quebra_pct,
                                    situacao_destino ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
-  )
+  ),
+  evidencia ( count )
 `
 
 type Periodo = 'HOJE' | 'SETE' | 'MES' | 'MES_ANTERIOR' | 'PERSONALIZADO'
@@ -206,7 +207,13 @@ export default function Controle() {
    *  mostra os 10 maiores de propósito, e cortar sem dizer que cortou
    *  faz a lista parecer o universo. */
   const motivosSomados = m.motivos.reduce((s, x) => s + x.valor, 0)
-  const motivosDeFora = m.osImprodutivas - motivosSomados
+  // 155: as duas pontas no mesmo grão (contrato). Com O.S. no numerador
+  // e contrato no denominador a nota dizia "outras 281" onde não havia
+  // nenhuma de fora.
+  const motivosDeFora = Math.max(0, m.contratosQuebrados - motivosSomados)
+  /** Quanto as barras de agrupamento somam: passa do total quando um
+   *  contrato quebrou por mais de um agrupamento (4 em 409, medido). */
+  const somaBarras = m.porAgrupamento.reduce((s, x) => s + x.valor, 0)
 
   return (
     <Shell acoes={
@@ -349,11 +356,15 @@ export default function Controle() {
             <MatrizGrupos linhas={filtradas} de={dtInicio} ate={dtFim} onCSV={baixarCSV} />
 
             {/* ===== 5. por que o dia não fechou ===== */}
+            {/* 155: o cabeçalho conta CONTRATO, não O.S. — a contagem antiga
+                dizia 690 onde há 409 (medido em 14 dias). A de O.S. fica ao
+                lado, menor: número que encolhe calado parece defeito. */}
             <div className="sobe sobe-2 grid gap-3 xl:grid-cols-2">
               <Painel titulo="Responsável pela quebra"
                 dica="Em que parte do processo o serviço caiu — e quanto isso pesa no total."
                 extra={<span className="tabular text-xs text-graf-500">
-                  {m.osImprodutivas} de {m.osComBaixa} O.S. com baixa
+                  {m.contratosQuebrados} de {m.contratosComBaixa} contratos com baixa
+                  <span className="ml-1.5 text-graf-600">({m.osImprodutivas} O.S.)</span>
                 </span>}
                 tabela={<TabelaSimples
                   colunas={['Agrupamento', 'Quebras', 'Impacto no UN', '% das quebras']}
@@ -362,13 +373,18 @@ export default function Controle() {
                   O <strong className="text-graf-300">agrupamento de quebra</strong> é a
                   classificação da própria CLARO (coluna AH da <em>Quebra Qualificada</em>):
                   cada código de baixa cai no lugar do processo em que o serviço quebrou.
-                  {' '}<strong className="text-graf-300">Impacto no UN</strong> é sobre as{' '}
-                  <span className="tabular">{m.osComBaixa}</span> O.S. com baixa do período —
-                  o mesmo denominador do cabeçalho.
+                  {' '}<strong className="text-graf-300">Impacto no UN</strong> é sobre os{' '}
+                  <span className="tabular">{m.contratosComBaixa}</span> contratos com baixa
+                  do período — o mesmo denominador do cabeçalho.
                   {' '}Passe o mouse na barra para o resumo com os motivos.
+                  {somaBarras > m.contratosQuebrados && <>
+                    {' '}As barras somam <span className="tabular">{somaBarras}</span> porque{' '}
+                    <span className="tabular">{somaBarras - m.contratosQuebrados}</span> contrato(s)
+                    quebraram por mais de um agrupamento e aparecem em cada um deles.
+                  </>}
                 </>}>
-                <QuebraPorAgrupamento grupos={m.porAgrupamento} totalUn={m.osComBaixa}
-                  totalQuebras={m.osImprodutivas} de={dtInicio} ate={dtFim}
+                <QuebraPorAgrupamento grupos={m.porAgrupamento} totalUn={m.contratosComBaixa}
+                  totalQuebras={m.contratosQuebrados} de={dtInicio} ate={dtFim}
                   temFiltro={temFiltro} />
               </Painel>
 
@@ -377,11 +393,12 @@ export default function Controle() {
                 tabela={<TabelaSimples colunas={['Motivo', 'Qtd']}
                   linhas={m.motivos.map(x => [x.rotulo, x.valor])} />}
                 nota={motivosDeFora > 0 &&
-                  <>Os 10 maiores. Outras <strong className="tabular">{motivosDeFora}</strong>{' '}
-                  O.S. improdutivas estão espalhadas em códigos de menor frequência —
-                  o percentual é sobre as {m.osImprodutivas} do período, não sobre estas dez.</>}>
+                  <>Os 10 maiores, em <strong>contratos</strong>. Outros{' '}
+                  <strong className="tabular">{motivosDeFora}</strong>{' '}
+                  estão espalhados em códigos de menor frequência —
+                  o percentual é sobre os {m.contratosQuebrados} do período, não sobre estes dez.</>}>
                 <BarrasHorizontais dados={m.motivos} cor="var(--st-conflito)"
-                  parte totalRef={m.osImprodutivas} rotuloLargo
+                  parte totalRef={m.contratosQuebrados} rotuloLargo
                   aoClicar={r => setMotivoAberto(a => a === r ? null : r)}
                   selecionado={motivoAberto} />
                 {/* 141: clicar no motivo abre QUEM deu a quebra — contrato,
@@ -395,7 +412,7 @@ export default function Controle() {
                       <p className="flex items-center gap-2 border-b border-graf-800 bg-graf-900
                                     px-3 py-1.5 text-[11px] text-graf-300">
                         <strong>{mot.rotulo}</strong>
-                        <span className="tabular text-graf-500">{mot.valor} O.S.</span>
+                        <span className="tabular text-graf-500">{mot.valor} contrato(s)</span>
                         <button onClick={() => setMotivoAberto(null)}
                           className="ml-auto text-graf-400 hover:text-graf-100">fechar ✕</button>
                       </p>
@@ -418,7 +435,14 @@ export default function Controle() {
                                     className="tabular text-af-400 underline underline-offset-2">
                                     {it.contrato ?? '—'}
                                   </Link>
-                                  {it.os && <span className="tabular ml-1.5 text-graf-600">O.S. {it.os}</span>}
+                                  {it.os && (
+                                    <span className="tabular ml-1.5 text-graf-600"
+                                      title={it.oss > 1
+                                        ? `${it.oss} O.S. deste contrato caíram neste mesmo motivo`
+                                        : undefined}>
+                                      O.S. {it.os}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="px-3 py-1.5 text-graf-300">{it.servico ?? '—'}</td>
                                 <td className="px-3 py-1.5 text-graf-300">

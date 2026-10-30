@@ -68,7 +68,29 @@ export interface Visita {
   equipe: { codigo: string; nome: string; supervisor_nome?: string | null } | null
   tecnico: { nome: string; matricula: string; supervisor?: { nome: string } | null } | null
   ordem_servico: OS[]
+  /*
+   * ┌─ 155 · a evidencia e NOSSA, nao do TOA ──────────────────────────┐
+   * │ > "lembrando que as evidencias precisam ser do nosso proprio     │
+   * │ >  sistema, nao do toa" — Emanuel, 29/10                         │
+   * │                                                                   │
+   * │ A planilha do TOA tem `Set PDF` (sim/nao) e `Resposta ECM` (o    │
+   * │ EDOC), e os dois casam 100% — medido em 29/10: 324 de 574. Dava  │
+   * │ para montar o card com eles em cinco minutos, e estaria errado:  │
+   * │ aquilo responde "a CLARO recebeu alguma coisa", nao "o nosso     │
+   * │ tecnico registrou". O card mede a tabela `evidencia`, que e      │
+   * │ foto/video do app do campo.                                      │
+   * │                                                                   │
+   * │ Vem do PostgREST como agregado: `evidencia(count)` devolve       │
+   * │ `[{count: n}]` — e `[]` quando o embed nao veio. Nulo e zero sao │
+   * │ coisas diferentes, mas aqui nao: o contrato sem nenhuma linha    │
+   * │ em `evidencia` tem zero evidencia, e isso e uma afirmacao.       │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  evidencia?: { count: number }[]
 }
+
+/** Quantas evidencias o contrato tem. O embed pode vir vazio. */
+export const quantasEvidencias = (v: Visita): number => v.evidencia?.[0]?.count ?? 0
 
 /**
  * ┌─ o vocabulário é o da CLARO, não o nosso (141) ───────────────────┐
@@ -115,6 +137,8 @@ function minutosEmManaus(iso: string): number {
 /** Uma O.S. improdutiva por trás do número, para o coordenador atuar (141). */
 export interface ItemMotivo {
   visita_id: string; contrato: string | null; os: string | null
+  /** 155: quantas O.S. do contrato caíram neste mesmo motivo. */
+  oss: number
   servico: string | null; tecnico: string | null; equipe: string | null
   responsavel: string | null
 }
@@ -235,11 +259,43 @@ export function calcular(visitas: Visita[]) {
   // 152: `produtivas` já exclui cancelado pela central e desatribuído,
   // então o filtro que a D-223 fazia aqui virou redundante -- e deixá-lo
   // seria a mesma regra escrita duas vezes, para divergir um dia.
-  const osImprodutivas = produtivas.flatMap(v =>
-    v.ordem_servico.filter(o =>
-      o.codigo_baixa?.natureza === 'IMPRODUTIVA'
-      && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
-      && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'))
+  const ehQuebra = (o: OS) =>
+    o.codigo_baixa?.natureza === 'IMPRODUTIVA'
+    && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
+    && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'
+
+  const osImprodutivas = produtivas.flatMap(v => v.ordem_servico.filter(ehQuebra))
+
+  /*
+   * ┌─ 155 · a quebra se conta por CONTRATO, não por O.S. ─────────────┐
+   * │ > "responsável pela quebra e motivo de produtividade, é bom a    │
+   * │ >  gente não duplicar ou fazer por OS. O ideal é mostrar         │
+   * │ >  contrato por contrato" — Emanuel, 29/10                       │
+   * │                                                                   │
+   * │ Ele está certo, e o tamanho do erro surpreende: medido em 14     │
+   * │ dias, 690 O.S. improdutivas em 409 CONTRATOS. O painel inflava   │
+   * │ 281 — 69% a mais — porque o mesmo código de baixa se repete nas  │
+   * │ O.S. do mesmo contrato (o caso comum é 2 O.S. por visita, e as   │
+   * │ duas caem pelo mesmo motivo).                                    │
+   * │                                                                   │
+   * │ O contrato entra UMA VEZ em cada agrupamento/motivo/responsável  │
+   * │ que ele de fato tem — não uma vez por O.S. Contrato que quebrou  │
+   * │ por dois motivos diferentes aparece nos dois, e isso não é       │
+   * │ duplicação: é o que aconteceu. Medido: 4 contratos em 409 (1,0%) │
+   * │ têm mais de um agrupamento, 7 mais de um motivo. Por isso a      │
+   * │ soma das barras pode passar do total por pouco, e a tela diz.    │
+   * │                                                                   │
+   * │ Escolher UM agrupamento para esses 4 seria o sistema decidindo   │
+   * │ no lugar de quem opera (D-088) para arrumar 1% da tela.          │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const quebrados = produtivas
+    .map(v => ({ v, oss: v.ordem_servico.filter(ehQuebra) }))
+    .filter(x => x.oss.length > 0)
+  const contratosQuebrados = quebrados.length
+  /** O denominador do impacto, no MESMO grão: contrato com alguma baixa. */
+  const contratosComBaixa = produtivas.filter(v =>
+    v.ordem_servico.some(o => o.codigo_baixa)).length
 
   /*
    * ┌─ 144 · o LOG, que é da CLARO e não nosso ────────────────────────┐
@@ -265,6 +321,35 @@ export function calcular(visitas: Visita[]) {
   const logRetornos = logs.reduce((t, l) => t + (l.n ?? 0), 0)
   const pctLog = logMedidos ? (logComRetorno * 100) / logMedidos : 0
 
+  /*
+   * ┌─ 155 · evidência: quem registrou e quem não ─────────────────────┐
+   * │ > "adicione mais um card (...) sobre contratos com evidências    │
+   * │ >  versus contratos sem evidências e a porcentagem (...) nessa   │
+   * │ >  contagem temos que desconsiderar os contratos enviados para   │
+   * │ >  justificativa e contratos cancelados pela central"            │
+   * │ >  — Emanuel, 29/10                                              │
+   * │                                                                   │
+   * │ Os dois que ele mandou tirar são exatamente `foraDaConta`:       │
+   * │ Auditar (o 800, que ele chama de enviado para justificativa —    │
+   * │ confirmado por ele em 29/10) e Cancelado pela central. `produ-   │
+   * │ tivas` já os exclui desde a 152, então a base é a mesma de todo  │
+   * │ o resto do Dashboard — uma régua, um universo.                   │
+   * │                                                                   │
+   * │ O que NÃO foi tirado: contrato ainda em aberto. Ele não pediu,   │
+   * │ e tirar por conta própria esconderia justamente quem ainda pode  │
+   * │ registrar. Em vez disso o card SEPARA os dois — "x ainda em      │
+   * │ aberto" —, porque não ter foto às 10h e não ter foto no          │
+   * │ fechamento são coisas diferentes.                                │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const comEvidencia = produtivas.filter(v => quantasEvidencias(v) > 0)
+  const semEvidencia = produtivas.filter(v => quantasEvidencias(v) === 0)
+  const evidenciasTotal = produtivas.reduce((t, v) => t + quantasEvidencias(v), 0)
+  const semEvidenciaAberto = semEvidencia.filter(v =>
+    !['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'].includes(v.situacao)).length
+  const pctEvidencia = produtivas.length
+    ? (comEvidencia.length * 100) / produtivas.length : 0
+
   const taxaConclusao = produtivas.length
     ? (concluidas.length / produtivas.length) * 100 : 0
 
@@ -280,10 +365,12 @@ export function calcular(visitas: Visita[]) {
   }))
 
   // ---------- improdutivas por responsabilidade (nosso diferencial) ----------
+  // 155: um contrato conta uma vez por responsável que ele tem.
   const contaResp: Record<string, number> = {}
-  for (const o of osImprodutivas) {
-    const k = o.codigo_baixa?.responsavel_quebra ?? 'SEM_CLASSIFICACAO'
-    contaResp[k] = (contaResp[k] ?? 0) + 1
+  for (const { oss } of quebrados) {
+    for (const k of new Set(oss.map(o => o.codigo_baixa?.responsavel_quebra ?? 'SEM_CLASSIFICACAO'))) {
+      contaResp[k] = (contaResp[k] ?? 0) + 1
+    }
   }
   const porResponsabilidade = Object.entries(contaResp)
     .map(([k, valor]) => ({
@@ -315,23 +402,32 @@ export function calcular(visitas: Visita[]) {
    * │ tela seria a contradição da D-150 de novo.                       │
    * └───────────────────────────────────────────────────────────────────┘
    */
+  // 155: o volume é de CONTRATO, e os motivos dentro da barra também —
+  // senão a barra diria 12 e os motivos dela somariam 19.
   const agrupados = new Map<string, { volume: number; motivos: Map<string, number> }>()
-  for (const o of osImprodutivas) {
-    const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_AGRUPAMENTO'
-    const g = agrupados.get(k) ?? { volume: 0, motivos: new Map<string, number>() }
-    g.volume += 1
-    const mot = `${o.codigo_baixa!.codigo} · ${o.codigo_baixa!.descricao}`
-    g.motivos.set(mot, (g.motivos.get(mot) ?? 0) + 1)
-    agrupados.set(k, g)
+  for (const { oss } of quebrados) {
+    const porAgr = new Map<string, Set<string>>()
+    for (const o of oss) {
+      const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_AGRUPAMENTO'
+      const set = porAgr.get(k) ?? new Set<string>()
+      set.add(`${o.codigo_baixa!.codigo} · ${o.codigo_baixa!.descricao}`)
+      porAgr.set(k, set)
+    }
+    for (const [k, mots] of porAgr) {
+      const g = agrupados.get(k) ?? { volume: 0, motivos: new Map<string, number>() }
+      g.volume += 1
+      for (const mot of mots) g.motivos.set(mot, (g.motivos.get(mot) ?? 0) + 1)
+      agrupados.set(k, g)
+    }
   }
-  const totalUn = osComBaixa.length
+  const totalUn = contratosComBaixa
   const porAgrupamento = [...agrupados.entries()]
     .map(([chave, g]) => ({
       chave,
       rotulo: chave === 'SEM_AGRUPAMENTO' ? 'sem agrupamento' : chave.toLowerCase(),
       valor: g.volume,
       pctUn: totalUn ? (g.volume * 100) / totalUn : 0,
-      pctQuebras: osImprodutivas.length ? (g.volume * 100) / osImprodutivas.length : 0,
+      pctQuebras: contratosQuebrados ? (g.volume * 100) / contratosQuebrados : 0,
       cor: AGR_COR[chave] ?? '#8b5cf6',
       motivos: [...g.motivos.entries()]
         .map(([rotulo, qtd]) => ({ rotulo, qtd }))
@@ -345,17 +441,27 @@ export function calcular(visitas: Visita[]) {
   // clicar em cima, aparecer o contrato, o tipo de serviço e o técnico
   // que deu a quebra" (Emanuel, 25/10). Sem isso o coordenador vê o
   // número e não tem onde atuar.
+  // 155: uma linha por CONTRATO e motivo. O contrato de 3 O.S. que caiu
+  // três vezes no mesmo código aparecia três vezes na lista, com o mesmo
+  // nome e o mesmo técnico — e o coordenador contava errado de olho.
+  // Quantas O.S. foram fica na própria linha.
   const contaMotivo = new Map<string, ItemMotivo[]>()
   for (const v of produtivas) {
+    const porMotivo = new Map<string, OS[]>()
     for (const o of v.ordem_servico) {
       if (o.codigo_baixa?.natureza !== 'IMPRODUTIVA') continue
       const k = `${o.codigo_baixa.codigo} · ${o.codigo_baixa.descricao}`
+      porMotivo.set(k, [...(porMotivo.get(k) ?? []), o])
+    }
+    for (const [k, oss] of porMotivo) {
       const l = contaMotivo.get(k) ?? []
       l.push({
-        visita_id: v.id, contrato: v.contrato ?? null, os: o.numero_os ?? null,
+        visita_id: v.id, contrato: v.contrato ?? null,
+        os: oss.map(o => o.numero_os).filter(Boolean).join(', ') || null,
+        oss: oss.length,
         servico: v.tipo_servico?.nome ?? v.tipo_atividade?.nome ?? null,
         tecnico: v.tecnico?.nome ?? null, equipe: v.equipe?.codigo ?? null,
-        responsavel: o.codigo_baixa.responsavel_quebra ?? null,
+        responsavel: oss[0].codigo_baixa?.responsavel_quebra ?? null,
       })
       contaMotivo.set(k, l)
     }
@@ -576,6 +682,13 @@ export function calcular(visitas: Visita[]) {
     osComBaixa: osComBaixa.length,
     osSucesso: osSucesso.length,
     osImprodutivas: osImprodutivas.length,
+    // 155: a quebra no grão de CONTRATO. As duas contagens ficam, porque
+    // a tela mostra as duas ("409 contratos, 690 O.S.") -- esconder a de
+    // O.S. faria o número encolher calado, que é o defeito da D-225.
+    contratosQuebrados, contratosComBaixa,
+    comEvidencia: comEvidencia.length, semEvidencia: semEvidencia.length,
+    semEvidenciaAberto, evidenciasTotal, pctEvidencia,
+    listaSemEvidencia: semEvidencia,
     nossas,
     // 152: aparecem na matriz, não entram em conta nenhuma.
     foraDaConta: foraDaConta.length, canceladoCentral, desatribuido,

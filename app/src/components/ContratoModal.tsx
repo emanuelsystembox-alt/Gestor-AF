@@ -136,8 +136,28 @@ function Dado({ r, v, largo }: { r: string; v: React.ReactNode; largo?: boolean 
   )
 }
 
+/**
+ * ┌─ 155 · a janela virou o PAINEL DE AÇÕES da página cheia ──────────┐
+ * │ > "o sistema deve desconsiderar essa tela menor. O ideal é        │
+ * │ >  aparecer somente a tela maior. A tela de página cheia. Essa    │
+ * │ >  sim deve ser a principal, para não ter duas telas que mostrem  │
+ * │ >  a mesma informação" — Emanuel, 29/10                           │
+ * │                                                                     │
+ * │ Apagar a janela e pronto teria TIRADO três comandos: + O.S.,      │
+ * │ Mudar status e Excluir só existiam aqui — a página cheia nunca os │
+ * │ teve. "Some com a tela menor" não é "some com o que ela fazia".   │
+ * │                                                                     │
+ * │ Então ela não foi apagada: em `modo="pagina"` ela deixa de ser    │
+ * │ sobreposição e vira a barra de ações DENTRO de VisitaDetalhe —    │
+ * │ mesmos botões, mesmos painéis, mesmo código. O que a página cheia │
+ * │ já mostra (detalhe, histórico, equipamento) fica de fora, que era │
+ * │ justamente a duplicação reclamada; Marcadores fica, porque só     │
+ * │ existe aqui.                                                       │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
 export function ContratoModal({
   id, indicadores, codigos, conjunto, equipes, pontos, onFechar, onMudou, acaoInicial,
+  modo = 'janela',
 }: {
   id: string
   indicadores: { id: string; nome: string }[]
@@ -149,7 +169,10 @@ export function ContratoModal({
   onMudou: () => void
   /** Veio do menu do botão direito: abre já na ação escolhida. */
   acaoInicial?: AcaoContrato | null
+  /** 155: `pagina` = sem sobreposição, embutida em VisitaDetalhe. */
+  modo?: 'janela' | 'pagina'
 }) {
+  const pagina = modo === 'pagina'
   const [v, setV] = useState<Visita | null>(null)
   const [aba, setAba] = useState<'detalhe' | 'historico' | 'equipamento' | 'marcadores'>(
     acaoInicial === 'marcadores' ? 'marcadores' : 'detalhe')
@@ -298,14 +321,13 @@ export function ContratoModal({
     : ''
   const cor = v ? SITUACAO_INFO[v.situacao]?.cor ?? '#64748b' : '#64748b'
 
-  return (
-    <div onClick={onFechar}
-      className="janela-fundo fixed inset-0 z-50 flex items-start justify-center
-                 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-      <div onClick={e => e.stopPropagation()}
+  const corpo = (
+      <div onClick={pagina ? undefined : e => e.stopPropagation()}
         style={{ borderTopColor: cor }}
-        className="janela-caixa sup-controle mt-6 w-full max-w-5xl rounded-xl
-                   border border-graf-700 border-t-4 bg-graf-950 shadow-2xl">
+        className={pagina
+          ? 'w-full overflow-hidden rounded-xl border border-graf-700 border-t-4 bg-graf-950'
+          : `janela-caixa sup-controle mt-6 w-full max-w-5xl rounded-xl
+             border border-graf-700 border-t-4 bg-graf-950 shadow-2xl`}>
 
         {/* ---------- cabeçalho ---------- */}
         <div className="flex flex-wrap items-center gap-3 border-b border-graf-800 px-5 py-3">
@@ -365,28 +387,38 @@ export function ContratoModal({
                          hover:border-af-600">
               Excluir
             </button>
-            <Link to={`/controle/visita/${id}`}
-              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
-                         hover:border-af-600 hover:text-af-400">
-              Página cheia
-            </Link>
-            <button onClick={onFechar} title="Fechar (Esc)"
-              className="rounded-md px-2 py-1 text-lg leading-none text-graf-500
-                         hover:text-graf-200">
-              ×
-            </button>
+            {/* 155: na página cheia estes dois não fazem sentido — ela
+                JÁ é a página cheia, e quem fecha é o Esc (ou o Voltar). */}
+            {!pagina && <>
+              <Link to={`/controle/visita/${id}`}
+                className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                           hover:border-af-600 hover:text-af-400">
+                Página cheia
+              </Link>
+              <button onClick={onFechar} title="Fechar (Esc)"
+                className="rounded-md px-2 py-1 text-lg leading-none text-graf-500
+                           hover:text-graf-200">
+                ×
+              </button>
+            </>}
           </div>
         </div>
 
-        {/* ---------- abas ---------- */}
+        {/* ---------- abas ----------
+             155: na página cheia sobra só Marcadores. Detalhe, Histórico e
+             Equipamento estão logo abaixo, na própria VisitaDetalhe — e era
+             exatamente essa a reclamação ("duas telas que mostram a mesma
+             informação"). Marcadores não existe lá, então fica. */}
         <div className="flex gap-1 border-b border-graf-800 px-5 pt-2">
-          {([['detalhe', 'Detalhe'],
-             ['historico', `Histórico (${v?.visita_evento.length ?? 0})`],
-             // 133: o equipamento do TOA tem aba própria aqui também — a
-             // janela e a página cheia mostram o contrato do mesmo jeito.
-             ['equipamento', 'Equipamento'],
-             ['marcadores', `Marcadores (${marcados.length})`]] as const).map(([a, rot]) => (
-            <button key={a} onClick={() => setAba(a)}
+          {(pagina
+            ? [['marcadores', `Marcadores (${marcados.length})`]] as const
+            : [['detalhe', 'Detalhe'],
+               ['historico', `Histórico (${v?.visita_evento.length ?? 0})`],
+               // 133: o equipamento do TOA tem aba própria aqui também.
+               ['equipamento', 'Equipamento'],
+               ['marcadores', `Marcadores (${marcados.length})`]] as const
+          ).map(([a, rot]) => (
+            <button key={a} onClick={() => setAba(pagina && aba === a ? 'detalhe' : a)}
               className={`rounded-t-md px-3 py-1.5 text-xs font-medium transition ${
                 aba === a ? 'bg-graf-900 text-af-300' : 'text-graf-400 hover:text-graf-200'}`}>
               {rot}
@@ -394,7 +426,9 @@ export function ContratoModal({
           ))}
         </div>
 
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
+        <div className={pagina
+          ? 'space-y-4 p-5'
+          : 'max-h-[70vh] space-y-4 overflow-y-auto p-5'}>
           {erro && <Alerta tipo="erro">{erro}</Alerta>}
           {ok && <Alerta tipo="ok">{ok}</Alerta>}
 
@@ -889,7 +923,9 @@ export function ContratoModal({
             </div>
           )}
 
-          {!v ? (
+          {/* 155: na página cheia este bloco é o que duplicava a tela de
+              baixo. Só Marcadores sobrevive, e só quando pedido. */}
+          {(!pagina || aba === 'marcadores') && (!v ? (
             <p className="py-10 text-center text-sm text-graf-400">Carregando contrato…</p>
           ) : aba === 'detalhe' ? (
             <>
@@ -1121,9 +1157,18 @@ export function ContratoModal({
                 </div>
               )}
             </section>
-          )}
+          ))}
         </div>
       </div>
+  )
+
+  // 155: a mesma árvore, com ou sem a sobreposição por cima.
+  if (pagina) return corpo
+  return (
+    <div onClick={onFechar}
+      className="janela-fundo fixed inset-0 z-50 flex items-start justify-center
+                 overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+      {corpo}
     </div>
   )
 }

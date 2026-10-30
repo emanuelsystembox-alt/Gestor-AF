@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, EM_ABERTO, SITUACAO_INFO } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
-import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
 import { MenuContrato, type AcaoContrato } from '../components/MenuContrato'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useUltimoDiaComVisita } from '../lib/dia'
@@ -87,9 +86,23 @@ export default function Servicos() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   // O contrato abre em JANELA, nao em linha expandida (D-056).
-  const [modal, setModal] = useState<string | null>(null)
+  const navegar = useNavigate()
+  /*
+   * ┌─ 155 · o contrato abre na PÁGINA, não mais numa janela ──────────┐
+   * │ > "o sistema deve desconsiderar essa tela menor. O ideal é       │
+   * │ >  aparecer somente a tela maior (...) ele pode apertar ESC e    │
+   * │ >  volta para a tela que estava antes" — Emanuel, 29/10          │
+   * │                                                                    │
+   * │ A ação escolhida no menu do botão direito viaja no ESTADO da     │
+   * │ rota, não na URL: "quero baixar este contrato" é um gesto, não   │
+   * │ um endereço para guardar nos favoritos.                           │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const abrirContrato = useCallback((visitaId: string, acao?: AcaoContrato) => {
+    navegar(`/controle/visita/${visitaId}`, acao ? { state: { acao } } : undefined)
+  }, [navegar])
+
   // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
-  const [acaoModal, setAcaoModal] = useState<AcaoContrato | null>(null)
   // Cadastro manual: o serviço que não veio do TOA precisa entrar
   // mesmo assim, senão não é despachado nem cobrado.
   const [novo, setNovo] = useState(false)
@@ -219,21 +232,10 @@ export default function Servicos() {
   }, [de, ate, versao])
 
 
-  // ---- transferência rápida, sem sair da lista ----
-  const [equipes, setEquipes] = useState<{ id: string; codigo: string; nome: string }[]>([])
-
-  useEffect(() => {
-    supabase.from('equipe').select('id, codigo, nome').eq('ativo', true).order('codigo')
-      .then(({ data }) => setEquipes((data ?? []) as { id: string; codigo: string; nome: string }[]))
-  }, [])
-
-
-  // ---- baixa da AFLINE, com sub-falha do código escolhido ----
-  const [codigos, setCodigos] = useState<CodigoDeBaixa[]>([])
-
-  // Os dois conjuntos de sub-falha convivem no banco; só um vale. Sem
-  // filtrar pelo vigente, a lista vem em dobro (CASO 1 + NÍVEL HARD).
-  const [conjunto, setConjunto] = useState<string | null>(null)
+  // 155: equipes, códigos de baixa e conjunto de sub-falha saíram daqui
+  // com a janela do contrato — eram três consultas por abertura de tela
+  // que só a janela usava. Quem precisa delas agora é VisitaDetalhe, e
+  // ela as carrega sozinha.
 
   // ---- histórico do contrato (D-069) e busca em GRUPO (D-105) ----
   // Um número de contrato inteiro deixa de ser filtro do período e vira
@@ -268,13 +270,6 @@ export default function Servicos() {
     return () => clearTimeout(id)
   }, [busca])
 
-  useEffect(() => {
-    supabase.from('codigo_baixa').select('codigo, descricao, situacao_destino').order('codigo')
-      .then(({ data }) => setCodigos((data ?? []) as CodigoDeBaixa[]))
-    supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
-      .then(({ data }) =>
-        setConjunto((data as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
-  }, [])
 
 
 
@@ -782,7 +777,7 @@ export default function Servicos() {
               porIndicador={porIndicador}
               locais={locais}
               carregando={carregando}
-              aoAbrir={v => setModal(v.id)}
+              aoAbrir={v => abrirContrato(v.id)}
               aoMenuContexto={(v, e) => {
                 // Botão direito abre as ações do contrato — é como o COP
                 // está acostumado a trabalhar.
@@ -939,29 +934,16 @@ export default function Servicos() {
             setVersao(x => x + 1)
             // Abre o contrato recém-criado: quem cadastrou quase sempre
             // quer conferir ou já atribuir equipe.
-            setModal(id)
+            abrirContrato(id)
           }}
         />
       )}
 
       {menu && (
         <MenuContrato v={menu.v} xy={menu} aoFechar={fecharMenu}
-          aoEscolher={acao => { setAcaoModal(acao); setModal(menu.v.id) }} />
+          aoEscolher={acao => abrirContrato(menu.v.id, acao)} />
       )}
 
-      {modal && (
-        <ContratoModal
-          id={modal}
-          acaoInicial={acaoModal}
-          indicadores={indicadores}
-          codigos={codigos}
-          conjunto={conjunto}
-          equipes={equipes}
-          pontos={pontos.get(modal) ?? null}
-          onFechar={() => { setModal(null); setAcaoModal(null) }}
-          onMudou={() => setVersao(x => x + 1)}
-        />
-      )}
     </Shell>
   )
 }

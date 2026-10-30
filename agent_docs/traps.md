@@ -404,6 +404,34 @@ controlador também. Resultado: quem não é técnico não tinha como ter a cida
 corrigida, e o campo ficava decorativo. Antes de agrupar campos atrás de uma trava,
 confira se todos pertencem mesmo à mesma entidade. Ver D-234.
 
+**`(eh_gestor() or x in (select equipes_visiveis()))` derruba o filtro de CIDADE.**
+`equipes_visiveis()` já filtra por `bases_visiveis()` — mas para ADMIN e COP o lado
+esquerdo do `or` é verdadeiro, o direito nunca é avaliado, e a cidade some junto.
+Estava em `central_do_controle`, `sinais_do_dia` e `ritmo_do_dia`: medido em 29/10,
+510 sinais de Manaus e 16 de São Luís, e quem estava com São Luís ativa via os 526.
+O conserto não é tirar o `eh_gestor()` (ele serve para o gestor ver equipe fora da
+carteira): é pôr `x.base_id in (select bases_visiveis())` ANTES dele, como condição
+própria. Procure esse padrão em toda função `SECURITY DEFINER` nova. Ver D-235.
+
+**Regra que nunca dispara parece "zero", e zero parece verdade.** O turno da tarde
+(145) exigia "mais de 7 dias com a primeira janela >= 11:00" — e em 74 técnicos,
+NENHUM chegou lá. A tela dizia "Ninguém no turno da tarde", o que soa como fato, e
+a meta das 11h20 nunca foi aplicada a ninguém. Antes de entregar uma classificação,
+conte quantos caem em cada lado com o dado real: se um lado dá zero, ou o dado é
+assim mesmo, ou a regra não alcança o dado — e vale saber qual. Ver D-235.
+
+**Apagar a tela que "duplica" pode apagar comando que só ela tinha.** "Tire a janela
+do contrato, deixe só a página cheia" — mas `+ O.S.`, `Mudar status` e `Excluir` só
+existiam na janela. Antes de remover uma tela "repetida", liste os COMANDOS das duas,
+não só os dados. Aqui a janela virou o painel de ações da página (`modo="pagina"`),
+em vez de sumir. Ver D-235.
+
+**Filtro que esvazia a tela por regra de negócio precisa dizer que é de propósito.**
+Em Equipes, filtrar por "Cancelado pela central" dava "0 de 67 equipes" e tabela
+vazia — porque esses contratos não contam para a equipe (D-225). Tudo correto, e
+parecia defeito. Quando um filtro legítimo pode zerar a lista, a tela escreve o
+porquê ao lado. Ver D-235.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

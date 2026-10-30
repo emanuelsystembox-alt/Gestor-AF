@@ -9626,3 +9626,285 @@ conferido no banco: `RENAN BRASIL YOUNG` saiu de `Manaus - AM` para
 **Fica para ele decidir:** o Renan não tem nenhuma cidade marcada em "Cidades
 que acessa", então agora ele enxerga **só São Luís** — deixou de ver Manaus. Se
 precisar das duas, é marcar Manaus ali.
+
+---
+
+### D-235 · Evidência, página cheia, Primeira WO, ritmo por janela e a cidade do sino (155)
+
+> Sete pedidos de uma vez, 29/10. Cada um virou uma peça; o que une é que
+> **cinco deles existiam e não funcionavam** — e só se descobre medindo.
+
+---
+
+#### 1. O card de evidência mede a NOSSA prova, não a do TOA
+
+> *"adicione mais um card entre os demais sobre contratos com evidências
+> versus contratos sem evidências e a porcentagem (...) clicando em cima do
+> card, o sistema deverá mostrar quais contratos não receberam evidência"*
+
+A tentação era a planilha do TOA. Ela tem `Set PDF` (sim/não) e `Resposta ECM`
+(o identificador EDOC do documento na CLARO), e eles casam **100%** — medido em
+29/10: 324 de 574 linhas com `Set PDF = sim`, e exatamente as mesmas 324 com
+EDOC. Daria um card bonito em cinco minutos.
+
+E estaria errado. Ele cortou isso antes que acontecesse:
+
+> *"lembrando que as evidências precisam ser do nosso próprio sistema, não do
+> TOA"* — Emanuel, 29/10
+
+São perguntas diferentes: `Set PDF` responde *"a CLARO recebeu alguma coisa"*;
+o card responde *"o nosso técnico registrou"*. O card lê a tabela `evidencia`
+— foto e vídeo do aplicativo do campo.
+
+**E o número é 0,0%.** Medido no dia 29/10, Manaus: **0 com evidência, 276
+sem**. Em 7 dias: 4 evidências em 2.053 contratos. Não é defeito do card — é o
+retrato de que o aplicativo do campo ainda não está em uso. O card nasce dizendo
+a verdade, e é para isso que ele serve.
+
+**Fora da conta:** Auditar (o 800) e Cancelado pela central — os dois que ele
+mandou tirar, confirmado por ele quando perguntei qual era "enviado para
+justificativa". São os mesmos que já saem de todo o Dashboard desde a 152, então
+a base do card é a mesma do resto da tela.
+
+**Não foi tirado:** contrato ainda em aberto. Ele não pediu, e tirar por conta
+própria esconderia justamente quem ainda pode registrar. O card SEPARA: "13 dos
+sem ainda estão em aberto", e o modal tem o filtro *Só os já encerrados*.
+
+#### 2. A quebra inflava 69% porque contava O.S.
+
+> *"responsável pela quebra e motivo de produtividade, é bom a gente não
+> duplicar ou fazer por OS. O ideal é mostrar contrato por contrato"*
+
+Medido em 14 dias: **690 O.S. improdutivas em 409 CONTRATOS**. O painel dizia
+690. A duplicação vem do caso comum — 2 O.S. por visita, as duas caindo pelo
+mesmo código.
+
+O contrato entra **uma vez em cada agrupamento/motivo/responsável que ele de
+fato tem**. Contrato que quebrou por dois motivos diferentes aparece nos dois:
+isso não é duplicação, é o que aconteceu. Medido: **4 contratos em 409 (1,0%)**
+têm mais de um agrupamento, 7 mais de um motivo. Por isso a soma das barras pode
+passar do total por pouco — e a tela diz quando passa.
+
+**Recusado:** escolher *um* agrupamento para esses 4. Seria o sistema decidindo
+no lugar de quem opera (D-088) para arrumar 1% da tela.
+
+A contagem de O.S. **não sumiu**: fica ao lado, menor ("33 de 270 contratos com
+baixa (54 O.S.)"). Número que encolhe calado parece defeito — é a lição da D-225.
+
+Conferido na tela contra o banco, medindo como `authenticated` e não como dono
+(D-081): 276 produtivas / 33 quebrados / 54 O.S. / 270 com baixa, os quatro
+batendo exatamente.
+
+#### 3. A janela do contrato virou a página cheia
+
+> *"o sistema deve desconsiderar essa tela menor. O ideal é aparecer somente a
+> tela maior (...) para não ter duas telas que mostrem a mesma informação. E aí,
+> quando o usuário abrir a tela, ele pode apertar ESC e volta para a tela que
+> estava antes"*
+
+Apagar a janela e pronto teria **tirado três comandos**: `+ O.S.`, `Mudar
+status` e `Excluir` só existiam nela — a página cheia nunca os teve. "Some com a
+tela menor" não é "some com o que ela fazia".
+
+Então a janela não foi apagada: ganhou `modo="pagina"`, deixa de ser sobreposição
+e vira a **barra de ações dentro de VisitaDetalhe**. Mesmos botões, mesmos
+painéis, mesmo código. O que a página cheia já mostra (detalhe, histórico,
+equipamento) fica de fora — que era exatamente a duplicação reclamada;
+Marcadores fica, porque só existe ali.
+
+A ação escolhida no menu do botão direito viaja no **estado da rota**, não na
+URL: "quero baixar este contrato" é um gesto, não um endereço para guardar.
+
+**Sobrou uma duplicata que eu mesmo criei:** a página tinha a seção "Transferir
+para outra equipe", e o painel de ações traz Transferir. Dois formulários de
+transferência na mesma página é a versão pior do problema que ele reclamou — a
+seção saiu. Com ela saiu o `setOk`, e a faixa verde que ninguém mais escrevia
+foi junto: faixa de sucesso que nunca acende é pior que nenhuma.
+
+O ESC já voltava (estava em VisitaDetalhe desde antes); foi conferido no
+navegador: `/controle/visita/...` → ESC → `/controle/servicos`.
+
+#### 4. Primeira WO: a meta das 11h20 nunca valeu para ninguém
+
+> *"para a gente saber se um técnico é da tarde, é bom a gente avaliar 3 a 4
+> dias com ele iniciando os primeiros contratos na janela de 11 a 14"*
+
+A 145 classificou o turno com dois critérios que, juntos, nunca disparavam:
+"primeira janela **>= 11:00**" (larga demais — pega a janela 14–17, que não é a
+tarde de que ele fala) e "em **mais de 7** dias dos últimos 30" (estreita
+demais). Medido em 29/10 sobre 74 técnicos:
+
+| regra | técnicos TARDE |
+|---|---|
+| da 145 (>7 dias, >= 11:00) | **0** |
+| nova (>= 3 dias, 11:00–14:00) | **2** |
+
+Ou seja: a meta das 11h20 existia no banco e **nunca foi aplicada a ninguém**.
+Todo técnico era cobrado pelas 08h20, inclusive quem a CLARO escala para começar
+às 11. Zero não era "nenhum técnico da tarde": era a regra não alcançando o dado.
+
+Ele escolheu 3 dias entre as opções. Virou parâmetro
+(`primeira_wo_dias_tarde`), e a faixa também (`primeira_wo_faixa_tarde`,
+11:00–14:00): é a janela da CLARO, não constante nossa.
+
+**A tabela do técnico** (`primeira_wo_grade`) é uma GRADE, não a lista de baixo
+expandida: um técnico por linha, um dia por coluna, 67 técnicos abertos de uma
+vez. E traz o que a lista não trazia — **dias escalados sem nenhuma WO aberta**,
+que somem de toda média. Medido como `authenticated`: 320 ms para 14 dias, 48 ms
+para hoje.
+
+Os filtros de equipe e bucket vão para o **banco**, não para a tela: o turno e a
+média têm de ser recalculados sobre o recorte, senão a tabela mostraria a média
+de todo mundo com o nome de um.
+
+#### 5. O ritmo deixou de ser ponto e passou a ser contrato por janela
+
+> *"o técnico de instalação precisa executar pelo menos 5 contratos no dia (...)
+> de manhã 3, de 12 às 15 ele precisa fazer 1 e de 15 às 18 ele precisa fazer 2
+> (...) e na VT o cálculo é diferente"*
+
+A conta ditada não fechava: 3+1+2 = 6, e ele tinha dito 5. Perguntei, e ele
+escolheu **2 / 1 / 2 = 5** para a adesão. VT: **3 / 1 / 3 = 7** (08–11, 11–14,
+14–17). Tudo em `ritmo_janelas`, parâmetro — inclusive para voltar a 3/1/2 se o
+alerta da manhã soar tarde demais na prática.
+
+**Conta como executado:** concluído, reagendado ou cancelado por código. Fora:
+cancelado pela central e auditado/desatribuído.
+
+**O relógio foi o cuidado maior.** `concluida_em` cai em `situacao_em` quando o
+TOA não fechou — e `situacao_em` é o `now()` da importação (D-224), igual para a
+planilha inteira. Um ritmo medido nele acusaria o time todo no mesmo minuto.
+Então a hora só vale com `finalizado_toa` + `fim`, ou com `bloqueado_em`. Medido
+em 29/10: 282 de 282 concluídas e 23 de 23 reagendadas têm fim do TOA; das 87
+canceladas, 75 não têm — e 74 dessas são justamente cancelado pela central e
+desatribuído, que não entram. **Sobra 1 contrato do dia sem hora confiável**, e
+ele vai em `sem_hora` em vez de entrar como se tivesse acontecido agora.
+
+**O alerta só acende quando falta um contrato INTEIRO** (`esperado >= 1`): às
+09:00 o esperado da adesão é 0,5, e ninguém executa meio contrato. Às 11:00 ele
+é 1,5 e quem fez 1 acende — que é o caso que ele deu.
+
+**Custo, que é real:** os cortes passaram de 3 para 10 (de hora em hora, a
+pedido). Rodando a função nova sobre o dia inteiro de 29/10: **328 linhas de
+"abaixo"** somando os dez cortes. A tela dele no mesmo dia, com a regra velha,
+mostrava 93 no histórico. Tirar horas de `ritmo_cortes` reduz isso sem tocar em
+código.
+
+#### 6. O sino tocava a cidade errada, e a causa estava num `or`
+
+> *"as notificações têm que ser direcionadas conforme a cidade que está sendo
+> filtrada. Quem está em São Luís não pode receber uma notificação de Manaus"*
+
+`equipes_visiveis()` **já** filtra por `bases_visiveis()` desde a 103. O que
+vazava era o atalho que todas as funções da central escreviam:
+
+```sql
+(eh_gestor() or x.equipe_id in (select equipes_visiveis()))
+```
+
+Para ADMIN e COP o primeiro lado é verdadeiro, o segundo nunca é avaliado, e o
+filtro de cidade some junto. Medido em 29/10: **510 sinais de Manaus e 16 de São
+Luís** no mesmo dia — e quem estava com São Luís ativa via os 526.
+
+O conserto não é tirar o `eh_gestor()` (ele existe para o gestor ver equipe que
+não é carteira dele): é acrescentar a cidade **antes** dele.
+
+E `sinal` não tinha coluna de cidade nenhuma. Em vez de carimbar nos dez
+INSERTs (e esquecer no décimo primeiro), a cidade vem de **gatilho**, deduzida
+da visita, do técnico ou da equipe — o mesmo princípio do funil `visita_evento`.
+Material e abastecimento passaram a carimbar o técnico, senão o gatilho não tem
+de onde tirar a cidade.
+
+Sinal **sem** cidade some da tela de todo mundo em vez de aparecer para todo
+mundo: sinal que não sabe de onde é não deve tocar em cidade nenhuma.
+
+#### 7. Rota e Equipes
+
+**Rota:** três filtros novos (bucket, supervisor, janela), cartões mais baixos
+(a janela e o tempo de execução dividem uma linha; situação e grupo dividem
+outra — 65 px contra ~78), e os dois tempos. O de deslocamento é o que o **TOA
+mede**; o de execução só aparece para quem ABRIU a atividade e não é cancelamento
+da central nem desatribuição (as duas armadilhas da D-227). Medido: 477 paradas,
+371 com execução mensurável — as outras 106 não têm como saber, e mostram nada
+em vez de zero.
+
+**Equipes:** o select "Toda situação" virou a barra de pílulas de Serviços
+(*"ele é mais dinâmico e bem melhor"*). O select escondia a informação atrás de
+um clique: quantos estão em cada situação é o que a pessoa quer saber ANTES de
+filtrar.
+
+E as colunas ganharam largura. A tabela não tinha nenhuma: o navegador dava a
+sobra inteira à primeira coluna de texto (Equipe), que é um bloco estreito, e
+empurrava Contratos e O.S. para o meio da tela, longe do nome a que se referem.
+Agora quem recebe a sobra é **Períodos**, que é o gráfico — o único conteúdo que
+melhora com espaço. Mesma lição da D-225: teto nas colunas curtas, piso na que
+carrega o conteúdo.
+
+**Um efeito colateral que a tela agora explica:** filtrar por *Cancelado pela
+central* ou *Auditar* deixava "0 de 67 equipes" e uma tabela vazia — porque esses
+dois não contam para a equipe, decisão dele em 26/10. Medido em 29/10: 28 e 27
+contratos, nenhuma equipe na tela. A pílula fica (o número é útil); o que faltava
+era a frase, com um atalho para desmarcar "Só com serviço no dia".
+
+#### 8. Monitoramento: só a cidade, filtro no mapa, e a espera com cara
+
+> *"nessa tela de monitoramento é bom mostrar os técnicos da cidade, apenas. E
+> quando fizer o filtro, deve ser filtrado os técnicos. Se tiver um delay (...)
+> deixe aplicado a animação"*
+
+Três defeitos, três causas diferentes:
+
+- **Técnico de outra cidade no mapa:** o mesmo `eh_gestor() or` do item 6, em
+  `monitor_tecnicos`. Com Manaus ativa, o Emmanuel aparecia em São Luís. Depois
+  da correção: 58 técnicos, todos de Manaus.
+- **O filtro não mexia no mapa:** a lista recebia os filtrados e o mapa recebia
+  `comEstado` — TODOS. Agora o mapa recebe os mesmos da lista.
+- **A demora:** medido como `authenticated`, `monitor_tecnicos` leva **86 ms** e
+  `painel_equipes` **1,18 s** — e as duas iam no mesmo `Promise.all`, então a
+  lista inteira esperava 1,2 s por uma informação que só pinta o selo "ocioso".
+  A lista agora aparece com o que é dela e o ocioso chega depois. Para o resto da
+  espera, lista e mapa ficam esmaecidos com um indicador por cima.
+
+**A varredura que a armadilha pediu:** 18 funções `SECURITY DEFINER` têm
+`eh_gestor() or` sem filtro de cidade. Entraram só as duas que MOSTRAM coisa na
+central ou no monitoramento — `monitor_tecnicos` e `conversas_do_controle` (o
+balão de mensagens também é notificação). As outras 16 são checagem de permissão,
+escrita (`excluir_visita`, `importar_toa`, `enviar_mensagem`…) ou telas do
+almoxarifado (`estoque_posicao`, `miscelanea_saldos`). **Ficam pendentes**: mexer
+em quem escreve ou no almoxarifado é outra conversa, e não foi pedida.
+
+#### 9. A régua de Períodos com teto
+
+> *"diminua também um pouco mais esse de dados do período, ficou muito grande.
+> Precisa diminuir mais e deixar um pouco mais centralizado"*
+
+O ajuste do item 7 deu a sobra da tabela inteira a Períodos — e numa tela de
+1900 px a régua de 06h–22h esticou para ~1.000 px, que só fica mais difícil de
+ler. Ganhou **teto de 36rem (~575 px) e fica no meio da coluna**; a sobra vira
+margem dos dois lados. Equipe subiu para 24rem, porque o bloco de detalhe
+quebrava ("+1 SEM / REGRA" em duas linhas). Conferido em 1900 × 950, a largura da
+tela dele.
+
+---
+
+**VERIFICADO:** `tsc --noEmit` e `npm run build` limpos. `testar_policies()`
+26/26 e `testar_campo()` 29/29, zero tabela sem RLS e zero `SECURITY DEFINER`
+alcançável pelo `anon`. No navegador, logado: Dashboard com o card novo e o modal
+(276 sem evidência, agrupados por serviço); Serviços → clique abre
+`/controle/visita/:id` com os seis comandos e ESC volta; Equipes com as 9 pílulas
+e as colunas alinhadas; Rota com os 6 filtros e os dois tempos no cartão;
+Indicadores com a grade de 67 técnicos × 15 dias e 2 no turno da tarde;
+Monitoramento com 58 técnicos só de Manaus, a busca filtrando lista e mapa, e a
+animação aparecendo na lista e no mapa durante a carga. Todas as
+medições de banco foram feitas como `authenticated`, nunca como dono (D-081).
+
+**NÃO VERIFICADO:** o ritmo por janela foi medido sobre o dia inteiro de hoje,
+mas **nunca rodou ao vivo** — o primeiro dia real dirá se 328 sinais é informação
+ou ruído, e o remédio é parâmetro, não código. O card de evidência não pôde ser
+testado com contrato que TEM evidência: não existe nenhuma no banco hoje, então
+só o lado "sem" foi visto. A nota de Equipes sobre "Cancelado pela central" foi
+vista no navegador, e o atalho desmarca o filtro e mostra as equipes.
+
+**Correção de rota minha, no caminho:** achei um aviso de chave duplicada no
+console de Indicadores e dei como sendo meu; era pré-existente — um `<>` sem
+chave no `lista.map`, que agora é `<Fragment key=…>`.

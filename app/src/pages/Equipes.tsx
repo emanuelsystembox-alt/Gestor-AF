@@ -1,12 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase, EM_ABERTO, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { lerPlanilha } from '../lib/planilha'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
 import { Alerta, Avatar, Vazio } from '../components/ui'
-import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
 import { MenuContrato, type AcaoContrato } from '../components/MenuContrato'
 import { FaixaJornada, FaixaPeriodos, SituacaoComPontos } from '../components/telemetria'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
@@ -19,6 +18,7 @@ import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { textoDistancia, useLocaisDaBaixa } from '../lib/localBaixa'
 import { fotosDosTecnicos } from '../lib/foto'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
+import { BarraComposicao } from '../components/telemetria'
 import {
   FILTRO_VAZIO, SEM_JANELA, SEM_SEGMENTO, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
   SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela,
@@ -325,17 +325,28 @@ export default function Equipes() {
 
   // O contrato abre em JANELA, como em Serviços (D-056) — e não numa
   // página separada. Era a última diferença entre as duas telas.
-  const [modal, setModal] = useState<string | null>(null)
+  const navegar = useNavigate()
+  /*
+   * ┌─ 155 · o contrato abre na PÁGINA, não mais numa janela ──────────┐
+   * │ > "o sistema deve desconsiderar essa tela menor. O ideal é       │
+   * │ >  aparecer somente a tela maior (...) ele pode apertar ESC e    │
+   * │ >  volta para a tela que estava antes" — Emanuel, 29/10          │
+   * │                                                                    │
+   * │ A ação escolhida no menu do botão direito viaja no ESTADO da     │
+   * │ rota, não na URL: "quero baixar este contrato" é um gesto, não   │
+   * │ um endereço para guardar nos favoritos.                           │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const abrirContrato = useCallback((visitaId: string, acao?: AcaoContrato) => {
+    navegar(`/controle/visita/${visitaId}`, acao ? { state: { acao } } : undefined)
+  }, [navegar])
+
   // A ação com que o modal abre quando vem do menu (Mudar status, Baixar…).
-  const [acaoModal, setAcaoModal] = useState<AcaoContrato | null>(null)
   // O menu do contrato — o mesmo de Serviços, por portal (ver MenuContrato).
   const [menu, setMenu] = useState<{ v: ContratoLinha; x: number; y: number } | null>(null)
   const fecharMenu = useCallback(() => setMenu(null), [])
-  // O que o modal precisa para baixar, transferir e marcar.
-  const [codigos, setCodigos] = useState<CodigoDeBaixa[]>([])
-  const [conjunto, setConjunto] = useState<string | null>(null)
-  const [equipesLista, setEquipesLista] =
-    useState<{ id: string; codigo: string; nome: string }[]>([])
+  // 155: o que a janela do contrato precisava saiu junto com ela — hoje
+  // quem baixa, transfere e marca é a página cheia, que carrega o seu.
 
   // expansão sob demanda
   const [aberta, setAberta] = useState<string | null>(null)
@@ -394,14 +405,6 @@ export default function Equipes() {
   useEffect(() => {
     supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
       .then(({ data: d }) => setIndicadores((d ?? []) as { id: string; nome: string }[]))
-    supabase.from('codigo_baixa').select('codigo, descricao, situacao_destino').order('codigo')
-      .then(({ data: d }) => setCodigos((d ?? []) as CodigoDeBaixa[]))
-    supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
-      .then(({ data: d }) => setConjunto(
-        (d as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
-    supabase.from('equipe').select('id, codigo, nome').eq('ativo', true).order('codigo')
-      .then(({ data: d }) => setEquipesLista(
-        (d ?? []) as { id: string; codigo: string; nome: string }[]))
   }, [])
 
   useEffect(() => {
@@ -688,6 +691,21 @@ export default function Equipes() {
       ouvidorias: cs.filter(v => v.ouvidoria).length,
       // Desatribuído e Cancelado pela central à parte (origem — filtroContratos.ts).
       situacoes: SITUACOES_DE_TELA.filter(s => cs.some(v => situacaoDeTela(v) === s)),
+      /* 155f: a contagem de cada situação, para a barra de pílulas.
+         > "tira esse filtro toda a situação (...) e coloque o filtro do
+         >  anexo 1, ele é mais dinâmico e bem melhor" — Emanuel, 29/10
+         O select escondia a informação atrás de um clique: quantos estão
+         em cada situação é o que a pessoa quer saber ANTES de filtrar. */
+      contagem: (() => {
+        const m: Record<string, number> = {}
+        for (const v of cs) {
+          const k = situacaoDeTela(v)
+          m[k] = (m[k] ?? 0) + 1
+        }
+        return m
+      })(),
+      total: cs.length,
+      abertas: cs.filter(v => EM_ABERTO.includes(v.situacao)).length,
     }
   }, [contratosDia])
 
@@ -924,14 +942,6 @@ export default function Equipes() {
                   {opContrato.janelas.map(j => <option key={j} value={j}>{j}</option>)}
                   {opContrato.semJanela && <option value={SEM_JANELA}>Sem janela</option>}
                 </select>
-                <select value={filtro.situacao} aria-label="Situação"
-                  onChange={e => mudaFiltro('situacao', e.target.value as FiltroContrato['situacao'])}
-                  className={sel}>
-                  <option value="TODAS">Toda situação</option>
-                  <option value="ABERTAS">Em aberto</option>
-                  {opContrato.situacoes.map(s => (
-                    <option key={s} value={s}>{infoSituacaoDeTela(s).label}</option>))}
-                </select>
                 <select value={filtro.statusToa} aria-label="Status da Atividade no TOA"
                   onChange={e => mudaFiltro('statusToa', e.target.value)} className={sel}>
                   <option value="TODOS">Todo status do TOA</option>
@@ -987,6 +997,81 @@ export default function Equipes() {
                   <span className="text-[11px] text-graf-400">carregando contratos do dia…</span>
                 )}
               </div>
+
+              {/* ====== a situação, em pílulas (155f) ======
+                  > "tira esse filtro toda a situação (...) e coloque o
+                  >  filtro do anexo 1, ele é mais dinâmico e bem melhor"
+                  >  — Emanuel, 29/10
+
+                  Mesma gramática de Serviços: a barra é a proporção, as
+                  pílulas são o comando, e cada uma já diz quantos são.
+                  O select dizia só o nome — para saber que há 28
+                  cancelados pela central era preciso escolher e contar. */}
+              {contratosDia !== null && opContrato.total > 0 && (
+                <div className="basis-full space-y-2 border-t border-graf-800 pt-2.5">
+                  <BarraComposicao
+                    fatias={opContrato.situacoes.map(st => ({
+                      chave: st, rotulo: infoSituacaoDeTela(st).label,
+                      qtd: opContrato.contagem[st] ?? 0, cor: infoSituacaoDeTela(st).cor,
+                    }))}
+                    ativa={filtro.situacao !== 'TODAS' && filtro.situacao !== 'ABERTAS'
+                      ? filtro.situacao : null} />
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(['TODAS', 'ABERTAS', ...opContrato.situacoes] as const).map(st => {
+                      const n = st === 'TODAS' ? opContrato.total
+                        : st === 'ABERTAS' ? opContrato.abertas
+                        : opContrato.contagem[st] ?? 0
+                      if (n === 0 && st !== 'TODAS') return null
+                      const ativo = filtro.situacao === st
+                      const cor = st === 'TODAS' ? 'var(--color-graf-400)'
+                        : st === 'ABERTAS' ? 'var(--st-execucao)'
+                        : infoSituacaoDeTela(st).cor
+                      return (
+                        <button key={st} aria-pressed={ativo}
+                          onClick={() => mudaFiltro('situacao',
+                            st as FiltroContrato['situacao'])}
+                          style={{ ['--pill-cor' as string]: cor }}
+                          className={`pill pill-filtro ${ativo ? 'pill-ativo' : 'pill-apagada'}`}>
+                          {st === 'TODAS' ? 'Todas' : st === 'ABERTAS' ? 'Em aberto'
+                            : infoSituacaoDeTela(st).label}
+                          <span className="tabular font-bold opacity-70">{n}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* ┌─ 155f · a pílula que esvazia a tela ────────────────┐
+                       │ Cancelado pela central e Auditar NÃO contam para a  │
+                       │ equipe — decisão dele em 26/10 (D-225/144b), e a    │
+                       │ `painel_equipes` os ignora. Resultado: filtrar por  │
+                       │ um dos dois deixava "0 de 67 equipes" e uma tabela  │
+                       │ vazia, sem nada dizendo que o vazio era de          │
+                       │ propósito. Medido em 29/10: 28 contratos cancelados │
+                       │ pela central e 27 auditados, e nenhuma equipe na    │
+                       │ tela.                                                │
+                       │                                                      │
+                       │ A pílula fica: ela é o número, e o número é útil.   │
+                       │ O que faltava era a frase.                           │
+                       └──────────────────────────────────────────────────────┘ */}
+                  {(filtro.situacao === 'CANCELADO_CENTRAL'
+                    || filtro.situacao === 'DESATRIBUIDO') && (
+                    <p className="text-[11px] text-graf-400">
+                      <strong className="text-graf-300">
+                        {infoSituacaoDeTela(filtro.situacao).label}
+                      </strong>{' '}
+                      não entra na contagem da equipe — ninguém foi ao endereço. Por isso a
+                      lista fica vazia com <em>Só com serviço no dia</em> marcado.
+                      {soAtivas && (
+                        <button onClick={() => setSoAtivas(false)}
+                          className="ml-1 text-af-400 underline underline-offset-2">
+                          desmarcar e ver de quem são
+                        </button>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
               {filtrando > 0 && (
                 <p className="basis-full text-[11px] text-graf-400">
                   O filtro escolhe <strong className="text-graf-300">contratos</strong>: a
@@ -1053,18 +1138,36 @@ export default function Equipes() {
                     <table className="w-full text-sm">
                       <thead className="border-b border-graf-700 bg-graf-900 text-left
                                         text-[11px] uppercase tracking-wide text-graf-400">
+                        {/* ┌─ 155f · a largura das colunas ─────────────────┐
+                             │ > "tem muito espaço entre a equipe e os        │
+                             │ >  contratos (...) os contratos podem ser      │
+                             │ >  levados mais para a esquerda, junto com as  │
+                             │ >  OS, e o período centralizar um pouco mais"  │
+                             │ >  — Emanuel, 29/10                            │
+                             │                                                 │
+                             │ A tabela não tinha largura nenhuma: o navegador │
+                             │ dava a sobra INTEIRA à primeira coluna de texto │
+                             │ (Equipe), que é um bloco estreito — e empurrava │
+                             │ Contratos e O.S. para o meio da tela, longe do  │
+                             │ nome a que se referem.                          │
+                             │                                                 │
+                             │ Agora quem recebe a sobra é PERÍODOS, que é o   │
+                             │ gráfico: ele é o único conteúdo que melhora     │
+                             │ com espaço. É a mesma lição da D-225 — teto nas │
+                             │ colunas curtas, piso na que carrega o conteúdo. │
+                             └─────────────────────────────────────────────────┘ */}
                         <tr>
                           <th className="w-8 px-2 py-2"></th>
-                          <th className="px-3 py-2 font-medium">Equipe</th>
+                          <th className="w-96 px-3 py-2 font-medium">Equipe</th>
                           {/* Número e hora CENTRADOS, cabeçalho e valor
                               juntos: alinhados à direita sob um rótulo
                               largo, o "10" ficava solto no canto e não se
                               lia como sendo daquela coluna. */}
-                          <th className="px-3 py-2 text-center font-medium">Contratos</th>
-                          <th className="px-3 py-2 text-center font-medium">O.S.</th>
-                          <th className="px-3 py-2 font-medium">Períodos</th>
-                          <th className="px-3 py-2 font-medium">Situação</th>
-                          <th className="px-3 py-2 text-center font-medium">Último status</th>
+                          <th className="w-20 px-2 py-2 text-center font-medium">Contratos</th>
+                          <th className="w-14 px-2 py-2 text-center font-medium">O.S.</th>
+                          <th className="px-3 py-2 text-center font-medium">Períodos</th>
+                          <th className="w-72 px-3 py-2 font-medium">Situação</th>
+                          <th className="w-24 px-2 py-2 text-center font-medium">Último status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1383,14 +1486,22 @@ export default function Equipes() {
                                     ("a manha esta cheia?"). A regua responde; os
                                     numeros continuam escritos embaixo. */}
                                 <td className="px-3 py-2.5">
-                                  {e.periodos?.length
-                                    ? <FaixaPeriodos periodos={e.periodos} jornada={e.jornada} />
-                                    : <span className="text-graf-600">—</span>}
-                                  {/* A jornada mora ABAIXO da regua, nao dentro:
-                                      a regua mede capacidade de turno, e uma
-                                      Refeicao ocupando vaga de instalacao diria
-                                      que o turno esta cheio quando nao esta. */}
-                                  <FaixaJornada itens={e.jornada} />
+                                  {/* 155f: a régua tem TETO e fica no meio da
+                                      coluna. "Diminua um pouco mais (...) e deixe
+                                      um pouco mais centralizado" (Emanuel, 29/10):
+                                      com a sobra da tabela inteira ela esticava a
+                                      ~1.000 px, e um gráfico de 06h–22h esticado
+                                      assim só fica mais difícil de ler. */}
+                                  <div className="mx-auto max-w-[36rem]">
+                                    {e.periodos?.length
+                                      ? <FaixaPeriodos periodos={e.periodos} jornada={e.jornada} />
+                                      : <span className="text-graf-600">—</span>}
+                                    {/* A jornada mora ABAIXO da regua, nao dentro:
+                                        a regua mede capacidade de turno, e uma
+                                        Refeicao ocupando vaga de instalacao diria
+                                        que o turno esta cheio quando nao esta. */}
+                                    <FaixaJornada itens={e.jornada} />
+                                  </div>
                                 </td>
 
                                 {/* Seis etiquetas do mesmo tamanho para 163 e 17
@@ -1488,7 +1599,7 @@ export default function Equipes() {
                                         carregando={filtrando > 0
                                           ? contratosDia === null
                                           : carregandoDetalhe === e.equipe_id}
-                                        aoAbrir={v => setModal(v.id)}
+                                        aoAbrir={v => abrirContrato(v.id)}
                                         aoMenuContexto={(v, ev) =>
                                           setMenu({ v, x: ev.clientX, y: ev.clientY })}
                                         vazio={
@@ -1628,22 +1739,9 @@ export default function Equipes() {
 
       {menu && (
         <MenuContrato v={menu.v} xy={menu} aoFechar={fecharMenu}
-          aoEscolher={acao => { setAcaoModal(acao); setModal(menu.v.id) }} />
+          aoEscolher={acao => abrirContrato(menu.v.id, acao)} />
       )}
 
-      {modal && (
-        <ContratoModal
-          id={modal}
-          acaoInicial={acaoModal}
-          indicadores={indicadores}
-          codigos={codigos}
-          conjunto={conjunto}
-          equipes={equipesLista}
-          pontos={pontos.get(modal) ?? null}
-          onFechar={() => { setModal(null); setAcaoModal(null) }}
-          onMudou={() => { setDetalhe({}); recarregar() }}
-        />
-      )}
     </Shell>
   )
 }

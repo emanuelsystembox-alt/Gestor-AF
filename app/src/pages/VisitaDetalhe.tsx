@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
@@ -12,6 +12,8 @@ import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { ProvaDoContrato } from '../components/ProvaDoContrato'
 import { ConversaTecnico } from '../components/ConversaTecnico'
 import { lerLog } from '../lib/log'
+import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
+import type { AcaoContrato } from '../components/MenuContrato'
 
 interface OS {
   id: string; sequencia: number; numero_os: string; ponto: string | null
@@ -139,6 +141,11 @@ function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: b
 export default function VisitaDetalhe() {
   const { id } = useParams<{ id: string }>()
   const navegar = useNavigate()
+  /* 155: o menu do botão direito escolhe a ação ANTES de abrir — e agora
+     abre a página, não a janela. A escolha viaja no estado da rota (e não
+     na URL: não é endereço que alguém queira guardar ou compartilhar). */
+  const rota = useLocation()
+  const acaoInicial = (rota.state as { acao?: AcaoContrato } | null)?.acao ?? null
 
   // Esc volta para onde a pessoa estava. Na janela do contrato o Esc já
   // fechava; abrir a página cheia e ficar preso nela quebrava o hábito.
@@ -191,13 +198,13 @@ export default function VisitaDetalhe() {
   /** 136: a prova do contrato, e 135: onde a baixa foi dada. */
   const [prova, setProva] = useState<Prova | null>(null)
   const [local, setLocal] = useState<LocalBaixa | null>(null)
-  const [equipes, setEquipes] = useState<{ id: string; codigo: string }[]>([])
+  const [equipes, setEquipes] = useState<{ id: string; codigo: string; nome: string }[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
-  const [transferindo, setTransferindo] = useState(false)
-  const [novaEquipe, setNovaEquipe] = useState('')
-  const [motivo, setMotivo] = useState('')
+  // 155: o aviso de sucesso saiu junto com a transferência -- ninguém
+  // mais escrevia nele, e uma faixa verde que nunca acende é pior que
+  // nenhuma: dá a impressão de que a tela confirma o que ela não vê.
+  // Quem confirma agora é o painel de ações, com o próprio aviso dele.
 
   async function carregar() {
     setCarregando(true); setErro(null)
@@ -221,13 +228,13 @@ export default function VisitaDetalhe() {
                  envio_lat, envio_lng, envio_precisao_m,
                  tecnico:tecnico_id ( nome, matricula )`)
         .eq('visita_id', id!).order('criado_em'),
-      supabase.from('equipe').select('id, codigo').order('codigo'),
+      supabase.from('equipe').select('id, codigo, nome').order('codigo'),
     ])
     carregarProvas([id!]).then(m => setProva(m.get(id!) ?? null)).catch(() => setProva(null))
     carregarLocais([id!]).then(m => setLocal(m.get(id!) ?? null)).catch(() => setLocal(null))
     setEventos((ev.data ?? []) as unknown as Evento[])
     setAnexos((an.data ?? []) as unknown as Evidencia[])
-    setEquipes((eq.data ?? []) as { id: string; codigo: string }[])
+    setEquipes((eq.data ?? []) as { id: string; codigo: string; nome: string }[])
 
     if (d.contrato) {
       const { data: ant } = await supabase.from('visita').select(SELECT)
@@ -239,22 +246,45 @@ export default function VisitaDetalhe() {
   }
   useEffect(() => { carregar() }, [id])
 
-  async function transferir() {
-    if (!novaEquipe) return
-    setTransferindo(true); setErro(null)
-    const { data, error } = await supabase.rpc('transferir_visita', {
-      p_visita: id, p_equipe: novaEquipe, p_motivo: motivo || null,
-    })
-    if (error) setErro(error.message)
-    else {
-      const r = data as { mudou: boolean; de?: string; para?: string }
-      setOk(r.mudou ? `Transferida de ${r.de ?? '(sem equipe)'} para ${r.para}.`
-                    : 'Já era essa equipe.')
-      setNovaEquipe(''); setMotivo('')
-      await carregar()
-    }
-    setTransferindo(false)
-  }
+  /*
+   * ┌─ 155 · o que a janela do contrato precisava para funcionar ──────┐
+   * │ A janela menor saiu (Emanuel, 29/10) e os comandos dela vieram   │
+   * │ para cá — mas eles dependem de quatro listas que Serviços        │
+   * │ carregava e esta tela não: indicadores de qualidade, códigos de  │
+   * │ baixa, o conjunto de sub-falha da empresa e a pontuação.         │
+   * │                                                                   │
+   * │ São quatro consultas pequenas e de cadastro (não mudam no dia),  │
+   * │ disparadas uma vez por montagem. A pontuação é a única por       │
+   * │ contrato, e usa a mesma RPC de período, com o dia dele.          │
+   * └───────────────────────────────────────────────────────────────────┘
+   */
+  const [indicadores, setIndicadores] = useState<{ id: string; nome: string }[]>([])
+  const [codigos, setCodigos] = useState<CodigoDeBaixa[]>([])
+  const [conjunto, setConjunto] = useState<string | null>(null)
+  const [pontosDoContrato, setPontosDoContrato] = useState<
+    { pontos_claro: number | null; edificacao: string; edificacao_de: string } | null>(null)
+
+  useEffect(() => {
+    supabase.from('indicador_qualidade').select('id, nome').eq('ativo', true).order('ordem')
+      .then(({ data }) => setIndicadores((data ?? []) as { id: string; nome: string }[]))
+    supabase.from('codigo_baixa').select('codigo, descricao, situacao_destino').order('codigo')
+      .then(({ data }) => setCodigos((data ?? []) as CodigoDeBaixa[]))
+    supabase.from('empresa').select('conjunto_sub_falha').maybeSingle()
+      .then(({ data }) =>
+        setConjunto((data as { conjunto_sub_falha: string | null } | null)?.conjunto_sub_falha ?? null))
+  }, [])
+
+  useEffect(() => {
+    if (!v?.data_agendada || !v.id) return
+    supabase.rpc('pontos_por_periodo', { p_de: v.data_agendada, p_ate: v.data_agendada })
+      .then(({ data }) => {
+        const achado = ((data ?? []) as {
+          visita_id: string; pontos_claro: number | null
+          edificacao: string; edificacao_de: string
+        }[]).find(p => p.visita_id === v.id)
+        setPontosDoContrato(achado ?? null)
+      })
+  }, [v?.id, v?.data_agendada])
 
   /** O pedido de ajuda do campo vale como destaque na aba, não só no bloco. */
   const temPedidoDeAjuda = useMemo(() => {
@@ -416,7 +446,26 @@ export default function VisitaDetalhe() {
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
-        {ok && <Alerta tipo="ok">{ok}</Alerta>}
+
+        {/* ---------- ações do contrato (155) ----------
+             Era a janela menor: Editar, + O.S., Mudar status, Transferir,
+             Baixar serviço, Excluir e Marcadores. Mesmo componente, sem a
+             sobreposição — "não ter duas telas que mostrem a mesma
+             informação" (Emanuel, 29/10). */}
+        {v && (
+          <ContratoModal
+            modo="pagina"
+            id={v.id}
+            acaoInicial={acaoInicial}
+            indicadores={indicadores}
+            codigos={codigos}
+            conjunto={conjunto}
+            equipes={equipes}
+            pontos={pontosDoContrato}
+            onFechar={() => {}}
+            onMudou={carregar}
+          />
+        )}
 
         {/* ---------- abas ---------- */}
         <div className="flex flex-wrap gap-1 border-b border-graf-800">
@@ -600,36 +649,11 @@ export default function VisitaDetalhe() {
                         tecnico: v.tecnico }}
               eventos={eventos} aoMudar={carregar} />
 
-            {/* ---------- transferir equipe ---------- */}
-            <section className="card-controle p-4">
-              <h2 className="mb-1 text-sm font-semibold">Transferir para outra equipe</h2>
-              <p className="mb-3 text-xs text-graf-500">
-                A transferência fica registrada no histórico, com a equipe de origem,
-                quem transferiu e o motivo.
-              </p>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-40">
-                  <label className="mb-1 block text-[11px] text-graf-400">Equipe destino</label>
-                  <select value={novaEquipe} onChange={e => setNovaEquipe(e.target.value)}
-                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
-                    <option value="">Selecione…</option>
-                    {equipes.filter(e => e.id !== v.equipe?.id)
-                      .map(e => <option key={e.id} value={e.id}>{e.codigo}</option>)}
-                  </select>
-                </div>
-                <div className="min-w-56 flex-1">
-                  <label className="mb-1 block text-[11px] text-graf-400">Motivo</label>
-                  <input value={motivo} onChange={e => setMotivo(e.target.value)}
-                    placeholder="Por que está transferindo?"
-                    className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
-                </div>
-                <button onClick={transferir} disabled={!novaEquipe || transferindo}
-                  className="rounded-md bg-af-600 px-4 py-1.5 text-sm font-medium text-white
-                             hover:bg-af-500 disabled:opacity-40">
-                  {transferindo ? 'Transferindo…' : 'Transferir'}
-                </button>
-              </div>
-            </section>
+            {/* 155: a seção "Transferir para outra equipe" saiu daqui.
+                O painel de ações no topo já traz Transferir, com o mesmo
+                formulário — e a reclamação era exatamente duas telas
+                mostrando a mesma coisa. Dois formulários de transferência
+                na MESMA página seria a versão pior disso. */}
           </div>
         )}
 
