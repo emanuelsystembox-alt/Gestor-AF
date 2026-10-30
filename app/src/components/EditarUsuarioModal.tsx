@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { equipeRotulo, tempoDeCasa } from '../lib/formato'
 import {
@@ -7,6 +7,8 @@ import {
 } from '../lib/validacao'
 import { Alerta, Avatar } from './ui'
 import { enviarFoto, removerFoto, urlsDasFotos } from '../lib/foto'
+import { useAuth } from '../lib/auth'
+import { PermissoesDoLogin, type AlteracoesPermissao } from './PermissoesDoLogin'
 
 /**
  * Editar o cadastro inteiro de uma pessoa — só ADMIN.
@@ -126,6 +128,10 @@ export function EditarUsuarioModal({
   const [erros, setErros] = useState<ErrosCadastro>({})
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  // 157a: as exceções de permissão deste login, ainda não salvas.
+  const { perfil: eu, temPapel } = useAuth()
+  const [alteracoesPerm, setAlteracoesPerm] = useState<AlteracoesPermissao>({})
+  const aoMudarPerm = useCallback((a: AlteracoesPermissao) => setAlteracoesPerm(a), [])
 
   // Senha: só mexe quem marcar. Um campo de senha sempre aberto convida
   // a trocar a senha de alguém sem querer.
@@ -417,6 +423,18 @@ export function EditarUsuarioModal({
       }
     }
 
+    // ---- 3b. permissões do login (157a) ----
+    // Depois do perfil: o padrão que vale é o do perfil que acabou de ser
+    // gravado. A RPC é a única porta — carimba quem mudou e recusa mexer
+    // nas próprias e no módulo Administração sem ADMIN.
+    const nPerm = Object.keys(alteracoesPerm).length
+    if (nPerm > 0) {
+      const { error } = await supabase.rpc('definir_permissoes_usuario',
+        { p_usuario: usuario.id, p_alteracoes: alteracoesPerm })
+      if (error) recados.push(`permissões não gravadas: ${traduzir(error.message)}`)
+      else recados.push(`${nPerm} permissão(ões) ajustada(s)`)
+    }
+
     // ---- 4. senha ----
     if (trocarSenha) {
       const { data, error } = await supabase.functions.invoke('admin-usuarios', {
@@ -468,7 +486,7 @@ export function EditarUsuarioModal({
                     overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
          role="dialog" aria-modal="true" aria-label={`Editar cadastro de ${usuario.nome}`}
          onClick={onFechar}>
-      <div className="janela-caixa card-controle my-6 w-full max-w-4xl"
+      <div className="janela-caixa card-controle my-6 w-full max-w-4xl xl:max-w-7xl"
            onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-graf-800 px-5 py-3">
           <div>
@@ -482,6 +500,9 @@ export function EditarUsuarioModal({
                        hover:border-af-600 hover:text-af-400">✕</button>
         </div>
 
+        {/* 157a: o cadastro à esquerda, as permissões à direita (em tela
+            larga); em tela estreita, as permissões vêm por último. */}
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-0">
         <div className="space-y-5 px-5 py-4">
           {erro && <Alerta tipo="erro">{erro}</Alerta>}
 
@@ -841,6 +862,16 @@ export function EditarUsuarioModal({
               </div>
             )}
           </section>
+        </div>
+        <div className="border-t border-graf-800 px-5 py-4 xl:border-l xl:border-t-0 xl:px-4">
+          <PermissoesDoLogin usuarioId={usuario.id}
+            perfilId={f.perfil_acesso_id || null}
+            euSouAdmin={temPapel('ADMIN')}
+            bloqueado={eu?.id === usuario.id
+              ? 'É o seu login: ninguém muda as próprias permissões. Peça a outro administrador.'
+              : null}
+            aoMudar={aoMudarPerm} />
+        </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-graf-800 px-5 py-3">

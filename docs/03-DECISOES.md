@@ -10147,3 +10147,72 @@ equipe 113 pelo `?tecnico=`.
 a pergunta da casa, a faixa da observação e os grupos só foram vistos no código.
 E o app só chega aos técnicos quando a atualização for publicada (`eas update`),
 o que não fiz. Nenhum grupo real foi criado no teste do site.
+
+---
+
+### D-237 · Permissões por login: exceções em cima do perfil (157)
+
+> *"preciso de uma tela dessa de permissões do que podem fazer, olhar,
+> controlar (...) não tem ainda, só separa quem é supervisor, COP e
+> coordenador (...) quando for editar algum login tem que ter essas opções
+> ou até mais se você pensar melhor"* — Emanuel, 30/10
+
+**O modelo: o perfil é o padrão; o login guarda só a diferença.** Tabela
+`usuario_permissao` (login, chave, concedida). Sem linha, vale o perfil —
+trocar o perfil de alguém continua trocando tudo de uma vez. Com linha, a
+exceção manda: `true` dá o que o perfil não dá, `false` tira o que dá.
+
+**Recusado: copiar as caixas do perfil para cada pessoa.** Com 90 logins, o
+perfil deixaria de significar alguma coisa, e uma mudança no perfil COP não
+chegaria em ninguém. A exceção guarda só a diferença.
+
+Só duas funções leem permissão (`tem_permissao`, `minhas_permissoes`); as
+duas passaram a olhar a exceção primeiro. Banco e tela fazem a mesma conta.
+
+**Travas (no banco):** ninguém muda as próprias; só quem tem
+`admin.usuarios` muda as dos outros; o módulo Administração só o ADMIN
+concede ou tira (senão quem gerencia usuários daria a outro o poder de
+gerenciar, e por ele a si mesmo); ADMIN tem tudo e exceção nele não se
+aplica; ninguém escreve na tabela — só `definir_permissoes_usuario`, que
+carimba quem mudou e quando. Três cenários novos em `testar_policies()`
+(157b, 32/32).
+
+**A tela:** no Editar cadastro, à direita (abaixo, em tela estreita), as
+permissões por módulo, com "Todos", etiqueta "a mais"/"tirada" em cada linha
+que difere do perfil (quem mudou e quando no passar do mouse), resumo no
+topo e "Voltar ao padrão do perfil". Trocar o perfil no formulário já mostra
+o padrão do perfil novo antes de salvar. Grava junto com o "Salvar cadastro",
+depois do perfil.
+
+#### O que a tela achou: 12 das 33 permissões não controlam nada
+
+Ao montar a lista, conferi cada chave contra as funções e policies do banco e
+o código da web. **Doze não são conferidas em lugar nenhum:** `servicos.ver`,
+`equipes.ver`, `importacao.ver`, `importacao.executar`, `relatorios.ver`,
+`configuracoes.ver/cadastrar/excluir`, `pontuacao.editar`, `admin.cargos`,
+`admin.empresa`, `servicos.desatribuir_pontuacao`. Importar planilha, por
+exemplo, é decidido por PAPEL dentro de `importar_toa`.
+
+Uma caixa que se desmarca e não muda nada é a tela mentindo: o ADMIN tiraria
+"Importar planilha" de alguém e a pessoa continuaria importando. Essas linhas
+levam a etiqueta **"sem efeito ainda"** (157c). A etiqueta é calculada na
+leitura, procurando a chave nas funções e policies — nunca guardada: no dia
+em que alguém passar a conferir uma delas, a etiqueta some sozinha (a
+armadilha do cache de regra, D-150). Medido: bate exatamente com as 12 da
+conferência à mão; 68 ms como `authenticated`.
+
+**Não fiz a fiação das doze.** Decidir o que cada uma barra (o menu? a RPC?
+as duas? quem perde o quê no dia em que passar a valer?) é regra de negócio —
+fica para o Emanuel.
+
+**VERIFICADO:** no banco, como `authenticated` e desfeito: ADMIN concede
+`servicos.transferir` e tira `servicos.ver` de um login, e `tem_permissao`
+obedece às duas; autoedição recusada; as três travas da bateria. `tsc` e
+`build`. No navegador: o painel abre no Editar cadastro, marcar "Transferir
+equipe" mostra "a mais" e "1 mudança a salvar" — com toda escrita bloqueada
+no teste, nada gravado.
+
+**NÃO VERIFICADO:** o "Salvar cadastro" gravando as exceções pela tela (só a
+RPC foi testada, no banco). O menu da web ainda decide quase tudo por papel —
+dar `servicos.transferir` a um supervisor libera o arrastar na Rota (156), mas
+a maioria das permissões finas vale nas RPCs, não no menu.
