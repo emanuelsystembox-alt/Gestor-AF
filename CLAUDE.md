@@ -91,7 +91,7 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
 docs/                 mapeamento, domínio, 240 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (140 arquivos, até a 143)
+supabase/migrations/  schema, em ordem (176 arquivos, até a 160b)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```

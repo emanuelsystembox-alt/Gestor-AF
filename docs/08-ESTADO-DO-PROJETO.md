@@ -431,9 +431,10 @@ falta o olho de quem usa.
 
 ---
 
-## Pendente em 31/10/2026 — permissões, Coordenador e gerenciar usuários (D-235 a D-239)
+## Pendente em 31/10/2026 — permissões, Coordenador, gerenciar usuários e a leva 160 (D-235 a D-240)
 
-Migrations 155 a 159. Site publicado. **App publicado em 30/10** pelo ar (`eas update`,
+Migrations 155 a 160b. Site publicado (último deploy com a 160, commit `69f14bc`).
+Edge Function `admin-usuarios` na versão 4 (fonte em `supabase/functions/`). **App publicado em 30/10** pelo ar (`eas update`,
 canal preview, runtime 0.5.0, commit `fa63569`) e APK 0.5.0 novo gerado (build
 `ec8d223c`).
 
@@ -470,6 +471,12 @@ APK 0.5.0 (por isso a atualização pelo ar basta).
   abrindo de novo (até duas aberturas).
 - **GPS de alta precisão durante a execução**: só proposto. Decidir se vale o custo de
   bateria antes de construir.
+- **Campos obrigatórios na EDIÇÃO** (160b): hoje os seis dados só são exigidos no
+  cadastro novo, e o preenchido não se apaga. Exigir também ao editar travaria 86 dos
+  89 logins (sem data de contratação). Confirmar se fica assim ou se liga depois que
+  o cadastro for completado.
+- **O app desta leva**: a 160 não mexeu no app. O que o app tinha de novo (156 a 158,
+  inclusive o Coordenador) foi publicado em 30/10 (commit `fa63569`).
 
 ### Também resolvido em 31/10 (160, D-240)
 - Fundo branco atrás do contrato; tela parada até a pessoa atualizar (manual/2/5 min);

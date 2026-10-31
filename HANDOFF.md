@@ -2,6 +2,20 @@
 
 Última atualização: **20/10/2026**, por Claude (Opus 5.5).
 
+> **31/10/2026 — o que mudou desde então, em uma frase cada** (detalhe em
+> `docs/03-DECISOES.md`, D-235 a D-240, e as pendências em
+> `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 31/10/2026"):
+> - Toda a gestão (ADMIN, COP, COORDENADOR, CONTROLADOR, SUPERVISOR) **vê a cidade
+>   ativa inteira**; o que cada um **faz** é decidido pela **permissão**, não pelo papel.
+> - Permissões por login (exceção em cima do perfil) no Editar cadastro; a tela marca
+>   "sem efeito ainda" nas chaves que nada confere.
+> - "Gerenciar usuários" vale sem ser ADMIN, mas nunca mexe em ADMIN, nunca dá papel
+>   ADMIN e nunca no próprio login.
+> - CPF e RG gravados só o `admin@afline.com.br` altera; seis dados obrigatórios no
+>   cadastro novo.
+> - As telas não se recarregam sozinhas: o Atualizar (manual / 2 / 5 min) é quem manda.
+> - A Edge Function `admin-usuarios` agora tem fonte no repositório.
+
 ---
 
 ## Em três linhas
