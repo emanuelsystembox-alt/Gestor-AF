@@ -478,6 +478,18 @@ APK 0.5.0 (por isso a atualização pelo ar basta).
 - **O app desta leva**: a 160 não mexeu no app. O que o app tinha de novo (156 a 158,
   inclusive o Coordenador) foi publicado em 30/10 (commit `fa63569`).
 
+### Respostas do Emanuel (31/10, noite) — feito na 161 (D-241)
+- ~~Permissões "sem efeito ainda"~~ — ligadas. Só "Dados da empresa" segue sem efeito
+  (não há tela nem tabela para editar).
+- ~~Victoria~~ — perfil COP. ~~Flavio~~ — sem "Gerenciar usuários".
+- ~~Renan: cargos e empresa~~ — "Gerenciar cargos e perfis" vale (com travas);
+  "Dados da empresa" não tem o que editar.
+- ~~VT por equipe~~ — régua pelo código de baixa (80,9% a 97,6% em Manaus).
+- ~~GPS de alta precisão~~ — feito no app, **falta publicar**:
+  `npx eas-cli@latest update --channel preview --environment preview --platform android --message "GPS de alta precisao durante a execucao (161)"`
+  (em `campo/`). Depois, `git diff campo/app.json` — a EAS costuma reescrever o arquivo.
+- Campos obrigatórios só no cadastro novo: confirmado. Papel Coordenador: o Emanuel marca.
+
 ### Também resolvido em 31/10 (160, D-240)
 - Fundo branco atrás do contrato; tela parada até a pessoa atualizar (manual/2/5 min);
   sino com contrato e equipe; CPF/RG só o administrador principal; seis dados

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { Alerta } from './ui'
 
 /**
- * Expurgo de pontuação por lote de WOs — só ADMIN (136).
+ * Expurgo de pontuação por lote de WOs — ADMIN ou quem tem "Desatribuir pontuação" (136, 161).
  *
  * > "o admin poderá jogar todas as WOs que o sistema deve expurgar por
  * >  alguma ordem da gerência (...) o técnico anexou foto de uma coisa,

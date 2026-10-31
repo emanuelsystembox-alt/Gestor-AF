@@ -34,11 +34,15 @@ import { Carregando } from './components/ui'
 function Protegida({
   children,
   exige,
+  permissao,
 }: {
   children: React.ReactNode
   exige?: 'GESTAO' | 'CAMPO' | 'ALMOXARIFADO' | 'FROTA' | 'SINCRONISMO'
+  /** 161: a chave "Visualizar menu" da tela. Sem ela, volta ao Dashboard —
+   *  o menu já esconde o item; isto fecha o endereço digitado. */
+  permissao?: string
 }) {
-  const { session, carregando, ehGestor, ehTecnico, temPapel } = useAuth()
+  const { session, carregando, ehGestor, ehTecnico, temPapel, pode } = useAuth()
   const local = useLocation()
 
   if (carregando) return <Carregando />
@@ -59,6 +63,8 @@ function Protegida({
   // 111: a gestão configura; o ROBO roda. O robô não entra em mais nada.
   if (exige === 'SINCRONISMO' && !(ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR', 'ROBO')))
     return <Navigate to="/" replace />
+
+  if (permissao && !pode(permissao)) return <Navigate to="/controle" replace />
 
   return <>{children}</>
 }
@@ -135,7 +141,7 @@ function Rotas() {
         <Route path="/controle" element={
           <Protegida exige="GESTAO"><Controle /></Protegida>} />
         <Route path="/controle/servicos" element={
-          <Protegida exige="GESTAO"><Servicos /></Protegida>} />
+          <Protegida exige="GESTAO" permissao="servicos.ver"><Servicos /></Protegida>} />
         <Route path="/controle/rota" element={
           <Protegida exige="GESTAO"><Rota /></Protegida>} />
         <Route path="/controle/visita/:id" element={
@@ -143,9 +149,9 @@ function Rotas() {
         <Route path="/controle/monitor" element={
           <Protegida exige="GESTAO"><Monitor /></Protegida>} />
         <Route path="/controle/equipes" element={
-          <Protegida exige="GESTAO"><Equipes /></Protegida>} />
+          <Protegida exige="GESTAO" permissao="equipes.ver"><Equipes /></Protegida>} />
         <Route path="/controle/importar" element={
-          <Protegida exige="GESTAO"><Importacao /></Protegida>} />
+          <Protegida exige="GESTAO" permissao="importacao.ver"><Importacao /></Protegida>} />
         <Route path="/controle/sincronismo" element={
           <Protegida exige="SINCRONISMO"><Sincronismo /></Protegida>} />
         <Route path="/controle/sub-falhas" element={
@@ -155,9 +161,9 @@ function Rotas() {
         <Route path="/controle/indicadores" element={
           <Protegida exige="GESTAO"><Indicadores /></Protegida>} />
         <Route path="/controle/relatorios" element={
-          <Protegida exige="GESTAO"><Relatorios /></Protegida>} />
+          <Protegida exige="GESTAO" permissao="relatorios.ver"><Relatorios /></Protegida>} />
         <Route path="/controle/configuracoes" element={
-          <Protegida exige="GESTAO"><Configuracoes /></Protegida>} />
+          <Protegida exige="GESTAO" permissao="configuracoes.ver"><Configuracoes /></Protegida>} />
         <Route path="/controle/humor" element={
           <Protegida exige="GESTAO"><Humor /></Protegida>} />
         <Route path="/controle/ocorrencias" element={

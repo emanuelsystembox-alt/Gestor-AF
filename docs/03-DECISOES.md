@@ -10407,3 +10407,116 @@ Edge Function v4 não foi chamada); a planilha de cidade com a coluna nova, de p
 a ponta; o relógio de 2/5 min disparando (só o seletor foi visto); a `rota_do_dia`
 devolve no máximo 1.000 paradas por chamada — Manaus tem ~480 por dia, mas uma cidade
 maior ficaria com o recorte do Monitoramento incompleto.
+
+---
+
+### D-241 · A entrada vira NEXUS MANAGER, com a AFLINE assinando
+
+> "agora não será mais Gestor AF, prestador de serviço CLARO. vai ser NEXUS
+> MANAGER, tem que ter sim agora a logo da AFLINE por que ela que esta
+> financiando o sistema" — Emanuel, 30/10.
+
+**O nome é o título.** O h1 da entrada (`pages/Login.tsx`) passou de "16 anos
+conectando vidas." para o letreiro **NEXUS / MANAGER**, com o símbolo ao lado e
+"Sistema de gestão inteligente" embaixo. Letreiro em texto de verdade (Exo 2), não
+imagem: é o que o leitor de tela anuncia (`aria-label="Nexus Manager"`, porque as
+duas palavras são blocos e sairiam "NEXUSMANAGER"). O símbolo é o átomo do logo
+que o Emanuel mandou, **sem o robô**: em 22 px (o topo do cartão de entrar) um robô
+vira borrão; as duas órbitas continuam legíveis.
+
+**Azul + vermelho.** O azul é do Nexus, o vermelho é da AFLINE — o par do logo. O
+degradê do NEXUS segue o desenho (NE azul, X na virada, US vermelho); no tema claro
+o meio escurece (`#2b78d8`, `#e8212e`) porque `#4f9bff` sobre o fundo fica abaixo
+de 3:1. A rede do fundo passou a ter nós e pulsos nas duas cores.
+
+**A AFLINE assina em cima**, com o AF e duas frases: "**16 anos** conectando
+vidas." e "Conectados com o futuro." — a história e o rumo. "Uma iniciativa
+AFLINE" chegou a entrar e **saiu a pedido** ("acho que não precisa dizer isso"): o
+logo já diz de quem é. "16 anos conectando vidas" chegou a sair e **voltou a
+pedido**.
+
+**Saíram, a pedido:** o cartão "Fibra no Brasil" (os 27 estados acendendo) e a
+chamada "Do Oiapoque ao Chuí, quem conecta o Brasil é o campo.", trocada por "Na
+velocidade da fibra, do despacho à baixa." (o Emanuel pediu conexão e velocidade).
+
+**A abertura** termina no letreiro (branco sobre o escuro) em vez do "16 anos"; o
+AF continua montando no começo — a AFLINE apresenta, o Nexus aparece.
+
+**O cartão "Clientes conectados" subiu** (`lg:-top-20`): o "NEXUS MANAGER" do topo
+do formulário é mais largo que o "GESTOR AF" e ficava embaixo dele (medido: o
+cartão ia até x=1272, o rótulo começava em 1256).
+
+**O título da aba** virou "Nexus Manager" (`index.html`).
+
+**NÃO MUDOU (fora do pedido, que era a entrada):** o cabeçalho de dentro do
+sistema, o ícone da aba (ainda o AF), os textos "Gestor AF" em Serviços, Equipes,
+Sincronismo e na planilha de cadastro, e o aplicativo do campo.
+
+**VERIFICADO:** `tsc` e `build`; no navegador (2046 px e 375 px): o letreiro cabe
+no celular sem rolagem lateral (vai até 359 de 375 px), MANAGER fecha a largura do
+NEXUS, o cartão de clientes não cobre mais o rótulo, fontes Exo 2 800 carregadas.
+
+**NÃO VERIFICADO:** a abertura animada à vista — a aba do painel estava escondida
+(`visibilityState: hidden`), e aba escondida não desenha; o fecho foi conferido só
+pelo DOM (letreiro, cores e textos presentes). O tema escuro da entrada não existe
+(ela é clara de propósito, D-011).
+
+---
+
+### D-241 · As decisões de 31/10: permissões que passam a valer, Victoria, Flavio, VT pelo código e GPS de alta precisão (161)
+
+> Respostas do Emanuel às pendências de 31/10, item a item.
+
+**Cadastro (feito direto no banco, a pedido):** Victoria passou para o perfil **COP**
+(o papel dela já era COORDENADOR, e as exceções que você deu continuam). Flavio
+perdeu **"Gerenciar usuários"** ("não, retirar"); as outras exceções dele ficam.
+
+**As permissões "sem efeito ainda" passam a valer** (161a) — *"pode ligar"*:
+
+| chave | o que barra |
+|---|---|
+| Importar planilha | a cadeia inteira: importar, prévia, reconciliar, desatribuir ausentes e o sincronismo da extensão (uma só deixaria importar pela metade) |
+| Configurações: cadastrar / editar / excluir | INSERT / UPDATE / DELETE nas 12 tabelas de configuração; as RPCs de configuração (buckets, sub-falhas, parâmetros, meta de execução, número do TOA) pedem "editar" |
+| Editar tabela de pontuação | regras de pontuação, combinações, tabela de preço |
+| Gerenciar cargos e perfis | cargos e perfis de acesso — **nunca** perfil com papel ADMIN, perfil que dá poder de Administração, permissão do módulo Administração, nem o **próprio** perfil (subir de poder por tabela) |
+| Desatribuir pontuação | expurgar e devolver pontuação (a aba aparece para quem tem) |
+| Visualizar menu (Serviços, Equipes, Importação, Relatórios, Configurações) | o item do menu e a entrada pelo endereço; ler os dados continua sendo o escopo do RLS |
+
+De fora, de propósito: `situacao_visita` (estrutura do sistema, não configuração) e
+`base` (criar cidade muda o escopo de todo mundo) seguem só do ADMIN. **"Dados da
+empresa" continua sem efeito:** não existe tela nem tabela de escrita para isso — a
+etiqueta da tela continua dizendo.
+
+A etiqueta "sem efeito ainda" foi ensinada a reconhecer `pode_configurar('…')` e as
+chaves conferidas pela tela (161b): sobrou só `admin.empresa`.
+
+**Quem perde menu** (os perfis como estão): Configurações só aparece para quem tem
+`configuracoes.ver` (Administrador e COP); Controlador, Coordenador e Supervisor
+deixam de ver. Importação, para Supervisor sem a exceção.
+
+Medido como o Renan (desfeito): cria cargo; edita o perfil Supervisor; não edita o
+próprio perfil nem o Administrador; não põe "Gerenciar usuários" em perfil nenhum;
+sem a chave de configuração, 0 linha em código de baixa.
+
+**VT por equipe pela régua do código** (161c). Executado = código SUCESSO e nenhum
+IMPRODUTIVO; não executado = IMPRODUTIVO; cancelado, reagendado e sem código, fora.
+Manaus, 14 dias: **415 × 54**, execução de **80,9% a 97,6%** entre os técnicos (pela
+régua do status do TOA, todos perto de 98%).
+
+**GPS de alta precisão durante a execução** (161d, app). O banco responde no envio do
+rastro se há contrato do técnico **em execução** (jornada fora — no primeiro teste o
+"em execução" era o almoço). Enquanto houver, o app tira uma leitura de satélite a
+cada 2 min, a mais dos pontos normais — com o app aberto no relógio da tela, com ele
+fechado dentro da entrega do segundo plano que já roda. O serviço de segundo plano
+**não** é religado com outra precisão: subir o serviço é o que derrubava o APK
+(D-172). Fora da execução, nada muda na bateria.
+
+**VERIFICADO:** baterias 33/33 e 29/29; zero tabela sem RLS e zero definer para o
+anon; os testes do Renan acima; `em_execucao` verdadeiro numa execução simulada e
+desfeita, falso na jornada; `tsc`/`build` do site e `tsc`/`expo export` do app; no
+navegador, o menu do ADMIN inteiro e a aba VT com o texto da régua nova.
+
+**NÃO VERIFICADO / NÃO FEITO:** o app **não foi publicado** — o `eas update` foi
+barrado pela trava de segurança da sessão (publicação em produção); o comando ficou
+para o Emanuel. Nada do GPS de alta precisão rodou num celular. O menu de quem NÃO é
+ADMIN não foi aberto pela tela (testado só o banco).

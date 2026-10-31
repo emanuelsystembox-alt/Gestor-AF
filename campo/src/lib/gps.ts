@@ -90,6 +90,24 @@ export async function lerPosicao(
   try { return await emVoo } finally { emVoo = null }
 }
 
+/**
+ * 161: leitura de ALTA precisão (satélite), só para o rastro durante a
+ * EXECUÇÃO — é ali que o local da baixa se decide e o raio de 200 m pede
+ * ponto bom. Não passa pela fila de `lerPosicao` de propósito: ela é
+ * "Balanced" e reaproveita leitura de até 1 min, e a ideia aqui é
+ * justamente uma leitura nova e melhor. Prazo maior (o satélite demora a
+ * fixar dentro de casa); sem fix no prazo, devolve nulo — e o rastro segue
+ * com o ponto normal, sem inventar posição.
+ */
+export async function lerPosicaoPrecisa(prazoMs = 20 * 1000): Promise<Location.LocationObject | null> {
+  try {
+    const p = await comPrazo(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }), prazoMs)
+    if (p) ultima = p
+    return p
+  } catch { return null }
+}
+
 /** Esquece a leitura guardada (troca de login). */
 export function esquecerPosicao() { ultima = null }
 

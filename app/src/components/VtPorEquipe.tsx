@@ -10,14 +10,15 @@ import { isoLocal } from '../lib/formato'
  * >  cancelado e os outros códigos não contabilizam (...) qual é a média
  * >  de execução de cada técnico" — Emanuel, 30/10
  *
- * Regra escolhida por ele: o "Status da Atividade" do TOA. Executado =
- * CONCLUÍDO; não executado = NÃO CONCLUÍDO; o resto fica fora.
+ * 156: a régua era o "Status da Atividade" do TOA — e no TOA "concluído"
+ * inclui a VT fechada com código improdutivo: 529 × 7 em 14 dias, todo
+ * mundo perto de 100%.
  *
- * A tela diz, ao lado da porcentagem, o que ela NÃO diz: no TOA,
- * "concluído" inclui a VT fechada com código improdutivo. Medido em 14
- * dias: 529 concluído contra 7 não concluído — quase todo mundo perto de
- * 100%. O número que separa um técnico do outro aqui é a QUANTIDADE por
- * dia, e é ela que vem primeiro.
+ * 161c (31/10, aprovado pelo Emanuel): a régua é o CÓDIGO de baixa da
+ * operadora. Executado = código de SUCESSO e nenhum IMPRODUTIVO; não
+ * executado = código IMPRODUTIVO (o "quebrado"); cancelado, reagendado e
+ * sem código ficam fora. Medido em Manaus, 14 dias: 415 × 54, e a execução
+ * vai de 80,9% a 97,6% entre os técnicos — agora a porcentagem separa.
  */
 interface LinhaVt {
   tecnico_id: string; nome: string; matricula: string | null; equipe: string | null
@@ -72,11 +73,11 @@ export function VtPorEquipe({ de, ate, equipe, buckets }: {
     <div className="space-y-3">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { r: 'Executados', v: String(tot.exe), t: 'Status da Atividade CONCLUÍDO no TOA' },
-          { r: 'Não executados', v: String(tot.nao), t: 'Status da Atividade NÃO CONCLUÍDO no TOA' },
+          { r: 'Executados', v: String(tot.exe), t: 'Código de baixa de SUCESSO, nenhum improdutivo' },
+          { r: 'Não executados', v: String(tot.nao), t: 'Código de baixa IMPRODUTIVO (o contrato quebrado)' },
           { r: 'Média por dia', v: n1(tot.media), t: 'Executados ÷ dias com contrato, somando todos os técnicos' },
           { r: 'Média de execução', v: tot.pct == null ? '—' : `${n1(tot.pct)}%`, t: 'Executados ÷ (executados + não executados)' },
-          { r: 'Fora da conta', v: String(tot.fora), t: 'Cancelado, pendente, em rota, iniciado — não entram, como você pediu' },
+          { r: 'Fora da conta', v: String(tot.fora), t: 'Cancelado, reagendado ou ainda sem código — não entram' },
         ].map(c => (
           <div key={c.r} className="card-controle p-3" title={c.t}>
             <p className="text-[10px] uppercase tracking-wide text-graf-500">{c.r}</p>
@@ -86,10 +87,10 @@ export function VtPorEquipe({ de, ate, equipe, buckets }: {
       </section>
 
       <p className="text-[11px] text-graf-400">
-        <strong className="text-graf-300">Como ler:</strong> no TOA, "Concluído" inclui a VT
-        fechada com código improdutivo — o técnico fechou a atividade, mas o serviço pode não
-        ter saído. Por isso a média de execução fica perto de 100% para quase todos; o que
-        separa um técnico do outro é <strong className="text-graf-300">quanto ele fecha por dia</strong>.
+        <strong className="text-graf-300">Como ler:</strong> a régua é o <strong className="text-graf-300">código
+        de baixa</strong>, não o status do TOA. Executado = código de sucesso; não executado =
+        código improdutivo (o contrato quebrado). Cancelado, reagendado e o que ainda não tem
+        código ficam fora da conta.
       </p>
 
       <section className="card-controle p-4">

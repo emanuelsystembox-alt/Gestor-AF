@@ -932,9 +932,9 @@ export default function Administracao() {
              ['perfis', 'Perfis de acesso', perfis.length],
              ['cargos', 'Cargos', cargos.length],
              ['exclusoes', 'Contratos apagados', exclusoes.length],
-             // 136 (D-215): expurgo de pontuação por lote de WOs. Só ADMIN
-             // — é ele quem responde pelo número que o técnico recebe.
-             ...(souAdmin ? [['expurgo', 'Expurgar pontuação', null] as const] : []),
+             // 136 (D-215): expurgo de pontuação por lote de WOs. Era só ADMIN;
+             // desde a 161 vale a chave "Desatribuir pontuação" (o banco confere).
+             ...(souAdmin || pode('servicos.desatribuir_pontuacao') ? [['expurgo', 'Expurgar pontuação', null] as const] : []),
              // 100 (D-176): o cadastro de uma cidade inteira por planilha padrão.
              // Só ADMIN: quem cria acesso é ADMIN (admin-usuarios).
              ...(souAdmin ? [['importar', 'Importar planilha', null] as const] : [])] as const).map(([a, rot, n]) => (

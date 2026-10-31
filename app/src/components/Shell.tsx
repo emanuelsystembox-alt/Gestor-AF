@@ -15,6 +15,9 @@ interface Item {
   /** Palavras a mais para a busca (Ctrl+K) achar a tela pelo que ela faz. */
   busca?: string
   futuro?: boolean
+  /** 161: a chave "Visualizar menu" que o item exige (Emanuel, 31/10: "pode
+   *  ligar"). Sem ela o item some do menu, e a rota também barra (App.tsx). */
+  permissao?: string
 }
 
 interface Modulo {
@@ -56,16 +59,16 @@ function lerFechados(): string[] {
 const OPERACAO: Modulo = {
   chave: 'operacao', titulo: 'Operação', icone: 'servicos', itens: [
     { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard', busca: 'painel controle inicio' },
-    { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos', busca: 'contratos os visitas baixa' },
-    { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes', busca: 'tecnicos login' },
+    { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos', busca: 'contratos os visitas baixa', permissao: 'servicos.ver' },
+    { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes', busca: 'tecnicos login', permissao: 'equipes.ver' },
     { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota', busca: 'mapa' },
     // 096: onde cada técnico está, a trilha, os próximos e o local da baixa.
     { para: '/controle/monitor', rotulo: 'Monitoramento', icone: 'monitor', busca: 'gps rastro trilha localizacao tecnico mapa proximos' },
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
     // 140: indicadores da operação — o primeiro é a Primeira WO.
     { para: '/controle/indicadores', rotulo: 'Indicadores', icone: 'indicadores', busca: 'primeira wo chegada atraso indicador' },
-    { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios' },
-    { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota' },
+    { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios', permissao: 'relatorios.ver' },
+    { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota', permissao: 'importacao.ver' },
     // 111: o robô que importa sozinho, de 5 em 5 minutos a de hora em hora.
     { para: '/controle/sincronismo', rotulo: 'Sincronismo', icone: 'sincronismo', busca: 'robo automatico toa importar intervalo' },
     // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
@@ -103,7 +106,7 @@ const QUALIDADE: Modulo = {
 }
 const AJUSTES: Modulo = {
   chave: 'ajustes', titulo: 'Ajustes', icone: 'configuracoes', itens: [
-    { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes', busca: 'sub-falhas situacao parametros' },
+    { para: '/controle/configuracoes', rotulo: 'Configurações', icone: 'configuracoes', busca: 'sub-falhas situacao parametros', permissao: 'configuracoes.ver' },
     { para: '/controle/administracao', rotulo: 'Administração', icone: 'administracao', busca: 'usuarios perfil acesso' },
   ],
 }
@@ -126,14 +129,16 @@ function useModulos(): Modulo[] {
   const { pode, ehGestor, temPapel } = useAuth()
   const gestao = ehGestor || temPapel('CONTROLADOR', 'SUPERVISOR')
   if (!gestao && temPapel('ROBO')) return [ROBO]
+  // 161: o item que exige uma chave some para quem não a tem.
+  const filtrar = (m: Modulo): Modulo => ({ ...m, itens: m.itens.filter(i => !i.permissao || pode(i.permissao)) })
   return [
-    ...(gestao ? [OPERACAO] : []),
+    ...(gestao ? [filtrar(OPERACAO)] : []),
     ...(gestao && (pode('campo.humor') || pode('campo.ocorrencias'))
       ? [CAMPO_EQUIPE(pode('campo.humor'), pode('campo.ocorrencias'))] : []),
     ...(gestao && pode('qualidade.ver') ? [QUALIDADE] : []),
     ...(pode('almoxarifado.ver') ? [ALMOXARIFADO] : []),
     ...(pode('frota.ver') ? [FROTA] : []),
-    ...(gestao ? [AJUSTES] : []),
+    ...(gestao ? [filtrar(AJUSTES)] : []),
     FUTURO,
   ]
 }

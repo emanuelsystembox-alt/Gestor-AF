@@ -4,7 +4,7 @@ import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import * as Battery from 'expo-battery'
 import { supabase } from './supabase'
-import { lerPosicao } from './gps'
+import { lerPosicao, lerPosicaoPrecisa } from './gps'
 import { concluirPasso, iniciarPasso, passoPendente, VERSAO_APP } from './diagnostico'
 
 /**
@@ -65,6 +65,27 @@ const MIN_M = 30
 const LOTE = 200
 /** Teto da fila no aparelho: ~2 dias de pontos a cada 2 min. */
 const TETO_FILA = 1500
+
+/*
+ * ┌─ 161 · ALTA PRECISÃO DURANTE A EXECUÇÃO ──────────────────────────┐
+ * │ > "GPS de alta precisão durante a execução (...) pode rodar."      │
+ * │ >  — Emanuel, 31/10                                                 │
+ * │                                                                     │
+ * │ O rastro normal é "Balanced" (rede e antena: dezenas a centenas de │
+ * │ metros). Para o local da baixa (raio de 200 m, 155h) isso é pouco. │
+ * │ Enquanto o BANCO disser que há contrato dele em execução           │
+ * │ (`registrar_rastro` → `em_execucao`, 161d), o app tira uma leitura │
+ * │ de satélite a cada 2 min, a mais dos pontos normais.               │
+ * │                                                                     │
+ * │ O serviço de segundo plano NÃO é religado com outra precisão:      │
+ * │ subir/descer o serviço é o passo que derrubava o APK (D-172). A    │
+ * │ leitura precisa é avulsa — com o app aberto, no relógio da tela;   │
+ * │ com ele fechado, dentro da entrega do segundo plano, que já roda.  │
+ * │ Fora da execução, nada muda: bateria como antes.                   │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+let emExecucao = false
+let ultimoPreciso = 0
 
 export type Motivo = 'ABRIU' | 'PERIODICO' | 'SEGUNDO_PLANO' | 'SAIU' | 'ENCERROU'
 
@@ -193,6 +214,8 @@ export async function enviar(): Promise<boolean | null> {
       const { data, error } = await supabase.rpc('registrar_rastro', { p_pontos: lote })
       if (error) break
       rotaAberta = !!(data as { rota_aberta?: boolean } | null)?.rota_aberta
+      // 161d: o servidor diz se há execução em andamento (app antigo ignora).
+      emExecucao = !!(data as { em_execucao?: boolean } | null)?.em_execucao
       mudar({ enviadoEm: new Date() })
       // Relê: o segundo plano pode ter posto ponto novo enquanto subia.
       const enviados = new Set(lote.map(p => p.em))
@@ -214,9 +237,25 @@ export async function enviar(): Promise<boolean | null> {
  * e aí só existe o que `index.ts` importou. Por isso `index.ts` importa
  * este arquivo antes de registrar o App.
  */
+/**
+ * 161: um ponto de satélite, se houver execução e já passaram 2 min do
+ * último. Nunca lança — sem fix, o rastro segue com o ponto normal.
+ */
+async function pontoPreciso(motivo: Motivo) {
+  // Folga de 15 s: a entrega do segundo plano vem "a cada 2 min" com
+  // variação, e 1:58 não pode pular a leitura inteira.
+  if (!emExecucao || Date.now() - ultimoPreciso < MIN_MS - 15_000) return
+  ultimoPreciso = Date.now()
+  try {
+    const l = await lerPosicaoPrecisa()
+    if (l) await anotar(l, motivo, true)
+  } catch { /* fica o ponto normal */ }
+}
+
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(TAREFA_RASTRO, async ({ data, error }) => {
   if (error || !data?.locations?.length) return
   for (const l of data.locations) await anotar(l, 'SEGUNDO_PLANO')
+  await pontoPreciso('SEGUNDO_PLANO')
   const aberta = await enviar()
   // Fim da rota com o app fechado: desliga. Aberto, quem decide é a tela.
   if (aberta === false && AppState.currentState !== 'active') {
@@ -374,6 +413,9 @@ export async function passoComAppAberto(motivo: Motivo = 'PERIODICO', forcar = f
     if (l) await anotar(l, motivo, forcar)
     if (!bg) mudar({ modo: 'APP_ABERTO' })
   }
+  // 161: em execução, o ponto de satélite vem também com o segundo plano
+  // ligado — ele entrega "Balanced".
+  await pontoPreciso(motivo)
   return enviar()
 }
 
@@ -386,6 +428,7 @@ export async function encerrarRastro() {
     await pararSegundoPlano('ENCERROU')
   } finally {
     await AsyncStorage.multiRemove([FILA, ULTIMO]).catch(() => {})
+    emExecucao = false
     mudar({ modo: 'DESLIGADO', naFila: 0, recado: null })
   }
 }
