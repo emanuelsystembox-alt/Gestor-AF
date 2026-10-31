@@ -13,6 +13,7 @@ import {
 export {
   ETAPAS, ErroImportacao, impressaoDasLinhas,
   type Resumo, type Desatribuicao, type PedidoImportacao, type ResultadoImportacao,
+  type FilaImportacao,
 } from './importarToaNucleo'
 
 export function importarLinhasToa(p: PedidoImportacao): Promise<ResultadoImportacao> {

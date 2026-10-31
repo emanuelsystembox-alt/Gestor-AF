@@ -252,6 +252,8 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
     const res = await importarLinhasToa(sb, {
       linhas, arquivoNome: nome, baseId: base, dia, usuarioId, origem: 'sincronismo', impressao,
       aoAvancar: (_e, n) => { mudar(x => { x.baixa.atual = `${b.nome}: importando (${n}/${linhas.length})…` }) },
+      // 165: a fila da cidade — o robô espera a vez como a gente espera.
+      aoEsperar: f => { mudar(x => { x.baixa.atual = `${b.nome}: na fila da cidade (posição ${f.posicao ?? '?'}), esperando ${f.na_frente ?? 'outra importação'} terminar…` }) },
     })
     await registrar(base, b.id, dia, iniciada, 'IMPORTADA', { importacao: res.importacaoId, impressao, linhas: linhas.length })
     const s = res.resumo

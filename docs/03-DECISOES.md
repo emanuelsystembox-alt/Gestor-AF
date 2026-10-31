@@ -10883,3 +10883,102 @@ conferidos intactos depois dos comandos da EAS.
 **NÃO VERIFICADO:** a tela no celular de verdade — a fonte condensada do Android, o
 sinal correndo nas órbitas, a abertura animada e o celular pequeno. A réplica confere
 proporção, não animação nem fonte do aparelho.
+
+### D-248 · Teste de carga: o sistema aguentando 100 pessoas, a fila de importação e os índices (165)
+
+> "precisamos fazer todos os testes de uso e estresse do sistema. Imagina que tem
+> mais de 100 pessoas usando o mesmo sistema, fazendo consultas (...) Terá mais de
+> 1 milhão de linhas (...) no app do técnico, na parte do painel dele, o sistema diz
+> que está somando os dados (...) se várias pessoas importaram ao mesmo tempo no
+> site, precisa ter uma fila de processamento (...) de um por um a rota de cada
+> cidade" e "temos que ver no uso normal também de cada controlador e técnico" —
+> Emanuel, 31/10.
+
+**Respostas às perguntas (31/10):** a prioridade "URA" são os **marcadores URA** (URA
+de interação e Baixa URA); o painel do técnico continua **todo ao vivo** (recusado:
+guardar os dias fechados de madrugada); o teste de carga **pode rodar em produção
+agora** (não há ambiente de teste no plano Free); e **nada se apaga** — o Emanuel
+assina o plano Pro (recusado: apagar as linhas cruas de importação com mais de 60 ou
+90 dias).
+
+**Como foi medido.** Não há senha de usuário para bater na API como eles (nem deve
+haver). A carga foi simulada DENTRO do banco, onde está o gargalo: sessões
+`authenticated` "vestidas" de pessoas reais (COP Sarah e Kayra, coordenadora
+Victoria, supervisor Flavio, técnicos Nicácio, Bruno, Caio e Anthony), cada uma
+repetindo a rotina normal do papel 10 vezes sem pausa — gestão: menu, sino, central,
+lista de Serviços, Equipes, pontos, revisita do LOG e **marcar/desmarcar URA**;
+técnico: agenda, painel, ranking, revisita, sino, mural. 8 sessões ao mesmo tempo
+(equivale a bem mais de 100 pessoas com o intervalo normal entre cliques). Tudo
+desfeito no fim. **640 chamadas, 0 erros, antes e depois.**
+
+**O que pesava** (`pg_stat_statements`, uso real até 31/10): `sinais_do_dia` (o sino da
+web, que toda tela consulta de minuto em minuto) somava **2 horas** de banco — 11.754
+chamadas de 631 ms; o painel do técnico, **5,3 s** + o ranking **3,9 s** por abertura
+(a tela do "Somando seus pontos…", encostando no limite de 8 s); a tela de Equipes
+1,5 s.
+
+**O que foi feito (165a–h):**
+- `producao_por_tecnico` e `painel_equipes` chamavam `pontos_da_visita` **uma visita
+  por vez**; trocadas pela versão em lote, que já existia (6.056 de 6.056 visitas com o
+  mesmo resultado, conferido antes).
+- `pontos_das_visitas` casava as regras por varredura; agora por junção (734 → 269 ms,
+  0 divergências).
+- **18 funções chamavam a regra de escopo por LINHA** (`ve_cidade_inteira()` solto no
+  WHERE — a armadilha da D-118 dentro de função). Reescritas para `(select …)` — 66
+  funções no total, contando `eh_gestor()`. Baterias 33/33 e 29/29 depois.
+- O sino do técnico (`meus_avisos`) lia a tabela inteira de avisos por causa de um
+  "gestor OU equipe" numa condição só; agora dois caminhos, cada um no seu índice. E
+  a lista ficou estável: 82 avisos de uma importação nascem no mesmo instante, e quais
+  entravam nos 50 era sorte (desempate pelo id).
+- **12 índices** onde o volume vai crescer — o mais grave: `visita.tecnico_responsavel_id`
+  não tinha índice, e é por ele que painel, revisita e agenda acham as visitas do
+  técnico. FK de cadastro pequeno ficou sem índice de propósito.
+
+**Resultado, mesmas 8 sessões simultâneas:**
+
+| | antes | depois |
+|---|---|---|
+| painel do técnico | 5.300 ms (sozinho) | ~280 ms |
+| ranking | 3.900 ms | ~225 ms |
+| tela de Equipes | 1.545 ms | ~190 ms |
+| sino da web (`sinais_do_dia`) | 215–608 ms, pico 989 | ~55 ms, pico 86 |
+| central | 180–491 ms | ~36 ms |
+| selos do menu | 70–204 ms | ~10 ms |
+| rodada de 10 rotinas (supervisor) | 15,4 s | 1,9 s |
+
+**A fila de importação, por cidade (165g).** Nada impedia duas importações da mesma
+cidade ao mesmo tempo (gente + gente, gente + robô), e a importação são três chamadas
+(D-181): uma no meio da outra podia desatribuir o que a outra acabou de trazer. Agora:
+- a importação sobe as linhas (isso corre em paralelo, não mexe em contrato) e **pede a
+  vez da cidade** antes de mexer nos contratos; só a primeira viva roda; cidades
+  diferentes não esperam umas pelas outras; a tela mostra "Na fila da cidade —
+  posição 2. Esperando *arquivo* (*quem*) terminar";
+- quem espera pergunta de 3 em 3 s; a tela fechada no meio **não trava a cidade**: sem
+  sinal por 3 min, a vez passa adiante;
+- a mesma guarda está **dentro** das três etapas no banco: ninguém passa por fora. A
+  extensão do TOA instalada antes desta versão (que não entra na fila) ganha uma vez
+  curta, de 1 min, se a cidade estiver livre; se não, recebe "na fila" em vez de
+  misturar duas importações;
+- a vez é decidida com advisory lock por **tentativa** — a primeira versão desenhada
+  segurava a trava durante a importação inteira e quem esperava ficaria preso até o
+  limite de 8 s; corrigido antes de aplicar.
+
+Testada em 10 cenários (desfeitos): duas cidades juntas, a segunda da mesma cidade
+esperando (posição 2), importar fora da vez recusado, extensão antiga recusada com a
+cidade ocupada, tela fechada perdendo a vez, extensão antiga ganhando vez de 1 min.
+
+**Espaço:** o banco tem 202 MB do limite de 500 MB do Free; 122 MB são as linhas cruas
+das importações, guardadas para sempre por decisão do Emanuel. **O Pro tem de entrar
+antes dos 500 MB.**
+
+**NÃO VERIFICADO:**
+- a fila pela TELA com duas pessoas importando de verdade (testada no banco, cenário a
+  cenário; a tela compila e mostra o recado, mas ninguém importou dois arquivos juntos);
+- a extensão do TOA nova (`fundo.js` regerado) — precisa ser **recarregada** no Chrome
+  onde roda o robô para mostrar a fila;
+- 1 milhão de linhas de verdade: o teste foi com o volume de hoje (6 mil visitas no
+  mês). As contas leem o período por índice de data, então crescem com o mês, não com
+  o histórico — mas não houve carga com dado sintético, porque gravar 1 milhão de
+  linhas falsas em produção estouraria o plano Free;
+- a API (PostgREST) e o Realtime sob 100 conexões: o teste mediu o banco; o teto de
+  conexões simultâneas do Realtime no Free não foi exercitado.

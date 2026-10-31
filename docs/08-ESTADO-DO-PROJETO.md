@@ -454,6 +454,36 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Pendente depois da 165 — teste de carga, fila de importação e índices (D-248)
+
+**Estado:** migration **165** aplicada (165a–h). Baterias 33/33 e 29/29; nenhuma tabela
+sem RLS; nenhuma `SECURITY DEFINER` para o `anon`. Teste de carga com 8 sessões
+simultâneas de pessoas reais: 640 chamadas, 0 erros; painel do técnico 5,3 s → ~0,3 s,
+sino da web 0,6 s → ~0,05 s. Web publicada com a fila de importação na tela. Extensão
+do TOA regerada (`extensao-toa/fundo.js`).
+
+### Depende do Emanuel
+- **Assinar o plano Pro do Supabase antes dos 500 MB** (hoje 202 MB; 122 MB são as
+  linhas cruas das importações, que ficam para sempre por decisão de 31/10).
+- **Recarregar a extensão do TOA** no Chrome onde o robô roda (chrome://extensions →
+  recarregar), para o robô mostrar "na fila da cidade". A antiga continua funcionando
+  e não mistura importações (a guarda é no banco), só não mostra a espera.
+
+### Verificação que ninguém fez ainda
+- Duas pessoas importando a mesma cidade ao mesmo tempo PELA TELA (a fila foi testada
+  no banco em 10 cenários).
+- Carga com 1 milhão de linhas sintéticas (não cabe no Free; refazer o teste no Pro,
+  num branch do Supabase).
+- A API (PostgREST) e o Realtime com 100 conexões de verdade; o teste mediu o banco.
+
+### Construção que ficou para depois
+- O painel do técnico e o ranking calculam a produção da EMPRESA inteira cada um
+  (~250 ms cada, juntos na abertura); dá para o ranking vir junto do painel numa
+  chamada só.
+- `importacao_linha` (122 MB) não tem retenção: cresce para sempre, por decisão.
+- 37 tabelas com mais de uma policy permissiva para a mesma ação (aviso do Supabase,
+  nível WARN): somam custo de leitura; revisar uma a uma.
+
 ## Pendente depois da D-247 — a entrada do app vira NEXUS MANAGER
 
 **Estado:** tela Entrar nova (AFLINE assina, símbolo do Nexus, letreiro NEXUS /

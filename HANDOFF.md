@@ -43,6 +43,10 @@
 > - **A entrada do app vira NEXUS MANAGER** (D-247): AFLINE assina em cima, símbolo
 >   do Nexus com as órbitas, letreiro NEXUS / MANAGER; o nome embaixo do ícone é
 >   "Nexus Manager". APK novo: build `e992bcd0`.
+> - **Teste de carga e fila de importação** (165, D-248): 8 sessões simultâneas de
+>   gente real, 0 erros; painel do técnico 5,3 s → 0,3 s, sino da web 0,6 → 0,05 s;
+>   12 índices; 66 funções com o escopo em `(select …)`. A importação agora espera a
+>   vez da cidade (uma por cidade de cada vez). **Assinar o Pro antes dos 500 MB.**
 
 ---
 

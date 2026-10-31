@@ -54,6 +54,19 @@ tela cheia (D-183).
 numa importação. Calcule o lado do parâmetro uma vez (lateral com
 `offset 0`) e dê índice de expressão à coluna (D-181).
 
+**A regra do `(select f())` vale DENTRO DE FUNÇÃO também, não só na policy.**
+`and (ve_cidade_inteira() or v.equipe_id in (...))` solto no WHERE de uma função é
+chamado uma vez POR LINHA, igual na policy. Estava em 18 funções — o sino da web
+(`sinais_do_dia`) fazia 1.195 chamadas de `ve_cidade_inteira` → `eh_gestao` →
+`tem_papel` (2.399) numa leitura só: ~470 dos 628 ms. Em `(select ve_cidade_inteira())`
+caiu para ~55 ms (165h, D-248). Em função nova, escreva sempre a forma com `select`.
+
+**Função "de uma visita" chamada num lateral por linha é o mesmo defeito, maior.**
+`left join lateral pontos_da_visita(v.id)` sobre o mês da empresa (6 mil visitas)
+fazia o painel do técnico levar 5,3 s e o ranking 3,9 s — e a função em LOTE
+(`pontos_das_visitas(uuid[])`) já existia. Antes de chamar uma função por linha,
+procure a irmã em lote; se não houver, crie (165a/165c, D-248).
+
 **Medir desempenho como owner mente igual a testar policy como owner.**
 `produtividade_periodo` fazia 402 ms como dono e **estourava o timeout**
 como `authenticated`, porque o RLS reavaliava as funções de escopo por

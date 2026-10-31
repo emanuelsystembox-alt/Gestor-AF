@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from '../lib/toa'
 import {
   ETAPAS, importarLinhasToa, reconciliarImportacao, type Resumo, type Desatribuicao,
+  type FilaImportacao,
 } from '../lib/importarToa'
 import { Alerta } from '../components/ui'
 import { Shell } from '../components/Shell'
@@ -114,6 +115,8 @@ export default function Importacao() {
   const [desatrib, setDesatrib] = useState<Desatribuicao | null | undefined>(undefined)
   /** Andamento visível (D-182): etapa atual, linhas enviadas, cronômetro. */
   const [etapa, setEtapa] = useState(0)
+  /** 165: na fila da cidade — quem está na frente (nulo = não está esperando). */
+  const [fila, setFila] = useState<FilaImportacao | null>(null)
   const [enviadas, setEnviadas] = useState(0)
   const [inicio, setInicio] = useState<number | null>(null)
   const [agora, setAgora] = useState(Date.now())
@@ -177,7 +180,7 @@ export default function Importacao() {
   async function enviar() {
     if (!leitura || !arquivo) return
     setFase('enviando'); setErro(null)
-    setEtapa(0); setEnviadas(0); setInicio(Date.now()); setAgora(Date.now())
+    setEtapa(0); setEnviadas(0); setInicio(Date.now()); setAgora(Date.now()); setFila(null)
     try {
       if (!ativa) throw new Error('Escolha a cidade no topo da tela antes de importar.')
 
@@ -190,7 +193,8 @@ export default function Importacao() {
         dia,
         usuarioId: perfil?.id ?? null,
         origem: 'manual',
-        aoAvancar: (e, n) => { setEtapa(e); setEnviadas(n) },
+        aoAvancar: (e, n) => { setEtapa(e); setEnviadas(n); setFila(null) },
+        aoEsperar: f => setFila(f),
       })
       setReconciliarPendente(r.reconciliou ? null : r.importacaoId)
       // 108: o código que o cadastro não conhece não trava nada — o
@@ -561,6 +565,14 @@ export default function Importacao() {
                     </li>
                   ))}
                 </ol>
+                {/* 165: esperando a vez — a tela diz por quem, e que não travou. */}
+                {fila && !fila.vez && (
+                  <p className="mt-3 rounded-md border border-amber-700/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-200">
+                    Na fila da cidade{fila.posicao ? <> — posição <strong className="tabular">{fila.posicao}</strong></> : null}.
+                    {' '}Esperando{fila.na_frente ? <> <strong>{fila.na_frente}</strong></> : ' outra importação'}
+                    {fila.quem ? <> ({fila.quem})</> : null} terminar. Pode deixar esta tela aberta: começa sozinho.
+                  </p>
+                )}
                 {etapa === 1 && leitura && leitura.linhas.length > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-graf-800">
                     <div className="h-full rounded-full bg-af-500 transition-all"
