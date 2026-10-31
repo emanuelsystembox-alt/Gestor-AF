@@ -27,6 +27,8 @@ const Humor = lazy(() => import('./pages/Humor'))
 const Ocorrencias = lazy(() => import('./pages/Ocorrencias'))
 // 147: a celula de qualidade -- falar com o assinante atendido (D-228).
 const Qualidade = lazy(() => import('./pages/Qualidade'))
+// 163: o Mural Nexus -- o canal da empresa com o time.
+const Mural = lazy(() => import('./pages/Mural'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -174,6 +176,10 @@ function Rotas() {
           <Protegida exige="GESTAO"><Qualidade /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
+
+        {/* 163: todo o time que usa o site lê; só o ADMIN publica (RLS). */}
+        <Route path="/mural" element={
+          <Protegida><Mural /></Protegida>} />
 
         <Route path="/almoxarifado" element={
           <Protegida exige="ALMOXARIFADO"><Almoxarifado /></Protegida>} />

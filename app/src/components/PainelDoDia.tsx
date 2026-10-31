@@ -269,12 +269,48 @@ function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
  * A ordem e por LOG decrescente: quem voltou oito vezes e a primeira
  * linha, nao a decima — e por ela que se abre a tela.
  */
+/** 163: a visita anterior do contrato NA NOSSA agenda (`revisita_dos_contratos`). */
+interface Anterior {
+  visita_id: string
+  anterior_id: string | null
+  anterior_data: string | null
+  anterior_grupo: string | null
+  anterior_situacao: string | null
+  anterior_equipe: string | null
+  anterior_tecnico: string | null
+  anterior_baixa_codigo: number | null
+  anterior_baixa_descricao: string | null
+  dias: number | null
+  revisita: boolean
+}
+
+type FiltroAqui = 'REVISITA' | 'PASSOU' | 'NUNCA'
+
+/**
+ * ┌─ 163 · já passou pela gente? ─────────────────────────────────────┐
+ * │ > "é interessante saber se o contrato já passou pela gente (...)  │
+ * │ >  código de baixa anterior, equipe anterior, data anterior [e o  │
+ * │ >  técnico anterior] para ter um controle mais eficaz de          │
+ * │ >  revisita" — Emanuel, 31/10                                     │
+ * │                                                                    │
+ * │ O LOG é da CLARO e conta a agenda inteira dela. A coluna "Anterior │
+ * │ aqui" é a NOSSA: a última visita concluída do contrato na nossa   │
+ * │ agenda (sem concluída, a última de qualquer situação). REVISITA   │
+ * │ é a regra do Emanuel, que mora no banco (163): anterior concluída,│
+ * │ até 30 dias, e o par de grupos certo. "Nunca passou por aqui" só  │
+ * │ vale desde que a cidade começou a ser importada.                  │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
 function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
   // 145: "nao consigo filtrar nessa propria janela o que e 1, log 2,
   // log 3, deve dar essa opcao" (Emanuel, 26/10). Dois filtros, que se
   // combinam: o valor do LOG e o grupo de servico. Nulo = todos.
   const [soLog, setSoLog] = useState<number | null>(null)
   const [soGrupo, setSoGrupo] = useState<string | null>(null)
+  const [soAqui, setSoAqui] = useState<FiltroAqui | null>(null)
+  /** Nulo = ainda carregando: a coluna diz "…", nunca "nunca passou". */
+  const [anteriores, setAnteriores] = useState<Map<string, Anterior> | null>(null)
+  const [erroAnterior, setErroAnterior] = useState<string | null>(null)
 
   const todos = useMemo(() => linhas
     .filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
@@ -286,34 +322,72 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
 
   const grupoDe = (v: Visita) => v.tipo_servico?.nome ?? 'Sem grupo de serviço'
 
+  // Uma chamada para a lista inteira, não uma por linha.
+  const chaveIds = useMemo(() => todos.map(x => x.v.id).join(','), [todos])
+  useEffect(() => {
+    if (!chaveIds) { setAnteriores(new Map()); return }
+    let vivo = true
+    setAnteriores(null); setErroAnterior(null)
+    supabase.rpc('revisita_dos_contratos', { p_visitas: chaveIds.split(',') })
+      .then(({ data, error }) => {
+        if (!vivo) return
+        if (error) { setErroAnterior(error.message); setAnteriores(new Map()); return }
+        setAnteriores(new Map(((data ?? []) as Anterior[]).map(a => [a.visita_id, a])))
+      })
+    return () => { vivo = false }
+  }, [chaveIds])
+
+  /** Em qual dos três o contrato cai. Sem resposta ainda (ou com erro): nenhum. */
+  const aquiDe = (v: Visita): FiltroAqui | null => {
+    if (!anteriores || erroAnterior) return null
+    const a = anteriores.get(v.id)
+    if (!a?.anterior_id) return 'NUNCA'
+    return a.revisita ? 'REVISITA' : 'PASSOU'
+  }
+
   /** Quantos de cada LOG — a contagem do chip é sobre o OUTRO filtro
    *  aplicado, para a soma dos chips sempre bater com a lista. */
   const porLog = useMemo(() => {
     const m = new Map<number, number>()
     for (const { v, n } of todos) {
       if (soGrupo && grupoDe(v) !== soGrupo) continue
+      if (soAqui && aquiDe(v) !== soAqui) continue
       m.set(n, (m.get(n) ?? 0) + 1)
     }
     return [...m.entries()].sort((a, b) => a[0] - b[0])
-  }, [todos, soGrupo])
+  }, [todos, soGrupo, soAqui, anteriores, erroAnterior])
 
   const porGrupo = useMemo(() => {
     const m = new Map<string, { qtd: number; graves: number }>()
     for (const { v, n } of todos) {
       if (soLog != null && n !== soLog) continue
+      if (soAqui && aquiDe(v) !== soAqui) continue
       const g = grupoDe(v)
       const t = m.get(g) ?? { qtd: 0, graves: 0 }
       t.qtd++; if (n >= LOG_GRAVE) t.graves++
       m.set(g, t)
     }
     return [...m.entries()].sort((a, b) => b[1].qtd - a[1].qtd)
-  }, [todos, soLog])
+  }, [todos, soLog, soAqui, anteriores, erroAnterior])
+
+  /** Os três do "aqui", contados sobre os OUTROS dois filtros. */
+  const porAqui = useMemo(() => {
+    const c: Record<FiltroAqui, number> = { REVISITA: 0, PASSOU: 0, NUNCA: 0 }
+    for (const { v, n } of todos) {
+      if (soLog != null && n !== soLog) continue
+      if (soGrupo && grupoDe(v) !== soGrupo) continue
+      const k = aquiDe(v)
+      if (k) c[k]++
+    }
+    return c
+  }, [todos, soLog, soGrupo, anteriores, erroAnterior])
 
   const voltaram = useMemo(() => todos.filter(({ v, n }) =>
-    (soLog == null || n === soLog) && (soGrupo == null || grupoDe(v) === soGrupo)),
-  [todos, soLog, soGrupo])
+    (soLog == null || n === soLog) && (soGrupo == null || grupoDe(v) === soGrupo)
+    && (soAqui == null || aquiDe(v) === soAqui)),
+  [todos, soLog, soGrupo, soAqui, anteriores, erroAnterior])
 
-  const filtrando = soLog != null || soGrupo != null
+  const filtrando = soLog != null || soGrupo != null || soAqui != null
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
@@ -338,6 +412,11 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
               O &ldquo;Contador de log&rdquo; é da CLARO e vem na planilha do TOA: quantas vezes o
               contrato já voltou para a agenda. Conta o histórico inteiro dela, inclusive o que
               nunca passou por aqui — por isso pode divergir da nossa reincidência.
+              {' '}<strong className="text-graf-300">Anterior aqui</strong> é a última visita do
+              contrato na NOSSA agenda; <strong className="text-amber-300">revisita</strong> = a
+              anterior concluída, até 30 dias, e o par de grupos que conta (VT depois de qualquer
+              serviço; retorno depois de adesão, migração GPON, reinstalação, mudança de endereço
+              ou retorno).
             </p>
           </div>
           <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
@@ -390,10 +469,34 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
               </button>
             ))}
           </div>
+          {/* ---- 163: já passou pela gente? ---- */}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 w-28 text-[11px] uppercase tracking-wide text-graf-400">Na nossa agenda</span>
+            <button onClick={() => setSoAqui(null)}
+              className={`rounded px-2 py-0.5 text-xs ${soAqui == null
+                ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+              Todos
+            </button>
+            {anteriores == null ? (
+              <span className="text-xs text-graf-400">procurando as visitas anteriores…</span>
+            ) : erroAnterior ? (
+              <span className="text-xs text-af-400">Não consegui ler as anteriores: {erroAnterior}</span>
+            ) : ([['REVISITA', 'Revisita'], ['PASSOU', 'Já passou, não é revisita'],
+                  ['NUNCA', 'Nunca passou por aqui']] as const).map(([k, rot]) => (
+              <button key={k} onClick={() => setSoAqui(soAqui === k ? null : k)}
+                aria-pressed={soAqui === k}
+                className={`rounded px-2 py-0.5 text-xs ${soAqui === k
+                  ? 'bg-af-600 font-semibold text-white'
+                  : k === 'REVISITA' ? 'bg-amber-900/40 text-amber-200 hover:bg-amber-900/60'
+                  : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                {rot} <strong className="tabular">{porAqui[k]}</strong>
+              </button>
+            ))}
+          </div>
           {voltaram.length === 0 && (
             <p className="px-4 py-6 text-sm text-graf-400">
               Nenhum contrato com esta combinação de filtros.{' '}
-              <button onClick={() => { setSoLog(null); setSoGrupo(null) }}
+              <button onClick={() => { setSoLog(null); setSoGrupo(null); setSoAqui(null) }}
                 className="text-af-400 underline-offset-2 hover:underline">Limpar os filtros</button>
             </p>
           )}
@@ -404,11 +507,9 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                   <th className="px-3 py-2 font-medium">LOG</th>
                   <th className="px-3 py-2 font-medium">Grupo de serviço</th>
                   <th className="px-3 py-2 font-medium">Contrato</th>
-                  <th className="px-3 py-2 font-medium">Técnico</th>
-                  <th className="px-3 py-2 font-medium">Equipe</th>
-                  <th className="px-3 py-2 font-medium">Área</th>
-                  <th className="px-3 py-2 font-medium">Situação</th>
-                  <th className="px-3 py-2 font-medium">Cód. de baixa</th>
+                  <th className="px-3 py-2 font-medium">Técnico · equipe · área</th>
+                  <th className="px-3 py-2 font-medium">Situação · cód. de baixa</th>
+                  <th className="px-3 py-2 font-medium">Anterior aqui</th>
                 </tr>
               </thead>
               <tbody>
@@ -428,14 +529,21 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
                       </td>
                       <td className="px-3 py-2">
                         {v.tecnico?.nome ?? <span className="text-graf-400">sem técnico</span>}
+                        <div className="text-[11px] text-graf-400">
+                          equipe {v.equipe?.codigo ?? '—'} · {v.area?.codigo ?? '—'}
+                        </div>
                       </td>
-                      <td className="px-3 py-2">{v.equipe?.codigo ?? <span className="text-graf-400">—</span>}</td>
-                      <td className="px-3 py-2">{v.area?.codigo ?? <span className="text-graf-400">—</span>}</td>
-                      <td className="px-3 py-2">{SITUACAO_INFO[v.situacao]?.label ?? v.situacao}</td>
                       <td className="px-3 py-2">
-                        {baixa
-                          ? <><span className="tabular font-medium">{baixa.codigo}</span> <span className="text-graf-300">{baixa.descricao}</span></>
-                          : <span className="text-graf-400">sem código</span>}
+                        {SITUACAO_INFO[v.situacao]?.label ?? v.situacao}
+                        <div className="text-[11px]">
+                          {baixa
+                            ? <><span className="tabular font-medium">{baixa.codigo}</span> <span className="text-graf-300">{baixa.descricao}</span></>
+                            : <span className="text-graf-400">sem código</span>}
+                        </div>
+                      </td>
+                      <td className="min-w-64 px-3 py-2">
+                        <CelulaAnterior a={anteriores?.get(v.id)} carregando={anteriores == null}
+                          erro={!!erroAnterior} />
                       </td>
                     </tr>
                   )
@@ -447,6 +555,52 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
       </div>
     </div>,
     document.querySelector('.sup-controle') ?? document.body,
+  )
+}
+
+/** A célula "Anterior aqui" da janela do LOG (163). */
+function CelulaAnterior({ a, carregando, erro }:
+  { a: Anterior | undefined; carregando: boolean; erro: boolean }) {
+  if (carregando) return <span className="text-graf-400">…</span>
+  // Erro não é "nunca passou": é "não sei" (regra 6).
+  if (erro) return <span className="text-graf-400">não consegui ler</span>
+  if (!a?.anterior_id) {
+    return <span className="text-graf-400">nunca passou por aqui</span>
+  }
+  const concluiu = a.anterior_situacao === 'CONCLUIDA'
+  return (
+    <div className="space-y-0.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {a.revisita && (
+          <span className="rounded bg-amber-900/50 px-1.5 py-px text-[10px] font-bold uppercase
+                           tracking-wide text-amber-200 ring-1 ring-amber-700/50">
+            revisita
+          </span>
+        )}
+        <span className="tabular font-medium">
+          {new Date(a.anterior_data + 'T12:00').toLocaleDateString('pt-BR')}
+        </span>
+        <span className="tabular text-[11px] text-graf-400">
+          {a.dias === 0 ? 'mesmo dia' : `${a.dias} dia${a.dias === 1 ? '' : 's'} antes`}
+        </span>
+        <span className="text-[11px] text-graf-300">{a.anterior_grupo ?? 'sem grupo'}</span>
+      </div>
+      <div className="text-[11px] text-graf-300">
+        {a.anterior_tecnico ?? 'sem técnico'} · equipe {a.anterior_equipe ?? '—'}
+      </div>
+      <div className="text-[11px]">
+        {a.anterior_baixa_codigo != null
+          ? <><span className="tabular font-medium">{a.anterior_baixa_codigo}</span>{' '}
+              <span className="text-graf-300">{a.anterior_baixa_descricao}</span></>
+          : <span className="text-graf-400">sem código de baixa</span>}
+        {!concluiu && (
+          <span className="ml-1 text-amber-300">
+            · {SITUACAO_INFO[a.anterior_situacao as keyof typeof SITUACAO_INFO]?.label
+               ?? a.anterior_situacao} — não concluiu
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -73,6 +73,9 @@ const P = {
   // nota dentro — é disso que a célula trata (147)
   qualidade: <><path d="M20 14.5a2 2 0 0 1-2 2H8l-4 3.5v-14a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />
                 <path d="m12 6.8 1.3 2.7 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4Z" /></>,
+  // Mural Nexus: o quadro com a imagem — o slide das campanhas (163)
+  mural: <><rect x="3" y="4.5" width="18" height="15" rx="2" /><circle cx="9" cy="10" r="1.7" />
+           <path d="m21 16-5.5-5.5L7 19" /></>,
 } as const
 
 export type NomeIcone = keyof typeof P

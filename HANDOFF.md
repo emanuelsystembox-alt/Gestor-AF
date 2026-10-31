@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **20/10/2026**, por Claude (Opus 5.5).
+Última atualização: **31/10/2026**, por Claude (Opus 5.5).
 
 > **31/10/2026 — o que mudou desde então, em uma frase cada** (detalhe em
 > `docs/03-DECISOES.md`, D-235 a D-242, e as pendências em
@@ -28,6 +28,14 @@
 >   histórico do contrato e "Vários contratos" busca a lista no período.
 > - **Responder em cima, conversa fecha o contrato, transições** (D-244); o contrato
 >   não apaga a tela ao recarregar. Pendências: seção "Pendente depois da 162".
+> - **Revisita na janela do LOG** (163, D-245): coluna "Anterior aqui" (data, grupo,
+>   técnico, equipe e código de baixa da visita anterior na NOSSA agenda) e filtro
+>   Revisita / Já passou / Nunca passou. Revisita = anterior concluída, até 30 dias,
+>   e o par certo (qualquer → VT; adesão, migração GPON, reinstalação, mudança de
+>   endereço → retorno; retorno → retorno). A regra mora em `revisita_dos_contratos`.
+> - **Mural Nexus** (163, D-245): Comunicação › Mural Nexus, slide com dizeres para
+>   todo o time; só o ADMIN publica (RLS em `mural_post` e no bucket `mural`).
+>   Nasceu vazio. Pendências: seção "Pendente depois da 163".
 
 ---
 

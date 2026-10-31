@@ -454,6 +454,25 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Pendente depois da 163 — revisita na janela do LOG e Mural Nexus (D-245)
+
+**Estado:** migration **163** aplicada (`revisita_dos_contratos`, `mural_post`, bucket
+`mural`, índice `visita (empresa_id, contrato)`). Baterias 33/33 e 29/29. Web
+publicada em 31/10.
+
+### Depende do Emanuel
+- **Publicar o primeiro conteúdo do Mural** (Comunicação › Mural Nexus): o mural
+  nasce vazio; o teste publicado foi apagado.
+- **Mural no aplicativo do técnico?** O pedido foi "dentro do site"; o app não tem.
+- **Revisita fora da janela do LOG?** Hoje a marca de revisita só aparece na janela
+  do LOG (contratos com Contador de log > 0). Contrato que voltou para nós sem LOG da
+  CLARO não aparece lá. Se a revisita tiver de ir para o relatório, para Serviços ou
+  para um indicador, dizer onde.
+
+### Verificação que ninguém fez ainda
+- O Mural aberto pela tela por quem não é ADMIN (só no banco: lê, não publica).
+- O slide passando sozinho com várias imagens; a ordem ↑↓.
+
 ## Pendente depois da 162 — equipamento e miscelânea no relatório, busca de contratos e transições (D-243, D-244)
 
 **Estado:** migration **162** aplicada (`relatorio_miscelanea`). Web publicada (30/10,

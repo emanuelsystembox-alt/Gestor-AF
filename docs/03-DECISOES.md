@@ -10690,3 +10690,71 @@ esqueleto por ~0,5 s e depois os 50 contratos; console sem erro.
 
 **NÃO VERIFICADO:** o recarregar sem apagar a tela depois de uma ação real (testar
 exigiria mudar status de um contrato de produção); conferido só pelo código.
+
+### D-245 · Revisita na janela do LOG, e o Mural Nexus (163)
+
+> "é interessante saber se o contrato já passou pela gente. É importante saber o
+> código de baixa anterior, equipe anterior, data anterior [e o técnico anterior].
+> Para ter um controle mais eficaz de revisita" — Emanuel, 31/10.
+
+**A janela do LOG ganhou a coluna "Anterior aqui"** e um terceiro filtro, "Na nossa
+agenda": Revisita · Já passou, não é revisita · Nunca passou por aqui. O LOG é o
+"Contador de log" da CLARO (a agenda inteira dela); a coluna nova é a NOSSA agenda:
+data e quantos dias antes, grupo, técnico, equipe e código de baixa da visita
+anterior. `revisita_dos_contratos(uuid[])` (163), INVOKER — a anterior é lida pelo
+RLS de quem pergunta.
+
+**"Anterior"** = a visita CONCLUÍDA mais recente do contrato antes desta; sem
+nenhuma concluída, a mais recente de qualquer situação, e a tela escreve "Cancelada
+— não concluiu". Baixa = a da operadora na menor sequência (como a 033); sem ela, a
+da AFLINE. "Nunca passou por aqui" só vale desde o começo da importação de cada
+cidade (Manaus 17/10, São Luís 29/10).
+
+**A regra de revisita** — perguntada e respondida (31/10):
+- a anterior tem de estar **concluída** (reagendado, cancelado e improdutivo não
+  geram revisita — o contrato reagendado aparece em dias seguidos com a mesma WO);
+- a nova em até **30 dias**;
+- o par de grupos: **qualquer grupo → VISITA TECNICA** ("VT da VT", e o serviço que
+  virou VT); **ADESAO, MIGRACAO GPON ("MDR"), REINSTALACAO, MUDANCA DE ENDERECO →
+  RETORNO DE CREDENCIADA**; **RETORNO → RETORNO**.
+- **Recusados, a pedido:** SERVICO→SERVICO (109 pares no banco) e ADESAO→ADESAO (84).
+  Na resposta vieram marcadas juntas "Qualquer coisa → VT" e "Nenhum desses"; lidas
+  como: só o "→ VT" entra além da frase original.
+
+Medido como `authenticated` (ADMIN, Manaus, 24 a 31/10): 2.238 contratos, 391 já
+tinham passado, 184 com anterior concluída, **99 revisitas**, 336 ms. Na tela, a
+janela do LOG de 31/10: 4 revisitas, 16 que passaram sem ser revisita, 8 que nunca
+passaram. Índice novo em `visita (empresa_id, contrato)` — a busca da anterior é por
+contrato e a coluna não tinha índice.
+
+> "crie um canal de comunicação dentro do site (...) Mural Nexus (...) um slide
+> passando uma imagem e embaixo vai ter descrições (...) campanhas da empresa,
+> ganhadores de cidades, ganhadores de prêmios, semana de segurança, setembro
+> amarelo (...) somente o admin poderá enviar conteúdos (...) todo o restante do
+> time poderá visualizar" — Emanuel, 31/10.
+
+**Mural Nexus** (`/mural`, menu "Comunicação", o primeiro do menu e para todos que
+usam o site): slide de imagens que passa sozinho a cada 7 s (para com o mouse em
+cima ou o foco dentro; setas, bolinhas e ← →), e os dizeres embaixo. O ADMIN, na
+mesma tela, publica (imagem JPG/PNG/WEBP até 5 MB, título, dizeres), edita, muda a
+ordem, tira do ar sem apagar e apaga.
+
+- **Quem barra é o banco:** `mural_post` com RLS (lê a empresa; INSERT, UPDATE e
+  DELETE só `tem_papel('ADMIN')`) e bucket privado `mural` com policies iguais; o
+  caminho começa pela empresa e a policy compara TEXTO (sem cast, D-116). A imagem
+  sai por URL assinada.
+- **O autor é carimbado pelo servidor** (gatilho `mural_post_carimbo`): o teste
+  mandou o id de outra pessoa e o banco gravou o ADMIN que publicou (D-061).
+- Publicar sobe a imagem e depois grava a linha (se a linha falhar, a imagem é
+  apagada); apagar tira a linha e depois a imagem.
+- Não é para o técnico no aplicativo: o pedido foi "dentro do site". Se for para o
+  campo também, é tela nova no app.
+
+**VERIFICADO:** `tsc` e `build`; baterias `testar_policies()` 33/33 e
+`testar_campo()` 29/29; nenhuma tabela sem RLS; nenhuma `SECURITY DEFINER` para o
+`anon`. Como `authenticated`: SUPERVISOR lê o post e é recusado ao publicar, editar
+e apagar. Na tela (ADMIN): publicada uma imagem de teste ("TESTE — apagar"), slide
+e legenda apareceram, e o "Apagar" deixou 0 linhas e 0 arquivos no banco.
+
+**NÃO VERIFICADO:** o Mural aberto por quem não é ADMIN pela tela (testado no
+banco); o slide passando com várias imagens (havia só a de teste); a ordem ↑↓.

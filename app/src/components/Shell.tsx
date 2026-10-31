@@ -116,6 +116,15 @@ const ROBO: Modulo = {
     { para: '/controle/sincronismo', rotulo: 'Sincronismo', icone: 'sincronismo' },
   ],
 }
+/** 163: o canal da AFLINE com o time. Para TODOS que usam o site — por
+ *  isso fora de Operação, que é só da gestão. Quem publica é o ADMIN,
+ *  e isso o banco decide, não o menu. */
+const COMUNICACAO: Modulo = {
+  chave: 'comunicacao', titulo: 'Comunicação', icone: 'mural', itens: [
+    { para: '/mural', rotulo: 'Mural Nexus', icone: 'mural',
+      busca: 'mural campanha aviso comunicado premio ganhadores setembro amarelo seguranca' },
+  ],
+}
 const FUTURO: Modulo = {
   chave: 'futuro', titulo: 'Próximas fases', icone: 'relatorios', itens: [
     { para: '/financeiro', rotulo: 'Financeiro', icone: 'produtividade', futuro: true },
@@ -132,6 +141,7 @@ function useModulos(): Modulo[] {
   // 161: o item que exige uma chave some para quem não a tem.
   const filtrar = (m: Modulo): Modulo => ({ ...m, itens: m.itens.filter(i => !i.permissao || pode(i.permissao)) })
   return [
+    COMUNICACAO,
     ...(gestao ? [filtrar(OPERACAO)] : []),
     ...(gestao && (pode('campo.humor') || pode('campo.ocorrencias'))
       ? [CAMPO_EQUIPE(pode('campo.humor'), pode('campo.ocorrencias'))] : []),

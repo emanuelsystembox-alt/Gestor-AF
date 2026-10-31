@@ -495,6 +495,21 @@ entrada** (Emanuel, 19/10).
 
 ---
 
+## Revisita (163, D-245)
+
+**Revisita é regra do Emanuel, não reincidência.** A `reincidencia` (033) é qualquer
+visita anterior do mesmo contrato. Revisita (`revisita_dos_contratos`) exige: a
+anterior **concluída** (reagendado, cancelado e improdutivo não contam), a nova em
+até **30 dias**, e o par de grupos: qualquer → VISITA TECNICA; ADESAO, MIGRACAO GPON,
+REINSTALACAO, MUDANCA DE ENDERECO → RETORNO DE CREDENCIADA; RETORNO → RETORNO.
+SERVICO→SERVICO e ADESAO→ADESAO **não** contam (perguntado, 31/10). Não escreva a
+regra de novo em outra tela: chame a função.
+
+## Mural Nexus (163, D-245)
+
+**Só o ADMIN publica; todo o time lê.** No banco (RLS de `mural_post` e do bucket
+`mural`), não na tela. O autor é carimbado por gatilho.
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)
