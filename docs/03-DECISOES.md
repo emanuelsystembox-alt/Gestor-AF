@@ -10877,7 +10877,7 @@ a 375 px e apagada em seguida. Ela mostrou um defeito: o clarão azul, sem desfo
 de 116 para 126 px para pesar junto do letreiro.
 
 **Publicado:** `eas update` canal preview, runtime 0.5.0 (update group `60f953cf`);
-APK 0.5.0 com o nome novo na fila da EAS (build `e992bcd0`). `app.json`/`eas.json`
+APK 0.5.0 com o nome novo gerado na EAS (build `e992bcd0`, FINISHED): https://expo.dev/artifacts/eas/eAwCkdXU08e7zo2pX2JAWvADLn-n9t4zc1zBKeSJsn0.apk. `app.json`/`eas.json`
 conferidos intactos depois dos comandos da EAS.
 
 **NÃO VERIFICADO:** a tela no celular de verdade — a fonte condensada do Android, o

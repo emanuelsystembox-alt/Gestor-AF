@@ -459,7 +459,7 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 **Estado:** tela Entrar nova (AFLINE assina, símbolo do Nexus, letreiro NEXUS /
 MANAGER), nome embaixo do ícone "Nexus Manager" (`app.json` `name`), textos do app
 que diziam "Gestor AF" trocados. Pelo ar: update group `60f953cf` (runtime 0.5.0). APK
-0.5.0 na fila da EAS (build `e992bcd0`) — **é o APK a instalar**: o anterior
+0.5.0 gerado na EAS (build `e992bcd0`, FINISHED) — **é o APK a instalar**: https://expo.dev/artifacts/eas/eAwCkdXU08e7zo2pX2JAWvADLn-n9t4zc1zBKeSJsn0.apk —: o anterior
 (`ec0a04d5`) ainda tem o nome "Gestor AF Campo".
 
 ### Verificação que ninguém fez ainda
