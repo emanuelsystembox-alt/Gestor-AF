@@ -74,6 +74,14 @@ inclusive função de **gatilho** (foi assim que `aviso_do_evento` escapou
 na 059 e precisou da 061). Confira com `has_function_privilege`, **não
 com o lint**, que demora a atualizar.
 
+**Restaurar o dump num Supabase self-hosted abre as funções ao `anon`.** O
+self-hosted dá `GRANT` automático (default privileges) a `anon`, `authenticated`
+e `service_role` em todo objeto criado; o `pg_dump` só grava o que difere do
+padrão do Postgres e não traz a retirada. No ensaio de 31/10 as **250
+`SECURITY DEFINER` ficaram executáveis por quem não está logado** (na nuvem: 0)
+— e as duas baterias não pegariam isso. Depois de qualquer restauração: a
+conferência 2 abaixo, e `perm-conferir.sql` (ver `docs/12-VPS-ERP.md`).
+
 **`bases_visiveis()` é a cidade ATIVA, não todas as que a pessoa pode ver**
 (103, D-180). O que ela PODE ver é `bases_permitidas()`: ADMIN todas;
 os demais, `perfil.base_id` + `usuario_base`. O COP **não** é mais global.

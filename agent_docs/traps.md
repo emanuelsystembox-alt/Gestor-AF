@@ -629,6 +629,20 @@ D-242). Antes de commitar `03-DECISOES.md`, `grep -n "^### D-" | tail` e confira
 que nenhum número aparece duas vezes — e antes de escolher um número, releia o fim
 do arquivo, não o que estava lá no começo da sessão.
 
+**O `setup.sh` do Supabase self-hosted troca o Docker da máquina — mesmo com
+`--skip-deps`.** Em 31/10, na VPS erp, rodou um `apt install docker-ce …` que
+removeu o `docker.io` do Ubuntu, falhou no `dpkg` e deixou o serviço do Docker
+PARADO: o n8n do alisson, que mora na mesma máquina, caiu ~3 min. Numa VPS que já
+tem container de outra pessoa, não rode instalador que mexe em pacote do sistema:
+baixe só a pasta `docker/` do repositório e gere os segredos com `utils/`. Se
+acontecer: `systemctl start docker`, depois `dpkg --configure -a`, e confira
+`dpkg --audit`. Ver `docs/12-VPS-ERP.md`.
+
+**Porta publicada pelo Docker passa por cima do firewall.** `ports: "8000:8000"`
+abre para a internet mesmo com `ufw` fechado. O compose oficial do Supabase
+publica a API (8000) e o banco (5432/6543) assim. Prenda em `127.0.0.1:` num
+override próprio e teste DE FORA (`curl` no IP público), não só `ss -tlnp`.
+
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`
 ou `campo/`.
