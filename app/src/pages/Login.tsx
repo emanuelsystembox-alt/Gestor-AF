@@ -130,8 +130,11 @@ export default function Login() {
 
         {/* ---- quem financia, o nome do sistema, a frase e as fotos ---- */}
         <div className="flex flex-col gap-7">
-          <div className="flex items-center gap-4" style={subir(pronto)}>
-            <SeloAFLINE largura={84} />
+          <div className="flex items-center gap-5" style={subir(pronto)}>
+            {/* 31/10: o selo cresceu (de 84 para até 118 px) — a AFLINE paga o
+                sistema e tem de pesar na entrada, sem precisar escrever isso
+                (Emanuel). Em tela estreita encolhe com a largura. */}
+            <SeloAFLINE largura="clamp(92px,9vw,118px)" />
             {/* Sem "uma iniciativa AFLINE": o logo já diz de quem é. As duas
                 frases juntas, a história e o rumo (Emanuel, 30/10). */}
             <span className="entrada-titulo flex flex-col gap-1 border-l border-[#dde0ea] pl-4 leading-tight">
@@ -203,6 +206,9 @@ export default function Login() {
                        px-7 pb-9 pt-12 shadow-[0_40px_90px_-40px_rgba(14,15,20,.35),0_0_0_1px_rgba(14,15,20,.04)]
                        sm:px-11">
             <div className="flex flex-col items-center gap-2 text-center">
+              {/* 31/10: o selo da AFLINE, pequeno, em cima do nome do sistema —
+                  a dona aparece também na porta de entrada (Emanuel). */}
+              <SeloAFLINE largura={46} sombra="leve" />
               <span className="entrada-titulo flex items-center gap-2 text-xs font-extrabold tracking-[.28em]
                                text-[#1d5fbf]">
                 <SimboloNexus largura={22} parado />
@@ -325,11 +331,18 @@ function MarcaAF({ largura, cor = ['#ff4d58', '#c10f1b'], line = '#d4121f', esti
  * Os traços do AF são os mesmos do ícone da aba (`public/favicon.svg`).
  * Redesenhado em SVG, e não a foto: nítido em qualquer tamanho.
  */
-function SeloAFLINE({ largura }: { largura: number | string }) {
+function SeloAFLINE({ largura, sombra = 'forte' }: {
+  largura: number | string
+  /** A sombra de 26 px é do selo grande; num selo de 46 px ela vira borrão. */
+  sombra?: 'forte' | 'leve'
+}) {
   const id = useRef(`sl${Math.random().toString(36).slice(2, 8)}`).current
   return (
     <svg viewBox="0 0 200 200" role="img" aria-label="AFLINE" className="shrink-0"
-      style={{ width: largura, height: 'auto', filter: 'drop-shadow(0 16px 26px rgba(14,15,20,.28))' }}>
+      style={{ width: largura, height: 'auto',
+               filter: sombra === 'forte'
+                 ? 'drop-shadow(0 16px 26px rgba(14,15,20,.28))'
+                 : 'drop-shadow(0 4px 8px rgba(14,15,20,.22))' }}>
       <defs>
         <radialGradient id={`${id}f`} cx=".68" cy=".22" r=".95">
           <stop offset="0" stopColor="#4a4f5b" /><stop offset=".55" stopColor="#2b2f38" />

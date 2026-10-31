@@ -456,9 +456,8 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ## Pendente em 31/10/2026 — permissões, Coordenador, usuários, leva 160 e 161 (D-235 a D-241)
 
-**Estado:** migrations 155 a 161d aplicadas. Site publicado a partir do commit
-`8269ff2`, gerado numa cópia limpa (sem a troca de nome para NEXUS, que outra sessão
-commitou depois em `7858fea` — publicar o site de novo leva o nome junto). Edge Function
+**Estado:** migrations 155 a 161d aplicadas. Site publicado em 31/10 já com o nome
+NEXUS MANAGER (D-242) e o selo da AFLINE maior na entrada, também em cima do "Entrar". Edge Function
 `admin-usuarios` na versão 4 (fonte em `supabase/functions/`). App: o que vai até a 158
 foi publicado em 30/10 (`eas update`, canal preview, runtime 0.5.0, commit `fa63569`,
 APK 0.5.0 build `ec8d223c`); **o GPS de alta precisão (161) não foi publicado**.
