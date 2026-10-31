@@ -433,7 +433,15 @@ falta o olho de quem usa.
 
 ## Pendente em 31/10/2026 — permissões, Coordenador e gerenciar usuários (D-235 a D-239)
 
-Migrations 155 a 159. Site publicado; app do técnico **não** publicado.
+Migrations 155 a 159. Site publicado. **App publicado em 30/10** pelo ar (`eas update`,
+canal preview, runtime 0.5.0, commit `fa63569`) e APK 0.5.0 novo gerado (build
+`ec8d223c`).
+
+Antes de publicar, o app foi conferido contra o banco de hoje: as 52 RPCs que ele chama
+existem, nenhuma com duas assinaturas; só 156e e 156g mexeram em RPCs do app, e o código
+publicado é o que chama essas versões; os 10 tipos de `aviso` do CHECK são exatamente os
+que o app conhece; zero `erro_app` em 7 dias; nenhuma dependência nativa nova desde o
+APK 0.5.0 (por isso a atualização pelo ar basta).
 
 ### Resolvido nesta leva
 - Permissões por login (exceções em cima do perfil) no Editar cadastro (157, D-237).
@@ -458,8 +466,10 @@ Migrations 155 a 159. Site publicado; app do técnico **não** publicado.
 - **VT por equipe**: a régua é Status do TOA (CONCLUÍDO × NÃO CONCLUÍDO) e dá ~100%
   para quase todos (529 × 7 em 14 dias). Se precisar separar quem resolveu, trocar
   para código produtivo × improdutivo.
-- **Publicar o app** (`eas update`): observação do COP, casa do cliente, grupos e o
-  Coordenador só chegam aos celulares assim.
+- ~~**Publicar o app**~~ — feito em 30/10. O técnico recebe fechando o app de vez e
+  abrindo de novo (até duas aberturas).
+- **GPS de alta precisão durante a execução**: só proposto. Decidir se vale o custo de
+  bateria antes de construir.
 
 ### Construção que ficou para depois
 - Cenários da 159 em `testar_policies()` (gestor de usuários não edita ADMIN, não dá
@@ -473,7 +483,6 @@ Migrations 155 a 159. Site publicado; app do técnico **não** publicado.
   mensagem, avisos) — ficaram de fora de propósito, mas ninguém revisou uma a uma.
 - Importação da planilha de cidade: a etapa 2 (criar os acessos) não retoma se a
   tela fechar no meio (D-233).
-- GPS de alta precisão durante a execução, no app (proposto, não feito).
 
 ### Verificação que ninguém fez ainda
 - O login do Renan aberto pela tela (rota, selos, Editar, Nova senha) — tudo foi
