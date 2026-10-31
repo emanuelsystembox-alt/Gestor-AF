@@ -607,6 +607,15 @@ mexeu, compare as permissões RESOLVIDAS antes de aceitar:
 eram as mesmas com e sem a lista inchada: o que a EAS escreveu era
 redundante, e o certo foi restaurar o arquivo.
 
+**Duas sessões na mesma pasta pegam o MESMO número de decisão — e o commit de
+uma leva o texto da outra.** Em 30/10 a sessão da entrada Nexus escreveu D-241 em
+`docs/03-DECISOES.md` sem commitar; a sessão da 161 escreveu outro D-241 no mesmo
+arquivo e commitou o arquivo inteiro, com o texto das duas. O número que já foi
+citado em outro documento commitado fica; o outro é renumerado (o Nexus virou
+D-242). Antes de commitar `03-DECISOES.md`, `grep -n "^### D-" | tail` e confira
+que nenhum número aparece duas vezes — e antes de escolher um número, releia o fim
+do arquivo, não o que estava lá no começo da sessão.
+
 **O Node resolve pacote pela pasta do script, não pelo `cwd`.** Script
 avulso que importa `@supabase/supabase-js` tem de estar dentro de `app/`
 ou `campo/`.

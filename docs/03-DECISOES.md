@@ -10410,59 +10410,6 @@ maior ficaria com o recorte do Monitoramento incompleto.
 
 ---
 
-### D-241 · A entrada vira NEXUS MANAGER, com a AFLINE assinando
-
-> "agora não será mais Gestor AF, prestador de serviço CLARO. vai ser NEXUS
-> MANAGER, tem que ter sim agora a logo da AFLINE por que ela que esta
-> financiando o sistema" — Emanuel, 30/10.
-
-**O nome é o título.** O h1 da entrada (`pages/Login.tsx`) passou de "16 anos
-conectando vidas." para o letreiro **NEXUS / MANAGER**, com o símbolo ao lado e
-"Sistema de gestão inteligente" embaixo. Letreiro em texto de verdade (Exo 2), não
-imagem: é o que o leitor de tela anuncia (`aria-label="Nexus Manager"`, porque as
-duas palavras são blocos e sairiam "NEXUSMANAGER"). O símbolo é o átomo do logo
-que o Emanuel mandou, **sem o robô**: em 22 px (o topo do cartão de entrar) um robô
-vira borrão; as duas órbitas continuam legíveis.
-
-**Azul + vermelho.** O azul é do Nexus, o vermelho é da AFLINE — o par do logo. O
-degradê do NEXUS segue o desenho (NE azul, X na virada, US vermelho); no tema claro
-o meio escurece (`#2b78d8`, `#e8212e`) porque `#4f9bff` sobre o fundo fica abaixo
-de 3:1. A rede do fundo passou a ter nós e pulsos nas duas cores.
-
-**A AFLINE assina em cima**, com o AF e duas frases: "**16 anos** conectando
-vidas." e "Conectados com o futuro." — a história e o rumo. "Uma iniciativa
-AFLINE" chegou a entrar e **saiu a pedido** ("acho que não precisa dizer isso"): o
-logo já diz de quem é. "16 anos conectando vidas" chegou a sair e **voltou a
-pedido**.
-
-**Saíram, a pedido:** o cartão "Fibra no Brasil" (os 27 estados acendendo) e a
-chamada "Do Oiapoque ao Chuí, quem conecta o Brasil é o campo.", trocada por "Na
-velocidade da fibra, do despacho à baixa." (o Emanuel pediu conexão e velocidade).
-
-**A abertura** termina no letreiro (branco sobre o escuro) em vez do "16 anos"; o
-AF continua montando no começo — a AFLINE apresenta, o Nexus aparece.
-
-**O cartão "Clientes conectados" subiu** (`lg:-top-20`): o "NEXUS MANAGER" do topo
-do formulário é mais largo que o "GESTOR AF" e ficava embaixo dele (medido: o
-cartão ia até x=1272, o rótulo começava em 1256).
-
-**O título da aba** virou "Nexus Manager" (`index.html`).
-
-**NÃO MUDOU (fora do pedido, que era a entrada):** o cabeçalho de dentro do
-sistema, o ícone da aba (ainda o AF), os textos "Gestor AF" em Serviços, Equipes,
-Sincronismo e na planilha de cadastro, e o aplicativo do campo.
-
-**VERIFICADO:** `tsc` e `build`; no navegador (2046 px e 375 px): o letreiro cabe
-no celular sem rolagem lateral (vai até 359 de 375 px), MANAGER fecha a largura do
-NEXUS, o cartão de clientes não cobre mais o rótulo, fontes Exo 2 800 carregadas.
-
-**NÃO VERIFICADO:** a abertura animada à vista — a aba do painel estava escondida
-(`visibilityState: hidden`), e aba escondida não desenha; o fecho foi conferido só
-pelo DOM (letreiro, cores e textos presentes). O tema escuro da entrada não existe
-(ela é clara de propósito, D-011).
-
----
-
 ### D-241 · As decisões de 31/10: permissões que passam a valer, Victoria, Flavio, VT pelo código e GPS de alta precisão (161)
 
 > Respostas do Emanuel às pendências de 31/10, item a item.
@@ -10520,3 +10467,64 @@ navegador, o menu do ADMIN inteiro e a aba VT com o texto da régua nova.
 barrado pela trava de segurança da sessão (publicação em produção); o comando ficou
 para o Emanuel. Nada do GPS de alta precisão rodou num celular. O menu de quem NÃO é
 ADMIN não foi aberto pela tela (testado só o banco).
+
+---
+
+### D-242 · A entrada vira NEXUS MANAGER, com a AFLINE assinando
+
+> "agora não será mais Gestor AF, prestador de serviço CLARO. vai ser NEXUS
+> MANAGER, tem que ter sim agora a logo da AFLINE por que ela que esta
+> financiando o sistema" — Emanuel, 30/10.
+
+**O nome é o título.** O h1 da entrada (`pages/Login.tsx`) passou de "16 anos
+conectando vidas." para o letreiro **NEXUS / MANAGER**, com o símbolo ao lado e
+"Sistema de gestão inteligente" embaixo. Letreiro em texto de verdade (Exo 2), não
+imagem: é o que o leitor de tela anuncia (`aria-label="Nexus Manager"`, porque as
+duas palavras são blocos e sairiam "NEXUSMANAGER"). O símbolo é o átomo do logo
+que o Emanuel mandou, **sem o robô**: em 22 px (o topo do cartão de entrar) um robô
+vira borrão; as duas órbitas continuam legíveis.
+
+**Azul + vermelho.** O azul é do Nexus, o vermelho é da AFLINE — o par do logo. O
+degradê do NEXUS segue o desenho (NE azul, X na virada, US vermelho); no tema claro
+o meio escurece (`#2b78d8`, `#e8212e`) porque `#4f9bff` sobre o fundo fica abaixo
+de 3:1. A rede do fundo passou a ter nós e pulsos nas duas cores.
+
+**O selo original da AFLINE** (círculo grafite, AF vermelho, LINE branco com o
+traço) substituiu o AF solto em cima do letreiro: "incluir o simbolo original da
+afline onde esta AF quase apagado" (Emanuel, 30/10). O LINE vermelho fino sobre o
+fundo claro sumia; no círculo escuro tem contraste. Redesenhado em SVG
+(`SeloAFLINE`) com os traços do `favicon.svg`, e não a foto mandada: a foto não
+chegou como arquivo, e SVG fica nítido em qualquer tamanho. A abertura (fundo
+escuro) continua com o AF que se monta em partes.
+
+**A AFLINE assina em cima**, com o selo e duas frases: "**16 anos** conectando
+vidas." e "Conectados com o futuro." — a história e o rumo. "Uma iniciativa
+AFLINE" chegou a entrar e **saiu a pedido** ("acho que não precisa dizer isso"): o
+logo já diz de quem é. "16 anos conectando vidas" chegou a sair e **voltou a
+pedido**.
+
+**Saíram, a pedido:** o cartão "Fibra no Brasil" (os 27 estados acendendo) e a
+chamada "Do Oiapoque ao Chuí, quem conecta o Brasil é o campo.", trocada por "Na
+velocidade da fibra, do despacho à baixa." (o Emanuel pediu conexão e velocidade).
+
+**A abertura** termina no letreiro (branco sobre o escuro) em vez do "16 anos"; o
+AF continua montando no começo — a AFLINE apresenta, o Nexus aparece.
+
+**O cartão "Clientes conectados" subiu** (`lg:-top-20`): o "NEXUS MANAGER" do topo
+do formulário é mais largo que o "GESTOR AF" e ficava embaixo dele (medido: o
+cartão ia até x=1272, o rótulo começava em 1256).
+
+**O título da aba** virou "Nexus Manager" (`index.html`).
+
+**NÃO MUDOU (fora do pedido, que era a entrada):** o cabeçalho de dentro do
+sistema, o ícone da aba (ainda o AF), os textos "Gestor AF" em Serviços, Equipes,
+Sincronismo e na planilha de cadastro, e o aplicativo do campo.
+
+**VERIFICADO:** `tsc` e `build`; no navegador (2046 px e 375 px): o letreiro cabe
+no celular sem rolagem lateral (vai até 359 de 375 px), MANAGER fecha a largura do
+NEXUS, o cartão de clientes não cobre mais o rótulo, fontes Exo 2 800 carregadas.
+
+**NÃO VERIFICADO:** a abertura animada à vista — a aba do painel estava escondida
+(`visibilityState: hidden`), e aba escondida não desenha; o fecho foi conferido só
+pelo DOM (letreiro, cores e textos presentes). O tema escuro da entrada não existe
+(ela é clara de propósito, D-011).

@@ -15,6 +15,9 @@
 >   cadastro novo.
 > - As telas não se recarregam sozinhas: o Atualizar (manual / 2 / 5 min) é quem manda.
 > - A Edge Function `admin-usuarios` agora tem fonte no repositório.
+> - **O sistema se chama NEXUS MANAGER** (D-242). A entrada já mostra o nome, com
+>   o selo da AFLINE, que financia; o resto do sistema ainda diz "Gestor AF"
+>   (ver as pendências de 30/10 em `docs/08-ESTADO-DO-PROJETO.md`).
 
 ---
 

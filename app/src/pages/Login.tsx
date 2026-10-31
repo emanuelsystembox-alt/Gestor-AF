@@ -23,16 +23,27 @@ import { INDICADORES_ENTRADA, type IndicadoresEntrada } from '../lib/entrada'
  * │ "Esqueci minha senha": diz quem troca (a Administração), em vez   │
  * │   de prometer um e-mail que o sistema não envia (D-173).           │
  * └────────────────────────────────────────────────────────────────────┘
+ *
+ * ┌─ NEXUS MANAGER (Emanuel, 30/10 — D-242) ──────────────────────────┐
+ * │ > "agora não será mais Gestor AF, prestador de serviço CLARO. vai │
+ * │ >  ser NEXUS MANAGER, tem que ter sim agora a logo da AFLINE por  │
+ * │ >  que ela que esta financiando o sistema"                         │
+ * │ O letreiro NEXUS / MANAGER é o título da página (o h1). A AFLINE  │
+ * │ assina em cima: o AF com "16 anos conectando vidas." (que era o   │
+ * │ título) e "Conectados com o futuro." — a história e o rumo. Sem   │
+ * │ "uma iniciativa AFLINE", que o Emanuel tirou (o logo já diz de    │
+ * │ quem é). Azul (Nexus) + vermelho                                   │
+ * │ (AFLINE) são o par do logo; a rede do fundo pulsa nas duas cores.  │
+ * │ Saíram, a pedido: o cartão "Fibra no Brasil" (os 27 estados) e a   │
+ * │ chamada "Do Oiapoque ao Chuí", trocada por uma de velocidade.      │
+ * └────────────────────────────────────────────────────────────────────┘
  */
 
 const ABERTURA_VISTA = 'entrada:abertura-vista'
 
-/** Norte → Sul, por região: é assim que o mapa "acende". */
-const UFS = ['AM', 'PA', 'AP', 'RR', 'AC', 'RO', 'TO',
-             'MA', 'PI', 'CE', 'RN', 'PB', 'PE', 'AL', 'SE', 'BA',
-             'MT', 'MS', 'GO', 'DF',
-             'MG', 'ES', 'RJ', 'SP',
-             'PR', 'SC', 'RS']
+/** O par do logo: o azul do Nexus encontra o vermelho da AFLINE. */
+const AZUL = ['#4f9bff', '#1d5fbf'] as const
+const VERMELHO = ['#ff4d58', '#c10f1b'] as const
 
 const FRASES_DA_ABERTURA: [string, string][] = [
   ['Mais clientes ', 'conectados.'],
@@ -44,7 +55,7 @@ const FRASES_DA_ABERTURA: [string, string][] = [
 const CHAMADAS = [
   'A fibra chega. O sorriso fica.',
   'Cada O.S. fechada é uma família conectada.',
-  'Do Oiapoque ao Chuí, quem conecta o Brasil é o campo.',
+  'Na velocidade da fibra, do despacho à baixa.',
   'Qualidade que se mede. Cuidado que se sente.',
 ]
 
@@ -104,40 +115,47 @@ export default function Login() {
   return (
     <main className="entrada relative min-h-screen w-full overflow-hidden bg-[#f6f7fb] text-[#0e0f14]">
       <Constelacao />
+      {/* Dois brilhos, um de cada cor da marca: o vermelho da AFLINE à
+          direita (onde sempre esteve) e o azul do Nexus atrás do letreiro. */}
       <div aria-hidden className="pointer-events-none absolute right-[-10vw] top-[-20vw] h-[60vw] w-[60vw]
                                   rounded-full"
         style={{ background: 'radial-gradient(closest-side,rgba(232,33,46,.10),rgba(232,33,46,0))' }} />
+      <div aria-hidden className="pointer-events-none absolute left-[-18vw] top-[2vw] h-[56vw] w-[56vw]
+                                  rounded-full"
+        style={{ background: 'radial-gradient(closest-side,rgba(29,95,191,.10),rgba(29,95,191,0))' }} />
 
       {/* ================= 01 · entrar ================= */}
       <section className="relative mx-auto grid min-h-screen max-w-[1320px] items-center gap-16
                           px-4 py-12 sm:px-10 lg:grid-cols-2 lg:gap-[72px] lg:py-14">
 
-        {/* ---- a marca, a frase e as fotos ---- */}
+        {/* ---- quem financia, o nome do sistema, a frase e as fotos ---- */}
         <div className="flex flex-col gap-7">
-          <div className="flex items-center gap-[18px]" style={subir(pronto)}>
-            <MarcaAF largura={150} />
-            <div className="flex flex-col gap-1.5 border-l border-[#dde0ea] pl-[18px]">
-              <span className="entrada-titulo text-xs font-extrabold tracking-[.28em] text-[#d4121f]">
-                GESTOR AF
+          <div className="flex items-center gap-4" style={subir(pronto)}>
+            <SeloAFLINE largura={84} />
+            {/* Sem "uma iniciativa AFLINE": o logo já diz de quem é. As duas
+                frases juntas, a história e o rumo (Emanuel, 30/10). */}
+            <span className="entrada-titulo flex flex-col gap-1 border-l border-[#dde0ea] pl-4 leading-tight">
+              <span className="text-[17px] font-bold text-[#1b1e27]">
+                <span className="font-black italic text-[#d4121f]">16 anos</span> conectando vidas.
               </span>
-              <span className="text-sm text-[#5b6275]">Prestador de serviço Claro</span>
-            </div>
+              <span className="text-[15px] font-semibold text-[#4a5064]">Conectados com o futuro.</span>
+            </span>
           </div>
 
-          <h1 className="entrada-titulo m-0 flex flex-col leading-[.95] tracking-[-.02em]"
-            style={subir(pronto, .12)}>
-            <span className="pr-2 font-black italic text-transparent"
-              style={{
-                fontSize: 'clamp(52px,6.4vw,92px)',
-                background: 'linear-gradient(100deg,#ff4d58,#c10f1b)',
-                WebkitBackgroundClip: 'text', backgroundClip: 'text',
-              }}>
-              16 anos
+          <div className="flex flex-col gap-4" style={subir(pronto, .12)}>
+            {/* aria-label: as duas palavras são blocos, e o leitor de tela
+                juntaria em "NEXUSMANAGER". */}
+            <h1 aria-label="Nexus Manager" className="m-0 flex items-center gap-[clamp(14px,1.6vw,24px)]">
+              <SimboloNexus largura="clamp(78px,8.6vw,124px)" />
+              <LetreiroNexus />
+            </h1>
+            <span className="entrada-titulo flex items-center gap-3 text-xs font-semibold
+                             tracking-[.18em] text-[#4a5064] sm:text-sm sm:tracking-[.3em]">
+              <span aria-hidden className="h-[2px] w-7 flex-none rounded-sm"
+                style={{ background: `linear-gradient(90deg,${AZUL[1]},${VERMELHO[1]})` }} />
+              SISTEMA DE GESTÃO INTELIGENTE
             </span>
-            <span className="font-extrabold" style={{ fontSize: 'clamp(46px,5.6vw,80px)' }}>
-              conectando vidas.
-            </span>
-          </h1>
+          </div>
 
           <div style={subir(pronto, .24)}><Chamadas /></div>
 
@@ -171,8 +189,11 @@ export default function Login() {
 
         {/* ---- o cartão de entrar, com os cartões que flutuam ---- */}
         <div className="relative flex flex-col items-center gap-5 lg:py-10">
+          {/* Alto o bastante para pousar só na margem de cima do cartão:
+              mais baixo, ele tampava o "NEXUS MANAGER" do topo do formulário
+              (mais largo que o antigo "GESTOR AF"). */}
           {ind?.clientes && (
-            <div className="z-[2] hidden lg:absolute lg:-left-2.5 lg:-top-1.5 lg:block" style={subir(pronto, .6)}>
+            <div className="z-[2] hidden lg:absolute lg:-left-2.5 lg:-top-20 lg:block" style={subir(pronto, .6)}>
               <CartaoClientes c={ind.clientes} />
             </div>
           )}
@@ -182,7 +203,11 @@ export default function Login() {
                        px-7 pb-9 pt-12 shadow-[0_40px_90px_-40px_rgba(14,15,20,.35),0_0_0_1px_rgba(14,15,20,.04)]
                        sm:px-11">
             <div className="flex flex-col items-center gap-2 text-center">
-              <span className="entrada-titulo text-xs font-extrabold tracking-[.28em] text-[#d4121f]">GESTOR AF</span>
+              <span className="entrada-titulo flex items-center gap-2 text-xs font-extrabold tracking-[.28em]
+                               text-[#1d5fbf]">
+                <SimboloNexus largura={22} parado />
+                NEXUS MANAGER
+              </span>
               <h2 className="entrada-titulo m-0 text-[34px] font-extrabold tracking-[-.01em]">Entrar</h2>
               <span className="text-base text-[#5b6275]">Acesse com seu e-mail e senha</span>
             </div>
@@ -243,14 +268,6 @@ export default function Login() {
               Acesso restrito. Cada ação fica registrada com o seu nome.
             </div>
           </form>
-
-          {/* Encostado na BORDA de baixo do cartão, e não por cima do texto:
-              com os 27 estados ele ficou mais alto que o do desenho (7 do
-              Norte) e tampava o "Esqueci minha senha". */}
-          <div className="z-[2] w-full max-w-[440px] lg:absolute lg:-right-4 lg:top-[calc(100%-3.5rem)] lg:w-auto"
-            style={subir(pronto, .75)}>
-            <CartaoBrasil aceso={pronto} />
-          </div>
         </div>
       </section>
 
@@ -300,6 +317,42 @@ function MarcaAF({ largura, cor = ['#ff4d58', '#c10f1b'], line = '#d4121f', esti
   )
 }
 
+/**
+ * O selo original da AFLINE: o AF vermelho num círculo grafite, com o LINE
+ * em branco e o traço embaixo (Emanuel, 30/10: "incluir o simbolo original
+ * da afline onde esta AF quase apagado"). O AF solto, com o LINE vermelho
+ * fino sobre o fundo claro, sumia; no círculo escuro ele tem contraste.
+ * Os traços do AF são os mesmos do ícone da aba (`public/favicon.svg`).
+ * Redesenhado em SVG, e não a foto: nítido em qualquer tamanho.
+ */
+function SeloAFLINE({ largura }: { largura: number | string }) {
+  const id = useRef(`sl${Math.random().toString(36).slice(2, 8)}`).current
+  return (
+    <svg viewBox="0 0 200 200" role="img" aria-label="AFLINE" className="shrink-0"
+      style={{ width: largura, height: 'auto', filter: 'drop-shadow(0 16px 26px rgba(14,15,20,.28))' }}>
+      <defs>
+        <radialGradient id={`${id}f`} cx=".68" cy=".22" r=".95">
+          <stop offset="0" stopColor="#4a4f5b" /><stop offset=".55" stopColor="#2b2f38" />
+          <stop offset="1" stopColor="#17191f" />
+        </radialGradient>
+        <linearGradient id={`${id}a`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ff4a54" /><stop offset="1" stopColor="#c81a23" />
+        </linearGradient>
+      </defs>
+      <circle cx={100} cy={100} r={98} fill={`url(#${id}f)`} />
+      {/* o brilho do selo, como no original */}
+      <ellipse cx={128} cy={46} rx={58} ry={26} fill="#fff" opacity={.06} transform="rotate(28 128 46)" />
+      <g fill={`url(#${id}a)`} transform="translate(12 -4) scale(.42)">
+        <path d="M142 136 L152 136 L127 296 L76 296 Z" />
+        <path d="M154 121 L371 121 L358 164.5 L228 164.5 L236 187 L321 187 L308 226 L249 226 L288 338 L229 338 Z" />
+      </g>
+      <text x={40} y={154} fontFamily="'Exo 2'" fontStyle="italic" fontWeight={300} fontSize={31}
+        letterSpacing={3} fill="#fff">LINE</text>
+      <path d="M37 160 H118" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" opacity={.9} />
+    </svg>
+  )
+}
+
 /** As chamadas que se revezam embaixo do título. */
 function Chamadas() {
   const [i, setI] = useState(0)
@@ -331,37 +384,81 @@ function Chamadas() {
 const vidro = 'rounded-[18px] border border-white/90 bg-white/85 backdrop-blur-[14px] ' +
               'shadow-[0_24px_50px_-24px_rgba(14,15,20,.35)]'
 
-/** "Fibra no Brasil": os 27 estados acendendo, do Norte ao Sul. */
-function CartaoBrasil({ aceso }: { aceso: boolean }) {
-  const [n, setN] = useState(0)
-  useEffect(() => {
-    if (!aceso) { setN(0); return }
-    if (menosMovimento()) { setN(UFS.length); return }
-    let k = 0
-    const t = setInterval(() => { k += 1; setN(k); if (k >= UFS.length) clearInterval(t) }, 70)
-    return () => clearInterval(t)
-  }, [aceso])
+/**
+ * O símbolo do Nexus: duas órbitas que se cruzam — a azul (Nexus) e a
+ * vermelha (AFLINE) — em volta de um núcleo com o N. É o átomo do logo,
+ * sem o robô: em 22 px um robô vira borrão, a órbita continua legível.
+ * O sinal correndo em cada órbita é a "velocidade"; para quem pede menos
+ * movimento (ou `parado`), as órbitas ficam e o sinal não corre.
+ */
+function SimboloNexus({ largura, parado = false }: { largura: number | string; parado?: boolean }) {
+  const id = useRef(`nx${Math.random().toString(36).slice(2, 8)}`).current
+  const corre = !parado && !menosMovimento()
+  // A elipse como caminho, para o sinal andar por cima dela.
+  const orbita = 'M4 50 a46 17 0 1 0 92 0 a46 17 0 1 0 -92 0'
+  const orbitas = [
+    { giro: -32, cor: `${id}a`, sinal: '#9cc8ff', dur: '3.2s' },
+    { giro: 32, cor: `${id}v`, sinal: '#ffb3b8', dur: '3.8s' },
+  ]
   return (
-    <div className={`${vidro} flex w-full flex-col gap-3 px-[18px] py-4 lg:w-[350px]`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold tracking-[.08em] text-[#6b7285]">FIBRA NO BRASIL</span>
-        <span className="h-2 w-2 rounded-full bg-[#16a34a]"
-          style={{ animation: menosMovimento() ? undefined : 'afPulsa 1.6s ease-out infinite' }} />
-      </div>
-      <span className="entrada-titulo text-xl font-extrabold leading-[1.15]">
-        Chegando a todo o Brasil, graças ao campo.
+    <svg viewBox="0 0 100 100" aria-hidden className="shrink-0 overflow-visible"
+      style={{ width: largura, height: 'auto', filter: 'drop-shadow(0 14px 22px rgba(29,95,191,.22))' }}>
+      <defs>
+        <linearGradient id={`${id}a`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={AZUL[0]} /><stop offset="1" stopColor={AZUL[1]} />
+        </linearGradient>
+        <linearGradient id={`${id}v`} x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={VERMELHO[0]} /><stop offset="1" stopColor={VERMELHO[1]} />
+        </linearGradient>
+        <radialGradient id={`${id}n`} cx=".35" cy=".3" r=".9">
+          <stop offset="0" stopColor="#3a4052" /><stop offset="1" stopColor="#12141b" />
+        </radialGradient>
+      </defs>
+      {orbitas.map(o => (
+        <g key={o.giro} transform={`rotate(${o.giro} 50 50)`}>
+          <path d={orbita} fill="none" stroke={`url(#${o.cor})`} strokeWidth={5.5} />
+          {corre && (
+            <circle r={3.4} fill={o.sinal}>
+              <animateMotion dur={o.dur} repeatCount="indefinite" path={orbita} />
+            </circle>
+          )}
+        </g>
+      ))}
+      <circle cx={50} cy={50} r={18} fill={`url(#${id}n)`} stroke="#fff" strokeWidth={2.5} />
+      <path d="M42.5 58.5V41.5h4l7 10.6V41.5h4v17h-4l-7-10.6v10.6z" fill="#fff" />
+    </svg>
+  )
+}
+
+/**
+ * O letreiro: NEXUS no degradê do logo (o "NE" azul, o "X" na virada, o
+ * "US" vermelho) e MANAGER em grafite, espaçado para fechar a largura do
+ * NEXUS. Texto de verdade, não imagem: é o h1 da página, e é o que o
+ * leitor de tela anuncia.
+ */
+function LetreiroNexus({ escuro = false }: { escuro?: boolean }) {
+  return (
+    <span className="entrada-titulo flex flex-col">
+      <span className="font-extrabold leading-[.88] tracking-[.02em] text-transparent"
+        style={{
+          fontSize: 'clamp(54px,7.2vw,104px)',
+          // No claro, o meio do degradê escurece: #4f9bff e #ff4d58 sobre o
+          // fundo #f6f7fb ficam abaixo de 3:1 (o piso da AA para texto grande).
+          // backgroundImage, não `background`: o atalho junto do backgroundClip
+          // faz o React avisar (e pode perder o recorte) ao redesenhar.
+          backgroundImage: escuro
+            ? `linear-gradient(90deg,${AZUL[0]} 0%,${AZUL[0]} 36%,${VERMELHO[0]} 58%,${VERMELHO[0]} 100%)`
+            : `linear-gradient(90deg,${AZUL[1]} 0%,#2b78d8 36%,#e8212e 58%,${VERMELHO[1]} 100%)`,
+          WebkitBackgroundClip: 'text', backgroundClip: 'text',
+        }}>
+        NEXUS
       </span>
-      <div className="flex flex-wrap gap-[5px]">
-        {UFS.map((uf, k) => (
-          <span key={uf}
-            className="flex h-[26px] min-w-[30px] items-center justify-center rounded-lg px-1.5 text-xs font-semibold"
-            style={{ background: k < n ? '#e8212e' : '#eceef4', color: k < n ? '#fff' : '#6b7285',
-                     transition: 'background .4s ease, color .4s ease' }}>
-            {uf}
-          </span>
-        ))}
-      </div>
-    </div>
+      <span className="font-semibold leading-none"
+        style={{ fontSize: 'clamp(21px,2.75vw,40px)', letterSpacing: '.36em',
+                 color: escuro ? '#e9ebf1' : '#1b1e27', marginTop: '.18em' }}>
+        MANAGER
+      </span>
+    </span>
   )
 }
 
@@ -546,14 +643,17 @@ function Abertura({ ind, aoRevelar, aoTerminar }: {
               </div>
             )
           })}
-          <div className="entrada-titulo absolute inset-0 flex flex-col items-center justify-center gap-1"
+          {/* O fecho: a AFLINE (o AF lá em cima) apresenta o Nexus Manager. */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4"
             style={{ opacity: fim ? 1 : 0, filter: `blur(${fim ? 0 : 16}px)`, transform: fim ? 'scale(1)' : 'scale(.92)',
                      transition: 'opacity .9s ease, filter 1s ease, transform 1.4s cubic-bezier(.2,.8,.2,1)' }}>
-            <span className="pr-2.5 font-black italic leading-none text-transparent"
-              style={{ fontSize: 'clamp(44px,7vw,110px)', background: 'linear-gradient(100deg,#ff6b73,#d4121f)',
-                       WebkitBackgroundClip: 'text', backgroundClip: 'text' }}>16 anos</span>
-            <span className="font-extrabold leading-[1.05] tracking-[-.02em] text-white"
-              style={{ fontSize: 'clamp(34px,5.4vw,84px)' }}>conectando vidas.</span>
+            <span className="flex items-center gap-[clamp(14px,1.8vw,26px)] text-left">
+              <SimboloNexus largura="clamp(72px,8vw,120px)" />
+              <LetreiroNexus escuro />
+            </span>
+            <span className="entrada-titulo text-sm font-semibold tracking-[.28em] text-[#a3a9b8]">
+              16 ANOS CONECTANDO VIDAS · CONECTADOS COM O FUTURO
+            </span>
           </div>
         </div>
 
@@ -574,7 +674,7 @@ function Abertura({ ind, aoRevelar, aoTerminar }: {
         Pular abertura
       </button>
       <div className="absolute bottom-0 left-0 h-[3px]"
-        style={{ width: on1 ? '100%' : '0%', background: 'linear-gradient(90deg,#ff4d58,#d4121f)',
+        style={{ width: on1 ? '100%' : '0%', background: `linear-gradient(90deg,${AZUL[0]},${VERMELHO[0]})`,
                  transition: on1 ? 'width 9.1s linear' : 'none' }} />
     </div>
   )
@@ -602,8 +702,10 @@ function Constelacao() {
     if (!tela || !ctx) return
     const parado = menosMovimento()
 
-    type P = { x: number; y: number; vx: number; vy: number; vermelho: boolean }
-    let nos: P[] = [], pulsos: { a: P; b: P; t: number }[] = []
+    // Nó colorido: um em cada oito é da marca — metade azul (Nexus), metade
+    // vermelho (AFLINE). E o pulso que corre na ligação também alterna.
+    type P = { x: number; y: number; vx: number; vy: number; cor: 'cinza' | 'azul' | 'vermelho' }
+    let nos: P[] = [], pulsos: { a: P; b: P; t: number; rgb: string }[] = []
     let L = 0, A = 0, quadro = 0
 
     function medir() {
@@ -615,7 +717,7 @@ function Constelacao() {
       nos = Array.from({ length: n }, () => ({
         x: Math.random() * L, y: Math.random() * A,
         vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18,
-        vermelho: Math.random() < .12,
+        cor: (r => r < .065 ? 'azul' : r < .13 ? 'vermelho' : 'cinza')(Math.random()),
       }))
     }
 
@@ -633,8 +735,9 @@ function Constelacao() {
         }
       }
       for (const a of nos) {
-        ctx!.fillStyle = a.vermelho ? 'rgba(232,33,46,.8)' : 'rgba(120,128,150,.55)'
-        ctx!.beginPath(); ctx!.arc(a.x, a.y, a.vermelho ? 2.4 : 1.8, 0, 7); ctx!.fill()
+        ctx!.fillStyle = a.cor === 'vermelho' ? 'rgba(232,33,46,.8)'
+                       : a.cor === 'azul' ? 'rgba(29,95,191,.8)' : 'rgba(120,128,150,.55)'
+        ctx!.beginPath(); ctx!.arc(a.x, a.y, a.cor === 'cinza' ? 1.8 : 2.4, 0, 7); ctx!.fill()
       }
       return ligacoes
     }
@@ -649,14 +752,14 @@ function Constelacao() {
       const ligacoes = desenhar()
       if (ligacoes.length && Math.random() < .05 && pulsos.length < 8) {
         const [a, b] = ligacoes[Math.floor(Math.random() * ligacoes.length)]
-        pulsos.push({ a, b, t: 0 })
+        pulsos.push({ a, b, t: 0, rgb: Math.random() < .5 ? '29,95,191' : '232,33,46' })
       }
       pulsos = pulsos.filter(p => p.t <= 1)
       for (const p of pulsos) {
         p.t += .012
         const x = p.a.x + (p.b.x - p.a.x) * p.t, y = p.a.y + (p.b.y - p.a.y) * p.t
         const g = ctx!.createRadialGradient(x, y, 0, x, y, 8)
-        g.addColorStop(0, 'rgba(232,33,46,.9)'); g.addColorStop(1, 'rgba(232,33,46,0)')
+        g.addColorStop(0, `rgba(${p.rgb},.9)`); g.addColorStop(1, `rgba(${p.rgb},0)`)
         ctx!.fillStyle = g; ctx!.beginPath(); ctx!.arc(x, y, 8, 0, 7); ctx!.fill()
       }
       quadro = requestAnimationFrame(passo)

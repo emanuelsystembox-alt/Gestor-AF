@@ -431,6 +431,29 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 30/10/2026 — o sistema vira NEXUS MANAGER (D-242)
+
+A **entrada** (`pages/Login.tsx`) já é Nexus Manager: letreiro como título, símbolo
+das órbitas, selo da AFLINE com "16 anos conectando vidas. / Conectados com o
+futuro.", sem o cartão "Fibra no Brasil" e sem a chamada do Oiapoque. A aba do
+navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a entrada:
+
+- **Cabeçalho de dentro do sistema** (`Shell`) e **ícone da aba** (`public/favicon.svg`,
+  ainda o AF): decidir se viram Nexus ou se a AFLINE fica.
+- **Textos "Gestor AF"** em Serviços (`TabelaContratos`), Equipes, Sincronismo (a
+  extensão do TOA fala em "login do Gestor AF") e na planilha de cadastro de cidade
+  (`cadastroCidade.ts`, autor e Leia-me).
+- **O aplicativo do campo** (`campo/`): nome, ícone e tela Entrar.
+- **O endereço** continua `gestor-af.pages.dev`; trocar o domínio é outra conversa
+  (o app e a extensão apontam para ele).
+- **A abertura animada não foi vista rodando** — a aba do navegador estava escondida;
+  conferida só pelo DOM. Vale um clique em "Ver abertura".
+- **O selo da AFLINE foi redesenhado em SVG**, a partir dos traços do `favicon.svg`,
+  porque a imagem original não chegou como arquivo. Se houver o arquivo oficial do
+  logo, conferir lado a lado.
+
+---
+
 ## Pendente em 31/10/2026 — permissões, Coordenador, gerenciar usuários e a leva 160 (D-235 a D-240)
 
 Migrations 155 a 160b. Site publicado (último deploy com a 160, commit `69f14bc`).
