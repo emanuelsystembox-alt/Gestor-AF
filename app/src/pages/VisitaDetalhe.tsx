@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
-import { Alerta, Pill } from '../components/ui'
+import { Alerta, Esqueleto, Pill } from '../components/ui'
 import { EquipamentoToa } from '../components/EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
@@ -347,7 +347,29 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
     }
   }, [v])
 
-  if (carregando) return <Casca janela={emJanela}><p className="p-12 text-center text-graf-400">Carregando…</p></Casca>
+  // ┌─ 162 · recarregar não apaga a tela ───────────────────────────────┐
+  // │ `carregar()` roda de novo depois de TODA ação (responder, baixar,   │
+  // │ transferir), e a tela inteira virava "Carregando…" e voltava — a    │
+  // │ rolagem pulava para o topo e a pessoa perdia onde estava. Agora o   │
+  // │ esqueleto só aparece na PRIMEIRA carga (ou em outro contrato); no   │
+  // │ recarregar o conteúdo fica, com o fio de progresso no topo.         │
+  // └─────────────────────────────────────────────────────────────────────┘
+  const recarregando = carregando && !!v && v.id === id
+  if (carregando && !recarregando) return (
+    <Casca janela={emJanela}>
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="aparece-tarde flex items-center gap-3">
+          <div className="esqueleto h-7 w-56" />
+          <div className="esqueleto h-6 w-24 rounded-full" />
+        </div>
+        <Esqueleto linhas={3} className="max-w-2xl" />
+        <div className="grid gap-3 md:grid-cols-2">
+          <Esqueleto linhas={5} />
+          <Esqueleto linhas={5} />
+        </div>
+      </div>
+    </Casca>
+  )
   if (!v) return (
     <Casca janela={emJanela}><div className="p-4">
       <Alerta tipo="erro">{erro}</Alerta>
@@ -435,6 +457,10 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
 
   return (
     <Casca janela={emJanela}>
+      {/* O fio fica preso no topo enquanto recarrega; não empurra nada. */}
+      <div className={`sticky top-0 z-20 -mb-0.5 ${recarregando ? 'barra-carregando' : 'h-0.5'}`}
+        role={recarregando ? 'progressbar' : undefined}
+        aria-label={recarregando ? 'Atualizando o contrato' : undefined} />
       <div className="pagina-entra space-y-3 p-4">
         {/* ---------- cabeçalho ---------- */}
         <div className="flex flex-wrap items-start gap-3">
@@ -522,6 +548,8 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
           ))}
         </div>
 
+        {/* 162: trocar de aba troca o conteúdo com um fade curto. */}
+        <div key={aba} className="aparece">
         {/* ================= DETALHE ================= */}
         {aba === 'detalhe' && (
           <div className="space-y-3">
@@ -1107,6 +1135,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
             )}
           </section>
         )}
+        </div>
       </div>
     </Casca>
   )

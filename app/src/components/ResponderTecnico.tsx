@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useLocation, useNavigate, type Location } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, SITUACOES, EM_ABERTO, type Situacao } from '../lib/supabase'
 import { useCentral } from '../lib/central'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
@@ -100,6 +101,22 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
   semMoldura?: boolean
 }) {
   const { abrirChat, recarregar: recarregarCentral } = useCentral()
+  // 162: "Quando clico em abrir conversa (...) ele abre a janela por trás,
+  // mas não fecha essa" (Emanuel, 30/10). Na JANELA do contrato (rota com
+  // fundo, App.tsx) a conversa abria atrás dela. Agora a janela fecha e
+  // volta para a lista de fundo — direto para ela, e não `-1`, que numa
+  // pilha de "Serviços anteriores" cairia em outro contrato. Na página
+  // cheia não há janela a fechar: a conversa abre por cima, como sempre.
+  const rota = useLocation()
+  const navegar = useNavigate()
+  const fundo = (rota.state as { fundo?: Location } | null)?.fundo
+  function abrirConversa(tecnicoId: string) {
+    if (fundo) {
+      navegar({ pathname: fundo.pathname, search: fundo.search, hash: fundo.hash },
+              { state: fundo.state })
+    }
+    abrirChat(tecnicoId)
+  }
   const [novaSituacao, setNovaSituacao] = useState('')
   const [resposta, setResposta] = useState('')
   const [respondendo, setRespondendo] = useState(false)
@@ -143,7 +160,7 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold">Responder ao técnico</h2>
         {visita.tecnico_responsavel_id && (
-          <button onClick={() => abrirChat(visita.tecnico_responsavel_id)}
+          <button onClick={() => abrirConversa(visita.tecnico_responsavel_id!)}
             className="ml-auto rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
                        hover:border-af-600 hover:text-af-400">
             Abrir conversa com {visita.tecnico?.nome?.split(' ')[0] ?? 'o técnico'}
@@ -167,13 +184,12 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
         </div>
       )}
 
-      {/* O contexto ANTES do formulário: ler, depois responder. */}
-      <p className="mb-1.5 text-[10px] uppercase tracking-wide text-graf-500">
-        As duas últimas atualizações do contrato
-      </p>
-      <UltimasAtualizacoes eventos={eventos} />
-
-      <p className="mb-3 mt-3 text-xs text-graf-400">
+      {/* 162: o formulário EM CIMA, o histórico embaixo — "novo status e
+          resposta ao técnico devem ficar em cima (...) do histórico de
+          conversa" (Emanuel, 30/10). Em 133 a ordem era a inversa ("ler,
+          depois responder"); quem usa todo dia preferiu a resposta à mão.
+          O pedido de ajuda continua no topo: é o que está sendo respondido. */}
+      <p className="mb-3 text-xs text-graf-400">
         Escolha o status que faz sentido e escreva a resposta: ela chega no celular do
         técnico como aviso, junto com a mudança. Encerrar exige todas as O.S. baixadas;
         contrato já encerrado só volta com motivo.
@@ -208,6 +224,11 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
           {respondendo ? 'Enviando…' : 'Responder e mudar status'}
         </button>
       </div>
+
+      <p className="mb-1.5 mt-4 text-[10px] uppercase tracking-wide text-graf-500">
+        As duas últimas atualizações do contrato
+      </p>
+      <UltimasAtualizacoes eventos={eventos} />
     </>
   )
 

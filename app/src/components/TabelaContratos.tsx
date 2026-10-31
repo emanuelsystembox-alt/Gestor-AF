@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Visita } from '../lib/metricas'
 import { SITUACAO_INFO } from '../lib/supabase'
 import { Pill } from './ui'
@@ -336,6 +336,33 @@ export function TabelaContratos({
                   + (mostra.data ? 1 : 0) + (renderAcoes ? 1 : 0)
                   + (temSelecao ? 1 : 0)
 
+  // ┌─ clicar abre, SELECIONAR não (162) ───────────────────────────────┐
+  // │ > "quando eu tento copiar um contrato, ele já vai abrindo a       │
+  // │ >  janela, ele não deixa eu selecionar o contrato como um texto"  │
+  // │ >  — Emanuel, 30/10                                               │
+  // │                                                                    │
+  // │ A linha inteira abre o contrato no clique. Arrastar para marcar o │
+  // │ número termina num `click` (o mouseup), e o duplo-clique que      │
+  // │ marca a palavra começa com um clique simples — os dois abriam a   │
+  // │ janela antes de a seleção existir. Agora:                         │
+  // │  · com texto selecionado, o clique não abre;                      │
+  // │  · o clique simples espera 250 ms; se virar duplo/triplo, desiste.│
+  // │ O preço é abrir um quarto de segundo depois. Botão "abrir" e menu │
+  // │ do botão direito continuam na hora.                                │
+  // └────────────────────────────────────────────────────────────────────┘
+  const esperaClique = useRef<number | null>(null)
+  useEffect(() => () => { if (esperaClique.current) clearTimeout(esperaClique.current) }, [])
+  const temSelecaoDeTexto = () => !!window.getSelection()?.toString().trim()
+  function aoClicarLinha(v: ContratoLinha, e: MouseEvent) {
+    if (!aoAbrir) return
+    if (esperaClique.current) { clearTimeout(esperaClique.current); esperaClique.current = null }
+    if (e.detail > 1 || temSelecaoDeTexto()) return
+    esperaClique.current = window.setTimeout(() => {
+      esperaClique.current = null
+      if (!temSelecaoDeTexto()) aoAbrir(v)
+    }, 250)
+  }
+
   return (
     <table className="w-full text-sm">
       <thead className="border-b border-graf-700 bg-graf-900 text-left
@@ -389,10 +416,20 @@ export function TabelaContratos({
         </tr>
       </thead>
       <tbody>
-        {carregando && (
-          <tr><td colSpan={nCols} className="px-3 py-10 text-center text-graf-400">
-            Carregando…</td></tr>
-        )}
+        {/* 162: o formato das linhas, com brilho, no lugar de "Carregando…". */}
+        {carregando && Array.from({ length: 6 }, (_, i) => (
+          <tr key={`esq-${i}`} className="border-b border-graf-500/25" aria-hidden="true">
+            <td colSpan={nCols} className="px-3 py-3">
+              <div className="aparece-tarde flex items-center gap-4">
+                <div className="esqueleto h-4 w-20" />
+                <div className="esqueleto h-4 w-16" />
+                <div className="esqueleto h-4 w-24" />
+                <div className="esqueleto h-4 flex-1" />
+                <div className="esqueleto h-4 w-28" />
+              </div>
+            </td>
+          </tr>
+        ))}
 
         {!carregando && linhas.length === 0 && vazio && (
           <tr><td colSpan={nCols}>{vazio}</td></tr>
@@ -427,12 +464,12 @@ export function TabelaContratos({
             /* A faixa colorida à esquerda separa um contrato do outro e
                diz a situação antes de qualquer leitura. */
             <tr key={v.id}
-                onClick={aoAbrir ? () => aoAbrir(v) : undefined}
+                onClick={aoAbrir ? e => aoClicarLinha(v, e) : undefined}
                 onContextMenu={aoMenuContexto ? e => {
                   e.preventDefault(); aoMenuContexto(v, e)
                 } : undefined}
                 style={{ ['--cor-sit' as string]: cor }}
-                className={`linha-contrato ${vivo ? 'linha-viva' : ''}
+                className={`aparece linha-contrato ${vivo ? 'linha-viva' : ''}
                             border-b border-graf-500/25
                             [&>td]:border-r [&>td]:border-graf-500/15
                             [&>td:last-child]:border-r-0

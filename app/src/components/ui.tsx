@@ -157,12 +157,31 @@ export function Pill({ situacao, vivo = false }: {
 }
 
 export function Carregando({ texto = 'Carregando…' }: { texto?: string }) {
+  // 162: o fio no topo diz "estou trabalhando" desde o primeiro instante;
+  // o círculo e a palavra só aparecem se a espera passar de ~200 ms — tela
+  // que abre rápido não pisca um spinner (`aparece-tarde`, styles.css).
   return (
-    <div className="sup-controle grid min-h-screen place-items-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-graf-700 border-t-af-500" />
-        <p className="text-sm text-graf-400">{texto}</p>
+    <div className="sup-controle min-h-screen">
+      <div className="barra-carregando" role="progressbar" aria-label={texto} />
+      <div className="aparece-tarde grid min-h-[80vh] place-items-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-graf-700 border-t-af-500" />
+          <p className="text-sm text-graf-400">{texto}</p>
+        </div>
       </div>
+    </div>
+  )
+}
+
+/** 162: o formato do que está vindo — blocos com brilho, no lugar de
+ *  "Carregando…" solto. `linhas` dá a altura aproximada da espera. */
+export function Esqueleto({ linhas = 4, className = '' }: { linhas?: number; className?: string }) {
+  return (
+    <div className={`aparece-tarde space-y-2.5 ${className}`} aria-hidden="true">
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className="esqueleto h-3.5"
+          style={{ width: `${[92, 78, 85, 64, 88, 70][i % 6]}%` }} />
+      ))}
     </div>
   )
 }

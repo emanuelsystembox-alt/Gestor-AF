@@ -113,6 +113,10 @@ export interface VisitaLinha {
   visita_marcador: { indicador_id: string; cumprido: boolean | null }[]
   equipamento_movimento: { operacao: string; serial: string
                            tipo: string | null; modelo: string | null }[]
+  /** 162: o equipamento que a varredura leu do TOA (117, D-192). */
+  visita_equipamento_toa: EquipToa[]
+  /** Quando a varredura leu este contrato; nulo = ainda não lido. */
+  toa_varrido_em: string | null
   // `reincidencia` tem UNIQUE(visita_id), e por isso o PostgREST a trata
   // como um-para-um: vem OBJETO ou null, não array. Tratar como array
   // rebentava a tela inteira em `reincidencia[0]`.
@@ -120,6 +124,12 @@ export interface VisitaLinha {
   /** 096: o melhor contato perguntado ao concluir. Chave = visita_id,
    *  então vem OBJETO ou null (mesma armadilha da reincidência). */
   contato_cliente: { telefone: string | null; login: string | null } | null
+}
+
+interface EquipToa {
+  secao: 'CLIENTE' | 'INSTALADO' | 'DESINSTALADO'
+  tipo: string | null; modelo: string | null; serial: string | null
+  serial_substituido: string | null; miscelanea: boolean
 }
 
 interface Reincidencia {
@@ -153,7 +163,7 @@ export const SELECT_RELATORIO = `
   logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng,
   data_agendada, janela_inicio, janela_fim,
   situacao, situacao_em, inicio, fim, tempo_deslocamento, tec1,
-  produtos_pendentes, tecnologia,
+  produtos_pendentes, tecnologia, toa_varrido_em,
   observacao, bloqueado_em, criado_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
@@ -176,6 +186,7 @@ export const SELECT_RELATORIO = `
   ),
   visita_marcador ( indicador_id, cumprido ),
   equipamento_movimento ( operacao, serial, tipo, modelo ),
+  visita_equipamento_toa ( secao, tipo, modelo, serial, serial_substituido, miscelanea ),
   reincidencia!reincidencia_visita_id_fkey (
     dias_desde,
     anterior:visita_anterior_id (
@@ -273,8 +284,10 @@ export const tecnologiaTxt = (t: string | null | undefined) =>
 /**
  * As colunas que descrevem a VISITA. Saem iguais nos dois relatórios —
  * no "por O.S." elas se repetem em cada ordem, como no sistema atual.
+ * O bloco do equipamento fica no meio e tem largura variável: ver
+ * `cabVisita` e `colunasEquipamento`.
  */
-const CAB_VISITA = [
+const CAB_ANTES_EQUIP = [
   'Operação', 'ID Atividade', 'Origem', 'Situação', 'Data situação', 'Hora situação',
   'WO', 'Contrato', 'Grupo de serviço', 'Tecnologia', 'Tipo de atividade', 'Natureza',
   'Data', 'Janela início', 'Janela fim',
@@ -286,7 +299,9 @@ const CAB_VISITA = [
   'Início', 'Fim', 'Tempo de conclusão', 'Tempo de deslocamento',
   'Aderência à janela', 'TEC1', 'Produtos pendentes',
   'Observação',
-  'Equipamento instalado', 'Equipamento retirado',
+]
+
+const CAB_DEPOIS_EQUIP = [
   'Serviço anterior — data', 'Serviço anterior — dias',
   'Serviço anterior — equipe', 'Serviço anterior — baixa',
   'Serviço anterior — tipo de serviço',
@@ -299,6 +314,62 @@ const CAB_VISITA = [
   'Baixa — distância do endereço (m)', 'Baixa — precisão GPS (m)',
   'Baixa — dentro do raio', 'Baixa — lat', 'Baixa — lng',
 ]
+
+/**
+ * ┌─ 162 · um equipamento por coluna ─────────────────────────────────┐
+ * │ > "equipamento no assinante, equipamento instalado no assinante,  │
+ * │ >  equipamento retirado [...] tanto os equipamentos que importaram│
+ * │ >  automaticamente [quanto] se o técnico colocou manualmente"     │
+ * │ > "instalado 1, instalado 2, instalado 3, instalado 4 [...]       │
+ * │ >  retirado 1, 2, 3 por coluna, para não ter que ficar tudo junto │
+ * │ >  em uma coluna só" — Emanuel, 30/10                             │
+ * │                                                                    │
+ * │ Pelo menos 4 de instalado e 3 de retirado, para a planilha ter a  │
+ * │ mesma forma de um dia para o outro; se algum contrato do arquivo  │
+ * │ tiver mais, o arquivo inteiro ganha as colunas que faltam — cortar│
+ * │ no 4º seria sumir com equipamento calado. "No assinante" continua │
+ * │ numa coluna só (não foi pedido separar).                          │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+const MIN_INSTALADO = 4
+const MIN_RETIRADO = 3
+
+interface Largura { inst: number; retr: number }
+
+function largura(visitas: VisitaLinha[]): Largura {
+  let inst = MIN_INSTALADO, retr = MIN_RETIRADO
+  for (const v of visitas) {
+    inst = Math.max(inst, equipamentos(v, 'INSTALADO', 'INSTALADO').length)
+    retr = Math.max(retr, equipamentos(v, 'DESINSTALADO', 'RETIRADO').length)
+  }
+  return { inst, retr }
+}
+
+function cabVisita(l: Largura): string[] {
+  return [
+    ...CAB_ANTES_EQUIP,
+    'Equipamento no assinante',
+    ...Array.from({ length: l.inst }, (_, i) => `Equipamento instalado ${i + 1}`),
+    ...Array.from({ length: l.retr }, (_, i) => `Equipamento retirado ${i + 1}`),
+    'Equipamento lido do TOA em',
+    ...CAB_DEPOIS_EQUIP,
+  ]
+}
+
+/** Completa a lista até a largura do arquivo: célula vazia, não coluna a menos. */
+const ate = (l: string[], n: number) => [...l, ...Array(Math.max(0, n - l.length)).fill('')]
+
+function colunasEquipamento(v: VisitaLinha, l: Largura): string[] {
+  return [
+    equipamentos(v, 'CLIENTE', null).join(' | '),
+    ...ate(equipamentos(v, 'INSTALADO', 'INSTALADO'), l.inst),
+    ...ate(equipamentos(v, 'DESINSTALADO', 'RETIRADO'), l.retr),
+    // Vazio nas colunas acima só quer dizer "nada" se o TOA foi lido;
+    // senão é "não sabemos", e a coluna diz isso (regra 6).
+    v.toa_varrido_em ? dt(v.toa_varrido_em)
+      : v.tipo_atividade?.natureza === 'JORNADA' ? '' : 'NÃO LIDO',
+  ]
+}
 
 /** SIM / NÃO / NÃO PERGUNTADO — três respostas, nenhuma vazia calada
  *  onde o contrato está concluído (regra 6). */
@@ -317,11 +388,42 @@ function colunasLocal(l: LocalBaixa | undefined): string[] {
   ]
 }
 
-function linhaVisita(v: VisitaLinha, locais?: Map<string, LocalBaixa>): string[] {
-  const inst = v.equipamento_movimento.filter(e => e.operacao === 'INSTALADO')
-  const retr = v.equipamento_movimento.filter(e => e.operacao === 'RETIRADO')
-  const eq = (l: typeof inst) =>
-    l.map(e => [e.serial, e.tipo, e.modelo].filter(Boolean).join(' - ')).join(' | ')
+/**
+ * ┌─ 162 · o equipamento das DUAS fontes, numa lista só ──────────────┐
+ * │ O TOA (lido pela varredura) e o técnico (lançado à mão no         │
+ * │ aplicativo) dizem o mesmo aparelho quando o serial é o mesmo: aí  │
+ * │ sai uma vez, marcado "(TOA E MANUAL)". Serial que só uma fonte tem│
+ * │ sai com a dela — a diferença é o que a conferência quer ver.      │
+ * │ Sem "troca: saiu X" — o que saiu já está na coluna de retirado    │
+ * │ (Emanuel, 30/10: "não precisa dizer troca, sair").                │
+ * │ Miscelânea do TOA NÃO entra aqui: tem relatório próprio (162).    │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+function equipamentos(v: VisitaLinha, toaSecao: EquipToa['secao'],
+                      operacao: 'INSTALADO' | 'RETIRADO' | null): string[] {
+  const chave = (s: string | null) => (s ?? '').trim().toUpperCase()
+  const itens: { serial: string | null; desc: string; toa: boolean; tec: boolean }[] = []
+  for (const t of v.visita_equipamento_toa ?? []) {
+    if (t.miscelanea || t.secao !== toaSecao) continue
+    itens.push({ serial: t.serial, desc: [t.tipo, t.modelo].filter(Boolean).join(' - '),
+                 toa: true, tec: false })
+  }
+  if (operacao) {
+    for (const m of v.equipamento_movimento ?? []) {
+      if (m.operacao !== operacao) continue
+      const ja = chave(m.serial) && itens.find(i => chave(i.serial) === chave(m.serial))
+      if (ja) { ja.tec = true; continue }
+      itens.push({ serial: m.serial, desc: [m.tipo, m.modelo].filter(Boolean).join(' - '),
+                   toa: false, tec: true })
+    }
+  }
+  return itens.map(i => {
+    const fonte = i.toa && i.tec ? 'TOA E MANUAL' : i.toa ? 'TOA' : 'MANUAL'
+    return [i.serial?.trim() || 'SEM SERIAL', i.desc].filter(Boolean).join(' - ') + ` (${fonte})`
+  })
+}
+
+function linhaVisita(v: VisitaLinha, l: Largura, locais?: Map<string, LocalBaixa>): string[] {
   const r: Reincidencia | null = Array.isArray(v.reincidencia)
     ? v.reincidencia[0] ?? null
     : v.reincidencia
@@ -355,7 +457,7 @@ function linhaVisita(v: VisitaLinha, locais?: Map<string, LocalBaixa>): string[]
     v.tempo_deslocamento ?? '',
     aderencia(v), rotuloTec1(v.tec1), produtosPendentes(v.produtos_pendentes),
     v.observacao ?? '',
-    eq(inst), eq(retr),
+    ...colunasEquipamento(v, l),
     r?.anterior ? dia(r.anterior.data_agendada) : '',
     r?.dias_desde == null ? '' : String(r.dias_desde),
     r?.equipe_anterior?.codigo ?? '',
@@ -390,8 +492,9 @@ export function porContrato(
   indicadores: Indicador[],
   locais?: Map<string, LocalBaixa>,
 ): string[][] {
+  const l = largura(visitas)
   const cab = [
-    ...CAB_VISITA,
+    ...cabVisita(l),
     'Qtd O.S.', 'Números das O.S.', 'Descrições das O.S.', 'Origem das O.S.',
     'Status operadora', 'Baixas TOA', 'Baixas AFLINE', 'Sub-falhas',
     'Pontuação CLARO', 'Pontuação equipe', 'Edificação', 'Edificação lida de',
@@ -402,7 +505,7 @@ export function porContrato(
   return [cab, ...visitas.map(v => {
     const p = pontos.get(v.id)
     return [
-      ...linhaVisita(v, locais),
+      ...linhaVisita(v, l, locais),
       String(v.ordem_servico.length),
       listaOS(v, o => o.numero_os),
       listaOS(v, o => o.descricao ?? o.tipo_os?.descricao),
@@ -427,8 +530,9 @@ export function porOS(
   indicadores: Indicador[],
   locais?: Map<string, LocalBaixa>,
 ): string[][] {
+  const l = largura(visitas)
   const cab = [
-    ...CAB_VISITA,
+    ...cabVisita(l),
     'Seq', 'Número O.S.', 'Ordem de serviço', 'Origem da O.S.',
     'Tipo O.S. cód.', 'Tipo O.S.', 'Ponto', 'Produto',
     'Status operadora',
@@ -456,7 +560,7 @@ export function porOS(
       // para a soma da planilha não contar em dobro.
       const primeira = !o || o.sequencia === ordenadas[0].sequencia
       saida.push([
-        ...linhaVisita(v, locais),
+        ...linhaVisita(v, l, locais),
         o ? String(o.sequencia) : '',
         o?.numero_os ?? '',
         o?.descricao ?? o?.tipo_os?.descricao ?? '',

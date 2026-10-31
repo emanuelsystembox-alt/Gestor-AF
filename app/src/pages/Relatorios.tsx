@@ -11,6 +11,7 @@ import { Alerta } from '../components/ui'
 import { isoLocal, pts } from '../lib/formato'
 import { useAuth } from '../lib/auth'
 import { linhasHumor, type HumorLinha } from '../lib/relatorioHumor'
+import { linhasMiscelanea, type MiscelaneaLinha } from '../lib/relatorioMiscelanea'
 
 /**
  * Relatórios — por contrato, por O.S. e o humor das equipes.
@@ -29,22 +30,57 @@ import { linhasHumor, type HumorLinha } from '../lib/relatorioHumor'
  * │ como o técnico se sente é dado sensível de empregado, não número   │
  * │ de operação.                                                        │
  * └─────────────────────────────────────────────────────────────────────┘
+ *
+ * ┌─ 162 · miscelânea, e o período inteiro ──────────────────────────────┐
+ * │ A aba Miscelânea lê `relatorio_miscelanea`: uma linha por item, com  │
+ * │ a fonte (TOA ou técnico) — ver lib/relatorioMiscelanea.ts.           │
+ * │                                                                       │
+ * │ E as leituras passaram a PAGINAR. O PostgREST devolve no máximo mil  │
+ * │ linhas por pedido, e esta tela pedia uma vez só: com ~550 contratos  │
+ * │ por dia, dois dias já saíam cortados, sem aviso — e a pontuação,     │
+ * │ que também é um pedido só, deixava o resto como "SEM REGRA". É a     │
+ * │ mesma armadilha do Dashboard (D-221).                                │
+ * └───────────────────────────────────────────────────────────────────────┘
  */
 
+const PAGINA = 1000
+/** Teto de segurança: 50 mil linhas, muito acima de qualquer mês real. */
+const MAX_PAGINAS = 50
 
+/**
+ * Pede de mil em mil até o lote vir menor. Passar do teto é ERRO, não
+ * corte calado: um relatório pela metade é pior que nenhum.
+ */
+async function paginar<T>(
+  pedir: (de: number, ate: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  vivo: () => boolean,
+): Promise<T[]> {
+  const tudo: T[] = []
+  for (let p = 0; p < MAX_PAGINAS; p++) {
+    const { data, error } = await pedir(p * PAGINA, (p + 1) * PAGINA - 1)
+    if (error) throw new Error(error.message)
+    if (!vivo()) return tudo
+    const lote = (data ?? []) as T[]
+    tudo.push(...lote)
+    if (lote.length < PAGINA) return tudo
+  }
+  throw new Error(`Período grande demais (mais de ${PAGINA * MAX_PAGINAS} linhas). Escolha um intervalo menor.`)
+}
 
 export default function Relatorios() {
   const [de, setDe] = useState(isoLocal())
   const [ate, setAte] = useState(isoLocal())
   const { pode } = useAuth()
   const podeHumor = pode('campo.humor')
-  const [tipo, setTipo] = useState<'contrato' | 'os' | 'humor'>('contrato')
+  const [tipo, setTipo] = useState<'contrato' | 'os' | 'miscelanea' | 'humor'>('contrato')
   const [humor, setHumor] = useState<HumorLinha[]>([])
+  const [misc, setMisc] = useState<MiscelaneaLinha[]>([])
   const [formato, setFormato] = useState<'xlsx' | 'csv'>('xlsx')
   const [linhas, setLinhas] = useState<VisitaLinha[]>([])
   const [pontos, setPontos] = useState<Map<string, PontoVisita>>(new Map())
   const [indicadores, setIndicadores] = useState<Indicador[]>([])
   const [carregando, setCarregando] = useState(false)
+  const [carregandoMisc, setCarregandoMisc] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   // filtros
@@ -79,34 +115,48 @@ export default function Relatorios() {
     return () => { vivo = false }
   }, [tipo, podeHumor, de, ate])
 
+  // A miscelânea também só é pedida com a aba escolhida.
+  useEffect(() => {
+    if (tipo !== 'miscelanea' || !de || !ate) return
+    let vivo = true
+    setCarregandoMisc(true); setErro(null)
+    paginar<MiscelaneaLinha>(
+      (a, b) => supabase.rpc('relatorio_miscelanea', { p_de: de, p_ate: ate }).range(a, b),
+      () => vivo,
+    ).then(ls => { if (vivo) setMisc(ls) })
+      .catch((e: Error) => { if (vivo) { setMisc([]); setErro(e.message) } })
+      .finally(() => { if (vivo) setCarregandoMisc(false) })
+    return () => { vivo = false }
+  }, [tipo, de, ate])
+
   useEffect(() => {
     if (!de || !ate) return
     let vivo = true
     setCarregando(true); setErro(null)
 
-    // Duas chamadas, não uma por linha: a pontuação do período inteiro
-    // resolve num RPC só (D-045).
+    // Duas leituras, não uma por linha: a pontuação do período inteiro
+    // resolve num RPC só (D-045). As duas paginam (162), e a ordem termina
+    // num campo único: sem desempate, a página seguinte repete ou pula linha.
     Promise.all([
-      supabase.from('visita').select(SELECT_RELATORIO)
+      paginar<VisitaLinha>((a, b) => supabase.from('visita').select(SELECT_RELATORIO)
         .is('excluido_em', null)
         .gte('data_agendada', de).lte('data_agendada', ate)
-        .order('data_agendada').order('janela_inicio', { nullsFirst: false }),
-      supabase.rpc('pontos_por_periodo', { p_de: de, p_ate: ate }),
-    ]).then(([v, p]) => {
+        .order('data_agendada').order('janela_inicio', { nullsFirst: false }).order('id')
+        .range(a, b), () => vivo),
+      paginar<PontoVisita>((a, b) => supabase.rpc('pontos_por_periodo', { p_de: de, p_ate: ate })
+        .order('visita_id').range(a, b), () => vivo),
+    ]).then(([ls, ps]) => {
       if (!vivo) return
-      if (v.error) setErro(v.error.message)
-      else {
-        const ls = (v.data ?? []) as unknown as VisitaLinha[]
-        setLinhas(ls)
-        // Onde a baixa do campo foi dada (096) — colunas do analítico.
-        carregarLocais(ls.map(l => l.id)).then(m => { if (vivo) setLocais(m) })
-          .catch(() => { if (vivo) setLocais(new Map()) })
-      }
+      setLinhas(ls)
+      // Onde a baixa do campo foi dada (096) — colunas do analítico.
+      carregarLocais(ls.map(l => l.id)).then(m => { if (vivo) setLocais(m) })
+        .catch(() => { if (vivo) setLocais(new Map()) })
       const m = new Map<string, PontoVisita>()
-      for (const x of (p.data ?? []) as PontoVisita[]) m.set(x.visita_id, x)
+      for (const x of ps) m.set(x.visita_id, x)
       setPontos(m)
-      setCarregando(false)
-    })
+    }).catch((e: Error) => {
+      if (vivo) { setLinhas([]); setPontos(new Map()); setErro(e.message) }
+    }).finally(() => { if (vivo) setCarregando(false) })
     return () => { vivo = false }
   }, [de, ate])
 
@@ -127,14 +177,25 @@ export default function Relatorios() {
     return true
   }), [linhas, semJornada, equipes, grupos, supervisores, situacoes, tecnologia])
 
+  // Os filtros de cima valem também para a miscelânea — exceto jornada e
+  // tecnologia, que são da visita e não vêm na linha do item.
+  const miscFiltrada = useMemo(() => misc.filter(l => {
+    if (equipes.length && !equipes.includes(l.equipe ?? '')) return false
+    if (grupos.length && !grupos.includes(l.grupo_servico ?? '')) return false
+    if (supervisores.length && !supervisores.includes(l.supervisor ?? '')) return false
+    if (situacoes.length && !situacoes.includes(l.situacao as Situacao)) return false
+    return true
+  }), [misc, equipes, grupos, supervisores, situacoes])
+
   const totalOS = filtradas.reduce((s, l) => s + l.ordem_servico.length, 0)
 
   const montado = useMemo(
     () => tipo === 'humor' ? linhasHumor(humor)
+      : tipo === 'miscelanea' ? linhasMiscelanea(miscFiltrada)
       : tipo === 'contrato'
         ? porContrato(filtradas, pontos, indicadores, locais)
         : porOS(filtradas, pontos, indicadores, locais),
-    [filtradas, pontos, indicadores, tipo, locais, humor])
+    [filtradas, pontos, indicadores, tipo, locais, humor, miscFiltrada])
 
   const somaPontos = useMemo(() => {
     let s = 0
@@ -169,11 +230,15 @@ export default function Relatorios() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws,
       tipo === 'humor' ? 'Humor das equipes'
+        : tipo === 'miscelanea' ? 'Miscelânea'
         : tipo === 'contrato' ? 'Por contrato' : 'Por O.S.')
     XLSX.writeFile(wb, `${nome}.xlsx`)
   }
 
   const previa = useMemo(() => montado.slice(0, 8), [montado])
+  // A miscelânea tem leitura própria: o relatório não está pronto enquanto
+  // ela não chega, mesmo que as visitas já tenham chegado.
+  const ocupado = carregando || (tipo === 'miscelanea' && carregandoMisc)
   const totalLinhas = montado.length - 1
 
   const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
@@ -216,6 +281,7 @@ export default function Relatorios() {
               <span className="mb-1 block">Tipo de relatório</span>
               <div className="flex rounded-md bg-graf-900 p-0.5">
                 {([['contrato', 'Por contrato'], ['os', 'Por O.S.'],
+                   ['miscelanea', 'Miscelânea'],
                    ...(podeHumor ? [['humor', 'Humor das equipes'] as const] : []),
                   ] as const).map(([t, rot]) => (
                   <button key={t} onClick={() => setTipo(t)}
@@ -246,7 +312,7 @@ export default function Relatorios() {
               Ocultar jornada
             </label>
 
-            <button onClick={baixar} disabled={carregando || totalLinhas === 0}
+            <button onClick={baixar} disabled={ocupado || totalLinhas === 0}
               className="ml-auto rounded-lg bg-af-600 px-5 py-2 text-sm font-semibold text-white
                          hover:bg-af-500 disabled:opacity-50">
               Baixar {formato === 'xlsx' ? 'Excel' : 'CSV'} · {totalLinhas} linhas ·{' '}
@@ -307,19 +373,31 @@ export default function Relatorios() {
           ))}
         </section>
 
-        <Alerta tipo="info">{PONTUACAO_NA_PRIMEIRA}</Alerta>
+        {tipo === 'miscelanea' ? (
+          <Alerta tipo="info">
+            Uma linha por item lançado no contrato. <strong>Fonte TOA</strong> é o que a
+            varredura leu do TOA; <strong>Fonte MANUAL</strong> é o que o técnico baixou
+            pelo aplicativo. As duas não se somam: contrato que o TOA ainda não leu não
+            tem linha TOA. {miscFiltrada.length} itens em{' '}
+            {new Set(miscFiltrada.map(l => l.visita_id)).size} contratos.
+          </Alerta>
+        ) : (
+          <Alerta tipo="info">{PONTUACAO_NA_PRIMEIRA}</Alerta>
+        )}
 
         <section className="card-controle overflow-hidden">
           <div className="border-b border-graf-800 px-4 py-2.5">
             <h2 className="text-sm font-semibold">
-              Prévia — {tipo === 'contrato' ? 'por contrato' : 'por O.S.'}
+              Prévia — {tipo === 'contrato' ? 'por contrato'
+                : tipo === 'os' ? 'por O.S.'
+                : tipo === 'miscelanea' ? 'miscelânea' : 'humor das equipes'}
             </h2>
             <p className="mt-0.5 text-xs text-graf-400">
               As 7 primeiras linhas do arquivo, exatamente como vão sair. Role para o
               lado: são {montado[0]?.length ?? 0} colunas.
             </p>
           </div>
-          {carregando ? (
+          {ocupado ? (
             <p className="px-4 py-8 text-center text-sm text-graf-400">Carregando…</p>
           ) : totalLinhas === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-graf-500">

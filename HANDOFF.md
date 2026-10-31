@@ -22,6 +22,12 @@
 > - **O sistema se chama NEXUS MANAGER** (D-242). A entrada já mostra o nome, com
 >   o selo da AFLINE, que financia; o resto do sistema ainda diz "Gestor AF"
 >   (ver as pendências de 30/10 em `docs/08-ESTADO-DO-PROJETO.md`).
+> - **Equipamento e miscelânea no relatório** (162, D-243): instalado 1..4 e retirado
+>   1..3 por coluna, das duas fontes (TOA e MANUAL); Relatórios › Miscelânea; os
+>   Relatórios deixaram de cortar em mil linhas. Em Serviços, um número mostra o
+>   histórico do contrato e "Vários contratos" busca a lista no período.
+> - **Responder em cima, conversa fecha o contrato, transições** (D-244); o contrato
+>   não apaga a tela ao recarregar. Pendências: seção "Pendente depois da 162".
 
 ---
 

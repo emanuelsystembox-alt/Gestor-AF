@@ -874,7 +874,10 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
           </div>
         </header>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* 162: cada tela monta o próprio Shell, então trocar de tela é
+            montar um <main> novo — e ele entra suave (só no primeiro
+            desenho; recarregar dados não anima nada). */}
+        <main className="pagina-entra min-w-0 flex-1">{children}</main>
         <ChatControle />
       </div>
     </div>

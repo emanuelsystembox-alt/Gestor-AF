@@ -454,6 +454,56 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Pendente depois da 162 — equipamento e miscelânea no relatório, busca de contratos e transições (D-243, D-244)
+
+**Estado:** migration **162** aplicada (`relatorio_miscelanea`). Web publicada (30/10,
+noite) e conferida no ar procurando os textos novos nos chunks. App não foi tocado.
+Nenhuma mudança de RLS, papel ou permissão: a função nova é `SECURITY DEFINER` com o
+escopo copiado de `visita_leitura`, sem `EXECUTE` para o `anon` (conferido).
+
+### Resolvido nesta leva
+- **Relatório por contrato e por O.S.**: equipamento das duas fontes (TOA lido pela
+  varredura + lançado à mão), um por coluna — Equipamento instalado 1..4+, retirado
+  1..3+, no assinante, e "lido do TOA em" / NÃO LIDO. Origem TOA / MANUAL / TOA E
+  MANUAL; sem "troca: saiu" (pedido do Emanuel). D-243.
+- **Relatórios › Miscelânea**: uma linha por item, fonte TOA ou MANUAL, com equipe,
+  WO, contrato, código SAP, quantidade. D-243.
+- **Relatórios cortava em 1.000 linhas, calado** (visitas e pontuação): agora pagina.
+- **Serviços**: um número (contrato, WO, O.S. ou atividade) mostra o histórico do
+  contrato em todas as datas; botão **"Vários contratos"** para colar a lista e ver o
+  status no período, dizendo quais não vieram; a lista também pagina. D-243.
+- **Selecionar o texto da linha do contrato** não abre mais a janela. D-243.
+- **Responder ao técnico** com o formulário em cima; "Abrir conversa" fecha a janela
+  do contrato; transições e esqueletos de carregamento; o contrato não apaga a tela ao
+  recarregar depois de uma ação. D-244.
+
+### Depende do Emanuel
+- **Regra de correção do lançamento de miscelânea** (TOA × MANUAL) continua em aberto
+  (D-192): o relatório mostra as duas fontes lado a lado, sem somar nem escolher.
+- **Marcadores na lista de contratos**: ficou como está, a pedido ("não é pra mexer").
+
+### Verificação que ninguém fez ainda
+- A paginação dos Relatórios e de Serviços passando de 1.000 linhas **na tela** (a
+  sessão de teste era de São Luís, 200 contratos no mês). A lógica é a mesma do
+  Dashboard (D-221), mas não foi vista com volume.
+- Uma linha MANUAL no relatório de miscelânea com dado real: nenhum técnico lançou
+  miscelânea pelo aplicativo ainda (0 linhas em 30/10).
+- O equipamento MANUAL no relatório com dado real: só existe 1 lançamento, de Manaus.
+  A junção TOA + MANUAL foi conferida com contrato fictício montado na tela.
+- O contrato recarregando sem apagar a tela depois de uma ação de verdade (exigiria
+  mudar status de contrato de produção): conferido só pelo código.
+- As animações com "reduzir movimento" ligado no sistema operacional (regra global já
+  existia; não foi vista).
+
+### Construção que ficou para depois
+- `material_do_toa` (125) tem `or tem_permissao('almoxarifado.ver')` sem filtro de
+  cidade: quem tem almoxarifado lê o material de contrato de OUTRA cidade, se souber o
+  id. Mesmo padrão da armadilha D-235. Não mexido por estar fora do pedido.
+- `visita.contrato` não tem índice. Com 5.561 visitas não pesa (a busca por número faz
+  `in` e `like` em contrato/WO); quando o banco crescer, é o primeiro índice a criar.
+- A busca por WO usa `like '*|número'` só quando a lista tem até 30 números; lista
+  maior procura só contrato, atividade e O.S.
+
 ## Pendente em 31/10/2026 — permissões, Coordenador, usuários, leva 160 e 161 (D-235 a D-241)
 
 **Estado:** migrations 155 a 161d aplicadas. Site publicado em 31/10 já com o nome

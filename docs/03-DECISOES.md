@@ -10528,3 +10528,165 @@ NEXUS, o cartão de clientes não cobre mais o rótulo, fontes Exo 2 800 carrega
 (`visibilityState: hidden`), e aba escondida não desenha; o fecho foi conferido só
 pelo DOM (letreiro, cores e textos presentes). O tema escuro da entrada não existe
 (ela é clara de propósito, D-011).
+
+### D-243 · Equipamento das duas fontes no relatório, e o relatório de miscelânea (162)
+
+> "quando o sistema reconhecer equipamento, equipamento retirado, colocado,
+> preciso que essas informações vá para o relatório [...] equipamento no
+> assinante, equipamento instalado no assinante, equipamento retirado [...]
+> deve sair tanto os equipamentos que importaram automaticamente, se o técnico
+> colocou manualmente" — Emanuel, 30/10.
+
+**Relatório por contrato e por O.S.: equipamento das duas fontes, um por coluna**,
+no lugar das duas colunas antigas, que só liam o lançamento do técnico
+(`equipamento_movimento`, 1 linha no banco inteiro) e ignoravam o que a varredura lê
+do TOA (`visita_equipamento_toa`):
+
+- **Equipamento no assinante** — a seção CLIENTE do TOA (o que já estava lá), numa
+  coluna só.
+- **Equipamento instalado 1, 2, 3, 4…** — TOA INSTALADO + lançado à mão INSTALADO.
+- **Equipamento retirado 1, 2, 3…** — TOA DESINSTALADO + lançado à mão RETIRADO.
+- **Equipamento lido do TOA em** — a hora da varredura, ou **NÃO LIDO**.
+
+> "não precisa dizer troca, sair. Bota só os instalados [...] instalado 1, instalado
+> 2, instalado 3, instalado 4 [...] retirado 1, 2, 3 por coluna, para não ter que
+> ficar tudo junto em uma coluna só [...] deixa a origem" — Emanuel, 30/10.
+
+Cada célula é `serial - tipo - modelo (ORIGEM)`, com ORIGEM = **TOA**, **MANUAL** ou
+**TOA E MANUAL** quando os dois dizem o mesmo serial (sem caixa e sem espaço). A
+primeira versão juntava tudo numa célula com `|` e escrevia `(troca: saiu X)` —
+**recusado** pelo Emanuel: o que saiu já está em "retirado". São no mínimo 4 colunas
+de instalado e 3 de retirado, para a planilha ter a mesma forma todo dia; se um
+contrato do arquivo tiver mais, o arquivo inteiro ganha as colunas que faltam —
+cortar no 4º sumiria com equipamento calado. Miscelânea do TOA não entra nessas
+colunas — tem relatório próprio, onde o lançamento do técnico também se chama MANUAL.
+
+**"NÃO LIDO" existe por causa da regra 6:** colunas de equipamento vazias num
+contrato que a varredura nunca abriu não querem dizer "sem equipamento". Jornada sai
+vazia (não tem equipamento a ler).
+
+> "relatório de miscelânea, vamos deixar em relatórios também [...] deve mostrar a
+> equipe, a WO, contrato, o que ele lançou de cada item" — Emanuel, 30/10.
+
+**Relatórios › Miscelânea:** uma linha por item, `relatorio_miscelanea(de, até)`
+(162). Duas fontes, com a coluna **Fonte**: TOA (o que a varredura leu, 2.179 linhas
+em 30/10) e TÉCNICO (`miscelanea_movimento` CONSUMO pelo aplicativo, **0 linhas** em
+30/10). **Não se somam nem se casam** — a regra de correção do lançamento continua
+em aberto (D-192); é a diferença que a conferência quer ver. Item do TOA sem código
+no catálogo sai sem código, com o nome do TOA.
+
+A função é `SECURITY DEFINER` porque `miscelanea_movimento` e `item_miscelanea` só
+abrem com `almoxarifado.ver`, e o relatório é de quem vê o CONTRATO. O escopo é a
+cópia da policy `visita_leitura` (cidade ativa sempre) — **recusado** copiar o
+`or tem_permissao('almoxarifado.ver')` do `material_do_toa`, que derruba o filtro de
+cidade (D-235). Medido como `authenticated`: com as funções de escopo soltas, 1,4 a
+2,9 s no mês; em `(select …)`, **14 a 70 ms** (D-118). ADMIN em São Luís viu 145
+linhas, em Manaus 2.034 — somam o total do banco; `anon` não executa.
+
+**A tela de Relatórios cortava em mil linhas, calada.** Visitas e pontuação eram um
+pedido só cada, e o PostgREST devolve no máximo 1.000: com ~550 contratos por dia,
+dois dias de Manaus já saíam pela metade, e a pontuação do resto virava "SEM
+REGRA". Agora as três leituras paginam (ordem terminando em campo único), e passar
+de 50 mil linhas é **erro na tela**, não corte. Mesma armadilha da D-221.
+
+**Serviços: o número vira histórico, e a lista em massa ganha caixa própria.**
+
+> "quando eu pesquisar um contrato e ele estiver vindo em outros dias, mostre todo o
+> histórico dele [...] histórico de vezes que ele veio na agenda" e "uma opção onde
+> eu clico e posso colocar mais de um contrato em uma vez para ele pesquisar todos
+> aqueles contratos do dia para ele saber o status, e se eu manipular na data ele
+> também pesquisa em outros dias" — Emanuel, 30/10.
+
+- **Um número na busca** (contrato, WO, O.S. ou ID da atividade do TOA) acha o
+  CONTRATO e mostra todas as vezes que ele veio na agenda, em qualquer dia ("2
+  visitas em 2 dias"). Antes o número só era procurado em `contrato`: colar a WO ou
+  a O.S. dava lista vazia. A WO casa pelo fim (`00696|741537174` ← `741537174`).
+- **"Vários contratos"** abre uma caixa para colar a lista (até 500). Vale o
+  PERÍODO de cima; trocar a data busca de novo. A tela diz quantos vieram e **quais
+  não estão no período**, pelo número. "ver todas as datas" vira histórico.
+- **Defeito que isso consertou:** colar vários números na caixa de cima esvaziava a
+  tela — o filtro de texto procurava a lista inteira dentro de cada campo.
+- A carga da lista também passou a paginar (mesma armadilha das mil linhas).
+
+Os três contratos do print (3148634, 3186579, 3174830) só existem no dia 30/10 no
+banco: São Luís começou a ser importada em 29/10. O LOG 1/LOG 2 deles é o contador
+do TOA, que enxerga a agenda de antes — histórico que o sistema não tem.
+
+**A linha do contrato deixa selecionar o texto.** "quando eu tento copiar um
+contrato, ele já vai abrindo a janela" (Emanuel, 30/10). A linha inteira abre no
+clique, e tanto o arrastar (termina num `click`) quanto o duplo-clique (começa com
+um clique simples) abriam antes de a seleção existir. Agora, com texto selecionado o
+clique não abre, e o clique simples espera 250 ms — se virar duplo ou triplo,
+desiste (`TabelaContratos`, vale para Serviços e Equipes). Conferido com o mouse de
+verdade: duplo-clique e arrastar marcam "8888415" sem abrir; clique simples abre.
+
+**FICOU DE FORA, a pedido:** os marcadores na lista de contratos — "deixar que ele
+já aparece, não é pra mexer" (Emanuel, 30/10).
+
+**VERIFICADO:** `tsc` e `build`; na tela (São Luís, 30/10): as quatro colunas com
+dado real, inclusive troca e NÃO LIDO; a aba Miscelânea com 57 itens em 31
+contratos; pontuação carregando pela leitura paginada; console sem erro. A mescla
+TOA + técnico foi conferida chamando o montador com um contrato fictício (o único
+lançamento manual do banco é de Manaus).
+
+Serviços, na tela (São Luís): a WO 741537174 (só de 29/10) achou o contrato 2799216
+e trouxe 29/10 e 30/10; a lista 2799216 8611260 3174830 deu 3 de 3 em 30/10 e, ao
+trocar para 29/10, 2 de 3 com "1 não está neste período: 3174830". O relatório com
+um contrato de 5 instalados abriu a 5ª coluna nas duas linhas.
+
+**NÃO VERIFICADO:** a paginação passando de mil linhas na tela (a sessão aberta era
+de São Luís, 200 contratos no mês) e a linha TÉCNICO da miscelânea com dado real
+(não existe nenhuma ainda).
+
+### D-244 · Responder em cima, conversa fecha o contrato, e espera mais confortável
+
+> "novo status e resposta ao técnico deve ficar em cima [...] do histórico de
+> conversa", "Quando clico em abrir conversa com a[o] Agivaldo, ele abre a janela
+> por trás, mas não fecha essa" e "Adicione alguns efeitos suaves em transições de
+> janelas, em telas que demoram um pouco mais para carregar" — Emanuel, 30/10.
+
+**Responder ao técnico:** o formulário (Novo status + Resposta) subiu para cima das
+"duas últimas atualizações". Em 133 a ordem era a inversa, de propósito ("ler,
+depois responder"); quem usa todo dia preferiu a resposta à mão. O ticket de suporte
+aberto pelo campo continua no topo — é o que está sendo respondido.
+
+**Abrir conversa fecha a janela do contrato.** A conversa é uma gaveta da Central,
+que fica atrás da janela do contrato (rota com fundo, 156 — `App.tsx`). Agora o botão leva
+para a lista de FUNDO e abre a conversa. Navega direto para o fundo, e não `-1`:
+numa pilha de "Serviços anteriores" o `-1` cairia em outro contrato. Na página cheia
+não há janela a fechar. De carona: para um técnico sem conversa ainda, o cabeçalho
+da gaveta dizia "Escolha uma conversa" (o nome só era procurado em quem já tinha
+conversa) — parecia ter aberto a conversa errada; agora diz o nome e a equipe.
+
+**Espera confortável** (`styles.css`, bloco 162):
+- A janela do contrato entra com o véu em fade e a caixa subindo e assentando
+  (`janela-fundo`/`janela-caixa`, que os outros modais já usavam e ela não).
+- A gaveta de Conversas desliza da direita.
+- Cada tela entra com um fade curto (`pagina-entra` no `<main>` do Shell).
+- A troca de aba do contrato faz fade (opacidade só).
+- Tabela de contratos carregando: **esqueleto** das linhas com brilho, no lugar de
+  "Carregando…"; as linhas que chegam aparecem em fade.
+- Contrato abrindo: esqueleto do cabeçalho e dos blocos.
+- **Recarregar o contrato não apaga mais a tela.** Depois de TODA ação (responder,
+  baixar, transferir) `carregar()` trocava a tela inteira por "Carregando…" e a
+  rolagem voltava ao topo. Agora o conteúdo fica e um fio de progresso corre no topo.
+- Carregamento de tela (lazy): o fio aparece na hora; o círculo e a palavra só
+  depois de ~200 ms — tela rápida não pisca spinner.
+
+**Armadilha evitada:** `janela-caixa` e `pagina-entra` terminavam com
+`transform: translateY(0) scale(1)` (`animation-fill-mode: both`). Não muda o
+desenho, mas faz do elemento o referencial de todo `position: fixed` dentro dele —
+o "menu abrindo longe do clique" (D-169). Pôr `pagina-entra` no `<main>` de TODAS as
+telas com `both` espalharia isso pelo sistema. As duas passaram a `backwards` e
+terminam em `transform: none`; medido na janela do contrato: `transform` final =
+`none`. Fades de troca no lugar (aba, linhas) são só opacidade. Quem pediu menos
+movimento no sistema operacional continua sem animação (regra global no fim do CSS).
+
+**VERIFICADO:** `tsc` e `build`; na tela (São Luís): janela com as duas animações e
+`transform: none` no fim; formulário antes do histórico no contrato 8888415;
+"Abrir conversa com AGIVALDO" fechou a janela (voltou a `/controle/servicos`) e abriu
+a gaveta com "AGIVALDO FERREIRA · equipe 113"; trocar a data mostrou 6 linhas de
+esqueleto por ~0,5 s e depois os 50 contratos; console sem erro.
+
+**NÃO VERIFICADO:** o recarregar sem apagar a tela depois de uma ação real (testar
+exigiria mudar status de um contrato de produção); conferido só pelo código.

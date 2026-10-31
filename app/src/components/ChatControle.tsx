@@ -110,6 +110,18 @@ export function ChatControle() {
 
   useEffect(() => { if (chatAberto) carregarConversas() }, [chatAberto])
 
+  // 162: aberta por "Abrir conversa com X" (janela do contrato) para um
+  // técnico SEM conversa ainda, o cabeçalho procurava o nome só em
+  // `conversas` e dizia "Escolha uma conversa" — parecia que tinha aberto
+  // a conversa errada. O nome sai da lista de técnicos, então ela vem.
+  useEffect(() => {
+    if (!chatAberto || !chatTecnico || tecnicos.length) return
+    if (conversas.some(c => c.tecnico_id === chatTecnico)) return
+    supabase.from('tecnico').select('id, nome, usuario_id, equipe:equipe_id ( codigo )')
+      .eq('situacao', 'ATIVO').order('nome')
+      .then(({ data }) => setTecnicos((data ?? []) as unknown as TecnicoOpcao[]))
+  }, [chatAberto, chatTecnico, conversas, tecnicos.length])
+
   // As duas listas de "com quem falar" só quando for começar conversa nova.
   useEffect(() => {
     if (!novo) return
@@ -255,8 +267,8 @@ export function ChatControle() {
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Conversas">
-      <div className="absolute inset-0 bg-black/40" onClick={fecharChat} />
-      <div className="sup-controle absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col border-l
+      <div className="janela-fundo absolute inset-0 bg-black/40" onClick={fecharChat} />
+      <div className="gaveta-entra sup-controle absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col border-l
                       border-graf-800 bg-graf-950 shadow-2xl">
         {/* 156g: duas chaves no topo. Os GRUPOS (todos os membros escrevem)
             não se misturam com as conversas a dois -- cada um é uma caixa. */}

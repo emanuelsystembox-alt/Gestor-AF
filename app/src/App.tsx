@@ -111,10 +111,12 @@ function JanelaContrato() {
     // fundo sólido (`styles.css`, fora das camadas do Tailwind, ganha do
     // `bg-black/60`) e o véu virava uma parede branca no tema claro — a
     // lista de trás sumia e parecia que o sistema tinha travado (31/10).
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
+    // 162: o véu entra com fade e a caixa sobe e assenta — as mesmas
+    // `janela-fundo`/`janela-caixa` dos outros modais, que esta não usava.
+    <div className="janela-fundo fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
                     bg-black/50 p-3 sm:p-6"
       onClick={() => navegar(-1)}>
-      <div className="sup-controle relative w-full max-w-[96rem] rounded-xl border border-graf-700 bg-graf-950 shadow-2xl"
+      <div className="janela-caixa sup-controle relative w-full max-w-[96rem] rounded-xl border border-graf-700 bg-graf-950 shadow-2xl"
         role="dialog" aria-modal="true" aria-label="Contrato"
         onClick={e => e.stopPropagation()}>
         <button onClick={() => navegar(-1)} title="Fechar e voltar (Esc)" aria-label="Fechar"

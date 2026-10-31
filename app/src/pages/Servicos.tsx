@@ -64,6 +64,57 @@ function supervisorDo(v: V): string | null {
 interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
 type V = ContratoLinha
 
+/** Teto da busca em massa: o in.(…) vai na URL, e 500 contratos já são ~5 KB. */
+const MAX_MASSA = 500
+
+/** Os números de 6+ dígitos de um texto colado, sem repetir. */
+function numerosDe(texto: string): string[] {
+  return [...new Set(texto.match(/\d{6,}/g) ?? [])]
+}
+
+/** Valor para o `in.(…)` do PostgREST: entre aspas, para vírgula não quebrar a lista. */
+const lista = (xs: string[]) => xs.map(x => `"${x.replace(/"/g, '')}"`).join(',')
+
+/**
+ * ┌─ 162 · o número que a pessoa digitou → o CONTRATO ─────────────────┐
+ * │ Até aqui a busca por número só procurava em `contrato`. Quem colava │
+ * │ a WO, a O.S. ou o ID da atividade do TOA via a lista vazia — e      │
+ * │ concluía que o contrato não existia. Agora o número é procurado nos │
+ * │ quatro lugares, e o que volta é o CONTRATO: é por ele que o         │
+ * │ histórico se monta (todas as vezes que veio na agenda).            │
+ * │ A WO vem como "00696|741543349": casa pelo fim, depois da barra.   │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+async function resolverNumeros(nums: string[]): Promise<{ contratos: string[]; ids: string[] }> {
+  const filtros = [`contrato.in.(${lista(nums)})`, `toa_atividade_id.in.(${lista(nums)})`]
+  // A WO é um `like` por número; numa lista grande isso vira uma URL enorme,
+  // e quem cola 300 contratos está colando contratos.
+  if (nums.length <= 30) filtros.push(...nums.map(n => `wo_numero.like.*|${n}`))
+  const [v, o] = await Promise.all([
+    supabase.from('visita').select('id, contrato').is('excluido_em', null).or(filtros.join(',')),
+    supabase.from('ordem_servico').select('visita:visita_id ( id, contrato )').in('numero_os', nums),
+  ])
+  if (v.error) throw new Error(v.error.message)
+  if (o.error) throw new Error(o.error.message)
+  const achadas = [
+    ...((v.data ?? []) as { id: string; contrato: string | null }[]),
+    ...((o.data ?? []) as unknown as { visita: { id: string; contrato: string | null } | null }[])
+      .map(x => x.visita).filter((x): x is { id: string; contrato: string | null } => !!x),
+  ]
+  return {
+    contratos: [...new Set(achadas.map(a => a.contrato).filter((c): c is string => !!c))],
+    // Visita sem contrato (cadastro manual antigo) entra pelo próprio id.
+    ids: [...new Set(achadas.filter(a => !a.contrato).map(a => a.id))],
+  }
+}
+
+/** O número da lista aparece nesta visita? (contrato, WO, atividade ou O.S.) */
+function visitaTemNumero(v: V, n: string): boolean {
+  return v.contrato === n || v.toa_atividade_id === n
+    || !!v.wo_numero?.endsWith(`|${n}`)
+    || v.ordem_servico.some(o => o.numero_os === n)
+}
+
 export default function Servicos() {
   const [params] = useSearchParams()
   // ┌─ o Dashboard entra aqui pela URL ────────────────────────────────┐
@@ -239,7 +290,7 @@ export default function Servicos() {
   // que só a janela usava. Quem precisa delas agora é VisitaDetalhe, e
   // ela as carrega sozinha.
 
-  // ---- histórico do contrato (D-069) e busca em GRUPO (D-105) ----
+  // ---- histórico do contrato (D-069), busca em GRUPO (D-105) e em MASSA (162) ----
   // Um número de contrato inteiro deixa de ser filtro do período e vira
   // a pergunta "o que já aconteceu neste contrato" — o período
   // esconderia justamente as outras visitas.
@@ -249,17 +300,38 @@ export default function Servicos() {
   // período volta a valer por padrão, porque quem cola 40 contratos
   // quase sempre quer o dia (ou o mês) que está na tela — e pode
   // desligar isso num clique.
+  //
+  // ┌─ 162 · o campo de "Vários contratos" ─────────────────────────────┐
+  // │ > "um campo, uma opção onde eu clico e posso colocar mais de um   │
+  // │ >  contrato em uma vez para ele pesquisar todos aqueles contratos │
+  // │ >  do dia para ele saber o status, e se eu manipular na data ele  │
+  // │ >  também pesquisa em outros dias" — Emanuel, 30/10               │
+  // │                                                                    │
+  // │ Colar 40 números na mesma caixa da busca de texto funcionava pela │
+  // │ metade: o filtro de texto procurava a lista INTEIRA ("3148634     │
+  // │ 3186579") dentro de cada campo e esvaziava a tela. A lista ganhou  │
+  // │ caixa própria; a busca de cima continua livre para estreitar.     │
+  // │ Vale o PERÍODO de cima, e trocar a data busca de novo. A tela diz │
+  // │ quais números da lista não estão no período — "não veio" é        │
+  // │ informação, não lista curta calada.                               │
+  // └────────────────────────────────────────────────────────────────────┘
   const [contratosBuscados, setContratosBuscados] = useState<string[]>([])
   /** Na busca por contrato, respeitar o período escolhido em cima. */
   const [contratoNoPeriodo, setContratoNoPeriodo] = useState(false)
+  /** 162: a lista colada no campo "Vários contratos" (aplicada). */
+  const [massa, setMassa] = useState<string[]>([])
+  const [massaAberta, setMassaAberta] = useState(false)
+  const [massaTexto, setMassaTexto] = useState('')
 
   useEffect(() => {
-    const achados = (busca.match(/\d{6,}/g) ?? [])
+    // Com a lista em massa aplicada, a caixa de cima é só filtro de texto
+    // sobre o que a lista trouxe.
+    if (massa.length) { setContratosBuscados([]); return }
     const t = busca.trim()
     // Só vale como lista de contrato se a busca for SÓ números e
     // separadores — senão "R JOAO 123456" viraria busca de contrato.
-    const soNumeros = t.length > 0 && /^[\d\s,;\n\r.-]+$/.test(t)
-    const alvo = soNumeros ? [...new Set(achados)] : []
+    const soNumeros = t.length > 0 && /^[\d\s,;\n\r.|-]+$/.test(t)
+    const alvo = soNumeros ? numerosDe(t) : []
     // Espera o usuário parar de digitar: sem isto, "226803663" dispara
     // nove consultas.
     const id = setTimeout(() => {
@@ -270,42 +342,90 @@ export default function Servicos() {
       else setContratoNoPeriodo(true)
     }, 350)
     return () => clearTimeout(id)
-  }, [busca])
+  }, [busca, massa.length])
+
+  /** Os números que a consulta procura: a lista em massa, ou o que foi digitado. */
+  const numeros = massa.length ? massa : contratosBuscados
+  const chaveNumeros = numeros.join(',')
+
+  function aplicarMassa() {
+    const ns = numerosDe(massaTexto).slice(0, MAX_MASSA)
+    setMassa(ns)
+    // A lista em massa é "do dia": o período de cima vale.
+    setContratoNoPeriodo(true)
+    if (ns.length) setMassaAberta(false)
+  }
+  function limparMassa() {
+    setMassa([]); setMassaTexto(''); setMassaAberta(false); setContratoNoPeriodo(false)
+  }
 
 
 
 
 
   useEffect(() => {
-    if (!contratosBuscados.length && (!de || !ate)) return
+    const nums = chaveNumeros ? chaveNumeros.split(',') : []
+    if (!nums.length && (!de || !ate)) return
     let vivo = true
     setCarregando(true); setErro(null)
 
-    // Contrato excluido some da lista, mas continua no banco (D-043).
-    let q = supabase.from('visita').select(SELECT).is('excluido_em', null)
-    if (contratosBuscados.length) {
-      q = contratosBuscados.length === 1
-        ? q.eq('contrato', contratosBuscados[0])
-        : q.in('contrato', contratosBuscados)
-      // O grupo pode ser lido dentro do período ou dia a dia, como o
-      // histórico de um contrato só.
-      if (contratoNoPeriodo && de && ate) {
-        q = q.gte('data_agendada', de).lte('data_agendada', ate)
-      }
-    } else {
-      q = q.gte('data_agendada', de).lte('data_agendada', ate)
-    }
+    ;(async () => {
+      try {
+        // Número → contratos (162). Sem nada achado, a lista é vazia — e a
+        // tela diz quais números não vieram, em vez de mostrar o período.
+        let porNumero: string | null = null
+        if (nums.length) {
+          const { contratos, ids } = await resolverNumeros(nums)
+          if (!vivo) return
+          const partes = [
+            ...(contratos.length ? [`contrato.in.(${lista(contratos)})`] : []),
+            ...(ids.length ? [`id.in.(${lista(ids)})`] : []),
+          ]
+          if (!partes.length) {
+            setLinhas([]); setAtualizadoEm(new Date()); setCarregando(false)
+            return
+          }
+          porNumero = partes.join(',')
+        }
 
-    q.order('data_agendada', { ascending: false })
-      .order('janela_inicio', { ascending: true, nullsFirst: false })
-      .then(({ data, error }) => {
-        if (!vivo) return
-        if (error) setErro(error.message)
-        else { setLinhas((data ?? []) as unknown as V[]); setAtualizadoEm(new Date()) }
-        setCarregando(false)
-      })
+        // Pagina até acabar: o PostgREST devolve no máximo mil por pedido,
+        // e uma semana de Manaus passa disso (D-221). A ordem termina no
+        // `id` para a página seguinte não repetir nem pular linha.
+        const PAGINA = 1000
+        const tudo: V[] = []
+        for (let p = 0; p < 30; p++) {
+          // Contrato excluido some da lista, mas continua no banco (D-043).
+          let q = supabase.from('visita').select(SELECT).is('excluido_em', null)
+          if (porNumero) q = q.or(porNumero)
+          // O grupo pode ser lido dentro do período ou dia a dia, como o
+          // histórico de um contrato só.
+          if ((!porNumero || contratoNoPeriodo) && de && ate) {
+            q = q.gte('data_agendada', de).lte('data_agendada', ate)
+          }
+          const { data, error } = await q
+            .order('data_agendada', { ascending: false })
+            .order('janela_inicio', { ascending: true, nullsFirst: false })
+            .order('id')
+            .range(p * PAGINA, (p + 1) * PAGINA - 1)
+          if (!vivo) return
+          if (error) throw new Error(error.message)
+          const lote = (data ?? []) as unknown as V[]
+          tudo.push(...lote)
+          if (lote.length < PAGINA) break
+        }
+        setLinhas(tudo); setAtualizadoEm(new Date())
+      } catch (e) {
+        if (vivo) setErro((e as Error).message)
+      }
+      if (vivo) setCarregando(false)
+    })()
     return () => { vivo = false }
-  }, [de, ate, versao, contratosBuscados, contratoNoPeriodo])
+  }, [de, ate, versao, chaveNumeros, contratoNoPeriodo])
+
+  /** 162: os números da lista em massa que não vieram nesta consulta. */
+  const naoAchados = useMemo(
+    () => massa.filter(n => !linhas.some(v => visitaTemNumero(v, n))),
+    [massa, linhas])
 
   /**
    * ┌─ O CONTROLE DEIXA DE CLICAR EM ATUALIZAR ─────────────────────┐
@@ -366,7 +486,10 @@ export default function Servicos() {
     () => ({ ...filtro, situacao: 'TODAS' }), [filtro])
 
   const semSituacao = useMemo(() => {
-    const t = busca.trim().toLowerCase()
+    // Número(s) digitado(s) em cima já foram resolvidos no servidor (162):
+    // filtrar de novo pelo texto apagaria a WO (que aqui tem "00696|") e
+    // a lista colada inteira, que não cabe em campo nenhum.
+    const t = contratosBuscados.length ? '' : busca.trim().toLowerCase()
     return base.filter(v => {
       // Grupo, origem, resultado, responsável, bucket, segmento: a regra é a
       // mesma de Equipes, e mora em um lugar só (lib/filtroContratos).
@@ -386,7 +509,7 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, filtroSemSituacao, busca, area, supervisor, equipe, tecnologia])
+  }, [base, filtroSemSituacao, busca, contratosBuscados, area, supervisor, equipe, tecnologia])
 
   const visiveis = useMemo(() => (situacao === 'TODAS'
     ? semSituacao
@@ -538,7 +661,7 @@ export default function Servicos() {
             <div className="relative min-w-72 flex-1">
               <input ref={buscaRef} value={busca} onChange={e => setBusca(e.target.value)}
                 aria-label="Buscar contrato, cliente, endereço, WO, O.S., node ou matrícula"
-                placeholder="Cliente, endereço, WO, contrato (ou vários, colados), O.S., node, matrícula…"
+                placeholder="Cliente, endereço, WO, contrato, O.S., node, matrícula…"
                 className="w-full rounded-md border border-graf-700 bg-graf-900 py-1.5 pl-3 pr-16
                            text-sm outline-none placeholder-graf-500 focus:border-af-500" />
               {/* A tecla fica escrita: atalho que ninguem descobre nao
@@ -551,12 +674,60 @@ export default function Servicos() {
                 </kbd>
               )}
             </div>
+            {/* 162: a lista de contratos em massa tem caixa própria. */}
+            <button onClick={() => setMassaAberta(a => !a)} aria-expanded={massaAberta}
+              className={`rounded-md border px-3 py-1.5 text-xs hover:border-af-600 hover:text-af-400 ${
+                massa.length ? 'border-af-600 text-af-400' : 'border-graf-700 text-graf-300'}`}>
+              Vários contratos{massa.length > 0 && <span className="tabular"> ({massa.length})</span>}
+            </button>
             <button onClick={exportar} disabled={visiveis.length === 0}
               className="rounded-md border border-graf-700 px-3 py-1.5 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400 disabled:opacity-40">
               Exportar {visiveis.length} linhas
             </button>
           </div>
+
+          {massaAberta && (
+            <div className="space-y-2 rounded-lg border border-graf-700 bg-graf-900/60 p-3">
+              <label className="block text-xs text-graf-300" htmlFor="massa-contratos">
+                Cole os contratos — um por linha, ou separados por espaço ou vírgula. A busca
+                vale para o período escolhido em cima ({dataBR(de)}
+                {de !== ate && <> a {dataBR(ate)}</>}); troque a data para ver outros dias.
+              </label>
+              <textarea id="massa-contratos" value={massaTexto} autoFocus rows={4}
+                onChange={e => setMassaTexto(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) aplicarMassa() }}
+                placeholder={'3148634\n3186579\n3174830'}
+                className="tabular w-full rounded-md border border-graf-700 bg-graf-900 px-3 py-2
+                           text-sm outline-none placeholder-graf-600 focus:border-af-500" />
+              <div className="flex flex-wrap items-center gap-2">
+                {(() => {
+                  const n = numerosDe(massaTexto).length
+                  return (
+                    <>
+                      <button onClick={aplicarMassa} disabled={n === 0}
+                        className="rounded-md bg-af-600 px-3 py-1.5 text-xs font-semibold text-white
+                                   hover:bg-af-500 disabled:opacity-40">
+                        Buscar {n} contrato{n === 1 ? '' : 's'}
+                      </button>
+                      {n > MAX_MASSA && (
+                        <span className="text-xs text-amber-400">
+                          Só os {MAX_MASSA} primeiros entram — divida a lista.
+                        </span>
+                      )}
+                    </>
+                  )
+                })()}
+                <span className="text-[11px] text-graf-400">Ctrl+Enter também busca</span>
+                {massa.length > 0 && (
+                  <button onClick={limparMassa}
+                    className="ml-auto text-xs text-graf-300 underline underline-offset-2 hover:text-af-400">
+                    tirar a lista
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <select value={grupo} onChange={e => setGrupo(e.target.value)} className={sel}>
@@ -682,18 +853,54 @@ export default function Servicos() {
 
         {/* Quando a busca vira histórico de contrato, a tela precisa
             dizer isso — senão o usuário acha que o filtro de data quebrou. */}
+        {massa.length > 0 && !carregando && (
+          <Alerta tipo={naoAchados.length ? 'aviso' : 'info'}>
+            <strong className="tabular">{massa.length}</strong> contrato{massa.length === 1 ? '' : 's'} na
+            lista —{' '}
+            {contratoNoPeriodo
+              ? <>no período escolhido ({dataBR(de)}{de !== ate && <> a {dataBR(ate)}</>}).</>
+              : <>em <strong>todas</strong> as datas.</>}
+            {' '}
+            <strong className="tabular">{massa.length - naoAchados.length}</strong> encontrado
+            {massa.length - naoAchados.length === 1 ? '' : 's'}
+            {naoAchados.length > 0 && (
+              <>, <strong className="tabular">{naoAchados.length}</strong> não{' '}
+                {contratoNoPeriodo
+                  ? (naoAchados.length === 1 ? 'está neste período' : 'estão neste período')
+                  : (naoAchados.length === 1 ? 'existe no sistema' : 'existem no sistema')}:{' '}
+                <span className="tabular select-all break-all">{naoAchados.join(', ')}</span></>
+            )}.{' '}
+            <button onClick={() => setContratoNoPeriodo(p => !p)}
+              className="underline underline-offset-2 hover:text-af-400">
+              {contratoNoPeriodo ? 'ver todas as datas' : 'limitar ao período'}
+            </button>
+            {' · '}
+            <button onClick={() => setMassaAberta(true)}
+              className="underline underline-offset-2 hover:text-af-400">
+              editar a lista
+            </button>
+            {' · '}
+            <button onClick={limparMassa}
+              className="underline underline-offset-2 hover:text-af-400">
+              tirar a lista
+            </button>
+          </Alerta>
+        )}
+
         {contratosBuscados.length > 0 && (
           <Alerta tipo="info">
             {contratosBuscados.length === 1 ? (
-              <>Contrato <strong className="tabular">{contratosBuscados[0]}</strong></>
+              <>Número <strong className="tabular">{contratosBuscados[0]}</strong></>
             ) : (
               <><strong className="tabular">{contratosBuscados.length}</strong> contratos
                 na busca</>
             )}
             {contratoNoPeriodo
               ? <> — mostrando só o que está <strong>no período</strong> escolhido.</>
-              : <> — mostrando <strong>todas</strong> as visitas, dia a dia,
-                  fora do período.</>}
+              : <> — mostrando <strong>todas as vezes que veio na agenda</strong>:{' '}
+                  <span className="tabular">{linhas.length}</span> visita{linhas.length === 1 ? '' : 's'}
+                  {' '}em <span className="tabular">{new Set(linhas.map(l => l.data_agendada)).size}</span>{' '}
+                  dia{new Set(linhas.map(l => l.data_agendada)).size === 1 ? '' : 's'}, fora do período.</>}
             {' '}
             <button onClick={() => setContratoNoPeriodo(p => !p)}
               className="underline underline-offset-2 hover:text-af-400">
