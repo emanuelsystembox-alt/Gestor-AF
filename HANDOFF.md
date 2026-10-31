@@ -3,7 +3,7 @@
 Última atualização: **20/10/2026**, por Claude (Opus 5.5).
 
 > **31/10/2026 — o que mudou desde então, em uma frase cada** (detalhe em
-> `docs/03-DECISOES.md`, D-235 a D-240, e as pendências em
+> `docs/03-DECISOES.md`, D-235 a D-242, e as pendências em
 > `docs/08-ESTADO-DO-PROJETO.md`, seção "Pendente em 31/10/2026"):
 > - Toda a gestão (ADMIN, COP, COORDENADOR, CONTROLADOR, SUPERVISOR) **vê a cidade
 >   ativa inteira**; o que cada um **faz** é decidido pela **permissão**, não pelo papel.
@@ -15,6 +15,10 @@
 >   cadastro novo.
 > - As telas não se recarregam sozinhas: o Atualizar (manual / 2 / 5 min) é quem manda.
 > - A Edge Function `admin-usuarios` agora tem fonte no repositório.
+> - As permissões "sem efeito ainda" passam a valer (161, D-241): importar,
+>   configurar, pontuação, cargos e perfis, desatribuir pontuação e os "Visualizar
+>   menu". Só "Dados da empresa" segue sem efeito. VT por equipe mede pelo código de
+>   baixa. O app tem GPS de alta precisão na execução — **ainda não publicado**.
 > - **O sistema se chama NEXUS MANAGER** (D-242). A entrada já mostra o nome, com
 >   o selo da AFLINE, que financia; o resto do sistema ainda diz "Gestor AF"
 >   (ver as pendências de 30/10 em `docs/08-ESTADO-DO-PROJETO.md`).

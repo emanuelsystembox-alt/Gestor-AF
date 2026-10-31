@@ -454,98 +454,74 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
-## Pendente em 31/10/2026 — permissões, Coordenador, gerenciar usuários e a leva 160 (D-235 a D-240)
+## Pendente em 31/10/2026 — permissões, Coordenador, usuários, leva 160 e 161 (D-235 a D-241)
 
-Migrations 155 a 160b. Site publicado (último deploy com a 160, commit `69f14bc`).
-Edge Function `admin-usuarios` na versão 4 (fonte em `supabase/functions/`). **App publicado em 30/10** pelo ar (`eas update`,
-canal preview, runtime 0.5.0, commit `fa63569`) e APK 0.5.0 novo gerado (build
-`ec8d223c`).
+**Estado:** migrations 155 a 161d aplicadas. Site publicado a partir do commit
+`8269ff2`, gerado numa cópia limpa (sem a troca de nome para NEXUS, que outra sessão
+commitou depois em `7858fea` — publicar o site de novo leva o nome junto). Edge Function
+`admin-usuarios` na versão 4 (fonte em `supabase/functions/`). App: o que vai até a 158
+foi publicado em 30/10 (`eas update`, canal preview, runtime 0.5.0, commit `fa63569`,
+APK 0.5.0 build `ec8d223c`); **o GPS de alta precisão (161) não foi publicado**.
 
-Antes de publicar, o app foi conferido contra o banco de hoje: as 52 RPCs que ele chama
-existem, nenhuma com duas assinaturas; só 156e e 156g mexeram em RPCs do app, e o código
-publicado é o que chama essas versões; os 10 tipos de `aviso` do CHECK são exatamente os
-que o app conhece; zero `erro_app` em 7 dias; nenhuma dependência nativa nova desde o
-APK 0.5.0 (por isso a atualização pelo ar basta).
-
-### Resolvido nesta leva
-- Permissões por login (exceções em cima do perfil) no Editar cadastro (157, D-237).
+### Resolvido (155 a 161)
+- Permissões por login, exceções em cima do perfil, no Editar cadastro (157, D-237).
 - Toda a gestão vê a cidade; a permissão decide o que faz; papel COORDENADOR (158, D-238).
 - Selos do menu e três leituras que ficaram na regra velha (158d).
 - "Gerenciar usuários" vale sem ser ADMIN, com travas contra virar ADMIN (159, D-239).
-- Observação do COP, casa do cliente, VT por equipe, grupos no chat (156, D-236).
+- Fundo branco atrás do contrato; tela parada até a pessoa atualizar (manual / 2 / 5
+  min); sino com contrato e equipe; CPF/RG só o administrador principal; seis dados
+  obrigatórios no cadastro novo; marcadores ao lado do + O.S.; coluna de papéis fora da
+  Administração; filtros do Monitoramento (160, D-240).
+- Respostas do Emanuel (161, D-241): as permissões "sem efeito" passam a valer; Victoria
+  com perfil COP; Flavio sem "Gerenciar usuários"; Renan edita cargos e perfis (com
+  travas); VT por equipe pelo código de baixa (80,9% a 97,6% em Manaus); GPS de alta
+  precisão durante a execução, no app; campos obrigatórios só no cadastro novo
+  (confirmado).
 
 ### Depende do Emanuel
-- **As permissões "sem efeito ainda"** (a tela marca): ver Serviços/Equipes/
-  Importação/Relatórios/Configurações, executar importação, cadastrar/excluir em
-  Configurações, tabela de pontuação, cargos, dados da empresa, desatribuir
-  pontuação. Para cada uma: esconde o menu, barra a ação, ou as duas? Cuidado: o
-  perfil Coordenador não tem `importacao.ver/executar` nem `configuracoes.ver` —
-  ligar essas chaves tira a Importação da Victoria.
-- **Victoria**: papel COP, perfil Coordenador. Desde a 158 transferir exige a chave,
-  que o perfil Coordenador não tem — ou troca o perfil, ou marca a exceção.
-- **Flavio (supervisor)** recebeu "Gerenciar usuários" em 30/10. Desde a 159 isso
-  vale: ele edita logins de São Luís (não ADMIN). Confirmar que é a intenção.
-- **Renan** tem `admin.cargos` e `admin.empresa` marcados; não fazem nada (só ADMIN).
-- **Papel Coordenador**: só o Renan tem. Marcar em quem é coordenador.
-- **VT por equipe**: a régua é Status do TOA (CONCLUÍDO × NÃO CONCLUÍDO) e dá ~100%
-  para quase todos (529 × 7 em 14 dias). Se precisar separar quem resolveu, trocar
-  para código produtivo × improdutivo.
-- ~~**Publicar o app**~~ — feito em 30/10. O técnico recebe fechando o app de vez e
-  abrindo de novo (até duas aberturas).
-- **GPS de alta precisão durante a execução**: só proposto. Decidir se vale o custo de
-  bateria antes de construir.
-- **Campos obrigatórios na EDIÇÃO** (160b): hoje os seis dados só são exigidos no
-  cadastro novo, e o preenchido não se apaga. Exigir também ao editar travaria 86 dos
-  89 logins (sem data de contratação). Confirmar se fica assim ou se liga depois que
-  o cadastro for completado.
-- **O app desta leva**: a 160 não mexeu no app. O que o app tinha de novo (156 a 158,
-  inclusive o Coordenador) foi publicado em 30/10 (commit `fa63569`).
-
-### Respostas do Emanuel (31/10, noite) — feito na 161 (D-241)
-- ~~Permissões "sem efeito ainda"~~ — ligadas. Só "Dados da empresa" segue sem efeito
-  (não há tela nem tabela para editar).
-- ~~Victoria~~ — perfil COP. ~~Flavio~~ — sem "Gerenciar usuários".
-- ~~Renan: cargos e empresa~~ — "Gerenciar cargos e perfis" vale (com travas);
-  "Dados da empresa" não tem o que editar.
-- ~~VT por equipe~~ — régua pelo código de baixa (80,9% a 97,6% em Manaus).
-- ~~GPS de alta precisão~~ — feito no app, **falta publicar**:
-  `npx eas-cli@latest update --channel preview --environment preview --platform android --message "GPS de alta precisao durante a execucao (161)"`
-  (em `campo/`). Depois, `git diff campo/app.json` — a EAS costuma reescrever o arquivo.
-- Campos obrigatórios só no cadastro novo: confirmado. Papel Coordenador: o Emanuel marca.
-
-### Também resolvido em 31/10 (160, D-240)
-- Fundo branco atrás do contrato; tela parada até a pessoa atualizar (manual/2/5 min);
-  sino com contrato e equipe; CPF/RG só o administrador principal; seis dados
-  obrigatórios no cadastro novo; marcadores ao lado do + O.S.; coluna de papéis fora
-  da Administração; filtros de equipe/bucket/supervisor/área no Monitoramento.
-
-### Verificação que ninguém fez (160)
-- Criar login pela tela com os seis campos (Edge Function v4 não foi chamada).
-- Planilha de cidade com a coluna "Data de contratação", de ponta a ponta.
-- O relógio de 2/5 min disparando.
-- `rota_do_dia` corta em 1.000 paradas: cidade maior que Manaus teria o recorte do
-  Monitoramento incompleto.
-- 86 dos 89 logins sem data de contratação, 16 sem matrícula do ponto: preencher.
-
-### Construção que ficou para depois
-- Cenários da 159 em `testar_policies()` (gestor de usuários não edita ADMIN, não dá
-  papel ADMIN, não se edita) — hoje testados só à mão.
-- **Escrita direta pela API**: a policy `visita_gestao` (ALL) deixa ADMIN/COP
-  alterarem `visita` direto, sem passar pela permissão da RPC. O site não usa esse
-  caminho, mas ele existe. Fechar exige listar o que ainda escreve direto.
-- `carteira` tem 0 linhas e nenhuma equipe tem `controlador_id`: o conceito de
-  carteira do controlador está morto desde a 158. Decidir se some.
-- Funções de ESCRITA com `eh_gestor() or ...` sem filtro de cidade (conversa,
-  mensagem, avisos) — ficaram de fora de propósito, mas ninguém revisou uma a uma.
-- Importação da planilha de cidade: a etapa 2 (criar os acessos) não retoma se a
-  tela fechar no meio (D-233).
+- **Publicar o app** (o GPS de alta precisão) — a trava de segurança da sessão não
+  deixou o assistente publicar em produção. Em `campo/`:
+  `npx eas-cli@latest update --channel preview --environment preview --platform android --message "GPS de alta precisao durante a execucao (161)"`.
+  Depois, `git diff campo/app.json`: a EAS costuma reescrever o arquivo (armadilha de
+  25/10).
+- **Papel Coordenador**: hoje Renan e Victoria. Marcar nos outros coordenadores.
+- **Menu Configurações**: desde a 161 só aparece para quem tem `configuracoes.ver`
+  (perfis Administrador e COP). Se Controlador, Coordenador ou Supervisor precisarem,
+  marcar a chave no perfil ou na exceção.
+- **"Dados da empresa"** (`admin.empresa`) segue sem efeito: não existe tela nem tabela
+  de escrita. Se for para existir, dizer o que a tela edita.
+- **Preencher o cadastro**: 86 dos 89 logins ativos sem data de contratação, 16 sem
+  matrícula do ponto (a trava só vale no cadastro novo, por decisão de 31/10).
 
 ### Verificação que ninguém fez ainda
-- O login do Renan aberto pela tela (rota, selos, Editar, Nova senha) — tudo foi
-  testado no banco como ele, não no navegador dele.
-- A Edge Function `admin-usuarios` chamada por um não-ADMIN de verdade.
-- Nada do app desta leva rodou num celular (compila e empacota).
+- O GPS de alta precisão num celular (nem publicado foi).
+- O menu e as telas de quem NÃO é ADMIN abertos pela tela, depois da 161 — testado só no
+  banco (Renan: cargos, perfis, configuração).
+- O login do Renan aberto pela tela (rota, selos, Editar, Nova senha).
+- A Edge Function `admin-usuarios` chamada de verdade por um não-ADMIN, e criando login
+  com os seis campos obrigatórios.
+- A planilha de cidade com a coluna "Data de contratação", de ponta a ponta.
+- O relógio de atualização de 2/5 min disparando (só o seletor foi visto).
 - O supervisor com "Transferir" arrastando na Rota pela tela.
+- Nada do app de 156 a 158 rodou num celular (compila, empacota e foi publicado).
+
+### Construção que ficou para depois
+- Cenários da 159 e da 161 em `testar_policies()` (gestor de usuários não edita ADMIN
+  nem se edita; quem edita perfis não toca em Administração nem no próprio perfil;
+  configuração e importação pela chave) — hoje testados só à mão.
+- **Escrita direta pela API**: a policy `visita_gestao` (ALL) deixa ADMIN/COP alterarem
+  `visita` direto, sem passar pela permissão da RPC. O site não usa esse caminho, mas
+  ele existe. Fechar exige listar o que ainda escreve direto.
+- `rota_do_dia` corta em 1.000 paradas: cidade maior que Manaus teria o recorte do
+  Monitoramento incompleto.
+- "Visualizar menu" controla menu e rota, não a LEITURA dos dados (que é o escopo do
+  RLS). Se a regra tiver de valer também na API, é outra conversa (custo por linha).
+- `carteira` tem 0 linhas e nenhuma equipe tem `controlador_id`: o conceito de carteira
+  do controlador está morto desde a 158. Decidir se some.
+- Funções de ESCRITA com `eh_gestor() or ...` sem filtro de cidade (conversa, mensagem,
+  avisos) — ficaram de fora de propósito, mas ninguém revisou uma a uma.
+- Importação da planilha de cidade: a etapa 2 (criar os acessos) não retoma se a tela
+  fechar no meio (D-233).
 
 ## Pendente em 26/10/2026 — humor do dia e ocorrências do campo (D-226)
 
