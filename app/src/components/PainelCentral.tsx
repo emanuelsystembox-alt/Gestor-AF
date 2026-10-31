@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { LinkContrato } from './LinkContrato'
 import { COM_ICONE, useCentral, type Sinal } from '../lib/central'
 
 /**
@@ -49,6 +50,9 @@ const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2
 /** Para onde o sinal leva, quando leva a algum lugar. */
 function destino(s: Sinal): string | null {
   if (s.visita_id) return `/controle/visita/${s.visita_id}`
+  // 160a: quebrado de UM contrato abre o contrato direto (Emanuel, 31/10);
+  // de vários, abre o técnico em Equipes e os contratos vão como etiquetas.
+  if (s.tipo === 'QUEBROU' && s.contratos?.length === 1) return `/controle/visita/${s.contratos[0].visita_id}`
   if (s.tipo === 'MATERIAL') return '/almoxarifado?aba=sinalizacoes'
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
   // 097: GPS e cerca abrem o técnico no Monitoramento.
@@ -58,6 +62,39 @@ function destino(s: Sinal): string | null {
   // Quebrou vai junto: é sobre o dia do técnico, não sobre um contrato.
   if ((s.tipo === 'RITMO' || s.tipo === 'QUEBROU') && s.tecnico_id) return `/controle/equipes?tecnico=${s.tecnico_id}`
   return null
+}
+
+/** O link certo: contrato abre POR CIMA da tela (156); o resto navega. */
+function LinkSinal({ para, fechar, className, children }: {
+  para: string; fechar: () => void; className: string; children: React.ReactNode
+}) {
+  return para.startsWith('/controle/visita/')
+    ? <LinkContrato to={para} onClick={fechar} className={className}>{children}</LinkContrato>
+    : <Link to={para} onClick={fechar} className={className}>{children}</Link>
+}
+
+/**
+ * 160a: equipe e contrato embaixo do título — "não mostra o número do
+ * contrato e nem o número da equipe, mostra apenas o nome" (Emanuel). O
+ * contrato não se repete quando o detalhe já o escreve.
+ */
+function DadosDoSinal({ s, fechar }: { s: Sinal; fechar: () => void }) {
+  const contratoNoDetalhe = !!s.contrato && !!s.detalhe?.includes(s.contrato)
+  const lista = s.contratos ?? []
+  if (!s.equipe && (!s.contrato || contratoNoDetalhe) && lista.length < 2) return null
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-graf-400">
+      {s.equipe && <span className="rounded bg-graf-800 px-1.5 py-px text-graf-200">equipe {s.equipe}</span>}
+      {s.contrato && !contratoNoDetalhe && <span className="tabular">contrato {s.contrato}</span>}
+      {lista.length > 1 && lista.map(c => (
+        <LinkContrato key={c.visita_id} to={`/controle/visita/${c.visita_id}`} onClick={fechar}
+          title="Abrir o contrato"
+          className="tabular rounded border border-graf-700 px-1.5 py-px text-graf-200 hover:border-af-600 hover:text-af-400">
+          {c.contrato ?? 'sem número'}
+        </LinkContrato>
+      ))}
+    </span>
+  )
 }
 
 export function PainelCentral({ fechar, filtro, titulo }: {
@@ -166,9 +203,12 @@ export function PainelCentral({ fechar, filtro, titulo }: {
                   </>)
                   return (
                     <li key={s.id} className="group flex items-start gap-1">
-                      {para
-                        ? <Link to={para} onClick={fechar} className="min-w-0 flex-1 rounded px-1.5 py-1 hover:bg-graf-800">{corpo}</Link>
-                        : <div className="min-w-0 flex-1 px-1.5 py-1">{corpo}</div>}
+                      <div className="min-w-0 flex-1">
+                        {para
+                          ? <LinkSinal para={para} fechar={fechar} className="block rounded px-1.5 py-1 hover:bg-graf-800">{corpo}</LinkSinal>
+                          : <div className="px-1.5 py-1">{corpo}</div>}
+                        <div className="px-1.5 pb-1"><DadosDoSinal s={s} fechar={fechar} /></div>
+                      </div>
                       <span className="shrink-0 pt-1.5 text-[10px] text-graf-400">{hora(s.criado_em)}</span>
                       <button onClick={() => dispensar([s.id])} aria-label={`Limpar: ${s.titulo}`}
                         title="Limpar — se acontecer de novo, volta"
@@ -196,9 +236,10 @@ export function PainelCentral({ fechar, filtro, titulo }: {
                       <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${COR[s.tipo]}`} />
                       <div className="min-w-0 flex-1">
                         {para
-                          ? <Link to={para} onClick={fechar} className="text-sm hover:underline">{s.titulo}</Link>
+                          ? <LinkSinal para={para} fechar={fechar} className="text-sm hover:underline">{s.titulo}</LinkSinal>
                           : <span className="text-sm">{s.titulo}</span>}
                         {s.detalhe && <span className="block truncate text-xs text-graf-400">{s.detalhe}</span>}
+                        <DadosDoSinal s={s} fechar={fechar} />
                       </div>
                       <span className={`shrink-0 pt-0.5 text-[10px] ${
                         !s.vigente ? 'text-emerald-400' : s.dispensado ? 'text-graf-400' : 'text-amber-300'}`}>

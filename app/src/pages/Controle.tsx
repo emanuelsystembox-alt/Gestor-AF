@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, SITUACAO_INFO } from '../lib/supabase'
 import { calcular, csvPorTipo, type Visita } from '../lib/metricas'
 import { Shell } from '../components/Shell'
+import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { ReguaDoDia, MatrizGrupos } from '../components/PainelDoDia'
 import { Alerta, Vazio } from '../components/ui'
 import {
@@ -113,6 +114,9 @@ export default function Controle() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [atualizado, setAtualizado] = useState<Date | null>(null)
+  // 31/10: o Dashboard não tinha Atualizar (Emanuel). Recarrega pelo botão
+  // ou pelo relógio que a pessoa ligar nele -- nunca por evento do banco.
+  const [versao, setVersao] = useState(0)
 
   const [dtInicio, dtFim] = useMemo(
     () => intervalo(periodo, de, ate), [periodo, de, ate])
@@ -157,7 +161,7 @@ export default function Controle() {
       setLinhas(tudo); setAtualizado(new Date()); setCarregando(false)
     })()
     return () => { vivo = false }
-  }, [dtInicio, dtFim])
+  }, [dtInicio, dtFim, versao])
 
   const filtradas = useMemo(() => linhas.filter(v => {
     if (origem !== 'TODAS' && v.origem !== origem) return false
@@ -218,12 +222,8 @@ export default function Controle() {
 
   return (
     <Shell acoes={
-      atualizado && (
-        <span className="hidden items-center gap-1.5 text-[11px] text-graf-500 md:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          atualizado {atualizado.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      )
+      <BotaoAtualizar aoAtualizar={() => setVersao(v => v + 1)} carregando={carregando}
+        atualizadoEm={atualizado} />
     }>
       <div className="space-y-3 p-4">
 

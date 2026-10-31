@@ -101,10 +101,14 @@ function JanelaContrato() {
     return () => { document.body.style.overflow = antes }
   }, [])
   return (
-    <div className="sup-controle fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
-                    bg-black/60 p-3 backdrop-blur-[1px] sm:p-6"
+    // A classe de tema (`.sup-controle`) vai na JANELA, não no véu: ela pinta
+    // fundo sólido (`styles.css`, fora das camadas do Tailwind, ganha do
+    // `bg-black/60`) e o véu virava uma parede branca no tema claro — a
+    // lista de trás sumia e parecia que o sistema tinha travado (31/10).
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto
+                    bg-black/50 p-3 sm:p-6"
       onClick={() => navegar(-1)}>
-      <div className="relative w-full max-w-[96rem] rounded-xl border border-graf-700 bg-graf-950 shadow-2xl"
+      <div className="sup-controle relative w-full max-w-[96rem] rounded-xl border border-graf-700 bg-graf-950 shadow-2xl"
         role="dialog" aria-modal="true" aria-label="Contrato"
         onClick={e => e.stopPropagation()}>
         <button onClick={() => navegar(-1)} title="Fechar e voltar (Esc)" aria-label="Fechar"

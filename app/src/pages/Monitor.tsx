@@ -249,6 +249,24 @@ export default function Monitor() {
   const [agora, setAgora] = useState(Date.now())
   const [busca, setBusca] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<Estado | 'TODOS'>('TODOS')
+  /*
+   * ┌─ 160 · o recorte: equipe, bucket, supervisor, área ───────────────┐
+   * │ > "é importante também a gente colocar alguns filtros, como        │
+   * │ >  equipe, como bucket, como supervisor, como área" — Emanuel 31/10│
+   * │                                                                    │
+   * │ Supervisor, bucket e área saem da `rota_do_dia` — a MESMA fonte    │
+   * │ dos filtros da Rota, para as duas telas não discordarem. Bucket e  │
+   * │ área são dos CONTRATOS do dia (um técnico pode ter mais de um);    │
+   * │ supervisor é o da equipe. Quem não tem contrato no dia não tem     │
+   * │ bucket nem área: com esses filtros ligados ele sai, e a tela diz.  │
+   * │ O recorte vale para tudo abaixo: cartões, lista, mapa e próximos.  │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const [fEquipe, setFEquipe] = useState('')
+  const [fBucket, setFBucket] = useState('')
+  const [fSupervisor, setFSupervisor] = useState('')
+  const [fArea, setFArea] = useState('')
+  const [donoDaEquipe, setDonoDaEquipe] = useState<Map<string, { buckets: Set<string>; areas: Set<string>; supervisor: string | null }>>(new Map())
 
   // o selecionado
   const [sel, setSel] = useState<string | null>(null)
@@ -291,6 +309,20 @@ export default function Monitor() {
   const carregar = useCallback(async () => {
     const meu = ++pedido.current
     setCarregando(true); setErro(null)
+    // 160: supervisor, bucket e área de cada equipe no dia (não segura a lista).
+    supabase.rpc('rota_do_dia', { p_data: data }).then(({ data: rd }) => {
+      if (meu !== pedido.current) return
+      const m = new Map<string, { buckets: Set<string>; areas: Set<string>; supervisor: string | null }>()
+      for (const x of (rd ?? []) as { equipe_id: string | null; supervisor: string | null; toa_bucket: string | null; area: string | null }[]) {
+        if (!x.equipe_id) continue
+        const d = m.get(x.equipe_id) ?? { buckets: new Set<string>(), areas: new Set<string>(), supervisor: null }
+        if (x.toa_bucket) d.buckets.add(x.toa_bucket)
+        if (x.area) d.areas.add(x.area)
+        if (x.supervisor) d.supervisor = x.supervisor
+        m.set(x.equipe_id, d)
+      }
+      setDonoDaEquipe(m)
+    })
     supabase.rpc('painel_equipes', { p_data: data }).then(({ data: p }) => {
       if (meu !== pedido.current) return
       setOciosas(new Set(((p ?? []) as { equipe_id: string; ocioso: boolean | null }[])
@@ -321,14 +353,11 @@ export default function Monitor() {
     fotosDosTecnicos(idsDaLista.split(',')).then(setFotos)
   }, [idsDaLista])
 
-  // Hoje, a central se atualiza sozinha a cada minuto: o ponto do
-  // celular chega de 2 em 2 min, e olhar um mapa de 10 min atrás é
-  // olhar o passado achando que é o presente.
-  useEffect(() => {
-    if (!ehHoje) return
-    const t = setInterval(() => setVersao(v => v + 1), 60_000)
-    return () => clearInterval(t)
-  }, [ehHoje])
+  // A central se atualizava sozinha a cada minuto. Desde 31/10 quem decide
+  // é a pessoa: o Atualizar, ou o relógio dele (2 ou 5 min) — "a tela da
+  // pessoa ainda vai ficar congelada, só vai atualizar quando ele autorizar
+  // ou quando der o temporizador" (Emanuel). O "há N min" ao lado do botão
+  // diz de quando é o mapa.
 
   // Trocar de dia limpa a seleção: a trilha é de um dia só.
   useEffect(() => { setSel(null); setContratosDia(null); setRefContrato('') }, [data])
@@ -423,9 +452,34 @@ export default function Monitor() {
     setContratosDia((d ?? []) as unknown as ContratoMapa[])
   }
 
+  const opcoesRecorte = useMemo(() => {
+    const eq = new Map<string, string>()
+    for (const t of tecnicos) if (t.equipe_id) eq.set(t.equipe_id, t.equipe_codigo ?? t.equipe_nome ?? '—')
+    const b = new Set<string>(), a = new Set<string>(), sv = new Set<string>()
+    for (const d of donoDaEquipe.values()) {
+      d.buckets.forEach(x => b.add(x)); d.areas.forEach(x => a.add(x))
+      if (d.supervisor) sv.add(d.supervisor)
+    }
+    const ord = (x: Set<string>) => [...x].sort((p, q) => p.localeCompare(q))
+    return {
+      equipes: [...eq.entries()].sort((p, q) => p[1].localeCompare(q[1], undefined, { numeric: true })),
+      buckets: ord(b), areas: ord(a), supervisores: ord(sv),
+    }
+  }, [tecnicos, donoDaEquipe])
+  const recorteLigado = !!(fEquipe || fBucket || fSupervisor || fArea)
+
   const comEstado = useMemo(
-    () => tecnicos.map(t => ({ t, e: estadoDo(t, ehHoje, agora) })),
-    [tecnicos, ehHoje, agora])
+    () => tecnicos
+      .filter(t => {
+        if (fEquipe && t.equipe_id !== fEquipe) return false
+        const d = t.equipe_id ? donoDaEquipe.get(t.equipe_id) : undefined
+        if (fBucket && !d?.buckets.has(fBucket)) return false
+        if (fArea && !d?.areas.has(fArea)) return false
+        if (fSupervisor && d?.supervisor !== fSupervisor) return false
+        return true
+      })
+      .map(t => ({ t, e: estadoDo(t, ehHoje, agora) })),
+    [tecnicos, ehHoje, agora, fEquipe, fBucket, fArea, fSupervisor, donoDaEquipe])
 
   const contagem = useMemo(() => {
     const c: Partial<Record<Estado, number>> = {}
@@ -525,9 +579,10 @@ export default function Monitor() {
     return { com, sem }
   }, [comEstado])
 
-  const kmTotal = tecnicos.reduce((s, t) => s + Number(t.km), 0)
-  const foraTotal = tecnicos.reduce((s, t) => s + t.baixas_fora, 0)
-  const baixasTotal = tecnicos.reduce((s, t) => s + t.baixas_campo, 0)
+  // 160: soma do RECORTE, como os cartões.
+  const kmTotal = comEstado.reduce((s, x) => s + Number(x.t.km), 0)
+  const foraTotal = comEstado.reduce((s, x) => s + x.t.baixas_fora, 0)
+  const baixasTotal = comEstado.reduce((s, x) => s + x.t.baixas_campo, 0)
 
   return (
     <Shell acoes={
@@ -589,6 +644,32 @@ export default function Monitor() {
                   className="shrink-0 text-xs text-af-400 underline underline-offset-2">
                   todos
                 </button>
+              )}
+            </div>
+            {/* 160: o recorte — vale para cartões, lista, mapa e próximos. */}
+            <div className="grid grid-cols-2 gap-1.5 border-b border-graf-800 p-2.5">
+              {([
+                ['Equipe', fEquipe, setFEquipe, opcoesRecorte.equipes, 'Todas as equipes'],
+                ['Bucket', fBucket, setFBucket, opcoesRecorte.buckets.map(x => [x, x] as [string, string]), 'Todos os buckets'],
+                ['Supervisor', fSupervisor, setFSupervisor, opcoesRecorte.supervisores.map(x => [x, x] as [string, string]), 'Todos os supervisores'],
+                ['Área', fArea, setFArea, opcoesRecorte.areas.map(x => [x, x] as [string, string]), 'Todas as áreas'],
+              ] as [string, string, (v: string) => void, [string, string][], string][]).map(([rot, val, set, ops, todos]) => (
+                <select key={rot} value={val} onChange={e => set(e.target.value)} aria-label={rot}
+                  className={`min-w-0 rounded-md border bg-graf-900 px-2 py-1 text-xs ${
+                    val ? 'border-af-600 text-graf-100' : 'border-graf-700 text-graf-300'}`}>
+                  <option value="">{todos}</option>
+                  {ops.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                </select>
+              ))}
+              {recorteLigado && (
+                <p className="col-span-2 flex items-center justify-between text-[11px] text-graf-400">
+                  <span>
+                    {comEstado.length} de {tecnicos.length} técnicos
+                    {(fBucket || fArea) && ' · bucket e área vêm dos contratos do dia: quem não tem contrato sai'}
+                  </span>
+                  <button onClick={() => { setFEquipe(''); setFBucket(''); setFSupervisor(''); setFArea('') }}
+                    className="shrink-0 text-af-400 underline underline-offset-2">limpar</button>
+                </p>
               )}
             </div>
             <ul className={`relative min-h-0 flex-1 overflow-y-auto transition-opacity ${

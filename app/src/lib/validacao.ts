@@ -178,7 +178,7 @@ export function conferirCadastro(c: {
   nome?: string; email?: string; cpf?: string; rg?: string
   whatsapp?: string; data_nascimento?: string; matricula_ponto?: string
   apelido?: string; data_contratacao?: string
-}, opcoes: { exigeEmail?: boolean } = {}): ErrosCadastro {
+}, opcoes: { exigeEmail?: boolean; exigeDocumentos?: boolean } = {}): ErrosCadastro {
   const e: ErrosCadastro = {}
 
   if (!nomeValido(c.nome)) {
@@ -206,6 +206,18 @@ export function conferirCadastro(c: {
   }
   if (!matriculaPontoValida(c.matricula_ponto)) {
     e.matricula_ponto = 'A matrícula do ponto é só números.'
+  }
+  // 160b: no CADASTRO NOVO os seis são obrigatórios -- "isso é uma trava do
+  // sistema, ninguém poderá se cadastrar sem esses dados" (Emanuel, 31/10).
+  // A Edge Function confere de novo; aqui é para o erro aparecer no campo.
+  if (opcoes.exigeDocumentos) {
+    const falta = 'Obrigatório para cadastrar.'
+    if (!soDigitos(c.whatsapp)) e.whatsapp ??= falta
+    if (!soDigitos(c.cpf)) e.cpf ??= falta
+    if (!(c.rg ?? '').trim()) e.rg ??= falta
+    if (!c.data_nascimento) e.data_nascimento ??= falta
+    if (!(c.matricula_ponto ?? '').trim()) e.matricula_ponto ??= falta
+    if (!c.data_contratacao) e.data_contratacao ??= falta
   }
   if ((c.apelido ?? '').trim() && /^\d+$/.test((c.apelido ?? '').trim())) {
     e.apelido = 'O apelido é como a pessoa é chamada, não um número.'

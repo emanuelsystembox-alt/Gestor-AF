@@ -91,6 +91,9 @@ function colunas(c: Catalogos): Record<ChaveAba, Coluna[]> {
       { chave: 'rg', titulo: 'RG', largura: 14, nota: '' },
       { chave: 'nascimento', titulo: 'Nascimento', largura: 13, tipo: 'data', nota: 'DD/MM/AAAA' },
       { chave: 'matricula_ponto', titulo: 'Matrícula do ponto', largura: 17, nota: 'Só números.' },
+      // 160b: obrigatória para criar acesso, como WhatsApp, CPF, RG,
+      // nascimento e matrícula do ponto (Emanuel, 31/10).
+      { chave: 'data_contratacao', titulo: 'Data de contratação', largura: 15, tipo: 'data', nota: 'DD/MM/AAAA' },
       { chave: 'login_toa', titulo: 'Login TOA', largura: 13,
         nota: 'Só para técnico. Ex.: Z384041. É ele que liga a pessoa aos contratos do TOA.' },
       { chave: 'skill', titulo: 'Skill', largura: 15, lista: c.skills, nota: 'Precisa do login TOA. Decide meta e comissão.' },
@@ -384,11 +387,17 @@ export async function lerPreenchida(arquivo: File, c: Catalogos): Promise<Planil
     const nasc = dataIso(s('nascimento'))
     if (s('nascimento') && !nasc) problemas.push({ aba: 'Pessoas', linha: p.linha, msg: `Nascimento "${s('nascimento')}" não é uma data que existe — use DD/MM/AAAA.` })
     if (nasc) p.nascimento = nasc
+    const contr = dataIso(s('data_contratacao'))
+    if (s('data_contratacao') && !contr) problemas.push({ aba: 'Pessoas', linha: p.linha, msg: `Data de contratação "${s('data_contratacao')}" não é uma data que existe — use DD/MM/AAAA.` })
+    if (contr) p.data_contratacao = contr
     const querAcesso = !!s('email') && norm(s('criar_acesso') || 'SIM') !== 'nao'
+    // 160b: quem vai ganhar ACESSO precisa dos seis dados obrigatórios. Quem
+    // é só cadastro de técnico (sem login) não tem perfil onde guardá-los.
     const e = conferirCadastro({
       nome: s('nome'), email: s('email'), cpf: s('cpf'), rg: s('rg'), whatsapp: s('whatsapp'),
       data_nascimento: nasc ?? '', matricula_ponto: s('matricula_ponto'), apelido: s('apelido'),
-    }, { exigeEmail: !!s('email') })
+      data_contratacao: contr ?? '',
+    }, { exigeEmail: !!s('email'), exigeDocumentos: querAcesso })
     for (const msg of Object.values(e)) problemas.push({ aba: 'Pessoas', linha: p.linha, msg })
 
     const perfil = c.perfis.find(x => norm(x.nome) === norm(s('perfil')))

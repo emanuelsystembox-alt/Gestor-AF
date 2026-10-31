@@ -543,7 +543,7 @@ export default function Administracao() {
     // A conferência vem ANTES da viagem ao servidor: erro de forma se
     // responde na hora, sem gastar uma criação de conta que vai falhar
     // pela metade (o acesso nasce e o perfil é recusado pelo CHECK).
-    const e = conferirCadastro(novo)
+    const e = conferirCadastro(novo, { exigeDocumentos: true })
     setErrosNovo(e)
     if (Object.keys(e).length) {
       setErro('Confira os campos marcados.')
@@ -564,6 +564,8 @@ export default function Administracao() {
         // date vazio vira '' e o Postgres recusa '' como data.
         data_nascimento: novo.data_nascimento || null,
         matricula_ponto: novo.matricula_ponto.trim() || null,
+        // 160b: a função de borda passou a gravar (e exigir) a data.
+        data_contratacao: novo.data_contratacao || null,
         cargo_id: novo.cargo_id || null,
         perfil_acesso_id: novo.perfil_acesso_id || null,
       },
@@ -581,16 +583,6 @@ export default function Administracao() {
       if (fotoNova && r?.usuario_id) {
         const rf = await enviarFoto(r.usuario_id, fotoNova, null)
         if ('erro' in rf) recado += ` A foto não foi: ${rf.erro}`
-      }
-
-      // A data de contratação (101) vai num UPDATE depois de criar, e não
-      // no corpo da `admin-usuarios`: a função de borda monta o perfil
-      // campo a campo e ignoraria o que não conhece. O ADMIN pode gravar
-      // pelo RLS — e só ele, pelo gatilho `perfil_protege_campos`.
-      if (novo.data_contratacao && r?.usuario_id) {
-        const { error: ed } = await supabase.from('perfil')
-          .update({ data_contratacao: novo.data_contratacao }).eq('id', r.usuario_id)
-        if (ed) recado += ` A data de contratação não foi gravada: ${traduzir(ed.message)}`
       }
 
       // O login do TOA é o que liga o acesso ao TÉCNICO — e é
@@ -1058,12 +1050,12 @@ export default function Administracao() {
                     {([['nome', 'Nome completo *', 'text', undefined],
                        ['email', 'E-mail *', 'text', undefined],
                        ['apelido', 'Apelido', 'text', undefined],
-                       ['whatsapp', 'WhatsApp', 'text', formataTelefone],
-                       ['cpf', 'CPF', 'text', formataCPF],
-                       ['rg', 'RG', 'text', undefined],
-                       ['data_nascimento', 'Nascimento', 'date', undefined],
-                       ['matricula_ponto', 'Matrícula do ponto', 'text', undefined],
-                       ['data_contratacao', 'Data de contratação', 'date', undefined],
+                       ['whatsapp', 'WhatsApp *', 'text', formataTelefone],
+                       ['cpf', 'CPF *', 'text', formataCPF],
+                       ['rg', 'RG *', 'text', undefined],
+                       ['data_nascimento', 'Nascimento *', 'date', undefined],
+                       ['matricula_ponto', 'Matrícula do ponto *', 'text', undefined],
+                       ['data_contratacao', 'Data de contratação *', 'date', undefined],
                        ['login_toa', 'Login TOA (matrícula do técnico)', 'text', undefined],
                       ] as [keyof typeof novo, string, string,
                             ((v: string) => string) | undefined][]).map(([k, rot, tipo, mascara]) => (
@@ -1357,7 +1349,6 @@ export default function Administracao() {
                         <th className="px-3 py-2 font-medium">Cidade</th>
                         <th className="px-3 py-2 font-medium">Supervisor</th>
                         <th className="px-3 py-2 font-medium">Perfil de acesso</th>
-                        <th className="px-3 py-2 font-medium">Papéis (o que o banco lê)</th>
                         {/* 152: o segmento ao lado dos papéis, que é onde a
                             pergunta "quem é essa pessoa" termina. */}
                         <th className="px-3 py-2 font-medium">Segmento</th>
@@ -1368,7 +1359,6 @@ export default function Administracao() {
                     <tbody>
                       {visiveis.map(u => {
                         const ed = editando === u.id
-                        const papeis = papeisPorUsuario.get(u.id) ?? []
                         const euMesmo = u.id === perfil?.id
                         return (
                           <tr key={u.id} className="border-b border-graf-800 align-top">
@@ -1533,33 +1523,9 @@ export default function Administracao() {
                                 </select>
                               ) : u.perfil_acesso?.nome ?? <span className="text-graf-600">—</span>}
                             </td>
-                            <td className="px-3 py-2">
-                              {ed ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {PAPEIS.map(p => {
-                                    const marcado = papeisEdit.includes(p)
-                                    return (
-                                      <button key={p}
-                                        onClick={() => setPapeisEdit(ps =>
-                                          marcado ? ps.filter(x => x !== p) : [...ps, p])}
-                                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium
-                                                    ring-1 ${marcado
-                                          ? 'bg-af-600/20 text-af-300 ring-af-600/40'
-                                          : 'bg-graf-900 text-graf-500 ring-graf-700'}`}>
-                                        {p}
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              ) : papeis.length ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {papeis.map(p => (
-                                    <span key={p} className="rounded bg-graf-800 px-1.5 py-0.5
-                                                             text-[10px] text-graf-300">{p}</span>
-                                  ))}
-                                </div>
-                              ) : <span className="text-xs text-af-400/70">sem papel</span>}
-                            </td>
+                            {/* 31/10: a coluna "Papéis (o que o banco lê)" saiu (Emanuel:
+                                "não faz sentido ela estar aí"). O papel continua no
+                                filtro "Tipo de login" e no Editar. */}
 
                             {/* 152: o SEGMENTO. Só existe para quem é
                                 técnico — em controlador a célula fica

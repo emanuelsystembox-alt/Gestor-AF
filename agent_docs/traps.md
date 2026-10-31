@@ -454,6 +454,19 @@ equipe". Antes de conceder poder por permissão, conte quantas linhas o escopo d
 papel alcança COM O DADO DE HOJE (`select count(*) from visita` como a pessoa). Ver
 D-238.
 
+**`.sup-controle` pinta fundo SÓLIDO — num véu, vira parede.** A classe de tema
+(`styles.css`, fora das camadas do Tailwind 4) tem `background`, e CSS fora de
+camada ganha de utilitário (`bg-black/60`). Posta no `fixed inset-0` da janela do
+contrato, cobriu a tela de trás de branco no tema claro (quase preto no escuro) —
+"parece que o sistema bugou". O defeito só aparece no tema claro: no escuro o
+`graf-950` passa por véu. Tema vai na CAIXA da janela, nunca no véu. Ver D-240.
+
+**Esc testado com `window.dispatchEvent` mente.** Uma tecla de verdade sai do
+elemento em foco e sobe até a `window`; disparar direto na `window` cai na fase de
+alvo e embaralha captura e bolha — o teste disse que o Esc da lista fechava também o
+contrato, e pela tecla real não fechava. Teste disparando no elemento, com
+`bubbles: true`. Ver D-240.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.

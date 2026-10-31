@@ -85,6 +85,20 @@ Deno.serve(async (req: Request) => {
     const nome = String(corpo.nome ?? "").trim()
     if (!email || !nome) return json({ erro: "Informe nome e e-mail." }, 400)
 
+    // 160b: "ninguem podera se cadastrar sem esses dados" (Emanuel, 31/10).
+    // As telas conferem antes; esta e a trava que nao se pula.
+    const obrigatorios: [string, string][] = [
+      ["whatsapp", "WhatsApp"], ["cpf", "CPF"], ["rg", "RG"],
+      ["data_nascimento", "nascimento"], ["matricula_ponto", "matricula do ponto"],
+      ["data_contratacao", "data de contratacao"],
+    ]
+    const faltam = obrigatorios
+      .filter(([k]) => !String(corpo[k] ?? "").trim())
+      .map(([, rotulo]) => rotulo)
+    if (faltam.length) {
+      return json({ erro: "Faltam dados obrigatorios: " + faltam.join(", ") + "." }, 400)
+    }
+
     const base = (corpo.base_id as string | undefined) ?? perfilAdmin?.base_id ?? null
 
     // 159: o banco diz se ESTE chamador pode criar ESTE login.
@@ -126,6 +140,7 @@ Deno.serve(async (req: Request) => {
       rg: corpo.rg ?? null,
       data_nascimento: corpo.data_nascimento ?? null,
       matricula_ponto: corpo.matricula_ponto ?? null,
+      data_contratacao: corpo.data_contratacao ?? null,
       login_field: corpo.login_field ?? null,
       ativo: true,
     })

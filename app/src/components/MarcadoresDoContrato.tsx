@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
 /**
- * Os marcadores de qualidade do contrato (URA, GEO, processos…), na
- * página do contrato, ao lado das O.S. (156).
+ * Os marcadores de qualidade do contrato (URA, GEO, processos…).
  *
- * > "tinha uma opção (...) na tela menor, que era marcadores (...) agora
- * >  só ficou a tela maior. E na tela maior não tem nenhum campo onde a
- * >  gente consiga colocar os marcadores. Os marcadores podem ficar ao
- * >  lado de OS, no lado direito" — Emanuel, 30/10
+ * > "A opção marcadores deve ficar ao lado do botão mais OS. Quando clicar
+ * >  em cima, abre um select para o controlador selecionar os marcadores
+ * >  que aquele contrato tem. Não precisa deixar eles expostos"
+ * >  — Emanuel, 31/10
  *
- * Eles existiam numa ABA da barra de ações (155) — escondidos atrás de um
- * clique que ninguém viu. Agora são um cartão sempre aberto. Quem grava é
- * o RLS de `visita_marcador` (permissão `servicos.marcadores`); a tela só
- * não oferece o clique a quem não tem.
+ * Histórico: 155 numa aba (ninguém achou), 156 num cartão sempre aberto ao
+ * lado das O.S. (ocupava espaço com doze botões). Agora é um botão na barra
+ * de ações, que diz quantos estão marcados e abre a lista para marcar.
+ * Quem grava é o RLS de `visita_marcador` (permissão `servicos.marcadores`);
+ * a tela só não oferece o clique a quem não tem.
  */
 export function MarcadoresDoContrato({ visitaId }: { visitaId: string }) {
   const { pode } = useAuth()
@@ -23,6 +23,8 @@ export function MarcadoresDoContrato({ visitaId }: { visitaId: string }) {
   const [marcados, setMarcados] = useState<{ id: string; indicador_id: string }[]>([])
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [aberto, setAberto] = useState(false)
+  const caixa = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
     const [i, m] = await Promise.all([
@@ -34,6 +36,26 @@ export function MarcadoresDoContrato({ visitaId }: { visitaId: string }) {
   }, [visitaId])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Fecha no clique fora e no Esc. O Esc é pego na CAPTURA e não segue:
+  // senão o mesmo Esc fecharia também a janela do contrato inteira.
+  useEffect(() => {
+    if (!aberto) return
+    const fora = (e: MouseEvent) => {
+      if (caixa.current && !caixa.current.contains(e.target as Node)) setAberto(false)
+    }
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopImmediatePropagation()
+      setAberto(false)
+    }
+    document.addEventListener('mousedown', fora)
+    window.addEventListener('keydown', esc, true)
+    return () => {
+      document.removeEventListener('mousedown', fora)
+      window.removeEventListener('keydown', esc, true)
+    }
+  }, [aberto])
 
   async function alternar(indicadorId: string) {
     setOcupado(true); setErro(null)
@@ -47,33 +69,41 @@ export function MarcadoresDoContrato({ visitaId }: { visitaId: string }) {
   }
 
   return (
-    <section className="card-controle p-4">
-      <h2 className="mb-1 text-sm font-semibold">
-        Marcadores <span className="tabular text-xs font-normal text-graf-400">({marcados.length})</span>
-      </h2>
-      <p className="mb-2.5 text-[11px] text-graf-400">
-        {podeMarcar ? 'Clique para aplicar ou tirar.' : 'Só quem tem a permissão de marcadores altera.'}
-      </p>
-      {indicadores.length === 0 ? (
-        <p className="text-xs text-graf-400">Nenhum marcador cadastrado. Cadastre em Configurações.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {indicadores.map(i => {
-            const on = marcados.some(m => m.indicador_id === i.id)
-            return (
-              <button key={i.id} disabled={ocupado || !podeMarcar} onClick={() => alternar(i.id)}
-                aria-pressed={on}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium ring-1 transition
-                            disabled:cursor-default ${
-                  on ? 'bg-sky-900/40 text-sky-300 ring-sky-700/50'
-                     : 'bg-graf-900 text-graf-400 ring-graf-700 enabled:hover:text-graf-200'}`}>
-                {on && <span className="mr-1">✓</span>}{i.nome}
-              </button>
-            )
-          })}
+    <div ref={caixa} className="relative">
+      <button onClick={() => setAberto(a => !a)} aria-expanded={aberto} aria-haspopup="true"
+        className={`rounded-md border px-2.5 py-1 text-xs hover:border-af-600 hover:text-af-400 ${
+          marcados.length ? 'border-sky-700/60 text-sky-300' : 'border-graf-700 text-graf-300'}`}>
+        Marcadores{marcados.length > 0 && <span className="tabular"> ({marcados.length})</span>} ▾
+      </button>
+      {aberto && (
+        <div role="dialog" aria-label="Marcadores do contrato"
+          className="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-graf-700
+                     bg-graf-900 p-2 shadow-2xl">
+          <p className="mb-1.5 px-1 text-[11px] text-graf-400">
+            {podeMarcar ? 'Marque o que este contrato tem.' : 'Só quem tem a permissão de marcadores altera.'}
+          </p>
+          {indicadores.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-graf-400">Nenhum marcador cadastrado. Cadastre em Configurações.</p>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto">
+              {indicadores.map(i => {
+                const on = marcados.some(m => m.indicador_id === i.id)
+                return (
+                  <li key={i.id}>
+                    <label className={`flex items-center gap-2 rounded px-1.5 py-1 text-xs ${
+                      podeMarcar ? 'cursor-pointer hover:bg-graf-800' : 'text-graf-400'}`}>
+                      <input type="checkbox" checked={on} disabled={ocupado || !podeMarcar}
+                        onChange={() => alternar(i.id)} className="accent-af-600" />
+                      <span className={on ? 'text-sky-300' : 'text-graf-200'}>{i.nome}</span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {erro && <p className="mt-1.5 px-1 text-xs text-af-400">{erro}</p>}
         </div>
       )}
-      {erro && <p className="mt-2 text-xs text-af-400">{erro}</p>}
-    </section>
+    </div>
   )
 }

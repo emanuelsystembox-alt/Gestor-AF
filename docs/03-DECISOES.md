@@ -10338,3 +10338,72 @@ Os cenários acima não entraram em `testar_policies()` (foram feitos à mão).
 `admin.cargos` e `admin.empresa` continuam "sem efeito ainda": cargos, perfis de
 acesso e dados da empresa seguem só do ADMIN — abrir perfis de acesso a outro
 login deixaria ele pôr permissão de Administração num perfil e atribuí-lo.
+
+---
+
+### D-240 · Tela parada até a pessoa querer, sino com contrato, CPF/RG travados, obrigatórios, marcadores e filtros do Monitoramento (160)
+
+> Pedidos de 31/10, em quatro blocos.
+
+**1. O fundo branco atrás do contrato.** *"deixou tudo branco atrás (...) dá a
+impressão de que o sistema bugou"*. A causa: a janela usava a classe de tema
+`.sup-controle`, que pinta fundo **sólido** (`styles.css`, fora das camadas do
+Tailwind, ganha do `bg-black/60`). No tema claro o véu virava parede branca; no
+escuro, quase preta — a lista estava lá, coberta. A classe foi para a janela; o
+véu ficou só translúcido. Esc com a lista de marcadores aberta fecha a lista, não
+o contrato (escuta na captura).
+
+**2. A tela não se mexe sozinha.** *"não quero que o sistema atualize quando
+alguém fizer uma importação e atualiza de todo mundo"*. Serviços recarregava a
+cada evento do banco; o Monitoramento, a cada minuto. Agora o **Atualizar** é a
+única recarga dessas telas — o clique, ou o relógio que a pessoa liga ao lado dele
+(manual / 2 min / 5 min, guardado no navegador dela, vale para todas as telas).
+Serviços continua contando as mudanças que chegam ("N mudanças — atualizar"), sem
+trocar a lista. O Dashboard e a Rota ganharam o botão. O sino e os selos do menu
+continuam se atualizando sozinhos — são aviso, não a tela de trabalho.
+
+**3. O sino diz contrato e equipe** (160a). Cada aviso traz a equipe; o de contrato,
+o número; o "Contrato quebrado" — agrupado por técnico — traz os contratos dele
+quebrados hoje como etiquetas, cada uma abre o contrato por cima da tela. De um
+contrato só, o próprio aviso abre o contrato. A regra de quebrado é a da
+`producao_por_tecnico` (O.S. com código IMPRODUTIVO). Medido: o "4 quebrados" do
+Josué lista os 4 contratos.
+
+**4. CPF e RG gravados só o administrador principal muda** (160b). *"Somente o
+e-mail de login ADM, que é o meu"* — `admin@afline.com.br`, não "qualquer ADMIN"
+(há três). A identidade mora numa função que só migration troca
+(`editor_dados_sensiveis`); um parâmetro editável pela tela deixaria outro ADMIN se
+pôr no lugar. Gatilho no banco; a tela trava o campo antes. Medido (desfeito): outro
+ADMIN troca CPF → recusado; Emanuel troca RG → ok.
+
+**5. Seis dados obrigatórios no cadastro novo.** WhatsApp, CPF, RG, nascimento,
+matrícula do ponto e data de contratação. A Edge Function `admin-usuarios` (v4)
+recusa criar login sem eles; a tela Novo usuário e a planilha de cidade (coluna nova
+"Data de contratação") conferem antes. **Não vale para editar quem já existe**:
+medido, dos 89 logins ativos, 86 não têm data de contratação e 16 não têm matrícula —
+a trava na edição travaria quase toda alteração. O que vale para todos: dado
+obrigatório preenchido **não se apaga** (gatilho).
+
+**6. Marcadores** viraram botão ao lado do **+ O.S.**, com a lista para marcar; o
+cartão exposto saiu.
+
+**7. Administração** perdeu a coluna "Papéis (o que o banco lê)". O papel continua
+no filtro "Tipo de login" e no Editar.
+
+**8. Monitoramento: filtros de equipe, bucket, supervisor e área.** Supervisor,
+bucket e área vêm da `rota_do_dia`, a mesma fonte dos filtros da Rota. O recorte vale
+para cartões, lista, mapa, km e próximos. Bucket e área são dos contratos do dia:
+quem não tem contrato sai do recorte, e a tela escreve isso.
+
+**VERIFICADO:** `tsc` e `build`; no navegador (Manaus): contrato aberto de Serviços
+com o véu translúcido e a lista atrás; Esc fecha a lista de marcadores e depois o
+contrato; seletor "manual / 2 / 5 min" em Serviços e no Dashboard; filtro de área no
+Monitoramento (18 de 55); sino com equipe e etiquetas de contrato, e a etiqueta
+abrindo o contrato por cima do Monitoramento. `testar_policies()` 33/33,
+`testar_campo()` 29/29, zero definer para o anon.
+
+**NÃO VERIFICADO:** criar um login de verdade pela tela com os seis campos (a
+Edge Function v4 não foi chamada); a planilha de cidade com a coluna nova, de ponta
+a ponta; o relógio de 2/5 min disparando (só o seletor foi visto); a `rota_do_dia`
+devolve no máximo 1.000 paradas por chamada — Manaus tem ~480 por dia, mas uma cidade
+maior ficaria com o recorte do Monitoramento incompleto.

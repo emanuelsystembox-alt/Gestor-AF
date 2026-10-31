@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACOES, SITUACAO_INFO, EM_ABERTO, type Situacao } from '../lib/supabase'
+import { MarcadoresDoContrato } from './MarcadoresDoContrato'
 import { Alerta, Pill } from './ui'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { equipeRotulo, mascaraTelefone, pts } from '../lib/formato'
@@ -365,6 +366,9 @@ export function ContratoModal({
                          hover:border-af-600 hover:text-af-400">
               + O.S.
             </button>
+            {/* 160: os marcadores ao lado do + O.S., numa lista que abre
+                (Emanuel, 31/10). Na janela pequena eles têm aba própria. */}
+            {pagina && <MarcadoresDoContrato visitaId={id} />}
             <button onClick={() => setAcao(acao === 'status' ? null : 'status')}
               title="Levar o contrato para o status que você escolher — o sistema da CLARO não volta status"
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300

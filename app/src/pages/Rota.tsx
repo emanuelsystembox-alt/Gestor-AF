@@ -3,6 +3,7 @@ import { supabase, SITUACAO_INFO, SITUACOES, type Situacao } from '../lib/supaba
 import { equipeRotulo, isoLocal } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
+import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { Alerta, Vazio } from '../components/ui'
 import { useTema } from '../lib/tema'
 import { useAuth } from '../lib/auth'
@@ -239,6 +240,8 @@ export default function Rota() {
   const [bairros, setBairros] = useState<BairroLinha[]>([])
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [carregando, setCarregando] = useState(true)
+  /** 31/10: de quando é o que está na tela (o Atualizar diz "há N min"). */
+  const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [foco, setFoco] = useState<string | null>(null)   // login em foco
@@ -285,6 +288,7 @@ export default function Rota() {
       setBairros((b.data ?? []) as BairroLinha[])
       setResumo((r.data ?? null) as Resumo | null)
       setCarregando(false)
+      setAtualizadoEm(new Date())
     })
     return () => { vivo = false }
   }, [data])
@@ -468,9 +472,13 @@ export default function Rota() {
 
   return (
     <Shell acoes={
-      <input type="date" value={data} onChange={e => setData(e.target.value)}
-        aria-label="Dia da rota"
-        className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+      <div className="flex items-center gap-2">
+        <input type="date" value={data} onChange={e => setData(e.target.value)}
+          aria-label="Dia da rota"
+          className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+        <BotaoAtualizar aoAtualizar={() => { recarregar() }} carregando={carregando}
+          atualizadoEm={atualizadoEm} />
+      </div>
     }>
       <div className="space-y-4 p-4">
         <div>

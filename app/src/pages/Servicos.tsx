@@ -316,16 +316,17 @@ export default function Servicos() {
    * │ um clique de transferir ou apagar em lote — trocar as linhas    │
    * │ nesse instante é como puxar o papel da mesa.                    │
    * │                                                                 │
-   * │ Então: lista livre recarrega sozinha; lista com seleção guarda  │
-   * │ o aviso e deixa ele decidir quando.                             │
+   * │ Então: lista com seleção guardava o aviso e deixava ele decidir.│
+   * │                                                                 │
+   * │ 31/10: agora a lista NUNCA se troca sozinha — com ou sem        │
+   * │ seleção. "Não quero que o sistema atualize quando alguém fizer  │
+   * │ uma importação" (Emanuel). O tempo real só CONTA o que chegou;  │
+   * │ quem recarrega é o Atualizar, ou o relógio que a pessoa ligou   │
+   * │ nele (2 ou 5 min).                                              │
    * └─────────────────────────────────────────────────────────────────┘
    */
-  const temSelecao = useRef(false)
-  temSelecao.current = selecionados.size > 0
-
   const aoVivo = useMudancasAoVivo(quantas => {
-    if (temSelecao.current) setMudancasEmEspera(n => n + quantas)
-    else setVersao(v => v + 1)
+    setMudancasEmEspera(n => n + quantas)
   })
 
   function aplicarMudancas() {
@@ -715,7 +716,8 @@ export default function Servicos() {
           <span className="inline-flex items-center gap-1.5 text-[11px] text-graf-500">
             <span className={`h-1.5 w-1.5 rounded-full ${
               aoVivo ? 'ponto-vivo bg-emerald-500' : 'bg-graf-600'}`} />
-            {aoVivo ? 'ao vivo' : 'sem conexão ao vivo — recarregue a página'}
+            {aoVivo ? 'ao vivo — avisa as mudanças, a lista só troca quando você atualizar'
+                    : 'sem conexão ao vivo — o aviso de mudanças está parado'}
           </span>
 
           {mudancasEmEspera > 0 && (

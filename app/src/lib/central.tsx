@@ -78,6 +78,11 @@ export interface Sinal {
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean
+  /** 160a: o código da equipe e o número do contrato, para o aviso não
+   *  dizer só o nome. `contratos`: no QUEBROU (agrupado por técnico), os
+   *  contratos dele quebrados hoje. */
+  equipe?: string | null; contrato?: string | null
+  contratos?: { visita_id: string; contrato: string | null }[] | null
 }
 
 /** Uma mensagem que acabou de chegar pelo Realtime — o chat aberto usa. */

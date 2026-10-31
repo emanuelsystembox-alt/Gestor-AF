@@ -13,7 +13,6 @@ import { ProvaDoContrato } from '../components/ProvaDoContrato'
 import { ConversaTecnico } from '../components/ConversaTecnico'
 import { lerLog } from '../lib/log'
 import { ObservacaoCop } from '../components/ObservacaoCop'
-import { MarcadoresDoContrato } from '../components/MarcadoresDoContrato'
 import { ContratoModal, type CodigoDeBaixa } from '../components/ContratoModal'
 import type { AcaoContrato } from '../components/MenuContrato'
 
@@ -627,7 +626,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
             {/* ---------- ordens de serviço + marcadores ----------
                 156: os marcadores ficam ao lado direito das O.S. ("podem
                 ficar ao lado de OS, no lado direito" — Emanuel, 30/10). */}
-            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid items-start gap-3">
             <section className="card-controle overflow-hidden">
               <div className="flex flex-wrap items-baseline gap-3 border-b border-graf-800 px-4 py-3">
                 <h2 className="text-sm font-semibold">
@@ -706,7 +705,8 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                 regra de pontuação for definida — ver <code>docs/06-PONTUACAO.md</code>.
               </p>
             </section>
-            <MarcadoresDoContrato visitaId={v.id} />
+            {/* 160: os marcadores saíram daqui para a barra de ações, ao lado
+                do + O.S. (MarcadoresDoContrato), como lista que abre. */}
             </div>
 
             {/* ---------- responder ao técnico / mudar status ---------- */}

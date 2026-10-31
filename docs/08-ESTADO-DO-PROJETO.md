@@ -471,6 +471,20 @@ APK 0.5.0 (por isso a atualização pelo ar basta).
 - **GPS de alta precisão durante a execução**: só proposto. Decidir se vale o custo de
   bateria antes de construir.
 
+### Também resolvido em 31/10 (160, D-240)
+- Fundo branco atrás do contrato; tela parada até a pessoa atualizar (manual/2/5 min);
+  sino com contrato e equipe; CPF/RG só o administrador principal; seis dados
+  obrigatórios no cadastro novo; marcadores ao lado do + O.S.; coluna de papéis fora
+  da Administração; filtros de equipe/bucket/supervisor/área no Monitoramento.
+
+### Verificação que ninguém fez (160)
+- Criar login pela tela com os seis campos (Edge Function v4 não foi chamada).
+- Planilha de cidade com a coluna "Data de contratação", de ponta a ponta.
+- O relógio de 2/5 min disparando.
+- `rota_do_dia` corta em 1.000 paradas: cidade maior que Manaus teria o recorte do
+  Monitoramento incompleto.
+- 86 dos 89 logins sem data de contratação, 16 sem matrícula do ponto: preencher.
+
 ### Construção que ficou para depois
 - Cenários da 159 em `testar_policies()` (gestor de usuários não edita ADMIN, não dá
   papel ADMIN, não se edita) — hoje testados só à mão.

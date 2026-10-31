@@ -132,6 +132,14 @@ export function EditarUsuarioModal({
   const { perfil: eu, temPapel } = useAuth()
   const [alteracoesPerm, setAlteracoesPerm] = useState<AlteracoesPermissao>({})
   const aoMudarPerm = useCallback((a: AlteracoesPermissao) => setAlteracoesPerm(a), [])
+  // 160b: CPF e RG gravados só o administrador principal muda (o banco
+  // recusa os outros). A tela pergunta para travar o campo antes.
+  const [possoDocs, setPossoDocs] = useState(false)
+  useEffect(() => {
+    supabase.rpc('posso_editar_documentos').then(({ data }) => setPossoDocs(data === true))
+  }, [])
+  const cpfTravado = !!usuario.cpf && !possoDocs
+  const rgTravado = !!usuario.rg && !possoDocs
 
   // Senha: só mexe quem marcar. Um campo de senha sempre aberto convida
   // a trocar a senha de alguém sem querer.
@@ -266,6 +274,15 @@ export function EditarUsuarioModal({
   async function salvar() {
     // O e-mail não é editável, então não entra na conferência.
     const e = conferirCadastro(f, { exigeEmail: false })
+    // 160b: dado obrigatório já preenchido não se apaga (o banco também barra).
+    const naoApaga: [keyof typeof f, string | null][] = [
+      ['whatsapp', usuario.whatsapp], ['cpf', usuario.cpf], ['rg', usuario.rg],
+      ['data_nascimento', usuario.data_nascimento], ['matricula_ponto', usuario.matricula_ponto],
+      ['data_contratacao', usuario.data_contratacao],
+    ]
+    for (const [k, antes] of naoApaga) {
+      if (antes && !String(f[k] ?? '').trim()) e[k as string] = 'Dado obrigatório: não se apaga.'
+    }
     if (trocarSenha && senhaNova && senhaNova.length < 8) {
       e.senha = 'A senha precisa de pelo menos 8 caracteres.'
     }
@@ -465,13 +482,16 @@ export function EditarUsuarioModal({
     return msg
   }
 
-  const Campo = ({ k, rot, tipo = 'text', dica, formata }: {
+  const Campo = ({ k, rot, tipo = 'text', dica, formata, travado }: {
     k: keyof typeof f; rot: string; tipo?: string; dica?: string
     formata?: (v: string) => string
+    /** 160b: CPF/RG gravados, para quem não é o administrador principal. */
+    travado?: boolean
   }) => (
     <label className="text-xs text-graf-400">
       <span className="mb-1 block">{rot}</span>
-      <input type={tipo} value={String(f[k] ?? '')}
+      <input type={tipo} value={String(f[k] ?? '')} disabled={travado}
+        title={travado ? 'Depois de gravado, só o administrador principal altera' : undefined}
         onChange={e => mudar(k, formata ? formata(e.target.value) : e.target.value)}
         aria-invalid={!!erros[k as string]}
         className={`${campo} ${erros[k as string] ? 'border-af-500' : ''}`} />
@@ -540,15 +560,17 @@ export function EditarUsuarioModal({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Campo k="nome" rot="Nome completo *" />
               <Campo k="apelido" rot="Apelido" />
-              <Campo k="data_nascimento" rot="Nascimento" tipo="date" />
-              <Campo k="whatsapp" rot="WhatsApp" formata={formataTelefone}
+              <Campo k="data_nascimento" rot="Nascimento *" tipo="date" />
+              <Campo k="whatsapp" rot="WhatsApp *" formata={formataTelefone}
                 dica="(92) 99123-4567" />
-              <Campo k="cpf" rot="CPF" formata={formataCPF} dica="com dígito conferido" />
-              <Campo k="rg" rot="RG" dica="sem padrão nacional — só o tamanho é conferido" />
-              <Campo k="matricula_ponto" rot="Matrícula do ponto" dica="só números" />
+              <Campo k="cpf" rot="CPF *" formata={formataCPF} travado={cpfTravado}
+                dica={cpfTravado ? 'gravado — só o administrador principal altera' : 'com dígito conferido'} />
+              <Campo k="rg" rot="RG *" travado={rgTravado}
+                dica={rgTravado ? 'gravado — só o administrador principal altera' : 'sem padrão nacional — só o tamanho é conferido'} />
+              <Campo k="matricula_ponto" rot="Matrícula do ponto *" dica="só números" />
               {/* Opcional (Emanuel, 17/10): é para saber o tempo de casa, que
                   é calculado aqui, na leitura — nunca guardado (101). */}
-              <Campo k="data_contratacao" rot="Data de contratação" tipo="date"
+              <Campo k="data_contratacao" rot="Data de contratação *" tipo="date"
                 dica={tempoDeCasa(f.data_contratacao)
                   ? `tempo de casa: ${tempoDeCasa(f.data_contratacao)}`
                   : 'não informada'} />

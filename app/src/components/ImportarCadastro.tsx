@@ -187,6 +187,7 @@ export function ImportarCadastro() {
             apelido: p.apelido || null, whatsapp: p.whatsapp || null, cpf: p.cpf || null,
             rg: p.rg || null, data_nascimento: p.nascimento || null,
             matricula_ponto: p.matricula_ponto || null,
+            data_contratacao: p.data_contratacao || null,
             cargo_id: p.cargo_id || null, perfil_acesso_id: p.perfil_acesso_id || null,
             // A cidade da planilha, e não a de quem importa.
             base_id: baseId,
