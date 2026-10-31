@@ -36,6 +36,13 @@
 > - **Mural Nexus** (163, D-245): Comunicação › Mural Nexus, slide com dizeres para
 >   todo o time; só o ADMIN publica (RLS em `mural_post` e no bucket `mural`).
 >   Nasceu vazio. Pendências: seção "Pendente depois da 163".
+> - **No app do técnico** (164, D-246): o Mural (tela + cartão na Agenda), o card
+>   **Revisita** no Painel (`revisita_do_tecnico`; ADESÃO e MANUTENÇÃO contam
+>   diferente) e o sino desenhado. Publicado pelo ar (runtime 0.5.0) e APK 0.5.0 gerado
+>   na EAS (build `ec0a04d5`). Pendências: seção "Pendente depois da 164".
+> - **A entrada do app vira NEXUS MANAGER** (D-247): AFLINE assina em cima, símbolo
+>   do Nexus com as órbitas, letreiro NEXUS / MANAGER; o nome embaixo do ícone é
+>   "Nexus Manager". APK novo: build `e992bcd0`.
 
 ---
 

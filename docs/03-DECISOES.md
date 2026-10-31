@@ -10758,3 +10758,128 @@ e legenda apareceram, e o "Apagar" deixou 0 linhas e 0 arquivos no banco.
 
 **NÃO VERIFICADO:** o Mural aberto por quem não é ADMIN pela tela (testado no
 banco); o slide passando com várias imagens (havia só a de teste); a ordem ↑↓.
+
+### D-246 · No app do técnico: Mural, card de Revisita e o sino desenhado (164)
+
+> "vamos adicionar no app o canal de comunicação da AFLINE para que o time possa
+> visualizar os ganhadores, informativos, campanhas entre outros. o mesmo do mural
+> do site, só que no app." — Emanuel, 31/10.
+
+**Mural no app** (só leitura): a mesma `mural_post` e o mesmo bucket `mural` da 163 —
+nenhuma regra nova no banco: a policy de leitura já é "quem é da empresa", e o
+técnico é. Tela própria, e um cartão no topo da Agenda (só quando há post no ar) que
+abre o Mural.
+
+> "colocar um card chamado revisita (...) técnico de adesão ou instalação: é tudo que
+> ele conclui; as revisitas é tudo que volta de retorno (...) retorno dividido pelo
+> total de conclusão (...) manutenção e somente visita técnica: concluída, reagendado,
+> cancelado — cancelado central não conta e auditar também não — a VT que retornou
+> dividido pelo total que ele fez e visitou o cliente" — Emanuel, 31/10.
+
+**Card Revisita no Painel** — a conta mora no banco, `revisita_do_tecnico(de, até)`
+(164), o técnico é o do login. Respostas às perguntas (31/10):
+- conta para quem fez o serviço **anterior** (o trabalho dele voltou);
+- o total são os serviços dele no período; o retorno vale até **30 dias** depois,
+  mesmo no mês seguinte — "Este mês" ainda sobe até fechar 30 dias;
+- **ADESÃO** (e toda skill que não é MANUTENÇÃO): total = contratos CONCLUÍDOS;
+  revisita = os que voltaram como RETORNO DE CREDENCIADA (depois de adesão, migração
+  GPON, reinstalação, mudança de endereço ou retorno) **ou como VT** — o par da 163;
+- **MANUTENÇÃO**: total = VTs concluídas, reagendadas ou canceladas, **sem** o
+  cancelado pela central (status do TOA "cancelado") e sem o desatribuído (800, o
+  "Auditar") — os mesmos de `origemCancelada()` da web; revisita = as que voltaram
+  em VT depois de **qualquer** visita dele (escolha do Emanuel, inclusive reagendada
+  ou cancelada — diferente da 163, que exige a anterior concluída).
+- Total zero = pct NULO, e o card diz "sem serviço no período", nunca "0%".
+- **Sem meta**: ninguém definiu o que é revisita boa ou ruim; o card é neutro.
+
+Medido como `authenticated` (logado como o técnico), outubro: NICACIO (ADESÃO) 1 de
+87 = 1,1% — os 87 batem com o card "Concluídos" do painel dele; DANILO PAIXAO
+(MANUTENÇÃO) 4 de 48 = 8,3%; LUIS FERNANDO (MANUTENÇÃO) 1 de 46 = 2,2%. 20–30 ms.
+
+> "O SINO DO APP também, mude para um mais profissional que combine com o app, um
+> ícone melhor" — Emanuel, 31/10.
+
+**O sino** deixou de ser o emoji 🔔 (que muda de desenho em cada Android) e virou um
+ícone de linha desenhado com `View`, na cor do tema. Sem biblioteca nova: a regra do
+`campo/` é `StyleSheet` e nada mais, e não há `react-native-svg`.
+
+**Publicação:** nenhuma peça nativa mudou desde o APK 0.5.0 (`package.json`,
+`app.json` e `app.config.js` iguais desde `fa63569`). A versão continua **0.5.0**:
+APK novo para quem instalar agora e `eas update` no canal preview para quem já tem
+o 0.5.0 — que leva junto o GPS de alta precisão da 161, até aqui não publicado.
+
+**Feito com dois agentes em paralelo**, a pedido ("use agentes múltiplos"): um no
+Mural + sino (`Mural.tsx`, `App.tsx`, `navegacao.ts`, `Agenda.tsx`), outro no card
+(`Painel.tsx`) — arquivos separados para um não sobrescrever o outro. Os dois diffs
+foram lidos antes de publicar. Decisão do agente mantida: o cartão do Mural fica
+DEPOIS dos avisos urgentes da Agenda ("a operadora cancelou — não vá"), não no topo
+absoluto — campanha não passa na frente de aviso que muda o dia.
+
+**VERIFICADO:** `tsc` limpo e bundle Android (`expo export`, 1.031 módulos) depois
+dos dois agentes; como `authenticated` logado como técnico (NICACIO): lê o post do
+mural, passa na policy do arquivo e é recusado ao publicar; a conta da revisita para
+três técnicos reais (acima); `anon` sem `EXECUTE`. Publicado: `eas update` canal
+preview, runtime 0.5.0 (update group `ffad73bc`); APK gerado (build `ec0a04d5`, FINISHED).
+`app.json`/`eas.json` intactos depois dos dois comandos (armadilha de 25/10).
+
+**NÃO VERIFICADO:** nada disso rodou num celular — o carrossel, as imagens assinadas,
+o sino desenhado (proporção calculada, não vista) e o card na grade do Painel.
+
+### D-247 · A entrada do app vira NEXUS MANAGER, como a do site
+
+> "precisamos melhorar a entrada do nosso app quando o técnico abrir igual como
+> fizemos com o site, incluir mais o nome do Nexus Manager, vamos ter que trocar
+> isso no builder também, APK do aplicativo, melhore o design do app (...) igual como
+> fizemos com a entrada do site" — Emanuel, 31/10.
+
+**A tela Entrar** (`campo/src/telas/Entrar.tsx`) ganhou a identidade do site (D-242):
+- a **AFLINE assina em cima**: a logo e as duas frases, "**16 anos** conectando
+  vidas." e "Conectados com o futuro.";
+- o **símbolo do Nexus**: duas órbitas, azul e vermelha, com o sinal correndo por
+  elas (3,2 s e 3,8 s, como no site) e o N no núcleo; no login, as órbitas giram e o
+  núcleo pulsa (antes era um arco vermelho em volta da logo);
+- o **letreiro NEXUS / MANAGER**, montando letra a letra na abertura, e "SISTEMA DE
+  GESTÃO INTELIGENTE" com o traço azul→vermelho;
+- o par de cores do logo no fundo: clarão azul em cima, vermelho embaixo (antes, só
+  vermelho);
+- o formulário continua num **cartão branco** ("Acesso do técnico"): o fundo escuro
+  é a marca, visto uma vez por dia; onde se lê e digita é claro (25/10, D-011).
+
+**Como foi desenhado sem biblioteca** (regra do `campo/`: `StyleSheet` e nada mais;
+não há `react-native-svg` nem fonte própria): cada órbita é um círculo com borda,
+achatado em `scaleY` e inclinado; o sinal anda pela elipse calculada (x = a·cos t,
+y = b·sin t) em 25 pontos, no thread nativo. O degradê do NEXUS virou **cor letra a
+letra** (N azul → X na virada → S vermelho): o React Native não recorta degradê em
+texto sem biblioteca. A fonte é a do sistema em versão condensada pesada — o site
+usa Exo 2, que no app exigiria instalar fonte. Quem pede menos movimento no celular
+recebe a tela pronta, sem órbita correndo.
+
+**O nome no celular:** `app.json` `name` "Gestor AF Campo" → **"Nexus Manager"** (o
+nome embaixo do ícone; só muda com APK novo). O `slug`, o pacote
+(`br.com.afline.campo`) e o projeto da EAS **não mudaram** — mudar o pacote faria o
+Android tratar como outro app, sem atualizar por cima. Os textos que o técnico lia
+com "Gestor AF" viraram "Nexus Manager": a notificação da rota do dia, o pedido de
+senha no romaneio e o aviso de GPS desligado. O ícone e a tela de abertura nativa
+continuam com o AF da AFLINE — a AFLINE apresenta, o Nexus aparece (como no site).
+
+**NÃO MUDOU:** o ícone do app (AF), a splash nativa, e os comentários de código que
+ainda dizem "Gestor AF".
+
+**VERIFICADO:** `tsc` limpo; bundle Android (`expo export`, 1.031 módulos); o nome
+resolvido pelo Expo (`expo config`) = "Nexus Manager"; `app.json` sem BOM.
+
+**Vista numa RÉPLICA, não no app:** o app não roda no navegador (`react-native-web`
+não está instalado, e não foi instalado só para isso). Foi montada uma página HTML
+com os mesmos números do `StyleSheet` (medidas, cores, rotação, achatamento), olhada
+a 375 px e apagada em seguida. Ela mostrou um defeito: o clarão azul, sem desfoque
+(o React Native não desfoca), era um **disco chapado de borda dura** no canto. Virou
+4 camadas concêntricas bem fracas (5–8%), que esmaecem em ondas; e o símbolo cresceu
+de 116 para 126 px para pesar junto do letreiro.
+
+**Publicado:** `eas update` canal preview, runtime 0.5.0 (update group `60f953cf`);
+APK 0.5.0 com o nome novo na fila da EAS (build `e992bcd0`). `app.json`/`eas.json`
+conferidos intactos depois dos comandos da EAS.
+
+**NÃO VERIFICADO:** a tela no celular de verdade — a fonte condensada do Android, o
+sinal correndo nas órbitas, a abertura animada e o celular pequeno. A réplica confere
+proporção, não animação nem fonte do aparelho.

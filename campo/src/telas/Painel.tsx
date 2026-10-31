@@ -50,6 +50,20 @@ interface LinhaRanking {
   pontos: number; concluidas: number; eu: boolean
 }
 
+/**
+ * O card de REVISITA (164) — a conta é do BANCO (`revisita_do_tecnico`), a
+ * tela só escreve. `pct` NULO = nenhum serviço dele no período: não é 0%.
+ */
+interface Revisita {
+  modelo: 'ADESAO' | 'MANUTENCAO'
+  skill: string | null
+  total: number; revisitas: number
+  pct: number | null
+}
+
+/** Carregado, ou o recado de que a RPC falhou — o card nunca some calado. */
+type EstadoRevisita = { ok: Revisita } | { erro: string } | null
+
 type Periodo = 'atual' | 'anterior'
 
 function intervalo(p: Periodo) {
@@ -73,14 +87,21 @@ export default function Painel() {
   const [rankingAberto, setRankingAberto] = useState(false)
   /** tecnico_id → URL da foto (103). Sem foto, o avatar mostra as iniciais. */
   const [fotos, setFotos] = useState<Map<string, string>>(new Map())
+  const [revisita, setRevisita] = useState<EstadoRevisita>(null)
 
   const carregar = useCallback(async (p: Periodo) => {
     const { de, ate } = intervalo(p)
     setErro(null)
-    const [a, b] = await Promise.all([
+    const [a, b, r] = await Promise.all([
       supabase.rpc('painel_do_tecnico', { p_de: de, p_ate: ate }),
       supabase.rpc('ranking_tecnicos', { p_de: de, p_ate: ate }),
+      // Mesmo período do painel (164). Falhar aqui NÃO derruba o painel:
+      // o card de revisita mostra que não calculou, e o resto segue.
+      supabase.rpc('revisita_do_tecnico', { p_de: de, p_ate: ate }),
     ])
+    setRevisita(r.error || r.data == null
+      ? { erro: r.error?.message ?? 'resposta vazia' }
+      : { ok: r.data as Revisita })
     if (a.error) { setErro(a.error.message); return }
     setPainel(a.data as Painel)
     const lista = (b.data ?? []) as LinhaRanking[]
@@ -192,7 +213,7 @@ export default function Painel() {
             </View>
           </>)}
 
-          {/* ---------- o mês em quatro números ---------- */}
+          {/* ---------- o mês em cinco números ---------- */}
           <TituloSecao titulo="O mês" extra={`${n(p.dias)} dia(s) com produção`} />
           <View style={e.grade}>
             <Bloco rotulo="Concluídos" valor={String(n(p.concluidas))}
@@ -206,6 +227,7 @@ export default function Painel() {
                    alerta={n(p.pontos_perdidos) > 0} />
             <Bloco rotulo="TEC1 perdido" valor={String(n(p.tec1_perdidos))}
                    nota="fora da janela do cliente" alerta={n(p.tec1_perdidos) > 0} />
+            <BlocoRevisita estado={revisita} esteMes={periodo === 'atual'} />
           </View>
 
           {/* ---------- TEC1 entregue (Emanuel, 24/10) ---------- */}
@@ -368,6 +390,59 @@ function Bloco({ rotulo, valor, nota, alerta }: {
       <Text style={e.blocoRotulo}>{rotulo}</Text>
       <Text style={[e.blocoValor, alerta && { color: cor.af700 }]}>{valor}</Text>
       <Text style={e.blocoNota}>{nota}</Text>
+    </View>
+  )
+}
+
+/**
+ * "temos que colocar um card chamado revisita (...) a conta seria retorno
+ * dividido pelo total de conclusão (...) para o time de manutenção (...) a VT
+ * que retornou dividido pelo total que ele fez e visitou o cliente"
+ * (Emanuel, 31/10 — 164).
+ *
+ * ┌─ o que esta tela NÃO faz, de propósito ──────────────────────────┐
+ * │ · não conta nada: ADESÃO × MANUTENÇÃO, o par de grupos e os 30    │
+ * │   dias moram em `revisita_do_tecnico` — reescrever aqui seria a   │
+ * │   segunda cópia da regra, pronta para divergir;                   │
+ * │ · não pinta bom/ruim: não há meta de revisita. A moldura é a      │
+ * │   neutra, como "Concluídos" — o vermelho dos vizinhos é de PERDA; │
+ * │ · não escreve 0%: sem serviço no período, `pct` vem NULO e a tela │
+ * │   diz "—" (regra 6: zero e desconhecido não são a mesma coisa);   │
+ * │ · não some no erro: diz que não calculou, em vez de mostrar 0.    │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+function BlocoRevisita({ estado, esteMes }: { estado: EstadoRevisita; esteMes: boolean }) {
+  if (estado == null) {
+    return <Bloco rotulo="Revisita" valor="…" nota="calculando" />
+  }
+  if ('erro' in estado) {
+    return <Bloco rotulo="Revisita" valor="—" nota="não consegui calcular" />
+  }
+  const r = estado.ok
+  const adesao = r.modelo !== 'MANUTENCAO'
+  const pct = r.pct == null ? null : n(r.pct)
+  const oQueConta = adesao
+    ? 'voltaram em retorno ou VT em até 30 dias'
+    : 'VTs que voltaram em até 30 dias'
+  return (
+    <View style={e.bloco}>
+      <Text style={e.blocoRotulo}>Revisita</Text>
+      <Text style={e.blocoValor}
+            accessibilityLabel={pct == null ? 'Revisita: sem serviço no período'
+              : `Revisita ${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} por cento`}>
+        {pct == null ? '—'
+          : `${pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
+      </Text>
+      <Text style={e.blocoNota}>
+        {pct == null ? 'sem serviço no período'
+          : `${n(r.revisitas)} de ${n(r.total)} ${adesao ? 'concluídos' : 'visitas'}`}
+      </Text>
+      <Text style={e.blocoNota}>{oQueConta}</Text>
+      {/* O retorno conta até 30 dias depois, mesmo caindo no mês seguinte
+          (Emanuel, 31/10): o número do mês corrente ainda não fechou. */}
+      {esteMes && pct != null && (
+        <Text style={e.notinha}>ainda pode subir: o retorno conta até 30 dias</Text>
+      )}
     </View>
   )
 }

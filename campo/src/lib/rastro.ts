@@ -348,7 +348,7 @@ export async function iniciarSegundoPlano(perguntar: boolean): Promise<boolean> 
         showsBackgroundLocationIndicator: true,
         activityType: Location.ActivityType.AutomotiveNavigation,
         foregroundService: {
-          notificationTitle: 'Gestor AF · rota do dia',
+          notificationTitle: 'Nexus Manager · rota do dia',
           notificationBody: 'Registrando sua rota enquanto houver contrato aberto hoje.',
           notificationColor: '#d11a24',
           killServiceOnDestroy: false,

@@ -454,6 +454,54 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Pendente depois da D-247 — a entrada do app vira NEXUS MANAGER
+
+**Estado:** tela Entrar nova (AFLINE assina, símbolo do Nexus, letreiro NEXUS /
+MANAGER), nome embaixo do ícone "Nexus Manager" (`app.json` `name`), textos do app
+que diziam "Gestor AF" trocados. Pelo ar: update group `60f953cf` (runtime 0.5.0). APK
+0.5.0 na fila da EAS (build `e992bcd0`) — **é o APK a instalar**: o anterior
+(`ec0a04d5`) ainda tem o nome "Gestor AF Campo".
+
+### Verificação que ninguém fez ainda
+- A entrada no celular: fonte condensada, órbitas correndo, abertura, tela pequena.
+  Só uma réplica HTML com os mesmos números foi vista.
+- O nome "Nexus Manager" embaixo do ícone (só com o APK novo instalado).
+
+### Depende do Emanuel
+- **Ícone e splash** continuam com o AF da AFLINE. Se o ícone tiver de ser o símbolo
+  do Nexus, é preciso a arte em PNG (1024×1024, e o primeiro plano do ícone adaptável).
+
+## Pendente depois da 164 — no app: Mural, card de Revisita e o sino (D-246)
+
+**Estado:** migration **164** aplicada (`revisita_do_tecnico`). App publicado pelo ar
+em 31/10 (`eas update`, canal preview, runtime 0.5.0, update group `ffad73bc`) — leva
+junto o GPS de alta precisão da 161, que estava pendente. **APK 0.5.0 novo** gerado
+na EAS (build `ec0a04d5`, FINISHED): https://expo.dev/artifacts/eas/T87yKFvnV6QkFnwO7odH4s3ta0G1PBYwipzEHd0RkPE.apk `app.json` e `eas.json` conferidos intactos depois dos dois
+comandos da EAS. Feito com dois agentes em paralelo (Mural + sino; card de Revisita),
+revisados antes de publicar.
+
+### Resolvido nesta leva
+- Mural Nexus no app (só leitura) + cartão no topo da Agenda quando há post.
+- Card **Revisita** no Painel: ADESÃO = voltou (retorno ou VT, 30 dias) ÷ concluídos;
+  MANUTENÇÃO = VT que voltou ÷ VTs concluídas/reagendadas/canceladas (sem central e
+  sem auditar). Conta para quem fez o serviço anterior. Sem serviço = "—".
+- O sino da Agenda desenhado, no lugar do emoji.
+
+### Depende do Emanuel
+- **Instalar o APK novo** nos celulares que não têm o 0.5.0 (quem tem recebe pelo ar).
+- **Meta de revisita**: o card é neutro porque não há meta; se houver, dizer o valor.
+- **Revisita na gestão**: hoje o técnico vê a dele; a web não tem ranking nem relatório
+  de revisita por técnico. Se for para ter, dizer onde.
+- A MANUTENÇÃO conta como revisita a VT que volta depois de visita REAGENDADA (escolha
+  de 31/10). Contrato reagendado volta por definição — vale olhar o número de um mês
+  inteiro antes de usar para cobrar alguém.
+
+### Verificação que ninguém fez ainda
+- Nada desta leva rodou num celular: o Mural (imagens assinadas, troca de 7 s), o
+  cartão da Agenda, o sino desenhado e o card de Revisita foram conferidos por `tsc`,
+  pelo bundle Android (`expo export`) e pela leitura do código, não na tela.
+- O APK novo instalado.
+
 ## Pendente depois da 163 — revisita na janela do LOG e Mural Nexus (D-245)
 
 **Estado:** migration **163** aplicada (`revisita_dos_contratos`, `mural_post`, bucket

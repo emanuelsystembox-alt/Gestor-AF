@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet,
+  Image, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -21,6 +21,7 @@ import { PainelAvisos } from '../ui/PainelAvisos'
 import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { useEstadoRastro } from '../lib/useRastro'
 import { BarraInferior } from '../ui/BarraInferior'
+import { capaDoMural } from './Mural'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -119,6 +120,9 @@ export default function Agenda({ navigation }: Props) {
   const [pendentes, setPendentes] = useState(0)
   const [avisos, setAvisos] = useState<AvisoCampo[]>([])
   const [sinoAberto, setSinoAberto] = useState(false)
+  /** 163: a capa do Mural Nexus (o primeiro post no ar). Nulo = nada no
+   *  ar, ou não deu para ler — nos dois casos o cartão não aparece. */
+  const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
 
   const carregar = useCallback(async (dia: string) => {
     setErro(null)
@@ -146,6 +150,15 @@ export default function Agenda({ navigation }: Props) {
   )
 
   useEffect(() => { ondeEstou().then(setGps) }, [])
+
+  // 163: a porta do Mural Nexus (D-245). Uma linha e uma URL assinada —
+  // a agenda é a tela que abre o app e não espera o mural inteiro. Erro
+  // aqui ESCONDE o cartão em vez de virar aviso: o mural é recado da
+  // empresa, não trabalho do dia, e um alerta vermelho no topo da agenda
+  // por causa dele assustaria à toa. Quem abre a tela do mural vê o erro.
+  const lerCapa = useCallback(
+    () => capaDoMural().then(setCapa).catch(() => setCapa(null)), [])
+  useEffect(() => { lerCapa() }, [lerCapa])
 
   // Os avisos vêm por dois caminhos, e os dois são necessários:
   // a leitura traz o que aconteceu enquanto o aplicativo estava
@@ -248,6 +261,7 @@ export default function Agenda({ navigation }: Props) {
     const r = await sincronizar()
     await carregar(data)
     await carregarAvisos().then(l => setAvisos(soNaoLidos(l))).catch(() => {})
+    await lerCapa()
     setPendentes(r.restam)
     setGps(await ondeEstou())
     setAtualizando(false)
@@ -276,11 +290,17 @@ export default function Agenda({ navigation }: Props) {
         {/* "Solicitar suporte técnico" (Emanuel, 27/09): o botão de ajuda.
             É o Impedimento — cai direto na central do controlador. O
             Material que ficava aqui foi para a barra de baixo. */}
-        {/* O sino (Emanuel, 24/10): o número é o que ele ainda não leu. */}
-        <Pressable onPress={() => setSinoAberto(true)} style={e.sino} hitSlop={6}
+        {/* O sino (Emanuel, 24/10): o número é o que ele ainda não leu.
+            Desenhado, não emoji (Emanuel, 31/10: "mude para um mais
+            profissional que combine com o app"): o 🔔 sai amarelo e com
+            a cara de cada fabricante. Ver IconeSino, no fim do arquivo. */}
+        <Pressable onPress={() => setSinoAberto(true)} hitSlop={6}
+          style={({ pressed }) => [e.sino, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
           accessibilityLabel={avisos.length ? `${avisos.length} avisos não lidos` : 'Avisos'}>
-          <Text style={e.sinoIcone}>🔔</Text>
+          <View style={[e.sinoAro, avisos.length > 0 && e.sinoAroAtivo]}>
+            <IconeSino tinta={avisos.length > 0 ? cor.af700 : cor.graf600} />
+          </View>
           {avisos.length > 0 && (
             <View style={e.sinoBolha}>
               <Text style={e.sinoNumero}>{avisos.length > 99 ? '99+' : avisos.length}</Text>
@@ -375,6 +395,30 @@ export default function Agenda({ navigation }: Props) {
           aoDispensarTodos={() => dispensar(
             avisos.filter(a => PESO_AVISO[a.tipo] === 'urgente').map(a => a.id))}
         />
+
+        {/* 163: o Mural Nexus (Emanuel, 31/10: "o canal de comunicação da
+            AFLINE para que o time possa visualizar os ganhadores,
+            informativos, campanhas"). Só aparece com post no ar — sem
+            nada publicado, não ocupa espaço. Vem DEPOIS do erro e dos
+            avisos urgentes: campanha não passa na frente de "a operadora
+            cancelou — não vá". Ver D-245 e D-246 e D-246. */}
+        {!!capa && (
+          <Pressable onPress={() => navigation.navigate('Mural')}
+            style={({ pressed }) => [e.mural, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Mural Nexus: ${capa.titulo}. Ver mural`}>
+            <View style={e.muralCapa}>
+              {!!capa.url && (
+                <Image source={{ uri: capa.url }} style={e.muralImagem} resizeMode="cover" />
+              )}
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={e.muralRotulo}>MURAL NEXUS</Text>
+              <Text style={e.muralTitulo} numberOfLines={2}>{capa.titulo}</Text>
+              <Text style={e.muralVer}>Ver mural ›</Text>
+            </View>
+          </Pressable>
+        )}
 
         {/* O estado do GPS fica visível o tempo todo, e não só na hora
             da baixa. Descobrir que a localização estava desligada
@@ -645,6 +689,25 @@ export default function Agenda({ navigation }: Props) {
   )
 }
 
+/**
+ * O sino, desenhado com View — sem biblioteca de ícone nem SVG (o campo é
+ * StyleSheet e nada mais, e não há react-native-svg). Ícone de linha com
+ * traço de 2 px, o mesmo peso da borda do botão "Suporte" ao lado, para
+ * os dois parecerem da mesma família: o pino em cima, a cúpula aberta
+ * embaixo, a borda mais larga que a cúpula e o badalo. ~20 × 21 px.
+ */
+function IconeSino({ tinta }: { tinta: string }) {
+  return (
+    <View style={e.sinoDesenho}
+      accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={[e.sinoPino, { backgroundColor: tinta }]} />
+      <View style={[e.sinoCupula, { borderColor: tinta }]} />
+      <View style={[e.sinoBorda, { backgroundColor: tinta }]} />
+      <View style={[e.sinoBadalo, { backgroundColor: tinta }]} />
+    </View>
+  )
+}
+
 /** Uma linha "rótulo · valor" da ficha do cartão. */
 function LinhaFicha({ rotulo, valor, forte }: { rotulo: string; valor: string; forte?: boolean }) {
   return (
@@ -697,14 +760,48 @@ const e = StyleSheet.create({
   email: { fontSize: 11, color: cor.graf400 },
   equipe: { fontSize: 13, fontWeight: '700', color: cor.af700 },
   sair: { paddingHorizontal: 10, paddingVertical: 8 },
-  sino: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  sinoIcone: { fontSize: 22 },
+  // 48 de alvo (o mínimo do campo) com um aro de 40 dentro: o aro tem a
+  // altura do botão "Suporte" ao lado, e o hitSlop ainda folga o toque.
+  sino: { width: 44, height: 48, alignItems: 'center', justifyContent: 'center' },
+  sinoAro: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: cor.graf200, backgroundColor: cor.graf50,
+  },
+  // Com aviso não lido, o aro ganha o vermelho claro da marca — o mesmo
+  // par fundo/texto do selo "x de y O.S. baixadas" que ainda falta.
+  sinoAroAtivo: { borderColor: cor.af500, backgroundColor: cor.af50 },
+  sinoDesenho: { width: 20, height: 21, alignItems: 'center' },
+  sinoPino: { width: 2, height: 2, borderRadius: 1 },
+  sinoCupula: {
+    width: 14, height: 13, borderWidth: 2, borderBottomWidth: 0,
+    borderTopLeftRadius: 7, borderTopRightRadius: 7,
+  },
+  sinoBorda: { width: 20, height: 2, borderRadius: 1 },
+  sinoBadalo: {
+    width: 6, height: 3, marginTop: 1,
+    borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
+  },
   sinoBolha: {
-    position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9,
+    position: 'absolute', top: 0, right: -2, minWidth: 20, height: 20, borderRadius: 10,
     paddingHorizontal: 4, backgroundColor: cor.af600,
+    // A borda branca separa o selo do aro — sem ela os dois viram uma mancha.
+    borderWidth: 2, borderColor: cor.branco,
     alignItems: 'center', justifyContent: 'center',
   },
-  sinoNumero: { fontSize: 11, fontWeight: '800', color: cor.branco },
+  sinoNumero: { fontSize: 10, fontWeight: '800', color: cor.branco, lineHeight: 12 },
+  mural: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72, padding: 10,
+    backgroundColor: cor.branco, borderWidth: 1, borderColor: cor.graf200,
+    borderRadius: raio.g, ...sombraCard,
+  },
+  // 16:9, como o slide. O fundo escuro segura a capa enquanto ela baixa.
+  muralCapa: {
+    width: 96, height: 54, borderRadius: raio.s, overflow: 'hidden', backgroundColor: cor.tinta,
+  },
+  muralImagem: { width: 96, height: 54 },
+  muralRotulo: { fontSize: 11, fontWeight: '800', color: cor.af700, letterSpacing: 0.6 },
+  muralTitulo: { fontSize: 15, fontWeight: '700', color: cor.tinta, lineHeight: 19 },
+  muralVer: { fontSize: 13, fontWeight: '800', color: cor.af700 },
   sairTexto: { color: cor.graf500, fontSize: 14, fontWeight: '600' },
   suporte: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,

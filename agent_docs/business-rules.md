@@ -505,6 +505,12 @@ REINSTALACAO, MUDANCA DE ENDERECO → RETORNO DE CREDENCIADA; RETORNO → RETORN
 SERVICO→SERVICO e ADESAO→ADESAO **não** contam (perguntado, 31/10). Não escreva a
 regra de novo em outra tela: chame a função.
 
+**O card de Revisita do técnico tem conta própria** (`revisita_do_tecnico`, 164,
+D-246), e é diferente por skill. Conta para quem fez o serviço ANTERIOR; serviços do
+período, retorno até 30 dias depois. ADESÃO: concluídos que voltaram como retorno ou
+VT. MANUTENÇÃO: VTs concluídas, reagendadas ou canceladas (sem cancelado pela central
+e sem desatribuído) que voltaram em VT — depois de QUALQUER visita dele.
+
 ## Mural Nexus (163, D-245)
 
 **Só o ADMIN publica; todo o time lê.** No banco (RLS de `mural_post` e do bucket

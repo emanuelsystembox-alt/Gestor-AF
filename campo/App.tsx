@@ -27,6 +27,7 @@ import GeoRota from './src/telas/GeoRota'
 import ConversaColega from './src/telas/ConversaColega'
 import Grupos from './src/telas/Grupos'
 import ConversaGrupo from './src/telas/ConversaGrupo'
+import Mural from './src/telas/Mural'
 import { Carregando } from './src/ui/componentes'
 import { cor } from './src/ui/tema'
 import type { Pilha } from './src/navegacao'
@@ -93,6 +94,8 @@ function Aplicacao() {
         <Stack.Screen name="ConversaColega" component={ConversaColega} />
         <Stack.Screen name="Grupos" component={Grupos} />
         <Stack.Screen name="ConversaGrupo" component={ConversaGrupo} />
+        {/* 163: o Mural Nexus, só leitura, aberto pelo cartão da Agenda (D-245). */}
+        <Stack.Screen name="Mural" component={Mural} />
         <Stack.Screen
           name="Captura" component={Captura}
           options={{ animation: 'fade', presentation: 'fullScreenModal' }}
