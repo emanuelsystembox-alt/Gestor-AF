@@ -52,7 +52,9 @@ Acento normal em tudo o mais.
 - Toda função nova: `revoke ... from public, anon` + `grant` explícito.
   Inclusive função de gatilho.
 - Terminar com `notify pgrst, 'reload schema';` quando houver DDL.
-- Arquivo em `supabase/migrations/`, aplicado pelo MCP ou SQL Editor.
+- Arquivo em `supabase/migrations/`, aplicado por SSH no banco da VPS
+  (`agent_docs/productivity.md`). O MCP do Supabase não serve mais: a nuvem
+  foi apagada em 01/11/2026.
 
 ## Nunca
 

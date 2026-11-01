@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AFLINE — ponte com o TOA",
   "description": "Sincronismo do Gestor AF com o TOA: baixa a planilha de Atividades e varre, pelas telas do TOA, nome do cliente e equipamentos. Não altera nada no TOA.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "minimum_chrome_version": "116",
   "permissions": [
     "alarms",
@@ -24,6 +24,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://pulsoline.grupoafline.com.br/*",
         "https://gestor-af.pages.dev/*",
         "https://*.gestor-af.pages.dev/*",
         "http://localhost:5173/*"

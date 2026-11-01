@@ -433,3 +433,64 @@ byte a byte.
 - Trocar a **senha do banco da nuvem** (metade apareceu num print) e **gerar
   chave secreta nova** na nuvem; apagar `/root/.origem-supabase.env`.
 - **Backup**: não há nenhum (decisão do Emanuel, "é temporário").
+
+### O endereço antigo do site manda para o novo (01/11)
+
+*"preciso desativar esse link, não deve mais carregar a página nele"* e *"quero
+apenas que as pessoas acessem o site pelo site novo"* (Emanuel). A Cloudflare não
+deixa apagar o `*.pages.dev` de um projeto, então `app/functions/_middleware.js`
+devolve **301** de `gestor-af.pages.dev` (e das prévias `*.gestor-af.pages.dev`)
+para `https://pulsoline.grupoafline.com.br`, com o mesmo caminho. Conferido no
+ar: `/entrar`, `/`, `/controle/sincronismo?x=1` e uma prévia → 301 para o
+mesmo caminho no novo; o novo responde 200 e a tela de entrada carrega sem erro.
+
+Junto:
+- **Extensão 0.6.1**: o content script (`ponte.js`) passou a valer também em
+  `pulsoline.grupoafline.com.br` — sem isso, a tela de Sincronismo no endereço
+  novo não falava com a extensão. O botão "abrir" do popup aponta para o novo.
+  Os endereços antigos continuam no manifesto (inofensivos com o 301).
+- **Login da VPS**: `SITE_URL` = endereço novo.
+- **Chave do Google Maps do site** (`…-CpY`, projeto `amazing-coast-h9v0l`,
+  "Browser key (auto created by Firebase)"): está **sem restrição de site** —
+  o `mapaGoogle.ts` e o `09-PUBLICAR.md` dizem que deveria estar restrita, e não
+  está. Por isso o mapa já funciona no endereço novo. Oferecida a restrição, o
+  Emanuel **recusou** (*"não quero bloquear o google apenas para meu site"*).
+
+### O que o Emanuel pediu e NÃO foi feito
+
+- **Apagar o Supabase da nuvem.** Recomendado não apagar: é a única cópia fora da
+  VPS (não há backup), e tem o que celulares e extensão ainda não atualizados
+  gravaram depois da troca. Apagar é irreversível e fica com ele (Project Settings
+  › General › Delete project). Pausar, que é reversível, foi oferecido.
+- **"Instalar" o Gerenciador Docker do hPanel**: recomendado não clicar — mexe no
+  Docker da máquina, como o `setup.sh` que derrubou o n8n. O Portainer já faz isso.
+
+### Atalho para os painéis (sem terminal)
+
+`Paineis da VPS.bat` na Área de Trabalho do Emanuel: abre o túnel SSH e, em
+seguida, monitoramento (19999), Studio (8000), Portainer (9443) e o navegador da
+VPS (3001). Os painéis funcionam enquanto a janela preta estiver aberta.
+
+## O Supabase da nuvem foi APAGADO (01/11/2026)
+
+*"eu quero deixar tudo em nosso banco agora, quero acabar com o supabase online,
+quero tudo em nossa VPS mesmo não tendo backup"* — e, depois: *"pronto, apaguei o
+projeto do supabase online"* (Emanuel, que fez a exclusão pelo painel). Conferido:
+o MCP não acha mais o projeto e `kqfflkxjijzdtnfshdlv.supabase.co` não resolve.
+
+**A VPS é agora a ÚNICA cópia do sistema, e não há backup.** O que celulares não
+atualizados e a extensão não recarregada gravaram na nuvem depois da troca foi
+junto com ela.
+
+Limpeza feita na VPS: a senha e a chave secreta da nuvem (`shred`), os scripts
+que as usavam, o dump do ensaio e as pastas `*.ensaio` (~680 MB com dado de
+assinante). **Ficou só o dump da troca**, `/root/migracao/20261101-0034/`
+(176 MB, `chmod 700`): é a única foto do banco fora dele mesmo — protege contra
+apagar dado por engano, não contra perder a VPS.
+
+**O que ficou desatualizado na documentação do projeto** e precisa mudar:
+`CLAUDE.md`, `agent_docs/productivity.md` e `agent_docs/security.md` ainda
+mandam usar o **MCP do Supabase** no projeto `kqfflkxjijzdtnfshdlv` — que não
+existe mais. Hoje o banco se acessa por SSH:
+`docker exec supabase-db psql -U postgres -d postgres` (como `authenticated`,
+para medir e testar, segue valendo o `set local role`).

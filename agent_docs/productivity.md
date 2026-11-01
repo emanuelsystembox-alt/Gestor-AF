@@ -4,21 +4,48 @@ Só o que está em uso de verdade neste projeto.
 
 ---
 
-## Supabase — via MCP, não pelo painel
+## O banco — Supabase self-hosted na VPS, via SSH
 
-O MCP do Supabase está conectado nesta sessão. É por ele que se aplica
-migration, se consulta o banco e se investiga. **Projeto:**
-`kqfflkxjijzdtnfshdlv` · **organização:** AFLINE Manager · **plano:
-Free**.
+Desde **01/11/2026** o banco **não está mais no Supabase da nuvem**: o
+projeto `kqfflkxjijzdtnfshdlv` foi **apagado**, e o **MCP do Supabase não
+serve mais** (se aparecer conectado, aponta para o nada). O sistema roda no
+Supabase instalado na VPS `erp.grupoafline.com` — ver `docs/12-VPS-ERP.md`.
 
+| | |
+|---|---|
+| API (site, app, extensão) | `https://api.pulsoline.grupoafline.com.br` |
+| SSH | `ssh root@179.197.82.110` (chave `~/.ssh/id_ed25519` da máquina do Emanuel) |
+| Pasta | `/opt/supabase` · segredos em `/opt/supabase/.env` (`chmod 600`) |
+| Banco | container `supabase-db`, Postgres 17 |
+| **Backup** | **nenhum** — decisão do Emanuel. Antes de mexer em dado, saiba disso |
+
+**Consultar** (o `postgres` daqui NÃO é superusuário, igual à nuvem —
+`supabase_admin` é; use `postgres` para o trabalho normal):
+
+```bash
+ssh root@179.197.82.110 "docker exec supabase-db psql -U postgres -d postgres -c 'select count(*) from visita'"
 ```
-apply_migration   DDL, sempre
-execute_sql       consulta e investigação
-get_advisors      lint de segurança/desempenho
+
+**Migration** — o arquivo em `supabase/migrations/` é o registro; o banco é
+o estado. Aplicar numa transação, parando no primeiro erro:
+
+```bash
+cat supabase/migrations/NNN_nome.sql | ssh root@179.197.82.110 "docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction"
 ```
 
-**Migrations rodam em ordem**, pelo MCP ou pelo SQL Editor. O arquivo em
-`supabase/migrations/` é o registro; o banco é o estado.
+E depois, como sempre, `notify pgrst, 'reload schema';` e as duas baterias.
+
+**Edge Function** — o código vai para
+`/opt/supabase/volumes/functions/<nome>/` e se reinicia o container
+`supabase-edge-functions` (`docker compose restart functions` em
+`/opt/supabase`).
+
+**Painéis visuais** (Studio, monitoramento, Portainer): só pelo túnel SSH —
+o atalho `Paineis da VPS.bat` na Área de Trabalho do Emanuel abre tudo.
+
+**Aspas e crases** em SQL passado pelo `ssh "…"` quebram no shell (ver
+`traps.md`): SQL com aspas vai num arquivo, copiado com `scp` ou por
+`cat arquivo | ssh … psql`.
 
 **Para testar como outro papel** (a única forma honesta — ver
 `security.md`):
@@ -47,7 +74,8 @@ npm run build
 npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-dirty=true
 ```
 
-No ar em **gestor-af.pages.dev**. Confira que subiu baixando do ar e
+No ar em **pulsoline.grupoafline.com.br** (o `gestor-af.pages.dev`, nome do
+projeto na Cloudflare, redireciona para ele — `app/functions/_middleware.js`). Confira que subiu baixando do ar e
 comparando com o local — o "Success" do Wrangler só diz que o upload
 terminou. Detalhes em `docs/09-PUBLICAR.md`.
 
@@ -103,8 +131,8 @@ E, para qualquer mudança em RLS, papel ou permissão, as duas baterias
 
 ```powershell
 cd app
-$env:SUPABASE_URL = "https://kqfflkxjijzdtnfshdlv.supabase.co"
-$env:SUPABASE_SERVICE_ROLE_KEY = "cole-aqui"
+$env:SUPABASE_URL = "https://api.pulsoline.grupoafline.com.br"
+$env:SUPABASE_SERVICE_ROLE_KEY = "cole-aqui"   # SERVICE_ROLE_KEY de /opt/supabase/.env na VPS
 node scripts/criar-usuarios-teste.mjs
 ```
 

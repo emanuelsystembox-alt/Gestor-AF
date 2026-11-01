@@ -68,10 +68,10 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 |---|---|
 | Repositório | `github.com/emanuelsystembox-alt/Gestor-AF` |
 | Pasta local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
-| Banco | Supabase `AFLINE manager` · `kqfflkxjijzdtnfshdlv` · sa-east-1 |
+| Banco | **Supabase self-hosted na VPS** `erp.grupoafline.com` (179.197.82.110) · API `https://api.pulsoline.grupoafline.com.br` · **sem backup** · ver `docs/12-VPS-ERP.md`. A nuvem (`kqfflkxjijzdtnfshdlv`) foi apagada em 01/11/2026 |
 | App (local) | `cd app; npm install; npm run dev` → localhost:5173 |
 | **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
-| **App no ar** | **https://gestor-af.pages.dev** — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
+| **App no ar** | **https://pulsoline.grupoafline.com.br** (o `gestor-af.pages.dev` redireciona) — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
 | **Extensão do Chrome (TOA)** | `extensao-toa/` (**0.6.0**) — baixa a planilha do TOA sozinha e **varre** nome, equipamento e material pelas telas (D-189 a D-197). Instalada sem compactação no Chrome de quem opera. Usar: `extensao-toa/README.md` · mexer: `docs/11-EXTENSAO-TOA.md` |
 

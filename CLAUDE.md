@@ -26,8 +26,11 @@ ngestor**, que é caro e cujo roadmap não controlamos.
 ```
 app/     web do controle    Vite 5 · React 18 · TypeScript 5.6 · Tailwind 4
 campo/   app do técnico     Expo SDK 57 · React Native 0.86 · React 19 · TS 6
-banco    Supabase           Postgres + PostgREST + Storage + Realtime  (plano Free)
-deploy   web → Cloudflare Pages (manual) · app → Expo Go / EAS Build
+banco    Supabase SELF-HOSTED na VPS (Hostinger, erp.grupoafline.com) — SEM backup
+         API https://api.pulsoline.grupoafline.com.br · acesso por SSH (agent_docs/productivity.md)
+         A nuvem (kqfflkxjijzdtnfshdlv) foi APAGADA em 01/11/2026: o MCP do Supabase não serve mais
+deploy   web → Cloudflare Pages (manual), no ar em https://pulsoline.grupoafline.com.br
+         (gestor-af.pages.dev redireciona) · app → Expo Go / EAS Build
 Node 24 · npm · Windows PowerShell 5.1 (sem `&&`)
 ```
 
@@ -131,7 +134,7 @@ tarefa pedir.
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |
-| `docs/12-VPS-ERP.md` | a VPS na Hostinger (Chrome 24 h, Portainer) — montada, sem uso ainda |
+| `docs/12-VPS-ERP.md` | **onde o sistema roda**: a VPS, o Supabase dela, a migração, os endereços e os painéis |
 | `docs/06-PONTUACAO.md` | faturamento — **8 perguntas em aberto** |
 | `docs/01` `02` `05` `07` | mapeamento, domínio, concorrente, telas |
 | `supabase/README.md` | ordem das migrations e conferências |

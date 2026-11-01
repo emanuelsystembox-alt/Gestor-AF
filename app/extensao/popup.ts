@@ -145,7 +145,7 @@ async function iniciar() {
   setInterval(() => pedir({ tipo: 'contar-pendentes' }), 120_000)
   $('janela-toa').addEventListener('click', () => pedir({ tipo: 'abrir-janela-toa' }))
   $('sair').addEventListener('click', () => pedir({ tipo: 'sair' }))
-  $('abrir').addEventListener('click', () => chrome.tabs.create({ url: 'https://gestor-af.pages.dev/controle/sincronismo' }))
+  $('abrir').addEventListener('click', () => chrome.tabs.create({ url: 'https://pulsoline.grupoafline.com.br/controle/sincronismo' }))
 }
 
 iniciar()

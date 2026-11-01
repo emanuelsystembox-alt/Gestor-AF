@@ -11,9 +11,13 @@ do sistema. As decisões completas, com o porquê de cada uma, estão em
 ```
 app/     web do controle    Vite + React + Tailwind   → Cloudflare Pages (deploy MANUAL)
 campo/   app do técnico     Expo + React Native       → Expo Go / EAS Build
-         banco + auth +     Supabase (Postgres,
-         storage + realtime  PostgREST, Storage, Realtime)
+         banco + auth +     Supabase SELF-HOSTED na VPS   → api.pulsoline.grupoafline.com.br
+         storage + realtime  (Postgres, PostgREST, Storage, Realtime) — SEM backup
 ```
+
+Desde 01/11/2026 o Supabase roda na VPS da Hostinger (`docs/12-VPS-ERP.md`); o
+projeto da nuvem foi apagado. A VPS também tem o n8n do alisson, um Chromium
+24 h, o Portainer e o monitoramento — mexer nela mexe em tudo isso.
 
 **Elas se atualizam por caminhos diferentes, e isso já causou confusão.**
 O banco muda quando a migration é aplicada; o site, quando alguém roda o

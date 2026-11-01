@@ -1,6 +1,8 @@
 # Segurança
 
-Stack real: **Supabase (Postgres + PostgREST + Storage + Realtime)**,
+Stack real: **Supabase self-hosted na VPS (Postgres + PostgREST + Storage + Realtime)** —
+desde 01/11/2026; a nuvem foi apagada. Porta de banco e painéis **só em 127.0.0.1**; para
+fora, só as rotas da API, pelo Caddy (`docs/12-VPS-ERP.md`). **Não há backup.**
 front web em Vite/React, aplicativo em Expo. Multi-tenant por
 `empresa_id`, com escopo adicional por **base** (praça) e **equipe**.
 
@@ -114,7 +116,7 @@ lenta (121 ms → 7 ms), o custo é linear. Escreva
 | chave | onde pode viver | o que faz |
 |---|---|---|
 | **publishable** (`sb_publishable_…`) | `.env` local, bundle do front, `eas.json` | nada sozinha — quem protege é o RLS |
-| **service_role** | **só** na máquina do Emanuel, em variável de ambiente, na hora do comando | ignora o RLS inteiro |
+| **service_role** | no `/opt/supabase/.env` da VPS (`chmod 600`, só root) — e, quando um script local precisar, na máquina do Emanuel em variável de ambiente, na hora do comando | ignora o RLS inteiro |
 
 A `service_role` **nunca** entra no front, no `.env` do Vite (que vai
 para o bundle), no Git, nem passa pelo assistente. É por isso que

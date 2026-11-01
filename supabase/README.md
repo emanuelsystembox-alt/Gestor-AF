@@ -1,10 +1,20 @@
-# Banco — Supabase `AFLINE manager`
+# Banco — Supabase self-hosted na VPS
 
 | | |
 |---|---|
-| Projeto | `kqfflkxjijzdtnfshdlv` |
-| Região | `sa-east-1` (São Paulo — perto de Manaus, importa para o técnico no 4G) |
-| Postgres | 17 |
+| Onde | VPS Hostinger `erp.grupoafline.com` (Boston), `/opt/supabase` — ver `docs/12-VPS-ERP.md` |
+| API | `https://api.pulsoline.grupoafline.com.br` |
+| Postgres | 17 (container `supabase-db`) |
+| Backup | **nenhum** (decisão do Emanuel, 01/11/2026) |
+
+> **Até 31/10/2026 o banco era o Supabase da nuvem** (`kqfflkxjijzdtnfshdlv`,
+> sa-east-1). Ele foi copiado para a VPS na troca de 01/11 e **apagado** pelo
+> Emanuel. O que está abaixo sobre CLI, `link` e `list_migrations` é desse
+> tempo. **O histórico `supabase_migrations.schema_migrations` NÃO veio na
+> cópia** (o `supabase db dump` só leva o schema `public`) e se perdeu com a
+> nuvem: o texto das migrations sem arquivo local só existe agora como ESTADO
+> do banco (`pg_get_functiondef`) e no dump da troca,
+> `/root/migracao/20261101-0034/estrutura.sql`, na VPS.
 
 **38 tabelas · 2 views · 55 funções · 74 policies · zero tabela sem RLS ·
 zero função `SECURITY DEFINER` acessível ao `anon`.**
