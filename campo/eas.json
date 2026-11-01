@@ -8,8 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://kqfflkxjijzdtnfshdlv.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_ITTkIUUWNRcBVPw3RCGLXw_hyMlndYy"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://api.pulsoline.grupoafline.com.br",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_MmKESG1GXIMq_WD9Xv1BrH_KD_gUSEW"
       },
       "channel": "development"
     },
@@ -20,16 +20,16 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://kqfflkxjijzdtnfshdlv.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_ITTkIUUWNRcBVPw3RCGLXw_hyMlndYy"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://api.pulsoline.grupoafline.com.br",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_MmKESG1GXIMq_WD9Xv1BrH_KD_gUSEW"
       },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://kqfflkxjijzdtnfshdlv.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_ITTkIUUWNRcBVPw3RCGLXw_hyMlndYy"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://api.pulsoline.grupoafline.com.br",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_MmKESG1GXIMq_WD9Xv1BrH_KD_gUSEW"
       },
       "channel": "production"
     }

@@ -310,3 +310,126 @@ agendamento foi conferido; roda às 07:17 UTC).
 **Regra para toda cópia daqui em diante:** depois de restaurar, rodar
 `perm-conferir.sql` (com as assinaturas medidas na nuvem NO MESMO DIA) e as duas
 baterias. Restauração sem essa conferência abre o banco para quem não está logado.
+
+### Os endereços (31/10)
+
+O `grupoafline.com.br` é da AFLINE e o DNS dele está na **HostGator** (cPanel
+`br244.hostgator.com.br`, `ns244`/`ns245`). Criados no Zone Editor em 31/10, a
+pedido do Emanuel (*"podemos criar então pulsoline.grupoafline.com.br?"*):
+
+| Nome | Registro | Para quê |
+|---|---|---|
+| `api.pulsoline.grupoafline.com.br` | **A** → `179.197.82.110` | a **API** (o Supabase da VPS). Ninguém digita: web, app e extensão usam por trás |
+| `pulsoline.grupoafline.com.br` | **CNAME** → `gestor-af.pages.dev` | o **site**, com nome da empresa. Cadastrado também como domínio do projeto `gestor-af` na Cloudflare Pages (API, com o login do Wrangler) |
+
+`gestor-af.pages.dev` continua funcionando; o nome novo é um segundo caminho
+para o mesmo site.
+
+Já existia no mesmo DNS `erp.grupoafline.com.br` → `179.197.82.110`, criado
+antes por alguém; nada na VPS usa esse nome. Não foi mexido.
+
+Tentativas que NÃO deram certo, para ninguém repetir: o `grupoafline.com`
+(sem `.br`) tem DNS na systemdns.com, fora do alcance; o domínio grátis
+"pendente" da conta Hostinger veio com o plano da VPS `gestao` (criado no mesmo
+segundo que ela) e recusou `.net` e `.online` — não foi usado.
+
+**HTTPS da API (31/10, liberado pelo alisson).** As portas 80/443 da VPS são
+do Caddy dele, então a API entra por ele:
+
+- `/opt/n8n/Caddyfile` ganhou o bloco `api.pulsoline.grupoafline.com.br`, que
+  repassa **só** `/rest/v1`, `/auth/v1`, `/storage/v1`, `/realtime/v1` e
+  `/functions/v1` para `supabase-envoy:8000`. Todo o resto — o Studio (`/`), o
+  pg-meta (`/pg`) — responde **404** de fora; o Studio segue só pelo túnel.
+- O Caddy foi ligado à rede `supabase_default` com `docker network connect`
+  (sem reiniciar: o n8n não piscou) e a ligação ficou registrada em
+  `/opt/n8n/docker-compose.override.yml`, para sobreviver a uma recriação.
+- Aplicado com `caddy validate` antes e `caddy reload`, gravando NO MESMO
+  arquivo (`cat > Caddyfile`): o Caddyfile entra no container por bind mount de
+  arquivo, e `sed -i`/`mv` trocariam o inode — o container continuaria vendo o
+  antigo.
+- Cópia do que havia antes: `/opt/n8n/backup-afline-20261101-0023/`.
+- Certificado Let's Encrypt emitido na hora, válido até 29/01/2027; o Caddy
+  renova sozinho.
+- No Supabase: `SUPABASE_PUBLIC_URL` e `API_EXTERNAL_URL` passaram ao endereço
+  novo, e `ADDITIONAL_REDIRECT_URLS` aos dois do site (cópia anterior:
+  `/opt/supabase/.env.antes-dominio`).
+
+Testado DE FORA, do PC do Emanuel: auth, storage, functions e rest **200**;
+Realtime abre o WebSocket (**101**); `/`, `/project/default`, `/pg/tables`
+**404**; certificado válido; n8n **200** e o dashboard do alisson pedindo senha
+(**401**), como antes. O site abre em `https://pulsoline.grupoafline.com.br`
+(**200**).
+
+### Publicação do site depois da migração
+
+Nada muda no jeito de publicar: o código continua no GitHub
+(`emanuelsystembox-alt/Gestor-AF`) e o site na Cloudflare Pages, publicado à mão
+pelo Wrangler (`docs/09-PUBLICAR.md`). Na troca, mudam só as duas variáveis do
+`app/.env` (`VITE_SUPABASE_URL` → `https://api.pulsoline.grupoafline.com.br` e a
+chave publicável nova da VPS), e o site é republicado uma vez. O mesmo no app
+(`eas update`) e na extensão (`npm run extensao`).
+
+## A TROCA (01/11/2026, 00:34–00:48 UTC = 31/10, 20:34–20:48 em Manaus)
+
+*"pode fazer a troca agora, ninguém está usando"* — e, perguntado se pausava o
+Supabase da nuvem no fim: *"Troca sem pausar"* (Emanuel). **Desde 00:48 UTC o
+sistema roda na VPS.** A nuvem segue LIGADA, com os dados até a troca.
+
+Não estava parado de todo: um celular de técnico mandava GPS em segundo plano e
+uma importação tinha rodado às 00:08 UTC. Ninguém usava as telas.
+
+**O que foi feito, em ordem:**
+1. Assinatura das permissões da nuvem medida de novo (igual à do ensaio, apesar
+   da 166 aplicada à tarde por outra sessão).
+2. Banco e arquivos da VPS zerados — o ensaio ficou em
+   `/opt/supabase/volumes/db/data.ensaio` e `volumes/storage.ensaio`.
+3. Exportação às **00:34:21 UTC** (`/root/migracao/20261101-0034/`) e restauração
+   numa transação ÚNICA que inclui a correção e a conferência das permissões: o
+   banco nunca existiu com as definer abertas ao `anon`. 6,7 s.
+4. 17/17 arquivos (sha256), 11 policies de storage idênticas (md5), `pg_cron`
+   ativo, **testar_policies 33/33, testar_campo 29/29**.
+5. **Site**: `app/.env` → `https://api.pulsoline.grupoafline.com.br` + chave
+   publicável da VPS; `tsc` e build limpos; publicado. Conferido NO AR nos dois
+   endereços (`gestor-af.pages.dev` e `pulsoline.grupoafline.com.br`): o bundle
+   cita a VPS e não cita a nuvem. CORS da API aceita os dois e
+   `chrome-extension://`.
+6. **Extensão do TOA**: `npm run tsc:extensao` + `npm run extensao` →
+   `extensao-toa/fundo.js` com o endereço novo.
+7. **App do técnico**: variáveis do ambiente `preview` da EAS, `campo/eas.json`
+   (os 3 perfis) e `campo/.env` trocados; `eas update` publicado para o runtime
+   **0.6.0** (APK de 31/10 18:10) **e para o 0.5.0** (APKs anteriores) — ver
+   abaixo.
+8. O que entrou na nuvem durante a troca: contagem tabela a tabela de novo, e
+   só `rastro_ponto` diferia (1 ponto de GPS). Copiado com o id original.
+9. Teste pelo endereço público com sessão real de ADMIN: contagens iguais e uma
+   foto de evidência baixada inteira (137.770 bytes).
+
+**O runtime do app.** O `app.json` estava em **0.6.0** e "PulsoLine" por mudança
+NÃO commitada de outra sessão (o APK 0.6.0 já foi gerado, às 18:10 UTC). O
+primeiro `eas update` saiu só para o 0.6.0 — os celulares no 0.5.0 não iam
+receber. Publicado de novo para o 0.5.0 (versão trocada só durante o comando;
+`package.json` igual ao commit, sem nativo novo, e o OTA "PulsoLine" das 18h já
+tinha ido ao 0.5.0 com este código). E o `eas update` **inchou o `app.json` de
+novo** (permissões em dobro, `runtimeVersion` a mais — `traps.md`): restaurado
+byte a byte.
+
+### O que ainda depende de gente
+
+- **Todo mundo entra de novo uma vez** — site, app e extensão (chaves novas).
+- **Celular do técnico**: a atualização só entra quando o app é **fechado e
+  aberto**. Até lá, ele **continua gravando na NUVEM** (o GPS em segundo plano
+  inclusive). O ponto de GPS que chegava em 00:41 era de um técnico de São Luís.
+- **Extensão do TOA**: no PC onde ela roda, `chrome://extensions` → **recarregar**
+  "AFLINE — ponte com o TOA". Até lá, a sincronização automática **grava na
+  NUVEM**.
+- Como a nuvem não foi pausada, o que cair nela por esses dois caminhos não
+  aparece na VPS. Conferir de novo (contagem tabela a tabela) e copiar o que
+  entrou depois das 00:48 UTC.
+
+### Limpeza que ficou para depois da troca firmar
+
+- `/root/migracao/` (dois dumps com dado de assinante), `volumes/db/data.ensaio`
+  e `volumes/storage.ensaio` — **LGPD: apagar**.
+- Trocar a **senha do banco da nuvem** (metade apareceu num print) e **gerar
+  chave secreta nova** na nuvem; apagar `/root/.origem-supabase.env`.
+- **Backup**: não há nenhum (decisão do Emanuel, "é temporário").
