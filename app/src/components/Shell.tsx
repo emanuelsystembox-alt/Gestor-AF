@@ -121,7 +121,7 @@ const ROBO: Modulo = {
  *  e isso o banco decide, não o menu. */
 const COMUNICACAO: Modulo = {
   chave: 'comunicacao', titulo: 'Comunicação', icone: 'mural', itens: [
-    { para: '/mural', rotulo: 'Mural Nexus', icone: 'mural',
+    { para: '/mural', rotulo: 'Mural PulsoLine', icone: 'mural',
       busca: 'mural campanha aviso comunicado premio ganhadores setembro amarelo seguranca' },
   ],
 }

@@ -434,13 +434,13 @@ export default function Romaneios({ navigation }: Props) {
             <Text style={e.numero}>Confirme com a sua senha</Text>
             <Text style={e.recado}>
               Este celular não tem digital nem bloqueio de tela. Para confirmar o
-              romaneio {pedindoSenha?.numero}, digite a senha do Nexus Manager.
+              romaneio {pedindoSenha?.numero}, digite a senha do PulsoLine.
             </Text>
             <TextInput value={senha} onChangeText={setSenha} secureTextEntry
               autoCapitalize="none" autoCorrect={false} autoFocus
               placeholder="Sua senha" placeholderTextColor={cor.graf300}
               onSubmitEditing={aceitarComSenha}
-              accessibilityLabel="Senha do Nexus Manager"
+              accessibilityLabel="Senha do PulsoLine"
               style={e.campoSenha} />
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }}

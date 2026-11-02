@@ -348,7 +348,8 @@ export async function iniciarSegundoPlano(perguntar: boolean): Promise<boolean> 
         showsBackgroundLocationIndicator: true,
         activityType: Location.ActivityType.AutomotiveNavigation,
         foregroundService: {
-          notificationTitle: 'Nexus Manager · rota do dia',
+          // D-249: a marca Nexus Manager virou PulsoLine (31/10).
+          notificationTitle: 'PulsoLine · rota do dia',
           notificationBody: 'Registrando sua rota enquanto houver contrato aberto hoje.',
           notificationColor: '#d11a24',
           killServiceOnDestroy: false,

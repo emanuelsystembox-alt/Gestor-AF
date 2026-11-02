@@ -39,13 +39,13 @@ export function useRastro(ligado: boolean) {
         if (!(await iniciarSegundoPlano(false))) rotaAnterior = null
         return
       }
-      // Primeira vez neste aparelho: explica ANTES de o Android mandar
-      // para os ajustes. Negar continua possível — aí grava com o app aberto.
+      // Primeira vez neste aparelho: avisa ANTES de o Android mandar para
+      // os ajustes. Negar continua possível — aí grava com o app aberto.
+      // D-249: fica só a instrução. "retire a mensagem de a cada 2 minutos
+      // o GPS vai colher sua localização" (Emanuel, 31/10) — o texto que
+      // explicava o registro de 2 a 5 min saiu; o comportamento é o mesmo.
       Alert.alert(
-        'Registro da rota do dia',
-        'Enquanto você tiver contrato aberto hoje, o aplicativo registra a sua ' +
-        'localização a cada 2 a 5 minutos, inclusive com ele fechado. Quando o ' +
-        'último contrato do dia fecha, o registro para sozinho.\n\n' +
+        'Localização',
         'Na próxima tela, escolha "Permitir o tempo todo".',
         [{
           text: 'Continuar',
@@ -85,7 +85,8 @@ export function useRastro(ligado: boolean) {
   }, [ligado])
 }
 
-/** O estado do rastro para mostrar na tela (Agenda). */
+/** O estado do rastro para mostrar na tela. A Agenda deixou de mostrar a
+ *  linha "Rota do dia sendo registrada" (D-249); fica para diagnóstico. */
 export function useEstadoRastro(): EstadoRastro {
   const [e, setE] = useState(estadoRastro())
   useEffect(() => ouvirRastro(setE), [])

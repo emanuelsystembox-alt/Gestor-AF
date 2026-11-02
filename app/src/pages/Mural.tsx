@@ -75,7 +75,7 @@ export default function Mural() {
     <Shell>
       <div className="mx-auto max-w-5xl space-y-4 p-4">
         <div>
-          <h1 className="text-xl font-semibold">Mural Nexus</h1>
+          <h1 className="text-xl font-semibold">Mural PulsoLine</h1>
           <p className="mt-1 text-sm text-graf-400">
             Campanhas, premiações e recados da AFLINE para o time.
           </p>
@@ -136,7 +136,7 @@ function Carrossel({ posts, urls }: { posts: Post[]; urls: Record<string, string
   const caixa = useRef<HTMLElement>(null)
   return (
     <section ref={caixa} className="card-controle overflow-hidden"
-      aria-roledescription="carrossel" aria-label="Mural Nexus"
+      aria-roledescription="carrossel" aria-label="Mural PulsoLine"
       onMouseEnter={() => setPausado(true)} onMouseLeave={() => setPausado(false)}
       onFocus={() => setPausado(true)}
       onBlur={e => { if (!caixa.current?.contains(e.relatedTarget as Node)) setPausado(false) }}

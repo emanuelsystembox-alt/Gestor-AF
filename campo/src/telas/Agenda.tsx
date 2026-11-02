@@ -19,7 +19,6 @@ import {
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
 import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
-import { useEstadoRastro } from '../lib/useRastro'
 import { BarraInferior } from '../ui/BarraInferior'
 import { capaDoMural } from './Mural'
 import { cor, raio, sombraCard } from '../ui/tema'
@@ -96,7 +95,6 @@ type Props = NativeStackScreenProps<Pilha, 'Agenda'>
 
 export default function Agenda({ navigation }: Props) {
   const { perfil, equipeId, equipeCodigo, matricula, sair } = useAuth()
-  const rastro = useEstadoRastro()
   const [data, setData] = useState(isoLocal())
   const [linhas, setLinhas] = useState<LinhaAgenda[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -120,7 +118,7 @@ export default function Agenda({ navigation }: Props) {
   const [pendentes, setPendentes] = useState(0)
   const [avisos, setAvisos] = useState<AvisoCampo[]>([])
   const [sinoAberto, setSinoAberto] = useState(false)
-  /** 163: a capa do Mural Nexus (o primeiro post no ar). Nulo = nada no
+  /** 163: a capa do Mural (o primeiro post no ar). Nulo = nada no
    *  ar, ou não deu para ler — nos dois casos o cartão não aparece. */
   const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
 
@@ -151,7 +149,7 @@ export default function Agenda({ navigation }: Props) {
 
   useEffect(() => { ondeEstou().then(setGps) }, [])
 
-  // 163: a porta do Mural Nexus (D-245). Uma linha e uma URL assinada —
+  // 163: a porta do Mural (D-245; PulsoLine desde a D-249). Uma linha e uma URL assinada —
   // a agenda é a tela que abre o app e não espera o mural inteiro. Erro
   // aqui ESCONDE o cartão em vez de virar aviso: o mural é recado da
   // empresa, não trabalho do dia, e um alerta vermelho no topo da agenda
@@ -396,9 +394,10 @@ export default function Agenda({ navigation }: Props) {
             avisos.filter(a => PESO_AVISO[a.tipo] === 'urgente').map(a => a.id))}
         />
 
-        {/* 163: o Mural Nexus (Emanuel, 31/10: "o canal de comunicação da
+        {/* 163: o Mural (era "Mural Nexus"; PulsoLine desde a D-249,
+            que trocou a marca). Emanuel, 31/10: "o canal de comunicação da
             AFLINE para que o time possa visualizar os ganhadores,
-            informativos, campanhas"). Só aparece com post no ar — sem
+            informativos, campanhas". Só aparece com post no ar — sem
             nada publicado, não ocupa espaço. Vem DEPOIS do erro e dos
             avisos urgentes: campanha não passa na frente de "a operadora
             cancelou — não vá". Ver D-245 e D-246 e D-246. */}
@@ -406,14 +405,14 @@ export default function Agenda({ navigation }: Props) {
           <Pressable onPress={() => navigation.navigate('Mural')}
             style={({ pressed }) => [e.mural, pressed && { opacity: 0.85 }]}
             accessibilityRole="button"
-            accessibilityLabel={`Mural Nexus: ${capa.titulo}. Ver mural`}>
+            accessibilityLabel={`Mural PulsoLine: ${capa.titulo}. Ver mural`}>
             <View style={e.muralCapa}>
               {!!capa.url && (
                 <Image source={{ uri: capa.url }} style={e.muralImagem} resizeMode="cover" />
               )}
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text style={e.muralRotulo}>MURAL NEXUS</Text>
+              <Text style={e.muralRotulo}>MURAL PULSOLINE</Text>
               <Text style={e.muralTitulo} numberOfLines={2}>{capa.titulo}</Text>
               <Text style={e.muralVer}>Ver mural ›</Text>
             </View>
@@ -429,17 +428,11 @@ export default function Agenda({ navigation }: Props) {
           </Aviso>
         )}
 
-        {/* 096: o técnico SABE que a rota do dia está sendo registrada,
-            e de que jeito. Transparência com quem é rastreado — e o
-            recado diz o que fazer quando só grava com o app aberto. */}
-        {rastro.modo !== 'DESLIGADO' && (
-          <Text style={e.rastro}>
-            {rastro.modo === 'SEGUNDO_PLANO'
-              ? 'Rota do dia sendo registrada, inclusive com o app fechado.'
-              : (rastro.recado ?? 'Rota do dia registrada enquanto o app está aberto.')}
-            {rastro.naFila > 0 ? ` ${rastro.naFila} ponto(s) esperando sinal.` : ''}
-          </Text>
-        )}
+        {/* D-249: aqui morava a linha "Rota do dia sendo registrada…"
+            (096). Saiu a pedido do Emanuel (31/10): "não precisa dizer
+            quando o usuário logar, olha, você vai estar enviando sinal,
+            não precisa nada disso". O rastro continua igual; só não é
+            mais anunciado na Agenda. */}
 
         {pendentes > 0 && (
           <Cartao style={e.pendentes}>
@@ -744,7 +737,6 @@ const e = StyleSheet.create({
   rotuloFicha: { width: 70, fontSize: 13, color: cor.graf400, lineHeight: 19 },
   valorFicha: { flex: 1, fontSize: 14, color: cor.graf600, lineHeight: 19 },
   valorForte: { fontWeight: '700', color: cor.tinta },
-  rastro: { fontSize: 12, color: cor.graf500, lineHeight: 17 },
   tela: { flex: 1, backgroundColor: cor.graf50 },
   cabecalho: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

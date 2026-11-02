@@ -67,7 +67,7 @@ export function GuardaGps({ ativo, children }: { ativo: boolean; children: React
                   <Text style={e.icone}>📍</Text>
                   <Text style={e.titulo}>Ligue a localização para continuar</Text>
                   <Text style={e.texto}>
-                    O Nexus Manager registra onde cada atendimento acontece. Com a
+                    O PulsoLine registra onde cada atendimento acontece. Com a
                     localização do celular desligada, as ações do aplicativo ficam
                     pausadas até ela voltar.
                   </Text>

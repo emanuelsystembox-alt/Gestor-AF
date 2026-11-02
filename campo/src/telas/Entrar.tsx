@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo, Animated, Easing, Image, KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TextInput, View,
+  StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useAuth } from '../lib/auth'
@@ -9,139 +9,91 @@ import { Aviso, Botao } from '../ui/componentes'
 import { cor, raio, TOQUE } from '../ui/tema'
 
 /**
- * A porta do aplicativo — NEXUS MANAGER, assinado pela AFLINE (D-247).
+ * A porta do aplicativo — PULSOLINE, Sistema de gestão AFLINE (D-249).
  *
- * > "precisamos melhorar a entrada do nosso app quando o técnico abrir
- * >  igual como fizemos com o site, incluir mais o nome do Nexus Manager
- * >  (...) melhore o design do app por favor igual como fizemos com a
- * >  entrada do site" — Emanuel, 31/10
+ * > "A marca Nexus Manager vai ter que mudar para PulsoLine, Sistema de
+ * >  gestão AFLINE (...) no aplicativo, na hora que abrir, precisa ter
+ * >  essa marca aparecendo e Nexus Manager sai (...) não vamos tirar a
+ * >  logomarca oficial da AFLINE" — Emanuel, 31/10
  *
- * ┌─ o mesmo desenho do site (D-242), no celular ─────────────────────┐
- * │ · a AFLINE assina em cima, com a logo e as duas frases — a        │
- * │   história ("16 anos conectando vidas.") e o rumo ("Conectados    │
- * │   com o futuro."); é ela que financia o sistema;                  │
- * │ · o símbolo do Nexus: duas órbitas, azul e vermelha (o par do     │
- * │   logo), com o sinal correndo por elas, e o N no núcleo;          │
- * │ · o letreiro NEXUS / MANAGER: o "NE" azul vira no "X" e chega ao  │
- * │   "US" vermelho, como o degradê do site — aqui letra a letra,     │
- * │   porque o React Native não recorta degradê em texto sem          │
- * │   biblioteca, e biblioteca nova no `campo/` não entra.            │
+ * ┌─ a arte de verdade, no preto dela ────────────────────────────────┐
+ * │ O logo é a ARTE que o Emanuel mandou (`assets/logo-pulsoline.png`),│
+ * │ não um redesenho: no app não há SVG, e a arte já traz o P, o       │
+ * │ batimento, o "Pulso" prata, o "Line" vermelho e "SISTEMA DE GESTÃO │
+ * │ AFLINE". O fundo dela é preto puro (0,0,0) — por isso a tela é    │
+ * │ preta pura: a imagem some na tela, sem retângulo. Os brilhos do   │
+ * │ fundo ficam nos CANTOS, longe do logo, pelo mesmo motivo.          │
  * │                                                                   │
- * │ Escura por fora, clara onde se digita (25/10, D-011): o fundo é o │
- * │ grafite da logo, visto uma vez por dia; o FORMULÁRIO fica num     │
- * │ cartão branco, com os campos claros do resto do app.              │
+ * │ O movimento é o do nome: um BATIMENTO. O logo bate duas vezes     │
+ * │ (tum-tum) e descansa; embaixo dele, um pulso vermelho corre de um │
+ * │ lado ao outro, como o traço de um monitor. No login, o batimento  │
+ * │ acelera enquanto o servidor confere. `Animated`, no thread nativo; │
+ * │ quem pede menos movimento recebe a tela pronta, parada.            │
  * │                                                                   │
- * │ As órbitas não são SVG (não há `react-native-svg`): cada uma é um │
- * │ círculo com borda, achatado em `scaleY` e inclinado — e o sinal   │
- * │ anda pela elipse calculada (x = a·cos t, y = b·sin t) em pontos,  │
- * │ no thread nativo. Quem pede menos movimento ganha tudo parado.    │
+ * │ Escura por fora, clara onde se digita (25/10, D-011): o formulário│
+ * │ fica num cartão branco, com os campos claros do resto do app.     │
  * └───────────────────────────────────────────────────────────────────┘
  */
 
-const FUNDO = '#16181b'
-/** O par do logo, na versão clara para fundo escuro (a do site no `escuro`). */
-const AZUL = '#4f9bff'
-const AZUL_FUNDO = '#1d5fbf'
-const VERMELHO = '#ff4d58'
-const VERMELHO_FUNDO = '#c10f1b'
-/** NEXUS letra a letra: do azul ao vermelho, passando pela virada no X. */
-const LETRAS: [string, string][] = [
-  ['N', '#5aa2ff'], ['E', '#7896f0'], ['X', '#b97cc6'], ['U', '#ff6470'], ['S', VERMELHO],
-]
-
-/** O clarão: do maior e mais fraco ao menor — somadas, esmaecem para a borda. */
-const CLARAO = [{ d: 560, o: 0.05 }, { d: 460, o: 0.06 }, { d: 360, o: 0.07 }, { d: 260, o: 0.08 }]
-
-/** O símbolo: lado do quadrado, e a elipse da órbita (46 × 17 de 100, como no site). */
-const SIMBOLO = 126
-const A = SIMBOLO * 0.46
-const B = SIMBOLO * 0.17
-const NUCLEO = SIMBOLO * 0.36
-const SINAL = 8
-
-/** A elipse amostrada: o sinal anda de ponto em ponto (25 pontos, volta fechada). */
-const PASSOS = Array.from({ length: 25 }, (_, i) => i / 24)
-const EIXO_X = PASSOS.map(t => A * Math.cos(t * 2 * Math.PI))
-const EIXO_Y = PASSOS.map(t => B * Math.sin(t * 2 * Math.PI))
+const FUNDO = '#000000'
+/** A arte: 1600 × 533. */
+const PROPORCAO = 533 / 1600
 
 export default function Entrar() {
   const { entrar } = useAuth()
+  const { width } = useWindowDimensions()
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [indo, setIndo] = useState(false)
   const [parado, setParado] = useState(false)
 
-  // A abertura: o símbolo nasce, os anéis se espalham, o NEXUS monta letra
-  // a letra; depois o palco sobe e o formulário entra.
+  // A abertura: a assinatura da AFLINE e o logo nascem; depois o palco sobe
+  // e o formulário entra.
   const nasce = useRef(new Animated.Value(0)).current
-  const anelA = useRef(new Animated.Value(0)).current
-  const anelB = useRef(new Animated.Value(0)).current
-  const letras = useRef(LETRAS.map(() => new Animated.Value(0))).current
-  const manager = useRef(new Animated.Value(0)).current
   const sobe = useRef(new Animated.Value(0)).current
-  // O sinal correndo nas duas órbitas.
-  const sinalA = useRef(new Animated.Value(0)).current
-  const sinalB = useRef(new Animated.Value(0)).current
-  // O login: as órbitas giram e o núcleo pulsa enquanto o servidor confere.
-  const gira = useRef(new Animated.Value(0)).current
-  const pulso = useRef(new Animated.Value(0)).current
+  // O batimento do logo (escala) e o pulso que corre embaixo dele.
+  const bate = useRef(new Animated.Value(0)).current
+  const corre = useRef(new Animated.Value(0)).current
   // O erro: o cartão balança.
   const balanca = useRef(new Animated.Value(0)).current
 
-  useEffect(() => {
-    let vivo = true
-    const loops: Animated.CompositeAnimation[] = []
-    AccessibilityInfo.isReduceMotionEnabled().then(menos => {
-      if (!vivo) return
-      if (menos) {
-        setParado(true)
-        ;[nasce, manager, sobe, ...letras].forEach(v => v.setValue(1))
-        return
-      }
-      const anel = (v: Animated.Value, atraso: number) => Animated.sequence([
-        Animated.delay(atraso),
-        Animated.timing(v, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ])
-      Animated.sequence([
-        Animated.parallel([
-          Animated.spring(nasce, { toValue: 1, friction: 6, tension: 55, useNativeDriver: true }),
-          anel(anelA, 150),
-          anel(anelB, 420),
-          Animated.sequence([
-            Animated.delay(320),
-            Animated.stagger(70, letras.map(v =>
-              Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }))),
-            Animated.timing(manager, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          ]),
-        ]),
-        Animated.timing(sobe, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]).start()
-      // O sinal nas órbitas, em velocidades diferentes (3,2 s e 3,8 s, como no site).
-      for (const [v, dur] of [[sinalA, 3200], [sinalB, 3800]] as const) {
-        const l = Animated.loop(Animated.timing(v, { toValue: 1, duration: dur, easing: Easing.linear, useNativeDriver: true }))
-        l.start(); loops.push(l)
-      }
-    })
-    return () => { vivo = false; loops.forEach(l => l.stop()) }
-  }, [nasce, anelA, anelB, letras, manager, sobe, sinalA, sinalB])
+  const larguraLogo = Math.min(width - 32, 520)
+  const alturaLogo = larguraLogo * PROPORCAO
 
   useEffect(() => {
-    if (!indo) {
-      gira.stopAnimation(); pulso.stopAnimation()
-      gira.setValue(0); pulso.setValue(0)
-      return
-    }
-    const g = Animated.loop(Animated.timing(gira, {
-      toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true,
-    }))
-    const p = Animated.loop(Animated.sequence([
-      Animated.timing(pulso, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(pulso, { toValue: 0, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    let vivo = true
+    let laco: Animated.CompositeAnimation | null = null
+    AccessibilityInfo.isReduceMotionEnabled().then(menos => {
+      if (!vivo) return
+      if (menos) { setParado(true); nasce.setValue(1); sobe.setValue(1); return }
+      Animated.sequence([
+        Animated.timing(nasce, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(sobe, { toValue: 1, duration: 560, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start()
+      // O monitor: o pulso atravessa a cada 2,4 s, sem parar.
+      laco = Animated.loop(Animated.sequence([
+        Animated.timing(corre, { toValue: 1, duration: 1700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.delay(700),
+        Animated.timing(corre, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]))
+      laco.start()
+    })
+    return () => { vivo = false; laco?.stop() }
+  }, [nasce, sobe, corre])
+
+  // O batimento: tum-tum e descanso; no login, mais rápido.
+  useEffect(() => {
+    if (parado) return
+    const pulsar = (to: number, ms: number) =>
+      Animated.timing(bate, { toValue: to, duration: ms, easing: Easing.out(Easing.quad), useNativeDriver: true })
+    const l = Animated.loop(Animated.sequence([
+      pulsar(1, 110), pulsar(0, 140), pulsar(0.6, 100), pulsar(0, 180),
+      Animated.delay(indo ? 260 : 1300),
     ]))
-    g.start(); p.start()
-    return () => { g.stop(); p.stop() }
-  }, [indo, gira, pulso])
+    l.start()
+    return () => l.stop()
+  }, [bate, indo, parado])
 
   function balancar() {
     balanca.setValue(0)
@@ -162,29 +114,23 @@ export default function Entrar() {
     // sessão chega, e desligar antes faria o botão piscar "Entrar".
   }
 
-  const anelEstilo = (v: Animated.Value) => ({
-    opacity: v.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.5, 0] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 2.2] }) }],
-  })
-  const giro = gira.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
+  const faixa = larguraLogo * 0.72
 
   return (
     <View style={e.tela}>
       <StatusBar style="light" />
-      {/* O par do logo atrás de tudo: o azul do Nexus encontra o vermelho da
-          AFLINE. Sem desfoque no React Native, um disco só fica com borda
-          dura (visto na réplica, 31/10); camadas concêntricas bem fracas
-          fazem o esmaecido. */}
-      {CLARAO.map((c, i) => (
-        <View key={`a${i}`} pointerEvents="none" style={[e.clarao, {
-          width: c.d, height: c.d, borderRadius: c.d / 2, opacity: c.o,
-          top: -150 - (c.d - 420) / 2, right: -170 - (c.d - 420) / 2, backgroundColor: AZUL_FUNDO,
+      {/* Os brilhos nos cantos: prata em cima, vermelho embaixo — camadas
+          fracas que esmaecem (o React Native não desfoca; D-247). */}
+      {[260, 200, 140].map((d, i) => (
+        <View key={`p${d}`} pointerEvents="none" style={[e.clarao, {
+          width: d, height: d, borderRadius: d / 2, top: -d / 2, right: -d / 2,
+          backgroundColor: '#9da2ad', opacity: 0.05 + i * 0.02,
         }]} />
       ))}
-      {CLARAO.map((c, i) => (
-        <View key={`v${i}`} pointerEvents="none" style={[e.clarao, {
-          width: c.d, height: c.d, borderRadius: c.d / 2, opacity: c.o * 0.75,
-          bottom: -170 - (c.d - 420) / 2, left: -150 - (c.d - 420) / 2, backgroundColor: '#d11a24',
+      {[320, 240, 160].map((d, i) => (
+        <View key={`v${d}`} pointerEvents="none" style={[e.clarao, {
+          width: d, height: d, borderRadius: d / 2, bottom: -d / 2, left: -d / 2,
+          backgroundColor: '#d11a24', opacity: 0.07 + i * 0.03,
         }]} />
       ))}
 
@@ -192,9 +138,9 @@ export default function Entrar() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={e.rolagem} keyboardShouldPersistTaps="handled">
 
-          {/* ---- quem assina: a AFLINE ---- */}
+          {/* ---- quem assina: a AFLINE (a logomarca oficial fica) ---- */}
           <Animated.View style={[e.assinatura, { opacity: nasce }]}>
-            <Image source={require('../../assets/logo-afline.png')} style={e.logo}
+            <Image source={require('../../assets/logo-afline.png')} style={e.selo}
               accessibilityLabel="AFLINE" />
             <View style={e.frases}>
               <Text style={e.frase}>
@@ -204,53 +150,31 @@ export default function Entrar() {
             </View>
           </Animated.View>
 
-          {/* ---- o símbolo do Nexus ---- */}
-          <Animated.View style={[e.palco, {
-            transform: [{ translateY: sobe.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) }],
-          }]}>
-            <Animated.View pointerEvents="none" style={[e.anel, { borderColor: AZUL }, anelEstilo(anelA)]} />
-            <Animated.View pointerEvents="none" style={[e.anel, { borderColor: VERMELHO }, anelEstilo(anelB)]} />
-            <Animated.View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-              style={[e.simbolo, {
-                opacity: nasce.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 1] }),
-                transform: [{ scale: nasce.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
-              }]}>
-              <View style={e.halo} />
-              {/* As órbitas giram juntas enquanto o login confere. */}
-              <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: giro }] }]}>
-                <Orbita giro="-32deg" tinta={AZUL} sinal="#9cc8ff" corre={!parado} volta={sinalA} />
-                <Orbita giro="32deg" tinta={VERMELHO} sinal="#ffb3b8" corre={!parado} volta={sinalB} />
-              </Animated.View>
-              <Animated.View style={[e.nucleo, {
-                transform: [{ scale: pulso.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) }],
-              }]}>
-                <Text style={e.nucleoN}>N</Text>
-              </Animated.View>
-            </Animated.View>
+          {/* ---- a marca: PulsoLine, com o batimento ---- */}
+          <Animated.View style={{
+            alignItems: 'center', marginTop: 18,
+            opacity: nasce,
+            transform: [
+              { translateY: sobe.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+              { scale: Animated.multiply(
+                  nasce.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }),
+                  bate.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] })) },
+            ],
+          }}>
+            <Image source={require('../../assets/logo-pulsoline.png')}
+              style={{ width: larguraLogo, height: alturaLogo }} resizeMode="contain"
+              accessible accessibilityRole="header"
+              accessibilityLabel="PulsoLine, sistema de gestão AFLINE" />
           </Animated.View>
 
-          {/* ---- o letreiro: o nome do sistema ---- */}
-          <View accessible accessibilityRole="header" accessibilityLabel="Nexus Manager"
-            style={e.letreiro}>
-            <View style={e.nexus}>
-              {LETRAS.map(([l, c], i) => (
-                <Animated.Text key={l} style={[e.letra, { color: c }, {
-                  opacity: letras[i],
-                  transform: [{ translateY: letras[i].interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
-                }]}>{l}</Animated.Text>
-              ))}
-            </View>
-            <Animated.Text style={[e.manager, {
-              opacity: manager,
-              transform: [{ translateY: manager.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
-            }]}>MANAGER</Animated.Text>
-            <Animated.View style={[e.tagline, { opacity: manager }]}>
-              <View style={e.traco}>
-                <View style={[e.tracoMetade, { backgroundColor: AZUL_FUNDO }]} />
-                <View style={[e.tracoMetade, { backgroundColor: VERMELHO_FUNDO }]} />
-              </View>
-              <Text style={e.taglineTexto}>SISTEMA DE GESTÃO INTELIGENTE</Text>
-            </Animated.View>
+          {/* O monitor: a linha fina e o pulso vermelho que corre nela. */}
+          <View style={[e.monitor, { width: faixa }]} pointerEvents="none">
+            {!parado && (
+              <Animated.View style={[e.pulso, {
+                transform: [{ translateX: corre.interpolate({ inputRange: [0, 1], outputRange: [-60, faixa] }) }],
+                opacity: corre.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+              }]} />
+            )}
           </View>
 
           {/* ---- o formulário, claro ---- */}
@@ -309,7 +233,7 @@ export default function Entrar() {
               Esqueceu a senha? Fale com o controlador — ele redefine pela
               tela de Administração.
             </Text>
-            <Text style={e.marca}>AFLINE · NEXUS MANAGER</Text>
+            <Text style={e.marca}>AFLINE · PULSOLINE</Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -317,91 +241,33 @@ export default function Entrar() {
   )
 }
 
-/**
- * Uma órbita: o círculo com borda achatado em elipse e inclinado, e o
- * sinal que corre por ela. O achatamento afina a borda em cima e embaixo —
- * fica como a órbita vista de lado, que é a ideia do desenho.
- */
-function Orbita({ giro, tinta, sinal, corre, volta }: {
-  giro: string; tinta: string; sinal: string; corre: boolean
-  /** 0 → 1 = uma volta inteira do sinal pela elipse. */
-  volta: Animated.Value
-}) {
-  return (
-    <View style={[StyleSheet.absoluteFill, { transform: [{ rotate: giro }] }]}>
-      <View style={[e.orbita, { borderColor: tinta, transform: [{ scaleY: B / A }] }]} />
-      {corre && (
-        <Animated.View style={[e.sinal, { backgroundColor: sinal, shadowColor: sinal, transform: [
-          { translateX: volta.interpolate({ inputRange: PASSOS, outputRange: EIXO_X }) },
-          { translateY: volta.interpolate({ inputRange: PASSOS, outputRange: EIXO_Y }) },
-        ] }]} />
-      )}
-    </View>
-  )
-}
-
 const e = StyleSheet.create({
   tela: { flex: 1, backgroundColor: FUNDO, overflow: 'hidden' },
   clarao: { position: 'absolute' },
-  rolagem: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 },
+  rolagem: { flexGrow: 1, justifyContent: 'center', padding: 16, paddingTop: 44, paddingBottom: 28 },
 
   assinatura: {
-    flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 12, marginBottom: 6,
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 12,
   },
-  logo: { width: 52, height: 52, borderRadius: 12 },
+  selo: { width: 50, height: 50, borderRadius: 12 },
   frases: {
     borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.16)', paddingLeft: 12, gap: 2,
   },
   frase: { fontSize: 14, fontWeight: '700', color: '#eef0f4' },
-  dezesseis: { fontWeight: '900', fontStyle: 'italic', color: VERMELHO },
+  dezesseis: { fontWeight: '900', fontStyle: 'italic', color: '#ff4d58' },
   fraseRumo: { fontSize: 12.5, fontWeight: '600', color: '#a9b0bd' },
 
-  palco: { alignItems: 'center', justifyContent: 'center', height: SIMBOLO + 36, marginTop: 4 },
-  anel: {
-    position: 'absolute', width: SIMBOLO * 0.8, height: SIMBOLO * 0.8,
-    borderRadius: SIMBOLO * 0.4, borderWidth: 2,
+  monitor: {
+    alignSelf: 'center', height: 2, marginTop: 2, borderRadius: 1, overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  simbolo: { width: SIMBOLO, height: SIMBOLO, alignItems: 'center', justifyContent: 'center' },
-  halo: {
-    position: 'absolute', width: SIMBOLO * 0.7, height: SIMBOLO * 0.7, borderRadius: SIMBOLO * 0.35,
-    backgroundColor: AZUL_FUNDO, opacity: 0.18,
+  pulso: {
+    position: 'absolute', left: 0, top: 0, width: 60, height: 2, borderRadius: 1,
+    backgroundColor: '#ff3b46',
   },
-  orbita: {
-    position: 'absolute', left: SIMBOLO / 2 - A, top: SIMBOLO / 2 - A,
-    width: A * 2, height: A * 2, borderRadius: A, borderWidth: 5,
-  },
-  sinal: {
-    position: 'absolute', left: SIMBOLO / 2 - SINAL / 2, top: SIMBOLO / 2 - SINAL / 2,
-    width: SINAL, height: SINAL, borderRadius: SINAL / 2,
-    shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 4,
-  },
-  nucleo: {
-    width: NUCLEO, height: NUCLEO, borderRadius: NUCLEO / 2,
-    backgroundColor: '#232838', borderWidth: 2.5, borderColor: cor.branco,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  nucleoN: { fontSize: NUCLEO * 0.5, fontWeight: '900', color: cor.branco, marginTop: -1 },
-
-  letreiro: { alignItems: 'center', marginTop: 2 },
-  nexus: { flexDirection: 'row' },
-  letra: {
-    fontSize: 54, lineHeight: 58, fontWeight: '900', letterSpacing: 1.5,
-    fontFamily: Platform.select({ android: 'sans-serif-condensed', ios: 'AvenirNextCondensed-Heavy' }),
-  },
-  manager: {
-    marginTop: 2, fontSize: 18, fontWeight: '600', letterSpacing: 9.5, color: '#e9ebf1',
-    // o espaçamento empurra a última letra: o recuo à esquerda centraliza de volta
-    paddingLeft: 9.5,
-  },
-  tagline: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  traco: { flexDirection: 'row', width: 26, height: 2, borderRadius: 1, overflow: 'hidden' },
-  tracoMetade: { flex: 1 },
-  taglineTexto: { fontSize: 10.5, fontWeight: '700', letterSpacing: 2.4, color: '#a9b0bd' },
 
   cartao: {
-    marginTop: 24, gap: 12, padding: 18, borderRadius: 20, backgroundColor: cor.branco,
+    marginTop: 26, gap: 12, padding: 18, borderRadius: 20, backgroundColor: cor.branco,
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   },

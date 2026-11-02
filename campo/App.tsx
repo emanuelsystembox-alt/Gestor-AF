@@ -11,7 +11,6 @@ import { Tropeco } from './src/ui/Tropeco'
 import { conferirFechamentoAnterior, instalarRedeDeErros } from './src/lib/diagnostico'
 import { anotarQueDerrubou } from './src/lib/rastro'
 import { faxinarCache } from './src/lib/cache'
-import { AvisoRastro, useCienciaRastro } from './src/ui/AvisoRastro'
 import { PesquisaHumor, useHumorDoDia } from './src/ui/PesquisaHumor'
 import Entrar from './src/telas/Entrar'
 import Agenda from './src/telas/Agenda'
@@ -40,13 +39,20 @@ instalarRedeDeErros()
 function Aplicacao() {
   const { session, carregando, tecnicoId, ehCampo } = useAuth()
   const ehTecnico = !!session && !!tecnicoId
-  // 097: o técnico dá ciência do registro ANTES de o rastro começar.
-  const { ciente, darCiencia } = useCienciaRastro(session?.user.id ?? null, ehTecnico)
-  // O rastro do dia (096): só para login de técnico, e depois da ciência.
-  useRastro(ehTecnico && ciente === true)
-  // 146: depois da ciência, a pergunta do dia — obrigatória, a partir das 6h.
-  // Só para quem é do campo: o controlador que também é técnico não responde.
-  const humor = useHumorDoDia(session?.user.id ?? null, ehTecnico && ehCampo && ciente === true)
+  // ┌─ Sem o "Estou ciente" (D-249, muda a 097/D-170) ─────────────────┐
+  // │ > "O técnico vai logar e vai entrar no aplicativo normal sem a     │
+  // │ >  mensagem do GPS. Mas a mensagem da pesquisa de clima (humor),   │
+  // │ >  isso a gente vai manter." — Emanuel, 31/10                      │
+  // │ Perguntado, ele decidiu: o rastro LIGA SEM a ciência, para todos.  │
+  // │ Até aqui o rastro e o humor esperavam o "Estou ciente"             │
+  // │ (`AvisoRastro`, apagado). A tabela `ciencia_rastro` continua no    │
+  // │ banco com o que já foi gravado; o app só não pergunta mais.        │
+  // └────────────────────────────────────────────────────────────────────┘
+  // O rastro do dia (096): só para login de técnico.
+  useRastro(ehTecnico)
+  // 146: a pergunta do dia — obrigatória, a partir das 6h. Só para quem é do
+  // campo: o controlador que também é técnico não responde.
+  const humor = useHumorDoDia(session?.user.id ?? null, ehTecnico && ehCampo)
 
   // 098: o app fechou no meio de um passo da última vez? Sobe ao banco
   // (precisa do login) — e, se foi ao ligar a rota em segundo plano, não
@@ -94,7 +100,7 @@ function Aplicacao() {
         <Stack.Screen name="ConversaColega" component={ConversaColega} />
         <Stack.Screen name="Grupos" component={Grupos} />
         <Stack.Screen name="ConversaGrupo" component={ConversaGrupo} />
-        {/* 163: o Mural Nexus, só leitura, aberto pelo cartão da Agenda (D-245). */}
+        {/* 163: o Mural (PulsoLine desde a D-249), só leitura, aberto pelo cartão da Agenda (D-245). */}
         <Stack.Screen name="Mural" component={Mural} />
         <Stack.Screen
           name="Captura" component={Captura}
@@ -103,7 +109,6 @@ function Aplicacao() {
       </Stack.Navigator>
     </NavigationContainer>
     </Tropeco>
-    <AvisoRastro visivel={ehTecnico && ciente === false} aoCiente={darCiencia} />
     <PesquisaHumor visivel={humor.pendente} aoResponder={humor.responder} />
     </GuardaGps>
   )

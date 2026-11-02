@@ -232,7 +232,7 @@ export default function GeoRota({ navigation }: Props) {
             {colegas.length === 0 ? (
               <Text style={e.vazio}>
                 Nenhum colega em rota por perto agora. Aparece quem está com contrato aberto
-                hoje na sua cidade e deu ciência do aviso de localização.
+                hoje na sua cidade.
               </Text>
             ) : pertos.map(c => (
               <View key={c.tecnico_id} style={e.colega}>

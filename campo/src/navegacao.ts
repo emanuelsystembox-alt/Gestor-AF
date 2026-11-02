@@ -28,8 +28,8 @@ export type Pilha = {
   Material: undefined
   /** Pedir abastecimento do carro que está no meu nome (091). */
   Abastecer: undefined
-  /** O Mural Nexus: campanhas, ganhadores e recados da AFLINE, só leitura
-   *  (163, D-245). Aberto pelo cartão no topo da Agenda. */
+  /** O Mural PulsoLine (era Mural Nexus até a D-249): campanhas, ganhadores
+   *  e recados da AFLINE, só leitura (163, D-245). Aberto pelo cartão no topo da Agenda. */
   Mural: undefined
   Visita: { id: string }
   /** O recibo do que o almoxarifado entregou (079). Fica fora da agenda

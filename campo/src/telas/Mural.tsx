@@ -12,7 +12,7 @@ import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
 /**
- * ┌─ Mural Nexus no aplicativo (163, D-245) ─────────────────────────────┐
+ * ┌─ Mural PulsoLine no aplicativo (163, D-245; era Mural Nexus) ────────┐
  * │ > "vamos adicionar no app o canal de comunicação da AFLINE para que  │
  * │ >  o time possa visualizar os ganhadores, informativos, campanhas    │
  * │ >  entre outros. o mesmo do mural do site, só que no app."           │
@@ -129,7 +129,7 @@ export default function Mural({ navigation }: Props) {
           <Text style={e.voltarTexto}>‹</Text>
         </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={e.titulo} accessibilityRole="header" numberOfLines={1}>Mural Nexus</Text>
+          <Text style={e.titulo} accessibilityRole="header" numberOfLines={1}>Mural PulsoLine</Text>
           <Text style={e.sub} numberOfLines={1}>Campanhas, premiações e recados da AFLINE</Text>
         </View>
       </View>

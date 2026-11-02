@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Nexus Manager",
+    "name": "PulsoLine",
     "slug": "afline-manager",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "gestoraf",

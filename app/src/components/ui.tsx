@@ -81,9 +81,12 @@ export function Marca({ compacto = false }: { compacto?: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <LogoCompleto altura={34} />
+      {/* D-249: o sistema é a PulsoLine; o AF ao lado é a AFLINE, que fica. */}
       <div className="border-l border-graf-700 pl-3 leading-tight">
-        <div className="text-[13px] font-semibold tracking-tight">Manager</div>
-        <div className="text-[10px] uppercase tracking-widest text-graf-400">Gestão de campo</div>
+        <div className="text-[14px] font-extrabold italic tracking-tight" style={{ fontFamily: '"Exo 2", var(--font-sans)' }}>
+          Pulso<span className="text-af-500">Line</span>
+        </div>
+        <div className="text-[10px] uppercase tracking-widest text-graf-400">Gestão AFLINE</div>
       </div>
     </div>
   )
