@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { lerPlanilhaTOA, validarPlanilha, type LinhaTOA } from '../src/lib/toa'
 import { importarLinhasToa, impressaoDasLinhas, ErroImportacao } from '../src/lib/importarToaNucleo'
 import { bucketDoNome, nomePadrao } from '../src/lib/toaNomes'
-import { CHAVE, ESTADO_VAZIO, lerEstado, type Estado, type LinhaLog, type OQueVarrer, type Pedido } from './estado'
+import { CHAVE, ESTADO_VAZIO, INTERVALOS, lerEstado, type BucketDisponivel, type BucketFora, type Estado, type LinhaLog, type OQueVarrer, type Pedido, type VezDoBucket } from './estado'
 
 /**
  * O fundo da extensão "AFLINE — ponte com o TOA" (0.3.0, D-193).
@@ -116,29 +116,99 @@ async function exportar(numero: number, dia: string): Promise<Exportacao> {
   return { ok: true, nome, bytes }
 }
 
-// ── a cidade e quem está logado ────────────────────────────────────────
+// ── quem está logado ───────────────────────────────────────────────────
 async function carregarQuemSou(): Promise<boolean> {
   const { data: { session } } = await sb.auth.getSession()
   if (!session) { await mudar(e => { e.usuario = null }); return false }
-  const [{ data: p }, { data: cidades }] = await Promise.all([
-    sb.from('perfil').select('id, nome, email').eq('id', session.user.id).maybeSingle(),
-    sb.rpc('minhas_cidades'),
-  ])
-  const lista = (cidades ?? []) as { id: string; nome: string; ativa: boolean }[]
-  const ativa = lista.find(c => c.ativa) ?? (lista.length === 1 ? lista[0] : null)
+  const { data: p } = await sb.from('perfil').select('id, nome, email').eq('id', session.user.id).maybeSingle()
   await mudar(e => {
     e.usuario = { id: session.user.id, nome: (p?.nome as string) ?? null, email: (p?.email as string) ?? session.user.email ?? null }
-    e.cidade = ativa ? { id: ativa.id, nome: ativa.nome } : null
+    if (!e.maquina) e.maquina = crypto.randomUUID()
   })
   return true
 }
 
-// ── o ciclo: pulso → baixa dos buckets vencidos → varredura vencida ────
-interface Ordem {
-  ligado: boolean; intervalo_min: number; hoje: string
-  outro: { nome: string | null; visto_em: string } | null
-  buckets: { id: string; nome: string; numero_toa: number; vencido: boolean; impressao: string | null }[]
+/**
+ * Um cliente do banco por CIDADE (0.8.0, 167, D-251).
+ *
+ * ┌─ por que não trocar a cidade ativa ──────────────────────────────┐
+ * │ A importação inteira confere a cidade por `bases_visiveis()` — a  │
+ * │ cidade ATIVA do topo do site. Trocá-la para importar outra cidade │
+ * │ mudaria a tela de quem está usando o site com o mesmo login. O    │
+ * │ cliente de cada cidade manda `x-afline-cidade`, e o banco só      │
+ * │ honra uma cidade que a pessoa PODE ver (ADMIN: todas). A sessão é │
+ * │ a mesma do `sb` — só o cabeçalho muda.                            │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
+const clientes = new Map<string, SupabaseClient>()
+function naCidade(base: string): SupabaseClient {
+  let c = clientes.get(base)
+  if (!c) {
+    c = createClient(__SUPABASE_URL__, __SUPABASE_KEY__, {
+      accessToken: async () => (await sb.auth.getSession()).data.session?.access_token ?? null,
+      global: { headers: { 'x-afline-cidade': base } },
+    })
+    clientes.set(base, c)
+  }
+  return c
 }
+
+// ── os buckets do login: árvore do TOA ∩ cidades do PulsoLine ─────────
+async function lerArvoreDoToa(): Promise<{ numero: number; nome: string }[] | null> {
+  const aba = await abaDoToa()
+  if (!aba?.id) return null
+  try {
+    const r = await chrome.tabs.sendMessage(aba.id, { tipo: 'arvore' }) as { ok?: boolean; itens?: { numero: number; nome: string }[] } | undefined
+    return r?.ok && r.itens?.length ? r.itens : null
+  } catch { return null }
+}
+
+interface BucketDoLogin extends BucketDisponivel {
+  vez: { minha: boolean; nome: string | null; visto_em: string; rota_min: number | null } | null
+}
+
+async function atualizarDisponiveis(): Promise<{ ok: boolean; mensagem?: string }> {
+  const arvore = await lerArvoreDoToa()
+  if (!arvore) {
+    return { ok: false, mensagem: 'Para listar os buckets do seu login, abra o TOA numa aba deste Chrome (se acabou de atualizar a extensão, dê F5 na aba do TOA).' }
+  }
+  const e = await lerEstado()
+  const { data, error } = await sb.rpc('sincronismo_meus_buckets', { p_arvore: arvore, p_maquina: e.maquina })
+  if (error) return { ok: false, mensagem: error.message }
+  const d = data as { buckets: BucketDoLogin[]; fora: BucketFora[] }
+  await mudar(x => {
+    x.disponiveis = {
+      em: Date.now(),
+      itens: d.buckets.map(({ id, nome, numero_toa, base_id, cidade }) => ({ id, nome, numero_toa, base_id, cidade })),
+      fora: d.fora,
+    }
+    // marcado que saiu do login (bucket desligado, cidade tirada) deixa de ser marcado
+    x.config.buckets = x.config.buckets.filter(id => d.buckets.some(b => b.id === id))
+    // a vez de quem já sincroniza cada um, para a lista mostrar antes do 1º pulso
+    const vezes: Record<string, VezDoBucket> = {}
+    for (const b of d.buckets) {
+      if (!b.vez) continue
+      vezes[b.id] = { id: b.id, nome: b.nome, numero_toa: b.numero_toa, base_id: b.base_id, cidade: b.cidade,
+                      vez: b.vez.minha, outro: b.vez.minha ? null : (b.vez.nome ?? 'outro computador'),
+                      ultima: x.vezes[b.id]?.ultima ?? null }
+    }
+    x.vezes = vezes
+  })
+  return { ok: true }
+}
+
+/** Os buckets (com cidade) destes ids: do último pulso ou da última leitura da árvore. */
+function infoDosBuckets(e: Estado, ids: string[]): BucketDisponivel[] {
+  return ids.map((id): BucketDisponivel | undefined => e.vezes[id] ?? e.disponiveis?.itens.find(b => b.id === id))
+    .filter((b): b is BucketDisponivel => !!b)
+}
+
+// ── o ciclo: pulso → baixa dos buckets vencidos → varredura vencida ────
+interface OrdemBucket extends BucketDisponivel {
+  vez: boolean; outro: { nome: string | null; visto_em: string } | null
+  ultima: string | null; impressao: string | null
+}
+interface Ordem { agora: string; hoje: string; buckets: OrdemBucket[] }
 
 async function travar(chave: string, minutos: number): Promise<boolean> {
   const r = await chrome.storage.session.get(chave)
@@ -149,33 +219,50 @@ async function travar(chave: string, minutos: number): Promise<boolean> {
 }
 const soltar = (chave: string) => chrome.storage.session.remove(chave)
 
-async function ciclo(forcar: boolean, modo: 'PULSO' | 'ASSUMIR' = 'PULSO') {
+async function soltarBuckets() {
+  const e = await lerEstado()
+  if (e.maquina && e.usuario) await sb.rpc('sincronismo_soltar_buckets', { p_maquina: e.maquina })
+  await mudar(x => { x.vezes = {} })
+}
+
+async function ciclo(forcar: boolean, assumir: string[] = []) {
   const est = await lerEstado()
   if (!est.ligado) return
   if (!(await travar('trava_baixa', 15))) return
   try {
     if (!(await carregarQuemSou())) return
     const e = await lerEstado()
-    if (!e.cidade) { await anotar('Sem cidade ativa no seu cadastro do Gestor AF.', 'erro'); return }
+    if (!e.config.buckets.length) { await mudar(x => { x.pulsoEm = Date.now(); x.vezes = {} }); return }
     const navegador = /Chrome\/(\d+)/.exec(navigator.userAgent)?.[0] ?? 'Chrome'
-    const { data, error } = await sb.rpc('sincronismo_pulso', {
-      p_base: e.cidade.id, p_info: `extensão ${VERSAO} · ${navegador}`, p_modo: modo,
+    const { data, error } = await sb.rpc('sincronismo_pulso_buckets', {
+      p_maquina: e.maquina, p_info: `extensão ${VERSAO} · ${navegador}`, p_buckets: e.config.buckets,
+      p_assumir: assumir, p_rota_min: e.config.rotaMin, p_varredura_min: e.config.varreduraMin,
+      p_toa_sessao: e.toaSessao,
     })
     if (error) { await anotar(`Pulso recusado: ${error.message}`, 'erro'); return }
     const o = data as Ordem
     await mudar(x => {
-      x.pulsoEm = Date.now(); x.servidorLigado = o.ligado; x.intervalo = o.intervalo_min
-      x.vez = o.outro ? 'RESERVA' : 'ESTE'; x.reservaDe = o.outro?.nome ?? null
+      x.pulsoEm = Date.now()
+      x.vezes = Object.fromEntries(o.buckets.map(b => [b.id, {
+        id: b.id, nome: b.nome, numero_toa: b.numero_toa, base_id: b.base_id, cidade: b.cidade,
+        vez: b.vez, outro: b.vez ? null : (b.outro?.nome ?? 'outro computador'), ultima: b.ultima,
+      }]))
     })
-    if (modo === 'ASSUMIR') await anotar('Este computador assumiu o sincronismo.', 'ok')
-    if (o.outro || !o.ligado) return
+    if (assumir.length) await anotar(`Este computador assumiu ${assumir.length} bucket(s).`, 'ok')
 
-    const fila = o.buckets.filter(b => forcar || b.vencido)
-    for (const b of fila) await rodarBucket(e.cidade.id, e.usuario!.id, b, o.hoje, forcar)
+    // O intervalo é DESTE computador; a conta usa o relógio do servidor.
+    const agora = new Date(o.agora).getTime()
+    const passo = e.config.rotaMin * 60_000 - 30_000
+    const vencidos = o.buckets.filter(b => b.vez && (forcar || !b.ultima || agora - new Date(b.ultima).getTime() >= passo))
+    for (const b of vencidos) await rodarBucket(b, o.hoje, forcar, e.usuario!.id)
 
-    // A varredura sozinha, quando a configuração mandar.
-    const { data: ve } = await sb.rpc('varredura_estado', { p_base: e.cidade.id })
-    if ((ve as { vencida?: boolean } | null)?.vencida && !(await lerEstado()).varredura.rodando) await varrer()
+    // A varredura sozinha, no ritmo que este computador escolheu.
+    const x = await lerEstado()
+    const minhas = o.buckets.filter(b => b.vez).map(b => b.id)
+    if (x.config.varreduraMin && minhas.length && !x.varredura.rodando) {
+      const ult = (await chrome.storage.local.get('varredura_tentativa')).varredura_tentativa as number | undefined
+      if (!ult || Date.now() - ult >= x.config.varreduraMin * 60_000 - 30_000) await varrer(minhas)
+    }
   } catch (err) {
     await anotar(`Falha no ciclo: ${String((err as Error)?.message ?? err)}`, 'erro')
   } finally {
@@ -184,10 +271,10 @@ async function ciclo(forcar: boolean, modo: 'PULSO' | 'ASSUMIR' = 'PULSO') {
   }
 }
 
-async function registrar(base: string, bucketId: string, dia: string, iniciada: string,
+async function registrar(cli: SupabaseClient, base: string, bucketId: string, dia: string, iniciada: string,
                          resultado: 'IMPORTADA' | 'SEM_MUDANCA' | 'SEM_SESSAO' | 'ERRO',
                          extra: { mensagem?: string; importacao?: string | null; impressao?: string; linhas?: number } = {}) {
-  const { error } = await sb.rpc('sincronismo_registrar_rodada', {
+  const { error } = await cli.rpc('sincronismo_registrar_rodada', {
     p_base: base, p_bucket: bucketId, p_dia: dia, p_iniciada_em: iniciada, p_resultado: resultado,
     p_mensagem: extra.mensagem ?? null, p_importacao: extra.importacao ?? null,
     p_impressao: extra.impressao ?? null, p_linhas: extra.linhas ?? null,
@@ -195,8 +282,10 @@ async function registrar(base: string, bucketId: string, dia: string, iniciada: 
   if (error) await anotar(`Não consegui registrar a rodada: ${error.message}`, 'erro')
 }
 
-/** Uma rodada de baixa de um bucket — o mesmo caminho da importação manual. */
-async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][number], dia: string, forcar: boolean) {
+/** Uma rodada de baixa de um bucket — o mesmo caminho da importação manual, na cidade DELE. */
+async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuarioId: string) {
+  const base = b.base_id
+  const cli = naCidade(base)
   const iniciada = new Date().toISOString()
   const fim = async (texto: string, tom: LinhaLog['tom']) => {
     await anotar(texto, tom)
@@ -206,7 +295,7 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
 
   const r = await exportar(b.numero_toa, dia)
   if (!r.ok) {
-    await registrar(base, b.id, dia, iniciada, r.motivo, { mensagem: r.mensagem })
+    await registrar(cli, base, b.id, dia, iniciada, r.motivo, { mensagem: r.mensagem })
     if (r.motivo === 'SEM_SESSAO') {
       await mudar(x => { x.toaSessao = 'CAIU' })
       selo('!', '#b45309', 'AFLINE — a sessão do TOA caiu: entre no TOA de novo')
@@ -220,7 +309,7 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
   const doNome = bucketDoNome(nome)
   if (doNome && doNome !== b.nome) {
     const msg = `O número ${b.numero_toa} no TOA é do bucket ${doNome}, não de ${b.nome}. Corrija o número no Gestor AF.`
-    await registrar(base, b.id, dia, iniciada, 'ERRO', { mensagem: msg })
+    await registrar(cli, base, b.id, dia, iniciada, 'ERRO', { mensagem: msg })
     return fim(msg, 'erro')
   }
 
@@ -228,7 +317,7 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
   try {
     const leitura = await lerPlanilhaTOA(new File([r.bytes], nome))
     if (leitura.linhas.length === 0) {
-      await registrar(base, b.id, dia, iniciada, 'SEM_MUDANCA', { mensagem: 'Planilha sem nenhuma atividade.', linhas: 0 })
+      await registrar(cli, base, b.id, dia, iniciada, 'SEM_MUDANCA', { mensagem: 'Planilha sem nenhuma atividade.', linhas: 0 })
       return fim(`${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.`, 'info')
     }
     const problemas = validarPlanilha(leitura)
@@ -237,25 +326,25 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
   } catch (e) {
     const msg = String((e as Error)?.message ?? e)
     const vazia = /vazia/i.test(msg)
-    await registrar(base, b.id, dia, iniciada, vazia ? 'SEM_MUDANCA' : 'ERRO',
+    await registrar(cli, base, b.id, dia, iniciada, vazia ? 'SEM_MUDANCA' : 'ERRO',
       { mensagem: vazia ? 'Planilha sem nenhuma atividade.' : msg, linhas: vazia ? 0 : undefined })
     return fim(vazia ? `${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.` : `${b.nome}: ${msg}`, vazia ? 'info' : 'erro')
   }
 
   const impressao = await impressaoDasLinhas(linhas)
   if (!forcar && b.impressao && b.impressao === impressao) {
-    await registrar(base, b.id, dia, iniciada, 'SEM_MUDANCA', { impressao, linhas: linhas.length })
+    await registrar(cli, base, b.id, dia, iniciada, 'SEM_MUDANCA', { impressao, linhas: linhas.length })
     return fim(`${b.nome}: conferido — ${linhas.length} atividades iguais à última importação; contratos em dia.`, 'ok')
   }
 
   try {
-    const res = await importarLinhasToa(sb, {
+    const res = await importarLinhasToa(cli, {
       linhas, arquivoNome: nome, baseId: base, dia, usuarioId, origem: 'sincronismo', impressao,
       aoAvancar: (_e, n) => { mudar(x => { x.baixa.atual = `${b.nome}: importando (${n}/${linhas.length})…` }) },
       // 165: a fila da cidade — o robô espera a vez como a gente espera.
-      aoEsperar: f => { mudar(x => { x.baixa.atual = `${b.nome}: na fila da cidade (posição ${f.posicao ?? '?'}), esperando ${f.na_frente ?? 'outra importação'} terminar…` }) },
+      aoEsperar: f => { mudar(x => { x.baixa.atual = `${b.nome}: na fila de ${b.cidade} (posição ${f.posicao ?? '?'}), esperando ${f.na_frente ?? 'outra importação'} terminar…` }) },
     })
-    await registrar(base, b.id, dia, iniciada, 'IMPORTADA', { importacao: res.importacaoId, impressao, linhas: linhas.length })
+    await registrar(cli, base, b.id, dia, iniciada, 'IMPORTADA', { importacao: res.importacaoId, impressao, linhas: linhas.length })
     const s = res.resumo
     return fim(`${b.nome}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, ${s.atualizadas} atualizadas`
       + (s.erros ? `, ${s.erros} com erro` : '')
@@ -265,7 +354,7 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
       s.erros ? 'erro' : 'ok')
   } catch (e) {
     const msg = String((e as Error)?.message ?? e)
-    await registrar(base, b.id, dia, iniciada, 'ERRO', {
+    await registrar(cli, base, b.id, dia, iniciada, 'ERRO', {
       mensagem: msg, importacao: e instanceof ErroImportacao ? e.importacaoId : null, linhas: linhas.length,
     })
     return fim(`${b.nome}: ${msg}`, 'erro')
@@ -276,26 +365,34 @@ async function rodarBucket(base: string, usuarioId: string, b: Ordem['buckets'][
 const ROTULO_O_QUE: Record<OQueVarrer, string> = {
   TUDO: 'nome e equipamento', NOME: 'só nome', EQUIPAMENTO: 'só equipamento',
 }
-
-/** Quanto falta por bucket, para as caixinhas da janelinha. Sem filtro:
- *  a pessoa precisa ver também o bucket que desmarcou. */
-async function contarPendentes() {
-  const e = await lerEstado()
-  if (!e.cidade) return
-  const { data, error } = await sb.rpc('varredura_pendentes', { p_base: e.cidade.id })
-  if (error) return
-  const m = new Map<string, { bucket: string; nomes: number; listas: number }>()
-  for (const p of (data ?? []) as Pendente[]) {
-    const b = p.bucket ?? ''
-    const x = m.get(b) ?? { bucket: b, nomes: 0, listas: 0 }
-    if (p.precisa_nome) x.nomes++
-    if (p.precisa_equipamento) x.listas++
-    m.set(b, x)
-  }
-  await mudar(s => { s.pendentes = { em: Date.now(), porBucket: [...m.values()].sort((a, b) => a.bucket.localeCompare(b.bucket)) } })
-}
 // `bucket` (120): a aba do TOA abre o bucket na árvore antes de procurar o contrato (0.5.0)
 interface Pendente { aid: string; contrato: string | null; precisa_nome: boolean; precisa_equipamento: boolean; bucket: string | null }
+
+/** Os buckets agrupados pela cidade de cada um: cada cidade, uma chamada. */
+function porCidade(bs: BucketDisponivel[]): Map<string, BucketDisponivel[]> {
+  const m = new Map<string, BucketDisponivel[]>()
+  for (const b of bs) m.set(b.base_id, [...(m.get(b.base_id) ?? []), b])
+  return m
+}
+
+/** Quanto falta nos buckets marcados, para a lista da janelinha. */
+async function contarPendentes() {
+  const e = await lerEstado()
+  if (!e.usuario) return
+  const m = new Map<string, { bucket: string; nomes: number; listas: number }>()
+  for (const [base, bs] of porCidade(infoDosBuckets(e, e.config.buckets))) {
+    const { data, error } = await naCidade(base).rpc('varredura_pendentes', { p_base: base, p_buckets: bs.map(b => b.nome) })
+    if (error) continue
+    for (const p of (data ?? []) as Pendente[]) {
+      const b = p.bucket ?? ''
+      const x = m.get(b) ?? { bucket: b, nomes: 0, listas: 0 }
+      if (p.precisa_nome) x.nomes++
+      if (p.precisa_equipamento) x.listas++
+      m.set(b, x)
+    }
+  }
+  await mudar(s => { s.pendentes = { em: Date.now(), porBucket: [...m.values()] } })
+}
 
 /**
  * A aba do TOA que a varredura usa. Prefere a da JANELA DA VARREDURA
@@ -309,6 +406,32 @@ async function abaDoToa(): Promise<chrome.tabs.Tab | null> {
   return abas.find(a => a.windowId === janela)
     ?? abas.find(a => /^Console de Aloca/.test(a.title || '')) ?? abas[0] ?? null
 }
+
+/**
+ * Sem aba do TOA, a extensão abre uma — fixada e ao fundo (0.7.0, D-250).
+ * O caminho direto não pilota tela: basta a aplicação do TOA carregada,
+ * escondida ou não. Espera o toa.js dizer que a aplicação está pronta; se a
+ * sessão caiu, a aba fica lá para a pessoa entrar.
+ */
+async function abaDoToaOuAbrir(): Promise<chrome.tabs.Tab | null> {
+  const ja = await abaDoToa()
+  if (ja) return ja
+  const aba = await chrome.tabs.create({ url: TOA + '/', active: false, pinned: true })
+  if (!aba.id) return null
+  await anotar('Varredura: abri o TOA numa aba fixada, ao fundo. Se ela pedir login, entre nela.')
+  // ~90 s: cada chamada à API do Chrome mantém o fundo acordado
+  for (let i = 0; i < 45; i++) {
+    await new Promise(r => setTimeout(r, 2000))
+    try {
+      const r = await chrome.tabs.sendMessage(aba.id, { tipo: 'toa-estado' }) as { direto?: boolean } | undefined
+      if (r?.direto) return aba
+    } catch { /* a aba ainda está carregando */ }
+  }
+  return aba
+}
+
+/** O dia de hoje em Manaus — o mesmo `hoje_local()` do banco (registrar_varredura). */
+const hojeLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Manaus' }).format(new Date())
 
 async function abrirJanelaDaVarredura(): Promise<{ ok: boolean; mensagem?: string }> {
   const atual = (await chrome.storage.local.get('janela_varredura')).janela_varredura as number | undefined
@@ -329,38 +452,45 @@ chrome.windows.onRemoved.addListener(async id => {
   if (atual === id) await chrome.storage.local.remove('janela_varredura')
 })
 
-async function varrer() {
+/** A varredura dos buckets `ids`, cada um na cidade dele (0.8.0). */
+async function varrer(ids: string[]) {
   const e = await lerEstado()
-  if (!e.cidade || !e.usuario) return
+  if (!e.usuario) return
   // uma varredura de mais de 3 h é uma que se perdeu: libera
   if (e.varredura.rodando && e.varredura.inicio && Date.now() - e.varredura.inicio < 3 * 3600_000) {
     await anotar('Já há uma varredura em andamento.'); return
   }
-  // 121 (0.6.0): o que ler vai ao banco; os buckets desmarcados saem aqui —
-  // bucket novo entra marcado, como sempre foi.
-  const { data, error } = await sb.rpc('varredura_pendentes', { p_base: e.cidade.id, p_o_que: e.escolha.oQue })
-  if (error) { await anotar(`Varredura: ${error.message}`, 'erro'); return }
-  const todos = (data ?? []) as Pendente[]
-  const pend = todos.filter(p => !e.escolha.fora.includes(p.bucket ?? ''))
+  await chrome.storage.local.set({ varredura_tentativa: Date.now() })
+  const grupos = porCidade(infoDosBuckets(e, ids))
+  if (!grupos.size) { await anotar('Varredura: marque ao menos um bucket na lista.', 'erro'); return }
+
+  const pend: (Pendente & { base: string })[] = []
+  for (const [base, bs] of grupos) {
+    const { data, error } = await naCidade(base).rpc('varredura_pendentes', {
+      p_base: base, p_buckets: bs.map(b => b.nome), p_o_que: e.escolha.oQue,
+    })
+    if (error) { await anotar(`Varredura em ${bs[0].cidade}: ${error.message}`, 'erro'); continue }
+    for (const p of (data ?? []) as Pendente[]) pend.push({ ...p, base })
+  }
   if (!pend.length) {
-    const deFora = todos.length - pend.length
-    await sb.rpc('varredura_estado', { p_base: e.cidade.id, p_terminou: 'nada pendente', p_contratos: 0 })
-    await anotar(deFora
-      ? `Varredura: nada a varrer nos buckets marcados (${deFora} pendente(s) nos desmarcados).`
-      : e.escolha.oQue === 'TUDO'
-        ? 'Varredura: nada a varrer — todos os contratos de hoje já têm nome, e os encerrados já têm o equipamento lido.'
-        : `Varredura: nada a varrer em "${ROTULO_O_QUE[e.escolha.oQue]}".`, 'ok')
+    for (const base of grupos.keys()) await naCidade(base).rpc('varredura_estado', { p_base: base, p_terminou: 'nada pendente', p_contratos: 0 })
+    await anotar(e.escolha.oQue === 'TUDO'
+      ? 'Varredura: nada a varrer — os contratos de hoje dos buckets marcados já têm nome, e os encerrados já têm o equipamento lido.'
+      : `Varredura: nada a varrer em "${ROTULO_O_QUE[e.escolha.oQue]}".`, 'ok')
     return
   }
-  const aba = await abaDoToa()
-  if (!aba?.id) { await anotar('Varredura: abra o TOA no Console de Alocação (dia de hoje) numa aba deste Chrome — a varredura troca de bucket sozinha.', 'erro'); return }
+  const aba = await abaDoToaOuAbrir()
+  if (!aba?.id) { await anotar('Varredura: não consegui abrir o TOA numa aba deste Chrome.', 'erro'); return }
 
   const idPedido = crypto.randomUUID()
-  await chrome.storage.session.set({ varredura_contratos: Object.fromEntries(pend.map(p => [p.aid, p.contrato ?? p.aid])) })
-  let r: { aceito?: boolean; mensagem?: string; bucket?: string | null } | undefined
+  await chrome.storage.session.set({
+    varredura_contratos: Object.fromEntries(pend.map(p => [p.aid, { contrato: p.contrato ?? p.aid, base: p.base }])),
+    varredura_bases: [...grupos.keys()],
+  })
+  let r: { aceito?: boolean; mensagem?: string; bucket?: string | null; direto?: boolean } | undefined
   try {
     r = await chrome.tabs.sendMessage(aba.id, {
-      tipo: 'varrer', idPedido,
+      tipo: 'varrer', idPedido, dia: hojeLocal(),
       itens: pend.map(p => ({ aid: p.aid, precisa_equipamento: p.precisa_equipamento, bucket: p.bucket })),
     })
   } catch {
@@ -375,12 +505,15 @@ async function varrer() {
   selo('0%', '#c81a23', `AFLINE — varrendo o TOA: 0 de ${pend.length}`)
   const porBucket = new Map<string, number>()
   for (const p of pend) porBucket.set(p.bucket ?? 'sem bucket', (porBucket.get(p.bucket ?? 'sem bucket') ?? 0) + 1)
-  await anotar(`Varredura começou (${ROTULO_O_QUE[e.escolha.oQue]}): ${pend.length} contratos (${[...porBucket].map(([b, n]) => `${b}: ${n}`).join(', ')}).`)
+  await anotar(`Varredura começou (${ROTULO_O_QUE[e.escolha.oQue]}${r.direto ? ', direto do TOA' : ', pelas telas'}): ${pend.length} contratos (${[...porBucket].map(([b, n]) => `${b}: ${n}`).join(', ')}).`)
 }
 
 interface EventoVarredura {
   tipo: 'varredura-evento'; idPedido: string; evento: 'item' | 'fim' | 'pausa' | 'retoma'
   aid?: string; feitos: number; total: number; cancelado?: boolean
+  /** 0.7.0, no 'fim': quantos vieram pelo caminho direto, por que o resto não
+   *  veio, e os campos do inventário que o TOA mandou (só nomes — diagnóstico). */
+  diretos?: number; motivos?: string[]; campos?: string[] | null
   resultado?: { ok: boolean; motivo?: string; mensagem?: string; nome?: string | null; leuEquipamento?: boolean; itens?: Record<string, string>[] }
 }
 
@@ -388,8 +521,7 @@ const avisosDeBucket = new Set<string>()
 
 async function aoEventoDaVarredura(ev: EventoVarredura) {
   const e = await lerEstado()
-  if (!e.cidade || ev.idPedido !== e.varredura.idPedido) return   // evento de uma varredura antiga
-  const base = e.cidade.id
+  if (!e.usuario || ev.idPedido !== e.varredura.idPedido) return   // evento de uma varredura antiga
 
   // A aba do TOA escondida: o Chrome para a tela, e a varredura espera ela voltar.
   if (ev.evento === 'pausa' || ev.evento === 'retoma') {
@@ -402,21 +534,24 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
   }
 
   if (ev.evento === 'item' && ev.aid && ev.resultado) {
-    const contratos = (await chrome.storage.session.get('varredura_contratos')).varredura_contratos as Record<string, string> | undefined
-    const contrato = contratos?.[ev.aid] ?? ev.aid
+    const contratos = (await chrome.storage.session.get('varredura_contratos')).varredura_contratos as Record<string, { contrato: string; base: string }> | undefined
+    const alvo = contratos?.[ev.aid]
+    const contrato = alvo?.contrato ?? ev.aid
     const lido = ev.resultado
     let delta = { nomes: 0, listas: 0, fora: 0, erros: 0 }
     if (!lido.ok) {
       if (lido.motivo === 'FORA_DO_CONSOLE') delta.fora = 1
-      else if (lido.motivo === 'SEM_BUCKET') {
+      else if (lido.motivo === 'SEM_BUCKET' || lido.motivo === 'SEM_DIRETO') {
         // o mesmo recado para todos os contratos do bucket: anota uma vez só
         delta.erros = 1
         const chave = `${ev.idPedido}|${lido.mensagem}`
         if (!avisosDeBucket.has(chave)) { avisosDeBucket.add(chave); await anotar(`Varredura: ${lido.mensagem}`, 'erro') }
       } else { delta.erros = 1; await anotar(`Varredura, ${contrato}: ${lido.mensagem ?? 'erro'}`, 'erro') }
+    } else if (!alvo) {
+      delta.erros = 1; await anotar(`Varredura, ${contrato}: não sei de que cidade é — não gravou.`, 'erro')
     } else {
-      const { error } = await sb.rpc('registrar_varredura', {
-        p_base: base, p_aid: ev.aid, p_nome: lido.nome ?? null,
+      const { error } = await naCidade(alvo.base).rpc('registrar_varredura', {
+        p_base: alvo.base, p_aid: ev.aid, p_nome: lido.nome ?? null,
         p_leu_equipamento: !!lido.leuEquipamento, p_itens: lido.itens ?? [],
       })
       if (error) { delta.erros = 1; await anotar(`Varredura, ${contrato}: não gravou — ${error.message}`, 'erro') }
@@ -434,15 +569,28 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
 
   if (ev.evento === 'fim') {
     const v = e.varredura
+    const telas = ev.feitos - (ev.diretos ?? 0) - v.erros - v.fora
     const resumo = `${v.nomes} nome(s), ${v.listas} lista(s) de equipamento`
+      + (ev.diretos != null ? ` (${ev.diretos} direto do TOA${telas > 0 ? `, ${telas} pelas telas` : ''})` : '')
       + (v.fora ? `; ${v.fora} fora do Console aberto` : '')
       + (v.erros ? `; ${v.erros} com erro` : '')
       + (ev.cancelado ? '; parada no meio' : '')
-    await sb.rpc('varredura_estado', { p_base: base, p_terminou: resumo, p_contratos: ev.feitos })
+    if (ev.motivos?.length) await anotar(`Varredura, caminho direto: ${ev.motivos.join('; ')}`, 'erro')
+    // os campos do inventário, uma vez por versão: acusam se a Oracle mudar
+    if (ev.campos?.length) {
+      const visto = (await chrome.storage.local.get('campos_inventario')).campos_inventario
+      if (visto !== VERSAO) {
+        await chrome.storage.local.set({ campos_inventario: VERSAO })
+        await anotar(`Campos do inventário no TOA: ${ev.campos.join(', ')}`)
+      }
+    }
+    // o histórico de cada cidade varrida ganha a rodada (118)
+    const bases = ((await chrome.storage.session.get('varredura_bases')).varredura_bases as string[] | undefined) ?? []
+    for (const base of bases) await naCidade(base).rpc('varredura_estado', { p_base: base, p_terminou: resumo, p_contratos: ev.feitos })
     await mudar(s => { s.varredura.rodando = false; s.varredura.pausada = false; s.varredura.ultimaEm = Date.now(); s.varredura.ultima = resumo })
     await anotar(`Varredura terminou: ${resumo}.`, v.erros ? 'erro' : 'ok')
     selo('', '#c81a23', 'AFLINE — ponte com o TOA')
-    await contarPendentes()   // as caixinhas mostram o que sobrou
+    await contarPendentes()   // a lista mostra o que sobrou
   }
 }
 
@@ -472,34 +620,49 @@ async function tratar(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
       if (error) return { ok: false, mensagem: error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message }
       await carregarQuemSou()
       await anotar('Entrou no Gestor AF.', 'ok')
+      atualizarDisponiveis().then(r => { if (!r.ok && r.mensagem) anotar(r.mensagem) })
       return { ok: true }
     }
     case 'sair': {
-      const e = await lerEstado()
-      if (e.cidade && e.vez === 'ESTE') await sb.rpc('sincronismo_pulso', { p_base: e.cidade.id, p_modo: 'SOLTAR' })
+      await soltarBuckets().catch(() => {})
       await sb.auth.signOut()
-      await chrome.storage.local.set({ [CHAVE]: { ...ESTADO_VAZIO } })
+      // o computador e a configuração dele ficam: são DESTE computador
+      const e = await lerEstado()
+      await chrome.storage.local.set({ [CHAVE]: { ...ESTADO_VAZIO, maquina: e.maquina, config: e.config } })
       selo('')
       return { ok: true }
     }
     case 'ligar': {
-      const e = await mudar(x => { x.ligado = p.sim })
+      await mudar(x => { x.ligado = p.sim })
       if (p.sim) { await anotar('Este computador vai sincronizar.', 'ok'); ciclo(false) }
-      else {
-        if (e.cidade && e.vez === 'ESTE') await sb.rpc('sincronismo_pulso', { p_base: e.cidade.id, p_modo: 'SOLTAR' })
-        await mudar(x => { x.vez = null })
-        await anotar('Este computador parou de sincronizar.')
-      }
+      else { await soltarBuckets(); await anotar('Este computador parou de sincronizar (os buckets ficaram livres para outro).') }
       return { ok: true }
     }
+    case 'configurar': {
+      if (!INTERVALOS.includes(p.rotaMin)) return { ok: false, mensagem: 'Intervalo da rota inválido.' }
+      if (p.varreduraMin != null && !INTERVALOS.includes(p.varreduraMin)) return { ok: false, mensagem: 'Intervalo da varredura inválido.' }
+      const e = await lerEstado()
+      const conhecidos = new Set([...(e.disponiveis?.itens ?? []).map(b => b.id), ...Object.keys(e.vezes)])
+      const buckets = [...new Set(p.buckets)].filter(id => conhecidos.has(id))
+      await mudar(x => { x.config = { rotaMin: p.rotaMin, varreduraMin: p.varreduraMin, buckets } })
+      if (e.ligado) ciclo(false)
+      return { ok: true }
+    }
+    case 'atualizar-buckets': {
+      const r = await atualizarDisponiveis()
+      contarPendentes()
+      return r
+    }
     case 'sincronizar-agora': ciclo(true); return { ok: true }
-    case 'assumir': ciclo(false, 'ASSUMIR'); return { ok: true }
+    case 'assumir': ciclo(false, p.buckets); return { ok: true }
     case 'varrer-agora': {
       if (!(await carregarQuemSou())) return { ok: false, mensagem: 'Entre no Gestor AF primeiro.' }
-      varrer(); return { ok: true }
+      const e = await lerEstado()
+      if (!e.config.buckets.length) return { ok: false, mensagem: 'Marque ao menos um bucket na lista.' }
+      varrer(e.config.buckets); return { ok: true }
     }
     case 'escolher-varredura': {
-      await mudar(x => { x.escolha = { fora: p.fora, oQue: p.oQue } })
+      await mudar(x => { x.escolha = { oQue: p.oQue } })
       return { ok: true }
     }
     case 'contar-pendentes': await contarPendentes(); return { ok: true }

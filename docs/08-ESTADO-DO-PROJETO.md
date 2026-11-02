@@ -454,6 +454,69 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Pendente depois da 170 — extensão 0.8.0, quebra na VT, abas do TOA, vídeo e transferência (D-250 a D-257)
+
+**Estado (02/11/2026):** migrations **167 a 170 aplicadas** (170: transferir não fixa a rota, D-257; `testar_policies` 33/33 depois dela); baterias 33/33 e 29/29
+depois da 167; nenhuma tabela sem RLS; nenhuma `SECURITY DEFINER` aberta ao `anon`. Site
+publicado (Sincronismo por bucket; abas Equipamento e Miscelânea com contador; "Operadora"
+no histórico da importação; "Início após abrir a janela"; sem as frases explicativas que
+o Emanuel pediu para tirar). Extensão **0.8.0** recarregada no Chrome do Emanuel, com a
+lista de buckets do login funcionando. **28 buckets da AFLINE cadastrados** (17 novos em
+02/11, todos com autor e número do TOA: BSB _03/_06/_12/_14/_15_VT, MAN-AFLINE_ADM,
+ITZ-AFLINE e _ADM, CXS, JIP, MBA, TMN, VHA, CWL, PMJ e PMJ_VT, PIT → Paraíso).
+
+### Depende do Emanuel
+- **Recarregar a extensão (↻) e dar F5 no TOA em TODO computador que sincroniza**: desde
+  a 167 o banco recusa as extensões 0.7 e anteriores ("atualize a extensão").
+- Em cada computador, **marcar os buckets e os tempos** no painel: a configuração antiga,
+  por cidade, não migrou (era outra coisa — uma por cidade, não por computador).
+- Os buckets `_ADM` (MAN e ITZ) foram cadastrados; dizer se devem ser sincronizados ou
+  desligados.
+- A conta do contador das abas (lista inteira, inclusive "já estava no cliente") foi
+  corrigida a pedido; confirmar se é a conta que a operação quer para a miscelânea também.
+- **Transferência (D-257):** avisar quem despacha que transferir não segura mais o contrato
+  sozinho — com o "Roteamento do TOA" ligado, a importação seguinte (até 1 h pelo
+  sincronismo) devolve o contrato à equipe do relatório. Para segurar, desligar a chave.
+- **Vídeo (D-256):** avisar os técnicos que o vídeo agora é só pela câmera do app (até 60 s);
+  da galeria, só foto. Quem ainda não abriu o app duas vezes depois de 02/11 continua com a
+  versão anterior (galeria com vídeo, câmera sem limite de qualidade).
+- **Retenção de evidência** continua em aberto (por quanto tempo a CLARO audita?): é a
+  alavanca grande do disco no longo prazo; nada é apagado hoje além de órfãos.
+
+### Verificação que ninguém fez ainda
+- Uma importação e uma varredura de ponta a ponta pela 0.8.0 numa cidade que **não** é a
+  ativa do topo (o cabeçalho foi testado no banco; a rodada inteira, não).
+- Dois computadores marcando o mesmo bucket: a vez, o "com Fulano" e o assumir.
+- O caminho direto da varredura num dia útil cheio (~300 contratos), e o `Time/get` pelo
+  pedido direto quando a camada do TOA falha.
+- Um vídeo gravado pela câmera do app num celular real depois da atualização `4b285ea5`:
+  tamanho (~11 MB em 60 s esperados) e se o equipamento fica legível em 720p. Se não ficar,
+  subir o `VIDEO_BITRATE` em `campo/src/telas/Captura.tsx`.
+- A transferência na Rota do dia e na janela do contrato com o roteamento ligado, seguida de
+  uma importação: o contrato tem de voltar (é o comportamento pedido) e o aviso tem de dizer.
+
+## Pendente depois da 166 — a marca vira PULSOLINE, e o rastro sem ciência (D-249)
+
+**Estado:** site publicado com a entrada PulsoLine (31/10). App: tela nova publicada
+pelo ar para o 0.5.0 (update group `adfcfd89`) e **APK 0.6.0** gerado na EAS (build
+`1d6414a7`, FINISHED: https://expo.dev/artifacts/eas/cMxcy_rjTrTAebHkkVuDZFpJh1hoKRHX32eqi3FtsrU.apk), com o nome "PulsoLine" no ícone. Migration 166 aplicada (Geo-Rota sem
+ciência).
+
+### Depende do Emanuel
+- **Instalar o APK 0.6.0** em todos os celulares: daqui para frente as atualizações
+  pelo ar só chegam a quem tem a 0.6.0.
+- **O aviso de rastreamento ao funcionário** agora é da AFLINE (contrato ou termo):
+  o sistema não mostra mais nada (decisão de 31/10, LGPD).
+- **Ícone e splash do app** continuam com o AF da AFLINE; se for para ter o P da
+  PulsoLine no ícone, mandar a arte do P sozinho em PNG 1024×1024.
+- O ícone da aba do site (favicon) continua o AF.
+
+### Verificação que ninguém fez ainda
+- A entrada do app num celular (batimento, pulso, tamanho do logo em tela pequena).
+- O rastro ligando sem a ciência num aparelho real, e o técnico novo aparecendo na
+  Geo-Rota.
+- A barra lateral do site logado com "PulsoLine / Gestão AFLINE".
+
 ## Pendente depois da 165 — teste de carga, fila de importação e índices (D-248)
 
 **Estado:** migration **165** aplicada (165a–h). Baterias 33/33 e 29/29; nenhuma tabela

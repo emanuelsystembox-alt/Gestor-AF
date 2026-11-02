@@ -48,7 +48,7 @@ const SELECT = `
     id, sequencia, numero_os, status_operadora, tec1_ao_vivo,
     tipo_os:tipo_os_id ( codigo, descricao ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade,
-                                   responsavel_quebra, agrupamento_quebra, quebra_pct,
+                                   responsavel_quebra, agrupamento_quebra, agrupamento_quebra_vt, quebra_pct,
                                    situacao_destino ),
     baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
   ),
@@ -492,34 +492,21 @@ export default function Controle() {
               </Painel>
 
               <Painel titulo="Tempo médio por etapa"
-                dica="Atraso em horas; as etapas em minutos. Só das visitas que têm as duas pontas medidas."
+                dica="Ex.: janela 08–12 e início após abrir 1h15 = começou às 09:15."
                 tabela={<TabelaSimples colunas={['Etapa', 'Tempo', 'Minutos']}
-                  linhas={m.etapas.map(e => [e.rotulo, e.texto, e.valor])} />}
-                nota={<>
-                  {/* ┌─ o rotulo enganava, e ele perguntou ─────────────┐
-                      │ > "o atraso sobre a janela é quanto tempo médio a │
-                      │ >  operação demorou a iniciar o outro contrato    │
-                      │ >  após baixado? não entendi" — Emanuel, 23/09    │
-                      │                                                   │
-                      │ Nao e. E `inicio - janela_inicio`. E o texto      │
-                      │ anterior ainda afirmava que "acima de 60 min      │
-                      │ compromete o horario prometido" -- o que e FALSO  │
-                      │ numa janela de 08 as 22, que tem 840 min de       │
-                      │ folga e domina esta operacao. A nota passa a      │
-                      │ explicar a aparente contradicao com o cartao      │
-                      │ "chegou dentro da janela", em vez de criar uma.   │
-                      └───────────────────────────────────────────────────┘ */}
-                  <strong className="text-graf-300">Atraso sobre a janela</strong> é
-                  quanto tempo <em>depois da abertura</em> do intervalo combinado o
-                  técnico começou — não é o tempo entre um contrato e o seguinte.
-                  Negativo significa que chegou adiantado.
-                  {' '}Por isso ele convive com “chegou dentro da janela”: numa janela
-                  de 08h–22h dá para começar 1h40 depois da abertura e ainda estar
-                  folgadamente no prazo.
-                  {' '}As três barras <strong className="text-graf-300">não se somam</strong>:
-                  as duas de baixo são etapas do atendimento, esta é a distância até o
-                  combinado.
-                </>}>
+                  linhas={m.etapas.map(e => [e.rotulo, e.texto, e.valor])} />}>
+                {/* ┌─ o rótulo enganava, e ele perguntou — duas vezes ──────┐
+                    │ > "o atraso sobre a janela é quanto tempo médio a       │
+                    │ >  operação demorou a iniciar o outro contrato após     │
+                    │ >  baixado?" — Emanuel, 23/09                           │
+                    │ > "é bom tirar esse texto (...) significa que em um     │
+                    │ >  contrato de 08 às 12 ele chegou 1:15 depois das 8    │
+                    │ >  horas? tá confuso" — Emanuel, 02/11                  │
+                    │                                                         │
+                    │ É `inicio - janela_inicio`. A nota longa embaixo saiu;  │
+                    │ o nome passou a dizer o que é (D-253), e o exemplo foi  │
+                    │ para a dica do (i).                                     │
+                    └─────────────────────────────────────────────────────────┘ */}
                 <BarrasHorizontais dados={m.etapas} />
                 {/* 141: "era bom saber quanto o time inteiro se atrasou para
                     chegar na primeira WO" (Emanuel, 25/10). A mesma regra do

@@ -203,6 +203,11 @@ As três últimas, para não repetir o esquecimento:
 | 130 | **Geo-Rota** — `colegas_por_perto` (última posição, mesma cidade, em rota, 30 min, ciência v2), `mensagem_colega` + `enviar_ao_colega`/`marcar_colega_lida`, Realtime (D-207) | ✓ |
 | 131 | **O painel da equipe obedece ao filtro** — `painel_equipes(p_data, p_visitas uuid[] default null)`: com a lista, contratos, O.S., períodos, situação, pontos, TEC1 e tempos só desses contratos; nulo = o dia inteiro, igual a antes (md5 conferido) (D-211) | ✓ |
 | 132 | **Galeria e destinatário** — `evidencia.da_galeria`, `registrar_evidencia(+p_galeria)`; `mensagem.para_usuario_id`, `enviar_mensagem(+p_para)`, `destinatarios_do_campo`, `tecnicos_da_cidade` (D-213) | ✓ |
+| 133–166 | *Não indexadas aqui* — cada uma tem cabeçalho próprio no arquivo e a decisão em `docs/03-DECISOES.md` | ✓ |
+| 167 | **Sincronismo por computador, vez por bucket** — `bases_visiveis()` honra o cabeçalho `x-afline-cidade` (só cidade de `bases_permitidas()`); `sincronismo_bucket_vez`; `sincronismo_meus_buckets`, `sincronismo_pulso_buckets`, `sincronismo_soltar_buckets`; `sincronismo_pulso` (por cidade) passa a recusar as extensões 0.7 e anteriores (D-251) | ✓ |
+| 168 | **O 205 (Falta Tap) em INFRA CLARO**, como o 211 da instalação (D-254) | ✓ |
+| 170 | **Transferir não fixa a rota** — `transferir_visita` não toca mais em `rota_fixada_*`; devolve `rota_fixada` como estava (D-257, muda a D-131) | ✓ |
+| 169 | **O agrupamento da quebra pode ser outro na VT** — `codigo_baixa.agrupamento_quebra_vt`, `agrupamento_da_quebra()`, `impacto_quebra` com o grupo de serviço; 301: PROCESSO VENDA / na VT INFRA CLIENTE (D-255) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |
 
 > **A 075 e a 076 derrubam e recriam `rota_do_dia`, que é `SECURITY

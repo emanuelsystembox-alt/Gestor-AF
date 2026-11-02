@@ -25,6 +25,9 @@ export interface OS {
      *  CLARO classifica caso a caso; o código sozinho não responde. */
     responsavel_quebra: string | null
     agrupamento_quebra: string | null
+    /** 169: o agrupamento quando o grupo de serviço é VISITA TECNICA. Nulo =
+     *  o mesmo de sempre. Use `agrupamentoDaQuebra`, nunca a coluna solta. */
+    agrupamento_quebra_vt?: string | null
     quebra_pct: number | null
     /** 143: código improdutivo que termina em CONCLUIDA não é quebra —
      *  o serviço saiu (570, 582, 583). */
@@ -259,12 +262,12 @@ export function calcular(visitas: Visita[]) {
   // 152: `produtivas` já exclui cancelado pela central e desatribuído,
   // então o filtro que a D-223 fazia aqui virou redundante -- e deixá-lo
   // seria a mesma regra escrita duas vezes, para divergir um dia.
-  const ehQuebra = (o: OS) =>
+  const ehQuebra = (o: OS, v: Visita) =>
     o.codigo_baixa?.natureza === 'IMPRODUTIVA'
-    && o.codigo_baixa.agrupamento_quebra !== 'SEM_QUEBRA'
+    && agrupamentoDaQuebra(o, v) !== 'SEM_QUEBRA'
     && o.codigo_baixa.situacao_destino !== 'CONCLUIDA'
 
-  const osImprodutivas = produtivas.flatMap(v => v.ordem_servico.filter(ehQuebra))
+  const osImprodutivas = produtivas.flatMap(v => v.ordem_servico.filter(o => ehQuebra(o, v)))
 
   /*
    * ┌─ 155 · a quebra se conta por CONTRATO, não por O.S. ─────────────┐
@@ -290,7 +293,7 @@ export function calcular(visitas: Visita[]) {
    * └───────────────────────────────────────────────────────────────────┘
    */
   const quebrados = produtivas
-    .map(v => ({ v, oss: v.ordem_servico.filter(ehQuebra) }))
+    .map(v => ({ v, oss: v.ordem_servico.filter(o => ehQuebra(o, v)) }))
     .filter(x => x.oss.length > 0)
   const contratosQuebrados = quebrados.length
   /** O denominador do impacto, no MESMO grão: contrato com alguma baixa. */
@@ -405,10 +408,10 @@ export function calcular(visitas: Visita[]) {
   // 155: o volume é de CONTRATO, e os motivos dentro da barra também —
   // senão a barra diria 12 e os motivos dela somariam 19.
   const agrupados = new Map<string, { volume: number; motivos: Map<string, number> }>()
-  for (const { oss } of quebrados) {
+  for (const { v, oss } of quebrados) {
     const porAgr = new Map<string, Set<string>>()
     for (const o of oss) {
-      const k = o.codigo_baixa?.agrupamento_quebra ?? 'SEM_AGRUPAMENTO'
+      const k = agrupamentoDaQuebra(o, v) ?? 'SEM_AGRUPAMENTO'
       const set = porAgr.get(k) ?? new Set<string>()
       set.add(`${o.codigo_baixa!.codigo} · ${o.codigo_baixa!.descricao}`)
       porAgr.set(k, set)
@@ -599,7 +602,10 @@ export function calcular(visitas: Visita[]) {
 
   const mAtraso = media(atraso)
   const etapas: { rotulo: string; valor: number; cor: string; texto: string }[] = [
-    { rotulo: 'Atraso sobre a janela', valor: mAtraso, cor: '#f59e0b', texto: horasMin(mAtraso) },
+    // D-253: era "Atraso sobre a janela", e ninguém entendia sem a nota —
+    // que saiu a pedido (02/11). É `inicio - janela_inicio`: numa janela de
+    // 08 às 12, 1h15 = começou às 09:15, ainda dentro dela.
+    { rotulo: 'Início após abrir a janela', valor: mAtraso, cor: '#f59e0b', texto: horasMin(mAtraso) },
     { rotulo: 'Deslocamento', valor: media(desloc), cor: '#0ea5e9', texto: `${media(desloc)} min` },
     { rotulo: 'Execução', valor: media(exec), cor: '#16a34a', texto: `${media(exec)} min` },
   ]
@@ -721,6 +727,19 @@ export function csvPorTipo(m: Metricas, data: string): string {
     ['Total', m.produtivas, m.produtivas - m.concluidas, m.concluidas, m.osImprodutivas, '',
       m.taxaConclusao.toFixed(1).replace('.', ',') + '%'],
   ]
-  return `AFLINE Manager - Ordens por tipo - ${data}\n` +
+  return `PulsoLine AFLINE - Ordens por tipo - ${data}\n` +
     linhas.map(l => l.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n')
+}
+
+/**
+ * O agrupamento da quebra DESTA O.S. (169, D-255): o código pode ter outro
+ * grupo na VT — "se for instalação, 301 é Comercial; se for VT, 301 é Causa
+ * Cliente" (Emanuel, 02/11). VT = grupo de serviço VISITA TECNICA. A mesma
+ * regra de `agrupamento_da_quebra` no banco (o período anterior do painel).
+ */
+export function agrupamentoDaQuebra(o: OS, v: Visita): string | null {
+  const c = o.codigo_baixa
+  if (!c) return null
+  return v.tipo_servico?.nome === 'VISITA TECNICA' && c.agrupamento_quebra_vt
+    ? c.agrupamento_quebra_vt : c.agrupamento_quebra
 }

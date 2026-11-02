@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { useCidades } from '../lib/cidade'
@@ -7,43 +7,33 @@ import { Alerta } from '../components/ui'
 import { extensaoPresente, extensaoAutonoma, type InfoExtensao } from '../lib/ponteToa'
 
 /**
- * Sincronismo com o TOA (111, D-189).
+ * Sincronismo com o TOA (111, D-189; por computador desde a 167, D-251).
  *
- * ┌─ uma tela que CONFIGURA e ACOMPANHA ─────────────────────────────┐
- * │ > "seria bom ter um botão chamado sincronismo (...) conseguimos  │
- * │ >  escolher quanto e quanto tempo queremos que o sistema         │
- * │ >  importe" — Emanuel, 19/10                                     │
+ * ┌─ esta tela ACOMPANHA; quem configura é a extensão ───────────────┐
+ * │ > "quem tiver a extensão ele poderá editar o tempo de importação │
+ * │ >  (...) selecionar quais buckets tem disponível no login"       │
+ * │ >  — Emanuel, 01/11                                              │
  * │                                                                  │
- * │ Quem OPERA (gestão, controlador) liga, desliga, escolhe o        │
- * │ intervalo e os buckets.                                          │
+ * │ Até a 166 esta tela configurava UMA vez por cidade (ligado,      │
+ * │ intervalo, buckets) e um computador por cidade tinha a vez.      │
+ * │ Desde a 167 cada computador escolhe, no painel da extensão, os   │
+ * │ buckets do login dele e os tempos; a vez é por BUCKET            │
+ * │ (`sincronismo_bucket_vez`). Aqui se vê, por bucket da cidade,    │
+ * │ quem sincroniza, em que ritmo e se está vivo — e o ADMIN acerta  │
+ * │ o número do TOA de cada bucket.                                  │
  * │                                                                  │
- * │ Quem EXECUTA, desde a 0.3.0, é a extensão do Chrome, sozinha (o  │
- * │ fundo dela, com o login de quem entrou na janelinha): bate o     │
- * │ pulso, baixa, importa pelo MESMO núcleo da importação manual e   │
- * │ varre — com esta tela aberta ou não (D-193). Até a 0.2.0 era     │
- * │ esta tela que trabalhava, e parava quando a pessoa saía dela.    │
- * │ (113: "qual quer um que configurar sua maquina, vai conseguir    │
- * │ importar com seu login" — Emanuel.) Quem decide o               │
- * │ dia, o que está vencido e DE QUEM É A VEZ é o servidor           │
- * │ (`sincronismo_pulso`): um computador por vez, para não importar  │
- * │ em dobro; o segundo fica de reserva e assume se o primeiro parar.│
- * │                                                                  │
- * │ Zero e desconhecido (regra 6): pulso parado há mais de 3 min não │
+ * │ Zero e desconhecido (regra 6): sinal parado há mais de 3 min não │
  * │ é "sincronizando" — a tela diz "sem sinal há X min".             │
  * └──────────────────────────────────────────────────────────────────┘
  */
 
-interface Config {
-  base_id: string; ligado: boolean; intervalo_min: number
-  configurado_em: string | null; executor_visto_em: string | null
-  executor_info: string | null; toa_sessao: 'OK' | 'CAIU' | null; toa_sessao_em: string | null
-  configurador: { nome: string | null } | null
-  executor: { nome: string | null } | null
-  /** 117: varredura sozinha a cada 30/60 min; nulo = só no botão. */
-  varredura_intervalo_min: number | null
-}
 interface Bucket {
-  id: string; nome: string; ativo: boolean; numero_toa: number | null; sincronizar: boolean
+  id: string; nome: string; ativo: boolean; numero_toa: number | null
+}
+interface Vez {
+  bucket_id: string; visto_em: string; desde: string; info: string | null
+  rota_min: number | null; varredura_min: number | null; toa_sessao: 'OK' | 'CAIU' | null
+  executor: { nome: string | null } | null
 }
 interface Rodada {
   id: string; bucket: string; dia: string; iniciada_em: string; terminada_em: string
@@ -52,8 +42,6 @@ interface Rodada {
   importacao: { qtd_criadas: number | null; qtd_atualizadas: number | null; qtd_erro: number | null } | null
 }
 
-/** 5 e 10 entraram na 114 (Emanuel, 19/10): o igual não reimporta, e a conferência custa < 1 s. */
-const INTERVALOS = [5, 10, 15, 30, 60] as const
 /** O pulso é de 60 s; três pulsos perdidos é silêncio de verdade, não atraso. */
 const SEM_SINAL_MS = 3 * 60_000
 
@@ -79,43 +67,41 @@ function ha(ts: string | null, agora: number): string {
   const h = Math.floor(m / 60)
   return `há ${h} h ${m % 60 ? `${m % 60} min` : ''}`.trim()
 }
+const ritmo = (min: number | null) => min == null ? null : min === 60 ? '1 hora' : `${min} min`
 
 export default function Sincronismo() {
   const { ehGestor, temPapel } = useAuth()
   const { ativa } = useCidades()
   const souRobo = temPapel('ROBO')
-  const podeConfigurar = ehGestor || temPapel('CONTROLADOR')
+  const podeVer = ehGestor || temPapel('CONTROLADOR')
   const souAdmin = temPapel('ADMIN')
 
-  const [cfg, setCfg] = useState<Config | null>(null)
   const [buckets, setBuckets] = useState<Bucket[] | null>(null)
+  const [vezes, setVezes] = useState<Vez[]>([])
   const [rodadas, setRodadas] = useState<Rodada[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [agora, setAgora] = useState(Date.now())
 
   const carregar = useCallback(async () => {
     // O RLS já devolve só a cidade ativa — sem filtro de tela.
-    const [c, b, r] = await Promise.all([
-      supabase.from('sincronismo')
-        .select(`base_id, ligado, intervalo_min, configurado_em, executor_visto_em,
-                 executor_info, toa_sessao, toa_sessao_em, configurador:configurado_por ( nome ),
-                 executor:executor_id ( nome ), varredura_intervalo_min`)
-        .maybeSingle(),
-      supabase.from('toa_bucket').select('id, nome, ativo, numero_toa, sincronizar').order('nome'),
+    const [b, v, r] = await Promise.all([
+      supabase.from('toa_bucket').select('id, nome, ativo, numero_toa').order('nome'),
+      supabase.from('sincronismo_bucket_vez')
+        .select('bucket_id, visto_em, desde, info, rota_min, varredura_min, toa_sessao, executor:executor_id ( nome )'),
       supabase.from('sincronismo_rodada')
         .select(`id, bucket, dia, iniciada_em, terminada_em, resultado, mensagem, linhas,
                  importacao:importacao_id ( qtd_criadas, qtd_atualizadas, qtd_erro )`)
         .order('terminada_em', { ascending: false }).limit(40),
     ])
-    const falha = c.error ?? b.error ?? r.error
+    const falha = b.error ?? v.error ?? r.error
     setErro(falha ? falha.message : null)
-    setCfg((c.data ?? null) as unknown as Config | null)
     setBuckets((b.data ?? []) as Bucket[])
+    setVezes((v.data ?? []) as unknown as Vez[])
     setRodadas((r.data ?? []) as unknown as Rodada[])
   }, [])
 
   // A tela de quem opera relê a cada 30 s: sem Realtime, que é conexão do
-  // teto do plano Free (D-119), e meio minuto basta para "está vivo?".
+  // teto do plano (D-119), e meio minuto basta para "está vivo?".
   useEffect(() => {
     carregar()
     const t = setInterval(() => { carregar(); setAgora(Date.now()) }, 30_000)
@@ -129,24 +115,20 @@ export default function Sincronismo() {
         <div>
           <h1 className="text-xl font-semibold">Sincronismo com o TOA</h1>
           <p className="mt-1 text-sm text-graf-400">
-            Um computador com a extensão "AFLINE — ponte com o TOA" e o TOA aberto baixa a planilha
-            de Atividades de cada bucket marcado e importa sozinho, com o login de quem está nele, em{' '}
-            <strong className="text-graf-200">{ativa?.nome ?? 'nenhuma cidade escolhida'}</strong>,
-            no dia de hoje — pelo mesmo caminho da importação manual. Planilha igual à última não
-            é importada de novo (a não ser que faça mais de 1 hora).
+            Computadores com a extensão "AFLINE — ponte com o TOA" baixam a planilha de Atividades e
+            importam sozinhos, pelo mesmo caminho da importação manual. <strong className="text-graf-200">Cada
+            computador escolhe no painel da extensão</strong> os buckets do login dele e de quanto em quanto
+            tempo importa a rota e varre o TOA; um bucket é sincronizado por um computador por vez. Abaixo,
+            os buckets de <strong className="text-graf-200">{ativa?.nome ?? 'nenhuma cidade escolhida'}</strong>.
           </p>
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
 
-        <Estado cfg={cfg} rodadas={rodadas} agora={agora} />
+        {(podeVer || souRobo) && <PainelExtensao />}
 
-        {(podeConfigurar || souRobo) && <PainelExtensao />}
-
-        {podeConfigurar && ativa && buckets && (
-          <Configuracao baseId={ativa.id} cfg={cfg} buckets={buckets}
-            souAdmin={souAdmin} aoSalvar={carregar} />
-        )}
+        {buckets && <Buckets buckets={buckets} vezes={vezes} rodadas={rodadas} agora={agora}
+                             souAdmin={souAdmin} aoMudarNumero={carregar} />}
 
         <Historico rodadas={rodadas} />
       </div>
@@ -154,176 +136,41 @@ export default function Sincronismo() {
   )
 }
 
-/* ─────────────────────────── o estado, para todos ─────────────────────────── */
+/* ─────────────────────── os buckets da cidade, e quem sincroniza ─────────────────────── */
 
-function Estado({ cfg, rodadas, agora }: { cfg: Config | null; rodadas: Rodada[]; agora: number }) {
-  const visto = cfg?.executor_visto_em ? new Date(cfg.executor_visto_em).getTime() : null
-  const semSinal = visto == null || agora - visto > SEM_SINAL_MS
-  const ultima = rodadas[0] ?? null
-  const quem = cfg?.executor?.nome ?? 'alguém'
-
-  let tom: 'ok' | 'aviso' | 'erro' | 'info'
-  let titulo: string
-  let detalhe: string
-  if (!cfg || !cfg.ligado) {
-    tom = 'info'; titulo = 'Desligado'
-    detalhe = 'Nada é importado sozinho. A importação manual continua funcionando como sempre.'
-  } else if (visto == null) {
-    tom = 'aviso'; titulo = 'Ligado, mas nenhum computador está sincronizando'
-    detalhe = 'Num computador com a extensão instalada e o TOA aberto, abra esta tela e clique em "Sincronizar por este computador".'
-  } else if (semSinal) {
-    tom = 'erro'; titulo = `Sem sinal ${ha(cfg.executor_visto_em, agora)}`
-    detalhe = `O computador de ${quem} desligou, suspendeu, perdeu a internet ou fechou esta tela. `
-      + 'Nada está sendo importado até outro computador assumir.'
-  } else if (cfg.toa_sessao === 'CAIU') {
-    tom = 'erro'; titulo = `A sessão do TOA caiu (${hora(cfg.toa_sessao_em)})`
-    detalhe = `O computador de ${quem} está ligado, mas o TOA pediu login de novo. Entre no TOA nesse computador.`
-  } else {
-    tom = 'ok'; titulo = `Sincronizando a cada ${cfg.intervalo_min} min, pelo computador de ${quem}`
-    const imp = rodadas.find(r => r.resultado === 'IMPORTADA')
-    detalhe = `Último pulso ${ha(cfg.executor_visto_em, agora)}.`
-      + (imp ? ` Última importação às ${hora(imp.terminada_em)}`
-               + (imp.importacao ? ` (${imp.importacao.qtd_atualizadas ?? 0} atualizados, ${imp.importacao.qtd_criadas ?? 0} novos)` : '')
-               + '.' : '')
-      + (ultima ? ` Última rodada às ${hora(ultima.terminada_em)} (${ultima.bucket}: ${ROTULO[ultima.resultado].texto.toLowerCase()}).` : '')
-  }
-
-  return (
-    <Alerta tipo={tom}>
-      <p className="font-medium">{titulo}</p>
-      <p className="mt-0.5">{detalhe}</p>
-      {cfg?.configurado_em && (
-        <p className="mt-1 text-xs opacity-80">
-          Configurado por {cfg.configurador?.nome ?? 'alguém'} em {quando(cfg.configurado_em)}
-          {cfg.executor_info && !semSinal ? ` · ${cfg.executor_info}` : ''}
-        </p>
-      )}
-    </Alerta>
-  )
-}
-
-/* ─────────────────────── a configuração, para quem opera ───────────────────── */
-
-function Configuracao({ baseId, cfg, buckets, souAdmin, aoSalvar }: {
-  baseId: string; cfg: Config | null; buckets: Bucket[]; souAdmin: boolean; aoSalvar: () => void
+function Buckets({ buckets, vezes, rodadas, agora, souAdmin, aoMudarNumero }: {
+  buckets: Bucket[]; vezes: Vez[]; rodadas: Rodada[]; agora: number; souAdmin: boolean; aoMudarNumero: () => void
 }) {
-  const [ligado, setLigado] = useState(cfg?.ligado ?? false)
-  const [intervalo, setIntervalo] = useState<number>(cfg?.intervalo_min ?? 30)
-  const [marcados, setMarcados] = useState<string[]>(buckets.filter(b => b.sincronizar).map(b => b.id))
-  const [salvando, setSalvando] = useState(false)
-  const [varrendoCfg, setVarrendoCfg] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
-
-  // Quando outra pessoa salva, a tela relê — e o formulário acompanha, a
-  // menos que ESTA pessoa esteja no meio de uma edição.
-  const editando = useRef(false)
-  useEffect(() => {
-    if (editando.current) return
-    setLigado(cfg?.ligado ?? false)
-    setIntervalo(cfg?.intervalo_min ?? 30)
-    setMarcados(buckets.filter(b => b.sincronizar).map(b => b.id))
-  }, [cfg, buckets])
-
-  const mexer = <T,>(f: (v: T) => void) => (v: T) => { editando.current = true; setOk(null); f(v) }
-
-  async function salvar() {
-    setSalvando(true); setErro(null); setOk(null)
-    const { error } = await supabase.rpc('configurar_sincronismo', {
-      p_base: baseId, p_ligado: ligado, p_intervalo: intervalo, p_buckets: marcados,
-    })
-    setSalvando(false)
-    if (error) { setErro(error.message); return }
-    editando.current = false
-    setOk(ligado ? `Ligado: a cada ${intervalo} min.` : 'Desligado.')
-    aoSalvar()
-  }
-
   return (
     <section className="card-controle p-4">
-      <h2 className="text-sm font-semibold">Configuração</h2>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" checked={ligado}
-            onChange={e => mexer(setLigado)(e.target.checked)}
-            className="h-4 w-4 accent-[var(--color-af-600)]" />
-          Sincronismo ligado
-        </label>
-
-        <fieldset className="flex items-center gap-1.5">
-          <legend className="sr-only">Intervalo</legend>
-          <span className="mr-1 text-xs text-graf-400">Importar a cada</span>
-          {INTERVALOS.map(m => (
-            <button key={m} type="button" aria-pressed={intervalo === m}
-              onClick={() => mexer(setIntervalo)(m)}
-              className={`rounded-md border px-2.5 py-1.5 text-xs ${
-                intervalo === m ? 'border-af-600 bg-af-600/15 text-af-200'
-                                : 'border-graf-700 text-graf-300 hover:bg-graf-800'}`}>
-              {m === 60 ? '1 hora' : `${m} min`}
-            </button>
-          ))}
-        </fieldset>
-
-        {/* 117: a varredura do TOA tem o seu próprio ritmo — ela é lenta (uns
-            10 s por contrato) e não precisa acompanhar a baixa. Grava na hora. */}
-        <label className="flex items-center gap-1.5 text-xs text-graf-400">
-          Varredura do TOA
-          <select value={cfg?.varredura_intervalo_min ?? ''} disabled={varrendoCfg}
-            onChange={async e => {
-              setVarrendoCfg(true); setErro(null)
-              const v = e.target.value ? Number(e.target.value) : null
-              const { error } = await supabase.rpc('configurar_varredura', { p_base: baseId, p_intervalo: v })
-              setVarrendoCfg(false)
-              if (error) setErro(error.message); else aoSalvar()
-            }}
-            className="rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs text-graf-100 outline-none focus:border-af-500">
-            <option value="">só no botão</option>
-            <option value="30">a cada 30 min</option>
-            <option value="60">a cada 1 hora</option>
-          </select>
-        </label>
-      </div>
-
-      <p className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wide text-graf-400">
-        Buckets que o sincronismo baixa
+      <h2 className="text-sm font-semibold">Quem sincroniza cada bucket</h2>
+      <p className="mt-0.5 text-xs text-graf-400">
+        A vez é de um computador por bucket. Se ele parar por 3 minutos, outro computador que tenha o bucket
+        marcado assume sozinho.
       </p>
       {buckets.length === 0 ? (
-        <p className="text-sm text-graf-400">
+        <p className="mt-3 text-sm text-graf-400">
           Nenhum bucket cadastrado nesta cidade. O ADMIN cadastra em Configurações › Buckets do TOA.
         </p>
       ) : (
-        <ul className="divide-y divide-graf-800 rounded-lg border border-graf-800">
+        <ul className="mt-3 divide-y divide-graf-800 rounded-lg border border-graf-800">
           {buckets.map(b => (
-            <LinhaBucket key={b.id} b={b} souAdmin={souAdmin}
-              marcado={marcados.includes(b.id)}
-              alternar={() => mexer(setMarcados)(
-                marcados.includes(b.id) ? marcados.filter(x => x !== b.id) : [...marcados, b.id])}
-              aoMudarNumero={aoSalvar} />
+            <LinhaBucket key={b.id} b={b} vez={vezes.find(v => v.bucket_id === b.id) ?? null}
+              ultima={rodadas.find(r => r.bucket === b.nome) ?? null}
+              agora={agora} souAdmin={souAdmin} aoMudarNumero={aoMudarNumero} />
           ))}
         </ul>
       )}
-
-      {erro && <div className="mt-3"><Alerta tipo="erro">{erro}</Alerta></div>}
-      {ok && <div className="mt-3"><Alerta tipo="ok">{ok}</Alerta></div>}
-
-      <button onClick={salvar} disabled={salvando}
-        className="mt-4 rounded-lg bg-af-600 px-5 py-2 text-sm font-semibold text-white
-                   hover:bg-af-500 disabled:opacity-50">
-        {salvando ? 'Salvando…' : 'Salvar'}
-      </button>
     </section>
   )
 }
 
-function LinhaBucket({ b, marcado, alternar, souAdmin, aoMudarNumero }: {
-  b: Bucket; marcado: boolean; alternar: () => void; souAdmin: boolean; aoMudarNumero: () => void
+function LinhaBucket({ b, vez, ultima, agora, souAdmin, aoMudarNumero }: {
+  b: Bucket; vez: Vez | null; ultima: Rodada | null; agora: number; souAdmin: boolean; aoMudarNumero: () => void
 }) {
   const [numero, setNumero] = useState(b.numero_toa?.toString() ?? '')
   const [erro, setErro] = useState<string | null>(null)
   useEffect(() => { setNumero(b.numero_toa?.toString() ?? '') }, [b.numero_toa])
-  // Sem número não há o que pedir ao TOA; desligado, a importação recusaria.
-  const disponivel = b.ativo && b.numero_toa != null
 
   async function salvarNumero() {
     setErro(null)
@@ -334,20 +181,33 @@ function LinhaBucket({ b, marcado, alternar, souAdmin, aoMudarNumero }: {
     aoMudarNumero()
   }
 
+  const vivo = vez && agora - new Date(vez.visto_em).getTime() <= SEM_SINAL_MS
+  let tom: string, texto: string
+  if (!b.ativo) { tom = 'text-graf-400'; texto = 'bucket desligado' }
+  else if (b.numero_toa == null) { tom = 'text-amber-300'; texto = 'sem o número do TOA — não dá para baixar' }
+  else if (!vez) { tom = 'text-graf-400'; texto = 'nenhum computador sincroniza' }
+  else if (!vivo) { tom = 'text-af-300'; texto = `sem sinal ${ha(vez.visto_em, agora)} (${vez.executor?.nome ?? 'alguém'})` }
+  else if (vez.toa_sessao === 'CAIU') { tom = 'text-af-300'; texto = `${vez.executor?.nome ?? 'alguém'}: a sessão do TOA caiu nesse computador` }
+  else {
+    tom = 'text-emerald-300'
+    texto = `${vez.executor?.nome ?? 'alguém'} · rota a cada ${ritmo(vez.rota_min) ?? '?'}`
+      + ` · varredura ${vez.varredura_min ? `a cada ${ritmo(vez.varredura_min)}` : 'só no botão'}`
+  }
+
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm">
-      <label className={`flex min-w-56 items-center gap-2 ${disponivel ? 'cursor-pointer' : 'opacity-60'}`}>
-        <input type="checkbox" checked={marcado && disponivel} disabled={!disponivel}
-          onChange={alternar} className="h-4 w-4 accent-[var(--color-af-600)]" />
-        <span className="font-mono text-xs">{b.nome}</span>
-      </label>
-      <span className="text-xs text-graf-400">
-        {!b.ativo ? 'bucket desligado'
-          : b.numero_toa != null ? <>nº no TOA <span className="tabular text-graf-300">{b.numero_toa}</span></>
-          : <span className="text-amber-300">sem o número do TOA — não dá para baixar</span>}
+      <span className="w-44 font-mono text-xs">{b.nome}</span>
+      <span className="min-w-0 flex-1">
+        <span className={`text-xs ${tom}`}>{texto}</span>
+        {vivo && (
+          <span className="block text-[11px] text-graf-400">
+            sinal {ha(vez!.visto_em, agora)}{vez!.info ? ` · ${vez!.info}` : ''}
+            {ultima ? ` · última rodada ${hora(ultima.terminada_em)} (${ROTULO[ultima.resultado].texto.toLowerCase()})` : ''}
+          </span>
+        )}
       </span>
-      {souAdmin && (
-        <span className="ml-auto flex items-center gap-1.5">
+      {souAdmin ? (
+        <span className="flex items-center gap-1.5">
           <input value={numero} onChange={e => setNumero(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric" placeholder="nº no TOA" aria-label={`Número de ${b.nome} no TOA`}
             className="tabular w-24 rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs
@@ -358,6 +218,8 @@ function LinhaBucket({ b, marcado, alternar, souAdmin, aoMudarNumero }: {
             gravar
           </button>
         </span>
+      ) : b.numero_toa != null && (
+        <span className="text-xs text-graf-400">nº no TOA <span className="tabular text-graf-300">{b.numero_toa}</span></span>
       )}
       {erro && <p className="w-full text-xs text-af-300">{erro}</p>}
     </li>
@@ -385,8 +247,10 @@ function PainelExtensao() {
       <p className="mt-1 text-sm text-graf-300">
         A extensão "AFLINE — ponte com o TOA" faz tudo sozinha: baixa a planilha, importa e varre nome,
         equipamento e miscelânea — <strong>com esta tela aberta ou não</strong>. Basta o Chrome aberto,
-        logado no TOA. Clique no <strong>ícone da extensão</strong> para entrar com o seu login do Gestor AF,
-        ligar "Sincronizar por este computador", ver a % e os resultados.
+        logado no TOA. Clique no <strong>ícone da extensão</strong> para entrar com o seu login, ligar
+        "Sincronizar por este computador", marcar os buckets do seu login e escolher os tempos da rota
+        (5, 15, 30 ou 60 min) e da varredura. O ADMIN enxerga os buckets de todas as cidades; os demais, os
+        das cidades que acessam.
       </p>
       <div className="mt-3">
         {ext === undefined ? (
@@ -395,8 +259,9 @@ function PainelExtensao() {
           <Alerta tipo="ok">Este Chrome tem a extensão {ext!.versao}. Use o ícone dela.</Alerta>
         ) : ext ? (
           <Alerta tipo="aviso">
-            Este Chrome tem a extensão {ext.versao}, que ainda dependia desta tela. Atualize: em
-            chrome://extensions clique em recarregar na extensão e recarregue as abas do TOA e do Gestor AF.
+            Este Chrome tem a extensão {ext.versao}, que não sincroniza mais (desde a 0.8.0 a configuração é
+            por computador). Atualize: em chrome://extensions clique em recarregar na extensão e recarregue as
+            abas do TOA e do PulsoLine.
           </Alerta>
         ) : (
           <Alerta tipo="info">

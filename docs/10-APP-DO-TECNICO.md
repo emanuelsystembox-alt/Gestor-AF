@@ -383,9 +383,19 @@ A câmera de um celular atual entrega 4 a 8 MB por foto — no 4G de rua,
 meio minuto por evidência, e o técnico desiste. Reduzida dá ~250 KB e
 ainda se lê o número de série na imagem.
 
-**O vídeo tem teto de 60 s**, checado na gravação e não só no bucket: um
-minuto já são ~15 MB e meio minuto de upload. Descobrir o limite **depois**
-de gravar é o pior dos mundos, porque o técnico acha que mandou.
+**O vídeo tem teto de 60 s**, checado na gravação e não só no bucket.
+Descobrir o limite **depois** de gravar é o pior dos mundos, porque o
+técnico acha que mandou.
+
+**O vídeo sai da câmera em 720p a ~1,5 Mbps** (D-256, 02/11): 60 s dão
+~11 MB. Antes a câmera gravava no máximo do aparelho — medido, 15 MB por
+vídeo, e mais de ~25 s estourava os 50 MB do bucket. `videoQuality` e
+`videoBitrate` valem no Android; no iPhone o bitrate pede codec.
+
+**Vídeo só pela câmera do app; da galeria, só foto** (D-256, muda a
+D-213). O vídeo da galeria subia no tamanho original e sem hora/GPS
+confiáveis. A foto da galeria sobe marcada `da_galeria`, com hora e GPS
+do arquivo (EXIF) ou nulos.
 
 **O upload é base64 → ArrayBuffer**, não `fetch(uri).blob()`. O Blob do
 React Native não carrega os bytes, carrega uma referência — e o

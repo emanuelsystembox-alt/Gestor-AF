@@ -4,7 +4,7 @@ import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Esqueleto, Pill } from '../components/ui'
-import { EquipamentoToa } from '../components/EquipamentoToa'
+import { EquipamentoToa, contagemToa, useEquipamentoToa } from '../components/EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
 import { carregarProvas, type Prova } from '../lib/prova'
@@ -115,7 +115,7 @@ const SELECT = `
  * equipamento e miscelânea e criar um menu pra ele, pra ganharmos mais
  * informações do contrato" (Emanuel, 25/10).
  */
-type Aba = 'detalhe' | 'responder' | 'historico' | 'anexos' | 'equipamento' | 'anteriores'
+type Aba = 'detalhe' | 'responder' | 'historico' | 'anexos' | 'equipamento' | 'miscelanea' | 'anteriores'
 
 const dt = (s: string | null) => s
   ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -183,6 +183,8 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
   const [v, setV] = useState<Det | null>(null)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [anexos, setAnexos] = useState<Evidencia[]>([])
+  // D-252: o que o TOA mostra, lido uma vez para as abas Equipamento e Miscelânea
+  const itensToa = useEquipamentoToa(v?.id, v?.toa_varrido_em)
   /**
    * ┌─ POR QUE PRECISA DE URL ASSINADA ──────────────────────────────┐
    * │ O bucket `evidencia` é PRIVADO (055-C). Um `<img src>` apontando │
@@ -383,7 +385,9 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
     ['responder', 'Responder'],
     ['historico', 'Histórico', eventos.length],
     ['anexos', 'Anexos', anexos.length],
-    ['equipamento', 'Equipamento'],
+    // D-252: separadas, cada uma com o que foi lançado (sem leitura do TOA, sem número)
+    ['equipamento', 'Equipamento', contagemToa(itensToa, v?.toa_varrido_em, 'EQUIPAMENTO')],
+    ['miscelanea', 'Miscelânea', contagemToa(itensToa, v?.toa_varrido_em, 'MISCELANEA')],
     ['anteriores', 'Serviços anteriores', anteriores.length],
   ]
 
@@ -896,7 +900,12 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                           {e.observacao ?? <span className="text-graf-600">—</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-graf-400">
-                          {e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
+                          {/* D-252: o que veio da importação é afirmação da OPERADORA (o TOA),
+                              não de quem importou — "importação com meu login tem que colocar
+                              como operadora" (Emanuel, 02/11). Quem importou fica na dica. */}
+                          {e.origem === 'IMPORTACAO'
+                            ? <span title={e.usuario?.nome ? `Importado por ${e.usuario.nome}` : undefined}>Operadora</span>
+                            : e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
                           {e.origem && <div className="text-[10px] text-graf-600">{e.origem.toLowerCase()}</div>}
                         </td>
                         {/* O login do TOA quando o evento veio da planilha; o
@@ -940,7 +949,10 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
             longa e não é o contrato — era ela que empurrava as O.S. para
             fora da primeira tela do Detalhe. */}
         {aba === 'equipamento' && (
-          <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
+          <EquipamentoToa itens={itensToa} varridoEm={v.toa_varrido_em} tipo="EQUIPAMENTO" />
+        )}
+        {aba === 'miscelanea' && (
+          <EquipamentoToa itens={itensToa} varridoEm={v.toa_varrido_em} tipo="MISCELANEA" />
         )}
 
         {/* ---------- a evidência em tela cheia ---------- */}

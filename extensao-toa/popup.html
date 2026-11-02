@@ -46,6 +46,15 @@
     .escolha label { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; cursor: pointer; }
     .escolha .conta { margin-left: auto; color: var(--suave); font-variant-numeric: tabular-nums; }
     .escolha .titulo { font-size: 11px; color: var(--suave); margin: 2px 0; }
+    /* 0.8.0: a lista de buckets, por cidade, e os tempos */
+    .cidade { font-size: 11px; font-weight: 600; color: var(--suave); margin: 8px 0 2px; }
+    .cidade:first-child { margin-top: 0; }
+    .escolha .vez { font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--cinza); color: var(--suave); white-space: nowrap; }
+    .escolha .vez.minha { background: #ecfdf5; color: var(--ok); }
+    .escolha .vez.outro { background: #fffbeb; color: var(--aviso); }
+    #rota-min button[aria-pressed=true] { border-color: var(--af); background: #fdecee; color: var(--af-escuro); font-weight: 600; }
+    select { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); }
+    a { color: var(--af); }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -67,25 +76,46 @@
       <label class="linha"><input id="ligado" type="checkbox"> <strong>Sincronizar por este computador</strong></label>
       <div id="situacao" class="situacao"></div>
 
-      <h2>Baixa (planilha do TOA)</h2>
+      <!-- 0.8.0 (D-251): os buckets e os tempos são DESTE computador -->
+      <h2>Buckets do seu login</h2>
+      <p class="pequeno">Os que a árvore do TOA deste Chrome mostra e que são de cidades que você acessa no PulsoLine. Um bucket é sincronizado por um computador por vez.</p>
+      <div class="escolha">
+        <div id="buckets"><p class="pequeno">Abra o TOA numa aba deste Chrome e clique em "Atualizar a lista".</p></div>
+        <p id="fora" class="pequeno"></p>
+        <div class="linha" style="margin-top:6px">
+          <button id="atualizar">Atualizar a lista</button>
+          <button id="assumir" hidden>Assumir os marcados</button>
+        </div>
+      </div>
+
+      <h2>Importar a rota (planilha do TOA)</h2>
+      <div class="linha" id="rota-min" role="group" aria-label="Importar a rota a cada">
+        <span class="pequeno">a cada</span>
+        <button data-min="5">5 min</button><button data-min="15">15 min</button>
+        <button data-min="30">30 min</button><button data-min="60">1 hora</button>
+      </div>
       <p id="baixa-atual" class="pequeno"></p>
       <p id="baixa-ultima" class="pequeno"></p>
       <div class="linha">
         <button id="sincronizar" class="forte">Sincronizar agora</button>
-        <button id="assumir" hidden>Assumir a vez</button>
       </div>
 
       <h2>Varredura (nome, equipamento, miscelânea)</h2>
-      <p class="pequeno">A varredura usa uma <strong>janela só dela</strong> com o TOA no Console de Alocação, no dia de hoje — ela troca de bucket sozinha, então deixe a <strong>lista de buckets</strong> (à esquerda) à vista. Você navega à vontade na outra janela; a dela pode ficar coberta, mas <strong>não minimizada</strong>.</p>
-      <div class="linha" style="margin-bottom:6px"><button id="janela-toa">Abrir a janela da varredura</button></div>
-      <div class="escolha" id="var-escolha">
-        <p class="titulo">Buckets (começa pelo que estiver aberto no Console)</p>
-        <div id="var-buckets"><p class="pequeno">Contando o que falta…</p></div>
-        <p class="titulo" style="margin-top:6px">Ler</p>
+      <div class="linha">
+        <label class="pequeno" for="var-min">Varrer sozinho</label>
+        <select id="var-min">
+          <option value="">só no botão</option>
+          <option value="5">a cada 5 min</option><option value="15">a cada 15 min</option>
+          <option value="30">a cada 30 min</option><option value="60">a cada 1 hora</option>
+        </select>
+      </div>
+      <div class="escolha">
+        <p class="titulo">Ler</p>
         <label><input type="radio" name="oque" value="TUDO"> Nome e equipamento</label>
         <label><input type="radio" name="oque" value="NOME"> Só o nome do cliente</label>
         <label><input type="radio" name="oque" value="EQUIPAMENTO"> Só equipamento e material (encerrados)</label>
       </div>
+      <p class="pequeno">Pede os dados direto ao TOA, nos buckets marcados acima: basta o TOA logado numa aba deste Chrome, em qualquer tela. O que não vier direto é lido pelas telas, que precisam do Console de Alocação à vista (<a href="#" id="janela-toa">abrir a janela da varredura</a>).</p>
       <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
       <p id="var-texto" class="pequeno"></p>
       <div class="linha">

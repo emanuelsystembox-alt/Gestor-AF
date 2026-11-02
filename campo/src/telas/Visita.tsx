@@ -1031,9 +1031,10 @@ export default function Visita({ route, navigation }: Props) {
             />
           </View>
         )}
-        {/* 132: da galeria do celular — sobe marcada, com hora e GPS do arquivo. */}
+        {/* 132: da galeria do celular — sobe marcada, com hora e GPS do arquivo.
+            D-256: só foto; vídeo só pela câmera do app. */}
         {podeAnexar && (
-          <Botao titulo={enviandoGaleria ? 'Enviando da galeria…' : 'Enviar da galeria'}
+          <Botao titulo={enviandoGaleria ? 'Enviando da galeria…' : 'Foto da galeria'}
             tom="contorno" carregando={enviandoGaleria}
             aoTocar={() => setEscolhendoTipo('GALERIA')} />
         )}

@@ -86,15 +86,16 @@ app/                  web do controle (17 telas, com Almoxarifado, Frota, Monito
   src/pages/          Controle · Servicos · Equipes · Rota · Produtividade
                       Relatorios · Importacao · Administracao · Visita…
   scripts/            criar-usuarios-teste.mjs (exige service_role)
-extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193)
+extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193); 0.8.0:
+                      pede os dados direto ao TOA (D-250), buckets e tempos por computador (D-251)
                       fundo.js/popup.js são GERADOS de app/extensao/ (npm run extensao)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/lib/            gps · rastro · antifraude · midia · galeria · cache · avisos · colegas · dominio · formato · auth
   src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir · Mural
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
-docs/                 mapeamento, domínio, 248 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (até a 165)
+docs/                 mapeamento, domínio, 257 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (até a 170)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -130,7 +131,7 @@ tarefa pedir.
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 248 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 257 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |

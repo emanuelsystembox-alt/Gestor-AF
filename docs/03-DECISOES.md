@@ -10982,3 +10982,361 @@ antes dos 500 MB.**
   linhas falsas em produção estouraria o plano Free;
 - a API (PostgREST) e o Realtime sob 100 conexões: o teste mediu o banco; o teto de
   conexões simultâneas do Realtime no Free não foi exercitado.
+
+### D-249 · A marca vira PULSOLINE — Sistema de gestão AFLINE; e o rastro sem o "Estou ciente" (166)
+
+> "A marca Nexus Manager vai ter que mudar para PulsoLine, Sistema de gestão AFLINE.
+> Temos que mudar a entrada e o front-end do nosso site para essa nova marca. É claro,
+> não vamos tirar a logomarca oficial da AFLINE (...) No aplicativo, devemos fazer a
+> mesma coisa (...) Adicione animações se for o caso (...) É bom o site indicar que
+> ainda tem algumas mensagens mais abaixo se ele rolar (...) É bom dar outra versão
+> para APK" — Emanuel, 31/10 (o áudio dizia "offline"; a arte enviada diz AFLINE).
+
+**No site** (`pages/Login.tsx`):
+- O Nexus saiu inteiro, com o azul dele: a PulsoLine é **vermelho e prata**, como a
+  arte. Os brilhos do fundo, a rede de pontos e a barra da abertura perderam o azul.
+- **O símbolo** é o P com o **batimento** dentro, redesenhado em SVG a partir da arte
+  (nítido em qualquer tamanho e animável — a imagem não é): a haste nasce vermelha e
+  desce prata, a barriga é vermelha, e o traço do batimento se desenha e some no
+  ritmo de um coração (`pulsoTraco`, styles.css). No fundo claro o prata vira grafite
+  (prata sobre #f6f7fb dá 1,2:1 e some).
+- **O letreiro**: "Pulso" grafite e "Line" vermelho, Exo 2 inclinada e pesada — a letra
+  da arte; texto de verdade, o h1 da página. Embaixo, "— SISTEMA DE GESTÃO AFLINE —".
+- **O selo da AFLINE fica**, em cima, com "16 anos conectando vidas. / Conectados com o
+  futuro."; o formulário diz PULSOLINE; a abertura termina na PulsoLine (prata no escuro).
+- **"Role para ver mais"**: um botão no pé da tela, com a seta que pulsa — a seção dos
+  indicadores ficava escondida abaixo da dobra. Some no primeiro gesto de rolar; o
+  clique desce até a seção (rolagem suave; se em 0,7 s nada se mexeu — aba sem
+  quadro —, salta direto). Só aparece quando há o que rolar.
+- Dentro do sistema: o topo da barra lateral diz **PulsoLine / Gestão AFLINE** ao lado
+  do AF; o título da aba é "PulsoLine · AFLINE"; o Mural virou **Mural PulsoLine**.
+- Para conferir o desenho sem deslogar ninguém: `/entrar?previa` mostra a entrada com
+  a sessão aberta — **só no desenvolvimento** (`import.meta.env.DEV`); conferido que o
+  trecho não está no site publicado.
+
+**No app** (`campo/src/telas/Entrar.tsx`): o logo é a **arte original**
+(`assets/logo-pulsoline.png`), não um redesenho — no app não há SVG, e a arte já traz
+tudo. O fundo dela é preto puro (0,0,0); a tela virou preta pura para a imagem sumir
+sem retângulo, e os brilhos ficam nos cantos, longe dela. O movimento é um batimento:
+o logo bate duas vezes e descansa (mais rápido enquanto confere o login) e um pulso
+vermelho corre embaixo, como num monitor. A AFLINE assina em cima, como no site. O
+nome embaixo do ícone virou **"PulsoLine"**, e os textos que diziam Nexus (notificação
+da rota, senha do romaneio, aviso de GPS, Mural) também.
+
+> "retire a mensagem de a cada 2 minutos o GPS vai colher sua localização, a cada 5
+> minutos (...) não precisa dizer quando o usuário logar, olha, você vai estar enviando
+> sinal (...) Mas a mensagem da pesquisa de clima (...) a gente vai manter" — Emanuel,
+> 31/10.
+
+**O rastro sem o "Estou ciente" — MUDA A D-170.** A ciência não era só texto: era a
+trava que ligava o rastro (o app só gravava depois dela), o que liberava a pergunta do
+humor e o que fazia o técnico aparecer na Geo-Rota. Perguntado, o Emanuel decidiu:
+- **o rastro liga sem a ciência, para todos**; o aviso ao funcionário passa a ser da
+  AFLINE (contrato ou termo assinado) — o sistema não o dá mais;
+- a tela "Estou ciente" (`AvisoRastro`) saiu do app; a linha "rota sendo registrada"
+  da Agenda também;
+- a **pesquisa de humor continua obrigatória** e não depende mais da ciência;
+- a Geo-Rota (`colegas_por_perto`, 166) deixou de exigir a ciência;
+- da mensagem que pede "Permitir o tempo todo" ao Android ficou **só a instrução
+  curta** — sem ela, muitos negam sem querer e o GPS só grava com o app aberto;
+- **ficaram**, de propósito: o `GuardaGps` (GPS desligado, negado ou simulado pausa o
+  app — é antifraude, não aviso), a notificação fixa do Android enquanto o rastro roda
+  em segundo plano (o Android exige), e a tabela `ciencia_rastro` (histórico).
+
+**Versão:** o app passou a **0.6.0** (`runtimeVersion` segue a versão). A tela nova
+foi publicada também pelo ar para quem tem o **0.5.0** (update group `adfcfd89`); daqui
+para frente, as atualizações pelo ar só chegam a quem instalar o APK 0.6.0 (build
+`1d6414a7`, FINISHED: https://expo.dev/artifacts/eas/cMxcy_rjTrTAebHkkVuDZFpJh1hoKRHX32eqi3FtsrU.apk).
+
+**VERIFICADO:** `tsc` e `build` da web; na tela (1440 px e 375 px): o letreiro cabe no
+celular sem rolagem lateral (16–359 de 375 px), a abertura termina na PulsoLine, o
+"Role para ver mais" some ao rolar e o clique leva à seção; console sem erro; no ar,
+os textos novos presentes e nenhum "NEXUS MANAGER". No app: `tsc` e `expo export`
+(1.031 módulos); o diff do agente (rastro sem ciência, humor obrigatório) revisado.
+
+**NÃO VERIFICADO:** a entrada do app num celular (o app não roda no navegador); o
+topo da barra lateral da web logado (o navegador de teste estava sem sessão); a
+rolagem suave do "Role para ver mais" num navegador visível (o painel de teste estava
+escondido); o rastro ligando sem ciência num aparelho real.
+
+### D-250 · A varredura pede os dados direto ao TOA (extensão 0.7.0) — MUDA A D-192
+
+> "precisamos melhorar nossa extensão do site, ela é muito lenta, e precisa ter a
+> tela aberta do toa, para entrar e sair de cada contrato (...) quero aplicar no
+> nosso, preciso que replique as estratégias de conexões para atualizar nossa
+> extensão" — Emanuel, 01/11.
+
+**De onde vieram as estratégias:**
+- `Projeto - Usabilidade TOA/filtro-area-v2.js` (do Emanuel): roda **dentro** da
+  página do TOA e chama a camada de API da própria aplicação
+  (`require('jbf/core/api-layer')` → `getTransport().send(módulo, ação)`), em vez de
+  clicar nas telas.
+- `referencia/extensao-alfa/1.0.7` (a extensão do Alfa Gestor, em produção na CLARO):
+  `m=Time&a=get` traz o Gantt de um bucket inteiro numa chamada (cada atividade, o
+  técnico `p` e o rótulo `L` com o nome); `m=sync&a=write` com `mandatory[1]=[aids]`
+  traz, por técnico, a atividade (`cname`) e o inventário (`invpool` install /
+  deinstall, `invsn`, `quantity`, `_identifier_structure.invtype` e `.192` = modelo,
+  `419` = ação).
+
+**O que mudou:** `extensao-toa/toa-pagina.js` (novo, `"world": "MAIN"`) faz essas duas
+chamadas — o Time/get primeiro pela camada da aplicação, depois direto; o sync/write
+direto, numa `window_id` própria para não mexer no sincronismo da aba. O `toa.js`
+tenta o caminho direto para tudo e só manda **pelas telas** (o caminho da D-192) o que
+não veio: atividade que não voltou, técnico que falhou, bucket que recusou. Uma
+chamada por bucket e uma por técnico (3 ao mesmo tempo) no lugar de ~9 s por contrato.
+Não precisa do Console nem da aba à vista; sem aba do TOA, o fundo abre uma fixada,
+ao fundo. O banco não mudou: o resultado chega ao `registrar_varredura` no mesmo
+formato.
+
+**Por que agora sim, e por que a D-192 recusou:** a D-192 recusou copiar a ficha
+anti-falsificação (`X-OFS-CSRF-SECURE`) e reenviar o `m=sync` "por fora", e o caminho
+ficou FECHADO. O que se faz aqui é de **dentro** da aba do TOA em que a pessoa entrou,
+com a sessão e a ficha que a aplicação guardou para ela, pedindo só o que essa senha
+já vê na tela — o mesmo que a extensão do Alfa faz para as prestadoras da CLARO. A
+decisão de reabrir é do Emanuel (a CLARO permite acesso automatizado com login de
+prestador, D-189). **Continua proibido:** qualquer chamada que grave no TOA
+(`managedgroup/update…`, `sync/write` com ação na pilha, baixa, status) — o
+`toa-pagina.js` não tem chamada genérica, só as duas, com parâmetros conferidos.
+
+**Zero e desconhecido:** atividade que não veio no Gantt **não** vira "fora do
+Console" (o Gantt pode não trazer subgrupo): vai pelas telas, que decidem. Inventário
+só conta para a atividade que voltou no `sync`; atividade ausente é "não sei".
+
+**O de/para é pela ORDEM da coluna (medido no TOA, 01/11).** Os campos de
+`_identifier_structure` vêm `{ type, text, order }`, **sem rótulo** — e o `order` é a
+ordem das colunas da tela "Lista de equipamento": 0 ID · 1 Tipo (`invtype`) · 2 Modelo
+(`192`) · 3 Serial (`invsn`) · 4 Ação (`419`) · 5 Serial substituído (`420`, só na
+troca) · 6 Ponto (`335`) · 7 Local do ponto (`307`) · 8 Quantidade. A ação vai em
+**código** ("1" nova instalação, "2" troca), como as 2.698 leituras feitas pelas telas.
+Coluna que não veio fica vazia, como na tela. A primeira varredura de cada versão anota
+no painel `campo=ordem` (nunca valores), para acusar se a Oracle mudar.
+
+**Sem `espera()` no caminho direto:** numa aba escondida há mais de 5 min, o Chrome
+alinha os relógios a um por minuto ("intensive throttling") — o fôlego de 400 ms entre
+contratos viraria um minuto. O ritmo é o da rede, com no máximo 3 pedidos ao mesmo
+tempo.
+
+**Medido no TOA (01/11, domingo, MAN-AFLINE, logado no navegador do assistente; só
+contagens e tamanhos, sem nome nem serial na tela):** a camada da aplicação, a sessão, a
+ficha e a árvore (com os buckets da AFLINE) existem na página. `Time/get` **pela camada
+do TOA**: 17 atividades em **108 ms**, todas com técnico. `sync/write` dos 4 técnicos:
+**116 a 212 ms** cada, as 17 atividades voltaram, 6 com nome — as 11 sem nome são
+jornada (rótulo sem vírgula). Grupos do inventário: `customer`, `install`, `deinstall`,
+`provider` (a carga, fora). Numa troca real: Instalado com ação 2 e serial substituído
+(12), Desinstalado com o aparelho que saiu, miscelânea com quantidade (cabo × 10).
+O formato bate com a última troca lida pelas telas no banco (tipo, modelo vazio na
+troca, ação 2, substituído 12, ponto 8 dígitos, "Sala"/"Outros", id 9). O bucket
+inteiro: ~0,6 s, contra ~2,5 min pelas telas (17 × 9 s).
+
+**NÃO VERIFICADO:** a extensão 0.7.0 instalada e rodando de ponta a ponta (o teste
+injetou o `toa-pagina.js` na aba, sem o `toa.js` nem o fundo — esses foram provados no
+simulador); a gravação no banco pelo `registrar_varredura` (as atividades de hoje ainda
+não tinham sido importadas); comparação valor a valor com a tela de Equipamento (só
+formato e tamanhos); um dia cheio (dia útil, ~300 contratos); o `Time/get` pelo pedido
+direto, quando a camada falha (a camada respondeu, o reserva não foi exercitado).
+
+**Depois, em uso (01/11, 11:07):** a 0.7.0 instalada no Chrome do Emanuel varreu 28
+nomes e 12 listas de equipamento, os 28 direto do TOA — "ficou muito perfeito" (Emanuel).
+
+### D-251 · O sincronismo é de cada computador, com a vez por bucket (extensão 0.8.0, 167)
+
+> "quem for importar por aqui [Importar TOA] serão usuários comuns que vão fazer o
+> download no TOA e importar (...) quem tiver a extensão ele poderá editar o tempo de
+> importação (...) 5 - 15 - 30 - 60 minutos de importação da rota, e para essa parte
+> debaixo [a varredura] deve ter um tempo também (...) ou na hora que escolherem (...)
+> selecionar quais buckets tem disponível no login para importar, porém somente o admin
+> consegue importar para todas as cidades de acordo com o login dele, os demais só vão
+> conseguir importar para os buckets disponíveis em seu login" — Emanuel, 01/11.
+
+**Perguntado, o Emanuel escolheu** (entre as opções oferecidas):
+- **Qual login decide:** os dois juntos. A extensão oferece o bucket que a **árvore do
+  TOA** deste Chrome mostra **e** que é de uma cidade que a pessoa pode ver no PulsoLine
+  (`bases_permitidas()`: ADMIN todas; os demais, a do cadastro + "Cidades que acessa").
+- **Onde mora a configuração:** em **cada computador**, com **trava por bucket**. Cada
+  pessoa marca no painel da extensão os buckets e os tempos dela; um bucket é
+  sincronizado por um computador por vez (pessoa + máquina, porque a mesma pessoa pode
+  estar em dois PCs); se o dono parar por 3 min, quem também marcou assume sozinho, ou
+  na hora com "Assumir os marcados".
+- **Tempos:** rota a cada 5, 15, 30 ou 60 min (o 10 saiu da escolha); varredura a cada
+  5, 15, 30 ou 60 min, ou só no botão.
+
+**Recusado:** continuar com a configuração por cidade, editada pela extensão (a outra
+opção oferecida). E trocar a cidade ativa do topo para importar outra cidade: mudaria a
+tela de quem está usando o site com o mesmo login.
+
+**Como uma extensão trabalha em várias cidades (migration 167):** a importação inteira
+(registro da importação, fila, `importar_toa`, reconciliar, desatribuir, as policies)
+confere a cidade por `bases_visiveis()`, a cidade ATIVA. Em vez de mexer em tudo isso,
+`bases_visiveis()` passou a honrar o cabeçalho **`x-afline-cidade`**: com ele, a
+resposta é aquela cidade — **só** se ela estiver em `bases_permitidas()`; qualquer outra
+coisa dá nenhuma cidade (nunca cai na ativa). É o mesmo poder de `trocar_cidade`, por
+pedido. A extensão tem um cliente do banco por cidade (mesma sessão, `accessToken`) que
+manda o cabeçalho. O site não manda, e para ele nada mudou. CORS do servidor conferido:
+aceita o cabeçalho.
+
+**O resto da 167:** `sincronismo_bucket_vez` (a vez de cada bucket, com o ritmo que o
+computador declarou, para a tela mostrar); `sincronismo_meus_buckets(p_arvore)` (o que
+a extensão oferece, e o que ficou de fora com o porquê: não cadastrado, outra cidade,
+desligado, número diferente); `sincronismo_pulso_buckets` (pulso, vez num `insert … on
+conflict` só, e a última rodada de cada bucket — o vencido a extensão conta com o
+relógio do servidor); `sincronismo_soltar_buckets`. O `sincronismo_pulso` por cidade
+**passou a recusar** com "atualize a extensão": uma 0.7 pulsando por cidade e uma 0.8
+pela vez do bucket importariam o mesmo bucket em dobro.
+
+**A tela Sincronismo** deixou de configurar: mostra, por bucket da cidade ativa, quem
+sincroniza, o ritmo da rota e da varredura, o último sinal e "sem sinal há X" depois de
+3 min; o ADMIN continua acertando o número do TOA. A **Importação manual** não mudou —
+é por ela que quem não tem a extensão importa.
+
+**Medido:** a árvore do TOA do login do Emanuel tem **28 buckets da AFLINE**; os 11
+cadastrados batem pelo número. Os outros 17 aparecem na extensão como "não cadastrado".
+
+**Aplicado em 02/11, com a autorização do Emanuel** (a permissão do assistente tinha
+recusado na primeira tentativa: banco de produção sem backup). Conferido depois:
+`testar_policies` 33/33 e `testar_campo` 29/29; nenhuma tabela sem RLS; nenhuma
+`SECURITY DEFINER` aberta ao `anon`. O cabeçalho testado como `authenticated`, numa
+transação desfeita: o ADMIN pede São Luís e vê só São Luís (e só os buckets dela);
+cabeçalho que não é uuid = nenhuma cidade; um não-ADMIN na cidade dele vê a dele; numa
+cidade que não acessa, nenhuma cidade e 0 visitas; sem cabeçalho, a cidade ativa.
+Web publicada; "Quem sincroniza cada bucket" conferido no bundle do ar. O Emanuel
+recarregou a 0.8.0 e a lista de buckets do login apareceu ("a extensão está ok").
+
+**O primeiro erro, e o que mudou por causa dele:** "Não consegui ler a lista" — o
+painel lateral lê os arquivos novos da pasta na hora, mas o FUNDO da extensão só troca
+quando ela é recarregada; o fundo 0.7 não conhecia o pedido e devolvia vazio (e a 167
+ainda não estava no banco). O painel agora diz "recarregue a extensão" quando o fundo
+não responde ao pedido.
+
+**Buckets cadastrados (02/11):** a árvore do TOA mostrou 17 buckets da AFLINE sem
+cadastro. O Emanuel conferiu a cidade proposta para cada um ("acertou"), e 16 foram
+cadastrados pelas funções da tela (`salvar_bucket` + `definir_numero_toa`), como ele
+(ADMIN), com autor, cada um na sua cidade pelo cabeçalho — sem trocar a cidade ativa
+dele: BSB-AFLINE_03/06/12/14/15_VT → Brasília; MAN-AFLINE_ADM → Manaus; ITZ-AFLINE e
+ITZ-AFLINE_ADM → Imperatriz; CXS → Caxias; JIP → Ji-Paraná; MBA → Marabá; TMN → Timon;
+VHA → Vilhena; CWL → Cacoal; PMJ-AFLINE e PMJ-AFLINE_VT → Palmas. **PIT-AFLINE (31698)
+ficou de fora**: a proposta tinha duas cidades (Paraíso - TO ou Teresina - PI).
+
+**NÃO VERIFICADO:** uma importação e uma varredura de ponta a ponta pela 0.8.0 numa
+cidade que não é a ativa (o mecanismo foi testado no banco, não a rodada inteira); dois
+computadores disputando o mesmo bucket.
+
+### D-252 · Equipamento e miscelânea em abas separadas, com contador; importação assinada pela Operadora
+
+> "separe equipamento e miscelânea ao lado, não coloque tudo junto, e coloque na aba a
+> quantidade de equipamento e quantidade de miscelânea lançada, igual ao anexo que tem um
+> contador" · "retire esse texto" · "tira essa também, não precisa" · "importação com meu
+> login tem que colocar como operadora o nome" — Emanuel, 02/11.
+
+- **Duas abas lado a lado**, Equipamento e Miscelânea, na página do contrato e na janela.
+  Miscelânea = item SEM serial (a coluna gerada `visita_equipamento_toa.miscelanea`, 117).
+  Os itens são lidos uma vez (`useEquipamentoToa`) para as duas.
+- **O contador conta o que foi LANÇADO**: Instalado + Retirado, em linhas (cabo × 10 é
+  uma linha). "Já estava no cliente" aparece na lista e não conta — ninguém lançou.
+  Escolha do assistente, a conferir com o Emanuel se ele quiser outra conta.
+- **Sem leitura do TOA, a aba fica sem número** — não "0" (regra 6). As frases "Lido do
+  TOA em … não mexe no estoque" e "Ainda não lido do TOA…" saíram a pedido; o número
+  ausente na aba ficou sendo o único sinal de "não lido".
+- **No histórico, evento de origem IMPORTACAO mostra "Operadora" em Quem**: é afirmação
+  do TOA, não de quem importou. O nome de quem importou fica na dica do mouse ("Importado
+  por …") e no histórico de Importar TOA. Só tela: o banco continua guardando o
+  `usuario_id` de quem importou.
+- **PIT-AFLINE (31698) → Paraíso - TO** (Emanuel), cadastrado como os 16 da D-251.
+
+Conferido no desenvolvimento num contrato de Manaus (Equipamento 5, Miscelânea 3,
+batendo com o banco; a troca mostra "no lugar de"; histórico com "Operadora") e no
+bundle publicado.
+
+**Corrigido no mesmo dia (02/11):** "tem equipamento que consta na tabela, porém não tá
+contando" — a aba mostrava Equipamento 0 com 6 itens em "Já estava no cliente". O
+contador passou a contar **a lista inteira** da aba (Instalado + Retirado + Cliente). A
+escolha de contar só o lançado era do assistente e estava errada para quem usa.
+
+### D-253 · "Atraso sobre a janela" vira "Início após abrir a janela", sem a nota longa
+
+> "é bom tirar esse texto (...) esse atraso sobre a janela que eu não entendi direito
+> ainda, significa que em um contrato de 08 às 12 ele chegou 1:15 depois das 8 horas?
+> tá confuso" — Emanuel, 02/11 (segunda vez que o nome confunde; a primeira, 23/09).
+
+Sim: é `inicio − janela_inicio`, e numa janela de 08 às 12, 1h15 quer dizer que começou
+às 09:15 — dentro da janela. "Atraso" sugeria estouro. O nome passou a dizer o que é
+(**Início após abrir a janela**), a nota de quatro frases embaixo do gráfico saiu, e o
+exemplo ficou numa dica de uma linha. O cálculo não mudou.
+
+### D-254 · O código 205 (Falta Tap Ou Passivo) vai para INFRA CLARO (168)
+
+> "esse código tá sem grupo (...) acredito eu porque é da VT, tem que colocar ele em um
+> grupo, ele se enquadra no mesmo grupo do time da instalação" — Emanuel, 02/11.
+
+A 143 o deixou sem grupo, "só ele pode dizer": não estava nos painéis da CLARO que vieram
+(são da instalação; o 205 é da VT/HFC). O irmão dele na instalação é o 211 (Falta NAP/NAP
+Lotada — o NAP é o TAP da fibra), em INFRA CLARO. O 205 foi para o mesmo grupo. O
+responsável (`responsavel_quebra`) segue vazio. Continua sem grupo: o 301 (Tipo de OS
+Incorreta). Conferido no painel "Responsável pela quebra": INFRA CLARO 8,33% (1).
+
+### D-255 · O agrupamento da quebra pode ser outro na VT: o 301 (169)
+
+> "se for instalação, 301 é Comercial; se for VT, 301 é Causa Cliente" — Emanuel, 02/11.
+
+Perguntado, decidiu: **Comercial = PROCESSO VENDA** e **Causa Cliente = INFRA CLIENTE**
+(os grupos que já existem); **VT = grupo de serviço VISITA TECNICA** (não o bucket _VT).
+
+Até aqui cada código tinha um agrupamento só. Entrou `codigo_baixa.agrupamento_quebra_vt`
+(nulo = o mesmo de sempre; só o 301 tem), e a regra mora em `agrupamento_da_quebra()` no
+banco — usada por `impacto_quebra`, o período anterior do painel — e em
+`agrupamentoDaQuebra()` em `lib/metricas.ts`, o painel do dia. **As duas têm de mudar
+juntas.** Conferido como `authenticated` em Manaus, 29–31/10: as 4 O.S. de 301 da VT
+caíram em INFRA CLIENTE e as 9 da instalação em PROCESSO VENDA; não sobrou "sem
+agrupamento". Nenhum código fica mais sem grupo.
+
+### D-256 · Vídeo só pela câmera do app, em 720p; galeria só foto; órfãos do Storage limpos
+
+> "existe alguma forma de compactar o que eles enviam, para não pesar tanto?" · "podemos
+> pedir para eles gravarem direto da câmera, não dando opção de enviar pela galeria" ·
+> "vídeo de até 60 seg direto da câmera e fotos pode ir pelos dois caminhos" — Emanuel, 02/11.
+
+**Medido antes:** a foto já saía comprimida do celular (1600 px, qualidade 0,7: média 325
+KB). O vídeo subia como a câmera gravou — **15 MB em média**, 1080p ou mais (~2 MB/s): um
+vídeo de mais de ~25 s estourava o teto de 50 MB do bucket, embora a tela deixasse gravar
+60 s. A mídia mora no Storage (disco da VPS), não no Postgres (198 MB, quase nada de mídia).
+
+**O que mudou (app, pela atualização no ar — update group `4b285ea5`, runtime 0.6.0):**
+- **Câmera do app grava vídeo em 720p a ~1,5 Mbps** (`videoQuality`, `videoBitrate` no
+  `CameraView`): 60 s ≈ 11 MB. Teto de 60 s mantido. Vale no Android; no iPhone o bitrate
+  pede codec no `recordAsync` — não publicamos para iPhone.
+- **Galeria só foto** (`mediaTypes: ['images']`; vídeo que vier assim mesmo é recusado com
+  recado). O botão virou "Foto da galeria". Isso muda a D-213, que tinha aberto a galeria
+  para foto e vídeo: o vídeo da galeria subia no tamanho original (o Android não comprime
+  sem peça nativa) e sem hora/GPS confiáveis.
+
+**Recusado:** compressão noturna no servidor (ideia do Emanuel, discutida): não alivia o
+4G do técnico nem o teto de 50 MB, e a VPS (2 núcleos, dividida com n8n e navegador) levaria
+horas por noite com ffmpeg em container. Com o vídeo só pela câmera, já em 720p, não sobra
+o que comprimir. Fica como opção se aparecer vídeo pesado de outro caminho.
+
+**Órfãos:** 5 arquivos no bucket `evidencia` sem linha em `evidencia` — todos de setembro,
+de visitas que não existem mais (127 KB a 9,5 MB; 10 MB juntos). Apagados pela API do
+Storage, dentro da VPS (apagar `storage.objects` pelo SQL deixaria o arquivo no disco).
+Depois: 10 objetos para 10 evidências; Storage de 43 MB para 33 MB.
+
+**NÃO VERIFICADO:** um vídeo gravado num aparelho real depois da atualização (tamanho e
+nitidez em 720p) — o aparelho tem de abrir o app duas vezes para pegar a atualização.
+
+### D-257 · Transferir não desarma mais o roteamento do TOA (170) — MUDA A D-131
+
+> "quando eu transferir manualmente um contrato de um técnico para outro, não deve
+> desarmar automático, o usuário que precisa desarmar se ele quiser, não mexa na frase que
+> já está escrita" — Emanuel, 02/11.
+
+`transferir_visita` gravava `rota_fixada_em` em toda transferência (D-131: "Transferir passa
+a fixar sozinho"). Agora não toca na rota fixada: o contrato armado continua armado, o
+fixado continua fixado; fixar é só pela chave "Roteamento do TOA". A frase da chave no
+contrato não mudou. O aviso da Rota do dia, que dizia "A rota ficou FIXADA", passou a dizer
+como ficou (já estava fixada, ou o roteamento continua ligado e é preciso desligar a chave).
+
+**Consequência, dita ao Emanuel:** com o roteamento armado, a próxima importação (a cada
+hora, pelo sincronismo) devolve o contrato à equipe do login do técnico no relatório — a
+transferência só segura se quem transferiu desligar a chave. Era o defeito que a D-131
+corrigiu; agora é escolha de quem opera.
+
+Testado como `authenticated`, desfeito no fim: equipe mudou, `rota_fixada_em` ficou nulo,
+resposta `rota_fixada: false`. `testar_policies` 33/33.

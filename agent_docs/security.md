@@ -93,6 +93,14 @@ a que filtra o que aparece na tela usa `bases_visiveis()`, como sempre.
 usuário na chave; quem mudar base ou cidade ativa por fora de `trocar_cidade`
 / do gatilho do perfil tem de apagar `app.bases_visiveis`.
 
+**`bases_visiveis()` honra o cabeçalho `x-afline-cidade`** (167, D-251). Com ele, a
+resposta é aquela cidade — **só** se ela estiver em `bases_permitidas()`; qualquer outra
+coisa (uuid de cidade que a pessoa não acessa, texto que não é uuid) dá **nenhuma**
+cidade, nunca "cai" na ativa. É o mesmo poder de `trocar_cidade`, pedido a pedido: a
+extensão usa para trabalhar em várias cidades sem mexer na tela de ninguém. O site não
+manda. Testado como `authenticated` (7 casos, D-251). Quem mexer em `bases_visiveis()`
+mantém isso — e a chave do cache da transação inclui o cabeçalho.
+
 **`SECURITY DEFINER` ignora o RLS.** Se a função faz algo privilegiado,
 cheque o papel **dentro** dela. Ver `importar_toa`, `baixar_os`.
 

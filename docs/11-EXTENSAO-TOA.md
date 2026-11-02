@@ -33,7 +33,8 @@ crescer: cada coisa nova que quisermos tirar do TOA entra aqui como uma
 |---|---|---|
 | `fundo.js` | **gerado** de `app/extensao/fundo.ts` (`npm run extensao`) | login (só a sessão), alarme, pulso/vez, exportar, importar pelo `importarToaNucleo`, comandar e gravar a varredura, selo no ícone |
 | `popup.html` / `popup.js` | `extensao-toa/popup.html` + **gerado** de `app/extensao/popup.ts` | a janelinha |
-| `toa.js` | `extensao-toa/toa.js` (à mão) | a varredura pelas telas, dentro da aba do TOA |
+| `toa.js` | `extensao-toa/toa.js` (à mão) | a varredura, dentro da aba do TOA: primeiro o caminho direto (pelo `toa-pagina.js`), depois pelas telas o que sobrou |
+| `toa-pagina.js` | `extensao-toa/toa-pagina.js` (à mão) | 0.7.0: no **mundo da página** do TOA, faz as duas chamadas de leitura (`Time/get`, `sync/write`) — ver abaixo |
 | `ponte.js` | `extensao-toa/ponte.js` (à mão) | só o "ping" para a tela Sincronismo |
 | `app/extensao/estado.ts` | — | o formato do estado guardado e dos pedidos da janelinha |
 
@@ -49,6 +50,37 @@ crescer: cada coisa nova que quisermos tirar do TOA entra aqui como uma
   `af_estado.escolha` (`fora` = os buckets desmarcados; bucket novo entra
   marcado) e vale também para a rodada automática deste computador. A
   varredura começa pelo bucket que já está aberto no Console.
+- **A configuração é de cada computador, a vez é por bucket (0.8.0, 167, D-251).** No
+  painel: "Atualizar a lista" lê a árvore do TOA (`toa-pagina.js`, op `arvore`) e
+  `sincronismo_meus_buckets` devolve o que a pessoa pode sincronizar (árvore ∩
+  `bases_permitidas()`; ADMIN, todas as cidades). Marca-se os buckets e os tempos (rota
+  5/15/30/60; varredura 5/15/30/60 ou só no botão), guardados em `af_estado.config`. O
+  pulso (`sincronismo_pulso_buckets`) dá a vez por bucket; a extensão importa e varre
+  cada bucket **na cidade dele** com um cliente do banco por cidade, que manda o
+  cabeçalho `x-afline-cidade` (`bases_visiveis()` só o honra para cidade permitida).
+  A tela Sincronismo só acompanha. `sincronismo_pulso` (por cidade) recusa as 0.7 e
+  anteriores.
+- **A varredura pede direto ao TOA (0.7.0, D-250).** "Muito lenta, e precisa
+  ter a tela aberta" (Emanuel, 01/11). O `toa-pagina.js` roda no mundo da página
+  (`"world": "MAIN"`), onde mora a aplicação do TOA, e o `toa.js` conversa com
+  ele por `window.postMessage` (marcas `afline-toa-pedido` / `afline-toa-resposta`).
+  Por bucket, **`m=Time&a=get`** (o Gantt: cada atividade do dia e o técnico dela,
+  `delta.activities[aid].p`) — primeiro pela camada de API da aplicação
+  (`jbf/core/api-layer`, a estratégia do filtro de área do Emanuel), senão direto.
+  Por técnico, **`m=sync&a=write`** com `mandatory[1]=[aids]` e `window_id`
+  própria: `delta.Activity[].cname` (o nome) e `delta.Inventory[]` (`invpool`
+  install → Instalado, deinstall → Desinstalado, customer → Cliente; o resto —
+  a carga do técnico — fica fora). As duas são as da extensão do Alfa
+  (`referencia/extensao-alfa`). Não precisa do Console nem da aba à vista; sem
+  aba do TOA, o fundo abre uma fixada, ao fundo. **O que não vier direto vai pelas
+  telas**, como antes — e isso continua precisando do Console à vista.
+  De/para do inventário **pela ordem da coluna** (`_identifier_structure[campo].order`,
+  medido em 01/11 — os campos vêm sem rótulo): 0 ID · 1 Tipo (`invtype`) · 2 Modelo
+  (`192`) · 3 Serial (`invsn`) · 4 Ação (`419`; grava-se o **código**, "1"/"2", como
+  as telas) · 5 Serial substituído (`420`, só na troca) · 6 Ponto (`335`) · 7 Local
+  do ponto (`307`) · 8 Quantidade. Medido: o bucket MAN-AFLINE inteiro em ~0,6 s
+  (1 `Time/get` de 108 ms + 4 `sync/write` de 116–212 ms). A 1ª varredura de cada
+  versão anota no painel `campo=ordem`, para acusar se a Oracle mudar.
 - **Uma regra só:** a extensão importa com `src/lib/importarToaNucleo.ts` —
   o mesmo da tela de Importação (`importarToa.ts` só passa o cliente da web).
   Mudou a importação? Mude no núcleo, rode `npm run extensao` e atualize.
@@ -147,6 +179,9 @@ desligada, ou fora da lista de endereços do manifest).
 | `exportar` | `numero` (inteiro, o providerId do bucket), `dia` (`AAAA-MM-DD`) | `{ ok, nome, base64 }` | `GET /?m=gridexport&a=download&itype=manage&providerId=<numero>&date=<dia>&panel=top&view=time&downloadId=<aleatório>&dates=<dia>&<timestamp>` |
 | `varrer` (0.2.0) | `itens: [{ aid, precisa_equipamento }]` | `{ aceito, bucket }` e depois eventos `canal: 'varredura'` (`item` com `resultado` `{ ok, nome, leuEquipamento, itens }`, e `fim`) | **nenhuma direta**: `toa.js`, na aba do TOA, navega pelas telas (Console → Detalhes → Equipamento) e lê o texto |
 | `cancelar-varredura` | — | `{ ok }` | — |
+| `varrer` (0.7.0) | + `dia` (`AAAA-MM-DD`, Manaus) | o mesmo; o `fim` traz também `diretos`, `motivos` e `campos` | **primeiro direto** (`toa-pagina.js`: `Time/get` por bucket, `sync/write` por técnico); só o que não veio vai pelas telas (D-250) |
+| `arvore` (0.8.0) | — | `{ ok, itens: [{ numero, nome }] }` — os buckets (t = 2) da árvore do TOA deste login | nenhuma: lê `initialTreeData.structure` da página (D-251) |
+| `toa-estado` | — | `{ noConsole, bucket, rodando, direto }` | — |
 
 **O caminho da varredura:** a página manda `varrer` → `ponte.js` → `fundo.js`
 acha a aba do TOA (`chrome.tabs.query` pelo host, preferindo a que está no
@@ -178,7 +213,9 @@ real, e a rodada é recusada antes de importar.
    daria a qualquer script no Gestor AF acesso a tudo que o login da pessoa
    alcança no TOA.
 2. **Só leitura, a menos que o Emanuel decida outra coisa.** Hoje a
-   extensão não grava nada no TOA. Ação que ESCREVE no TOA (baixar O.S.,
+   extensão não grava nada no TOA. O `toa-pagina.js` só tem as duas chamadas
+   de leitura da D-250 — nunca acrescente nele uma chamada genérica, nem
+   `managedgroup`, nem `sync/write` com ação na pilha. Ação que ESCREVE no TOA (baixar O.S.,
    mudar status, mover atividade) é decisão de negócio e de risco com a
    CLARO — pergunte antes, e registre em `docs/03-DECISOES.md`.
 3. **Permissões mínimas.** `host_permissions` só com o endereço do TOA;
@@ -267,6 +304,11 @@ sincronismo de baixa funciona sem aba do TOA aberta. A varredura vai
 precisar de **uma aba do TOA aberta** e de um script da extensão **dentro
 dela**, pedindo pela aplicação do TOA. Os nomes de tipo/modelo
 (`invtype` 6 → "3 - EMTA") estão num dicionário que a aplicação carrega.
+
+> **Reaberto em 01/11 (D-250), por decisão do Emanuel:** a 0.7.0 faz o `m=sync`
+> (e o `m=Time`) de **dentro** da aba do TOA, com a sessão e a ficha que a
+> aplicação guardou para quem entrou — só leitura, só as duas chamadas. O
+> parágrafo abaixo fica como o registro do que se pensava em 19/10.
 
 **Caminho FECHADO (19/10, noite):** reenviar o `m=sync` (ou o `m=Hint`)
 por fora da aplicação exige copiar a ficha anti-falsificação do TOA

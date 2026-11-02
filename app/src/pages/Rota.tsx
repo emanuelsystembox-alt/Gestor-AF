@@ -463,8 +463,11 @@ export default function Rota() {
     } else if ((r as { mudou?: boolean } | null)?.mudou === false) {
       setErro('As duas faixas são da mesma equipe — nada mudou.')
     } else {
+      // 170 (D-257): transferir não fixa mais a rota; o aviso diz como ficou
       setOk(`Contrato ${mover.parada.contrato ?? ''} → equipe ${faixaDestino.equipe}. `
-            + 'A rota ficou FIXADA: a próxima importação do TOA não desfaz.')
+            + ((r as { rota_fixada?: boolean } | null)?.rota_fixada
+              ? 'A rota já estava fixada: a importação do TOA não desfaz.'
+              : 'O roteamento do TOA continua ligado: para a importação não devolver o contrato, desligue a chave no contrato.'))
       recarregar()
     }
     setOcupado(false); setMover(null); setMotivo('')

@@ -15,10 +15,26 @@ import { Aviso, Botao } from '../ui/componentes'
 import { cor, raio } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
-/** Teto de gravação. Um minuto de vídeo em 4G de rua já são ~15 MB e
- *  meio minuto de upload; acima disso o técnico grava e não consegue
- *  mandar — que é o pior dos mundos, porque ele acha que mandou. */
+/** Teto de gravação. Acima disso o técnico grava e não consegue mandar —
+ *  que é o pior dos mundos, porque ele acha que mandou. */
 const MAX_SEG = 60
+
+/**
+ * ┌─ o vídeo sai leve da câmera (D-256) ──────────────────────────────┐
+ * │ > "vídeo de até 60 seg direto da câmera" — Emanuel, 02/11         │
+ * │                                                                    │
+ * │ Sem isto a câmera grava no máximo do aparelho (1080p ou 4K, perto │
+ * │ de 2 MB por segundo): medido, 15 MB por vídeo, e um vídeo de mais  │
+ * │ de ~25 s estourava o teto de 50 MB do bucket. Em 720p a ~1,5 Mbps, │
+ * │ 60 s dão ~11 MB e ainda se vê o equipamento e a instalação.        │
+ * │ `videoQuality` em 16:9 e `videoBitrate` valem no Android (o APK);  │
+ * │ no iPhone o bitrate exige codec no `recordAsync` — não publicamos  │
+ * │ para iPhone hoje. O vídeo só entra pela câmera: a galeria é só     │
+ * │ foto (lib/galeria.ts).                                             │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+const VIDEO_QUALIDADE = '720p' as const
+const VIDEO_BITRATE = 1_500_000
 
 type Props = NativeStackScreenProps<Pilha, 'Captura'>
 
@@ -187,6 +203,8 @@ export default function Captura({ route, navigation }: Props) {
         style={StyleSheet.absoluteFill}
         facing="back"
         mode={ehVideo ? 'video' : 'picture'}
+        videoQuality={VIDEO_QUALIDADE}
+        videoBitrate={VIDEO_BITRATE}
       />
 
       <SafeAreaView style={e.sobreposicao} edges={['top', 'bottom']} pointerEvents="box-none">

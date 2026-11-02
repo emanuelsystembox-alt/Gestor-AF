@@ -33,8 +33,9 @@ export function extensaoPresente(): Promise<InfoExtensao | null> {
   })
 }
 
-/** 0.3.0 ou mais nova: a extensão que trabalha sozinha (D-193). */
+/** 0.8.0 ou mais nova: a que sincroniza por computador e por bucket (167, D-251).
+ *  As anteriores pulsam por cidade, e o banco passou a recusar. */
 export function extensaoAutonoma(v: InfoExtensao): boolean {
   const [a, b] = v.versao.split('.').map(Number)
-  return a > 0 || b >= 3
+  return a > 0 || b >= 8
 }

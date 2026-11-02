@@ -1,6 +1,25 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **31/10/2026**, por Claude (Opus 5.5).
+Última atualização: **02/11/2026**, por Claude (Opus 5.5).
+
+> **01 e 02/11/2026 — a extensão e o sincronismo** (detalhe em `docs/03-DECISOES.md`,
+> D-250 a D-257; pendências em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente depois da 170"):
+> - **A varredura pede os dados direto ao TOA** (extensão 0.7.0, D-250): o bucket inteiro
+>   em ~0,6 s, sem abrir contrato por contrato e sem a aba à vista. Só leitura.
+> - **Sincronismo por computador, vez por bucket** (0.8.0, 167, D-251): cada computador
+>   escolhe os buckets do login e os tempos (rota 5/15/30/60; varredura idem ou só no
+>   botão); o ADMIN alcança todas as cidades. `bases_visiveis()` honra `x-afline-cidade`.
+>   **Toda extensão antiga para de sincronizar até ser recarregada.**
+> - No contrato, **Equipamento e Miscelânea** em abas separadas com contador; importação
+>   assinada **"Operadora"** no histórico (D-252). "Atraso sobre a janela" virou **"Início
+>   após abrir a janela"** (D-253).
+> - Quebra: **205 → INFRA CLARO** (168); **301 depende do serviço** — instalação PROCESSO
+>   VENDA, VT INFRA CLIENTE — com `agrupamento_quebra_vt` (169, D-255).
+> - 17 buckets novos cadastrados (28 no total).
+> - **Vídeo só pela câmera do app, em 720p** (até 60 s); galeria só foto; 5 arquivos órfãos
+>   do Storage apagados (D-256, atualização no ar `4b285ea5`).
+> - **Transferir não fixa mais a rota** (170, D-257): com o roteamento ligado, a próxima
+>   importação devolve o contrato — quem quer segurar desliga a chave.
 
 > **31/10/2026 — o que mudou desde então, em uma frase cada** (detalhe em
 > `docs/03-DECISOES.md`, D-235 a D-242, e as pendências em
@@ -43,6 +62,10 @@
 > - **A entrada do app vira NEXUS MANAGER** (D-247): AFLINE assina em cima, símbolo
 >   do Nexus com as órbitas, letreiro NEXUS / MANAGER; o nome embaixo do ícone é
 >   "Nexus Manager". APK novo: build `e992bcd0`.
+> - **A marca é PULSOLINE — Sistema de gestão AFLINE** (D-249): entrada do site e do
+>   app refeitas (o Nexus saiu; vermelho e prata; o P com o batimento); "Role para ver
+>   mais" na entrada do site. **O rastro liga sem o "Estou ciente"** (muda a D-170) e a
+>   Geo-Rota não exige mais a ciência (166). App **0.6.0**.
 > - **Teste de carga e fila de importação** (165, D-248): 8 sessões simultâneas de
 >   gente real, 0 erros; painel do técnico 5,3 s → 0,3 s, sino da web 0,6 → 0,05 s;
 >   12 índices; 66 funções com o escopo em `(select …)`. A importação agora espera a

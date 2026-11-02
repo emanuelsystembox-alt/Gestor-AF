@@ -173,6 +173,26 @@ a primeira varredura gravou 5 contratos e se perdeu, e a extensão ficou
 **fundo da extensão** (alarme do Chrome, estado em `chrome.storage`), não
 numa tela. Ver D-193.
 
+**O painel da extensão é novo, o FUNDO continua velho até recarregar.** O painel lateral
+(popup.html/popup.js) lê os arquivos da pasta a cada abertura; o service worker
+(fundo.js) só troca quando a extensão é recarregada em `chrome://extensions` (↻). Em
+01/11 o painel da 0.8.0 pediu "atualizar a lista" a um fundo 0.7.0, que não conhecia o
+pedido e devolveu vazio — "Não consegui ler a lista", sem pista. O painel agora traduz
+resposta vazia em "recarregue a extensão". Depois de mudar a extensão: ↻ nela **e** F5
+na aba do TOA (os scripts de conteúdo também são da versão da página).
+
+**Relógio em aba escondida há mais de 5 min anda de minuto em minuto.** O Chrome alinha
+os `setTimeout` encadeados de aba escondida ("intensive throttling"): um fôlego de 400 ms
+entre contratos viraria um minuto. Pedido de rede não sofre isso. Trabalho que roda numa
+aba do TOA ao fundo (o caminho direto da varredura, D-250) não usa `espera()` entre um
+item e outro — o ritmo é o da rede, com limite de pedidos simultâneos.
+
+**Código de baixa é GLOBAL e o RLS não deixa editar.** `codigo_baixa.empresa_id` é nulo
+nos códigos da CLARO; a policy de UPDATE exige `empresa_id = minha_empresa()`, então um
+`update` como ADMIN afeta **0 linhas, sem erro**. O agrupamento da quebra se muda por
+migration (168, 169), como sempre foi (141, 143). Confira `row_count` depois de um update
+que importa.
+
 **Aba escondida não desenha.** O Chrome quase para uma aba que não está à vista
 (e uma janela totalmente coberta, no Windows): não desenha a tela e atrasa os
 relógios. Script que pilota a tela de outro sistema (a varredura do TOA, D-193) erra

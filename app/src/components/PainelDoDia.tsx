@@ -408,16 +408,9 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
               {filtrando && <span className="ml-1 font-normal text-graf-400">
                 de {todos.length}</span>}
             </h2>
-            <p className="mt-0.5 text-[11px] text-graf-500">
-              O &ldquo;Contador de log&rdquo; é da CLARO e vem na planilha do TOA: quantas vezes o
-              contrato já voltou para a agenda. Conta o histórico inteiro dela, inclusive o que
-              nunca passou por aqui — por isso pode divergir da nossa reincidência.
-              {' '}<strong className="text-graf-300">Anterior aqui</strong> é a última visita do
-              contrato na NOSSA agenda; <strong className="text-amber-300">revisita</strong> = a
-              anterior concluída, até 30 dias, e o par de grupos que conta (VT depois de qualquer
-              serviço; retorno depois de adesão, migração GPON, reinstalação, mudança de endereço
-              ou retorno).
-            </p>
+            {/* A explicação do "Contador de log", do "Anterior aqui" e da revisita saiu a
+                pedido do Emanuel (02/11): "não precisa explicar". As regras estão em
+                business-rules.md (Revisita, D-245) e o contador vem pronto do TOA. */}
           </div>
           <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
             Fechar

@@ -1,4 +1,4 @@
-# AFLINE — ponte com o TOA (0.6.0)
+# AFLINE — ponte com o TOA (0.8.0)
 
 Extensão do Chrome que **sincroniza o Gestor AF com o TOA sozinha**
 (D-189, D-192, D-193):
@@ -32,14 +32,24 @@ TOA. **Ela não altera nada no TOA** e não guarda a sua senha.
 1. **Entre no TOA** neste Chrome, com o seu login.
 2. **Clique no ícone da extensão** (abre o painel lateral) → entre com o seu **e-mail e senha do
    Gestor AF**. A extensão guarda só a sessão, como o navegador faz no site.
-3. Marque **"Sincronizar por este computador"**. A janelinha diz em uma frase
-   como está: sincronizando, de reserva (outro computador está com a vez), a
-   sessão do TOA caiu, ou desligado no Gestor AF.
-4. Quem opera liga o sincronismo e escolhe buckets e intervalos em
-   **Gestor AF › Operação › Sincronismo** (lá também fica o histórico de cada
-   rodada, com sucesso ou falha).
+3. Clique em **"Atualizar a lista"** (com o TOA aberto numa aba): aparecem os
+   **buckets do seu login** — os que a árvore do TOA mostra e que são de cidades
+   que você acessa no PulsoLine (o ADMIN vê todas). Marque os que este computador
+   sincroniza e escolha os tempos: **rota a cada 5, 15, 30 ou 60 min** e
+   **varredura a cada 5, 15, 30 ou 60 min, ou só no botão** (0.8.0, D-251).
+4. Marque **"Sincronizar por este computador"**. Cada bucket é sincronizado por um
+   computador por vez: o painel mostra "este computador", "com Fulano" ou "livre".
+   Em **PulsoLine › Operação › Sincronismo** se acompanha quem sincroniza cada
+   bucket e o histórico de cada rodada.
 
-**Para a varredura:** clique em **"Abrir a janela da varredura"** no painel.
+**Para a varredura (0.7.0):** basta o **TOA logado numa aba deste Chrome**, em
+qualquer tela — pode ficar escondida ou minimizada. A varredura **pede os dados
+direto ao TOA** (uma chamada por bucket e uma por técnico, D-250): o bucket inteiro
+em menos de um segundo, sem abrir contrato por contrato. Sem aba do TOA, a extensão
+abre uma, fixada e ao fundo (se pedir login, entre nela). O que não vier direto é
+lido pelas telas, do jeito antigo abaixo — só isso precisa do Console à vista.
+
+**A leitura pelas telas (a reserva):** clique em **"Abrir a janela da varredura"** no painel.
 Abre o TOA numa **janela só dela**; deixe-a no **Console de Alocação**, no dia
 de hoje, com a **lista de buckets (a árvore à esquerda) à vista**: desde a 0.5.0
 a varredura **troca de bucket sozinha** — abre MAN-AFLINE, depois

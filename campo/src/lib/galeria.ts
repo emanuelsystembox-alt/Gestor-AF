@@ -2,7 +2,11 @@ import * as ImagePicker from 'expo-image-picker'
 import type { Captura } from './midia'
 
 /**
- * Foto ou vídeo da GALERIA do celular (132, Emanuel 25/10).
+ * Foto da GALERIA do celular (132, Emanuel 25/10). Desde 02/11 (D-256),
+ * SÓ FOTO: "vídeo de até 60 seg direto da câmera, e fotos pode ir pelos
+ * dois caminhos" (Emanuel). O vídeo da galeria subia no tamanho original
+ * (o Android não comprime sem peça nativa) e sem hora/GPS confiáveis; o da
+ * câmera do app sai em 720p e carimbado. O seletor nem mostra vídeos.
  *
  * ┌─ contra a fraude: a galeria não é a câmera ───────────────────────┐
  * │ A câmera do app carimba hora e GPS do momento. Da galeria, a hora │
@@ -15,7 +19,7 @@ import type { Captura } from './midia'
 
 export interface DaGaleria {
   captura: Captura
-  /** A hora da foto/vídeo segundo o arquivo; nula = o arquivo não diz. */
+  /** A hora da foto segundo o arquivo; nula = o arquivo não diz. */
   capturadaEm: string | null
   lat: number | null
   lng: number | null
@@ -53,26 +57,23 @@ function grau(v: unknown, ref: unknown): number | null {
 export async function escolherDaGaleria(): Promise<DaGaleria | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
   if (!perm.granted) {
-    throw new Error('Autorize o acesso às fotos e vídeos nos ajustes do celular para enviar da galeria.')
+    throw new Error('Autorize o acesso às fotos nos ajustes do celular para enviar da galeria.')
   }
   const r = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images', 'videos'],
+    mediaTypes: ['images'],
     exif: true,
     quality: 1,
     allowsEditing: false,
   })
   if (r.canceled || !r.assets?.length) return null
   const a = r.assets[0]
-  const video = a.type === 'video'
+  // o seletor só oferece foto; se um aparelho devolver vídeo assim mesmo, recusa
+  if (a.type === 'video') throw new Error('Vídeo só pela câmera do app (até 60 s). Da galeria, só foto.')
   const exif = (a.exif ?? {}) as Record<string, unknown>
   const lat = grau(exif.GPSLatitude, exif.GPSLatitudeRef)
   const lng = grau(exif.GPSLongitude, exif.GPSLongitudeRef)
   return {
-    captura: {
-      uri: a.uri,
-      midia: video ? 'VIDEO' : 'FOTO',
-      duracaoSeg: video && a.duration ? Math.round(a.duration / 1000) : undefined,
-    },
+    captura: { uri: a.uri, midia: 'FOTO' },
     capturadaEm: dataExif(exif.DateTimeOriginal) ?? dataExif(exif.DateTime),
     // 0,0 é o "não sei" de alguns aparelhos, não um lugar no oceano.
     lat: lat && lng ? lat : null,

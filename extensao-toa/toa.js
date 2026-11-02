@@ -1,20 +1,102 @@
-// A varredura pelas TELAS do TOA (117, D-192). Roda dentro da aba do TOA.
+// A varredura do TOA (117, D-192; caminho direto 0.7.0, D-250). Roda dentro
+// da aba do TOA, no mundo isolado da extensão.
 //
-// ┌─ o que este script faz, e o que ele NÃO faz ───────────────────────┐
-// │ Faz o que uma pessoa faria com o mouse, contrato por contrato, no  │
-// │ Console de Alocação: clica no bloco da atividade, em "Detalhes",   │
-// │ lê o Nome; clica em "Equipamento" e lê a tabela. Quem conversa com │
-// │ o servidor é a própria aplicação do TOA, do jeito normal.          │
+// ┌─ dois caminhos, nesta ordem ───────────────────────────────────────┐
+// │ 1. DIRETO (0.7.0): pede ao toa-pagina.js, que roda no mundo da     │
+// │    página, os dados que as telas de Detalhes e Equipamento pedem — │
+// │    uma chamada por bucket e uma por técnico, sem abrir tela        │
+// │    nenhuma. Não precisa do Console, nem da aba à vista.            │
+// │ 2. PELAS TELAS (0.2 a 0.6): o que uma pessoa faria com o mouse, no │
+// │    Console de Alocação — bloco, "Detalhes", "Equipamento", voltar. │
+// │    Só para o que o caminho direto não trouxe (atividade que não    │
+// │    veio, técnico que falhou): a rede de segurança, ~9 s cada.      │
 // │                                                                    │
-// │ NÃO pede nada ao servidor por conta própria, NÃO copia ficha de    │
-// │ segurança, NÃO clica em nada que grave (só "Detalhes",             │
-// │ "Equipamento", "voltar" e o bucket na árvore — 0.5.0). Ver         │
-// │ docs/11-EXTENSAO-TOA.md.                                           │
-// │                                                                    │
-// │ "Recurso" (a carga do técnico) não é lido — Emanuel, 19/10.        │
+// │ Nos dois, só LEITURA: nada que grave no TOA. Ver                   │
+// │ docs/11-EXTENSAO-TOA.md. "Recurso" (a carga do técnico) não é lido │
+// │ — Emanuel, 19/10.                                                  │
 // └────────────────────────────────────────────────────────────────────┘
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// ── a conversa com toa-pagina.js (mundo da página) ──────────────────────
+const PEDIDO = 'afline-toa-pedido'
+const RESPOSTA = 'afline-toa-resposta'
+const aguardando = new Map()
+window.addEventListener('message', (ev) => {
+  if (ev.source !== window) return
+  const d = ev.data
+  if (!d || d.origem !== RESPOSTA || !aguardando.has(d.id)) return
+  aguardando.get(d.id)(d)
+  aguardando.delete(d.id)
+})
+function pedirPagina(op, params = {}, prazo = 60000) {
+  const id = crypto.randomUUID()
+  return new Promise((ok, falha) => {
+    const t = setTimeout(() => { aguardando.delete(id); falha(new Error('o TOA não respondeu a tempo')) }, prazo)
+    aguardando.set(id, (d) => { clearTimeout(t); d.ok ? ok(d) : falha(new Error(d.erro || 'erro')) })
+    window.postMessage({ origem: PEDIDO, id, op, ...params }, location.origin)
+  })
+}
+async function diretoPronto() {
+  try { const r = await pedirPagina('pronto', {}, 3000); return !!r.temSessao } catch { return false }
+}
+
+/** Até `n` tarefas ao mesmo tempo. Sem `espera()` entre elas: numa aba
+ *  escondida há mais de 5 min o Chrome alinha os relógios a 1 por minuto,
+ *  e um fôlego de 400 ms viraria um minuto. O ritmo é o da rede. */
+async function emParalelo(lista, n, tarefa) {
+  let i = 0
+  const trabalhador = async () => { while (i < lista.length && !cancelado) { const x = lista[i++]; await tarefa(x) } }
+  await Promise.all(Array.from({ length: Math.min(n, lista.length) }, trabalhador))
+}
+
+/**
+ * O caminho direto. Devolve os itens que NÃO conseguiu (vão pelas telas) e
+ * o motivo de cada grupo que falhou, para o recado.
+ *
+ * Atividade que não veio no Gantt do bucket NÃO vira "fora do Console": o
+ * Gantt pode não trazer subgrupo, e quem decide "fora" é a tela. Zero e
+ * desconhecido não são a mesma coisa.
+ */
+async function varrerDireto(itens, dia, aoLer) {
+  const sobra = []
+  const motivos = new Set()
+  const porBucket = new Map()
+  for (const it of itens) {
+    const b = it.bucket || ''
+    if (!porBucket.has(b)) porBucket.set(b, [])
+    porBucket.get(b).push(it)
+  }
+  for (const [bucket, doBucket] of porBucket) {
+    if (cancelado) { sobra.push(...doBucket); continue }
+    let ativ
+    try { ativ = (await pedirPagina('bucket', { bucket, dia })).atividades }
+    catch (e) { motivos.add(`${bucket}: ${e.message}`); sobra.push(...doBucket); continue }
+
+    const porTecnico = new Map()
+    for (const it of doBucket) {
+      const a = ativ[it.aid]
+      if (!a || !a.tecnico) { sobra.push(it); continue }
+      if (!porTecnico.has(a.tecnico)) porTecnico.set(a.tecnico, [])
+      porTecnico.get(a.tecnico).push(it)
+    }
+    await emParalelo([...porTecnico], 3, async ([tecnico, dele]) => {
+      let r
+      try { r = await pedirPagina('tecnico', { tecnico, aids: dele.map((x) => x.aid), dia }) }
+      catch (e) { motivos.add(`${bucket}: ${e.message}`); sobra.push(...dele); return }
+      for (const it of dele) {
+        const lido = r.porAid[it.aid]
+        if (!lido) { sobra.push(it); continue }
+        const leu = !!it.precisa_equipamento && r.veioInventario
+        await aoLer(it, {
+          ok: true, nome: lido.nome || ativ[it.aid].rotuloNome || null,
+          leuEquipamento: leu, itens: leu ? lido.itens : [],
+        })
+      }
+    })
+  }
+  return { sobra, motivos: [...motivos] }
+}
 
 // ┌─ aba escondida = tela parada ──────────────────────────────────────┐
 // │ O Chrome quase para uma aba que não está à vista: não desenha a    │
@@ -255,24 +337,50 @@ async function varrer(pedido) {
   // 0.6.0: começa pelo bucket que JÁ está aberto no Console — "coloquei para
   // começar primeiro na VT e não vai" (Emanuel). Os outros seguem na ordem do banco.
   const aberto = noConsole() ? normalizar(bucketAberto()) : null
-  const itens = aberto
+  const todos = aberto
     ? [...pedido.itens.filter((i) => normalizar(i.bucket) === aberto),
        ...pedido.itens.filter((i) => normalizar(i.bucket) !== aberto)]
     : pedido.itens
-  const total = itens.length
+  const total = todos.length
   const avisar = (evento) => chrome.runtime.sendMessage({
     tipo: 'varredura-evento', idPedido: pedido.idPedido, abaGestor: pedido.abaGestor, total, ...evento,
   }).catch(() => {})
-  let feitos = 0
+  let feitos = 0, diretos = 0
   const bucketInicial = noConsole() ? bucketAberto() : null
   // escondida → 'pausa'; à vista de novo → 'retoma' (a janelinha mostra)
   avisarPausa = (sim) => avisar({ evento: sim ? 'pausa' : 'retoma', feitos })
   try {
+    // 1. o caminho direto (0.7.0)
+    let itens = todos, motivos = []
+    if (pedido.dia && (await diretoPronto())) {
+      const r = await varrerDireto(todos, pedido.dia, async (it, resultado) => {
+        feitos++; diretos++
+        await avisar({ evento: 'item', aid: it.aid, feitos, resultado })
+      })
+      itens = r.sobra; motivos = r.motivos
+    }
+    let campos = null
+    try { campos = (await pedirPagina('campos', {}, 3000)).campos } catch { /* sem diagnóstico */ }
+    const fimDireto = { diretos, campos, motivos }
+
+    // 2. o que sobrou, pelas telas — que precisam do Console
+    if (itens.length && !cancelado && !noConsole() && !nosDetalhes() && !naLista()) {
+      const recado = 'Não veio pelo caminho direto'
+        + (motivos.length ? ` (${motivos.join('; ')})` : '')
+        + '. Para ler pelas telas, deixe a aba do TOA no Console de Alocação.'
+      for (const it of itens) {
+        feitos++
+        await avisar({ evento: 'item', aid: it.aid, feitos, resultado: { ok: false, motivo: 'SEM_DIRETO', mensagem: recado } })
+      }
+      itens = []
+    }
+    if (!itens.length) { await avisar({ evento: 'fim', feitos, cancelado, ...fimDireto }); return }
+
     for (const it of itens) {
-      if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
+      if (cancelado) { await avisar({ evento: 'fim', feitos, ...fimDireto, cancelado: true }); return }
       let r
       await esperarVisivel()
-      if (cancelado) { await avisar({ evento: 'fim', feitos, cancelado: true }); return }
+      if (cancelado) { await avisar({ evento: 'fim', feitos, ...fimDireto, cancelado: true }); return }
       // Uma segunda tentativa antes de anotar erro: o TOA às vezes só está lento.
       try { r = await processar(it) } catch (e1) {
         try { await espera(1500); r = await processar(it) }
@@ -286,7 +394,7 @@ async function varrer(pedido) {
     await voltarAoConsole()
     // deixa o Console no bucket em que estava (quem olha a janela não se perde)
     if (bucketInicial && !consoleEm(bucketInicial)) await abrirBucket(bucketInicial).catch(() => {})
-    await avisar({ evento: 'fim', feitos })
+    await avisar({ evento: 'fim', feitos, ...fimDireto })
   } finally {
     rodando = false
     avisarPausa = null
@@ -297,15 +405,26 @@ chrome.runtime.onMessage.addListener((msg, sender, responder) => {
   if (sender.id !== chrome.runtime.id || !msg) return false
   if (msg.tipo === 'varrer') {
     if (rodando) { responder({ aceito: false, mensagem: 'Esta aba do TOA já está varrendo.' }); return false }
-    if (!noConsole() && !nosDetalhes() && !naLista()) {
-      responder({ aceito: false, mensagem: 'Deixe a aba do TOA no Console de Alocação (bucket e dia de hoje) e tente de novo.' })
-      return false
-    }
-    responder({ aceito: true, bucket: noConsole() ? bucketAberto() : null })
-    varrer(msg)
-    return false
+    // 0.7.0: com o caminho direto, qualquer tela do TOA serve; sem ele, só o Console
+    diretoPronto().then((direto) => {
+      if (!direto && !noConsole() && !nosDetalhes() && !naLista()) {
+        responder({ aceito: false, mensagem: 'Deixe a aba do TOA no Console de Alocação (bucket e dia de hoje) e tente de novo.' })
+        return
+      }
+      responder({ aceito: true, direto, bucket: noConsole() ? bucketAberto() : null })
+      varrer(msg)
+    })
+    return true
   }
   if (msg.tipo === 'cancelar-varredura') { cancelado = true; responder({ ok: true }); return false }
-  if (msg.tipo === 'toa-estado') { responder({ noConsole: noConsole(), bucket: noConsole() ? bucketAberto() : null, rodando }); return false }
+  // 0.8.0: os buckets que o login deste TOA enxerga (a lista da extensão)
+  if (msg.tipo === 'arvore') {
+    pedirPagina('arvore', {}, 5000).then((r) => responder({ ok: true, itens: r.itens }), () => responder({ ok: false }))
+    return true
+  }
+  if (msg.tipo === 'toa-estado') {
+    diretoPronto().then((direto) => responder({ noConsole: noConsole(), bucket: noConsole() ? bucketAberto() : null, rodando, direto }))
+    return true
+  }
   return false
 })

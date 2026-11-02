@@ -126,6 +126,10 @@ sai pela API do Storage (policy `evidencia_arquivo_apagar`), depois a linha
 contrato guarda que uma foto/vídeo foi apagado, por quem e quando — sem o
 arquivo. Ninguém apaga a evidência de OUTRO; não há UPDATE.
 
+**Vídeo só pela câmera do app, até 60 s, em 720p; foto pela câmera ou pela galeria**
+(D-256, Emanuel 02/11). A galeria não oferece vídeo: subia no tamanho original e sem
+hora/GPS confiáveis. Foto da galeria sobe marcada `da_galeria` (D-213).
+
 **Nenhuma foto é obrigatória para baixar** — decisão do Emanuel entre
 quatro opções (D-115). Se virar exigência, é tabela nova + cenário em
 `testar_campo()`.
@@ -144,6 +148,10 @@ até alguém dizer de quem é.
 `equipe_do_login` lê **só** `equipe_login_toa` com `criado_por is not
 null`: "estava lá antes" não é prova de nada — a 039 preservou 9 seeds
 de migration achando que eram declaração, e eles rotearam 121 contratos.
+
+**Transferir não fixa a rota** (170, D-257). A chave "Roteamento do TOA" do contrato é a
+única que fixa; armada, a próxima importação devolve o contrato à equipe do login do
+técnico. Quem transfere e quer segurar, desliga a chave.
 
 **A data de contratação é da pessoa** (`perfil.data_contratacao`, 101),
 opcional, e só o ADMIN altera. O tempo de casa é calculado na leitura,
@@ -350,11 +358,11 @@ app vira ponto `SAIU` ("app fechado" na trilha, não "parado"). Sem
 contrato produtivo de hoje em aberto, o segundo plano **desliga
 sozinho**: rastrear o técnico fora da rota não foi pedido e é dado
 pessoal de empregado. O técnico **sabe** que é registrado (aviso na
-Agenda). Só a gestão lê o rastro (a TRILHA), e só de equipe visível.
+Agenda — o aviso saiu na D-249). Só a gestão lê o rastro (a TRILHA), e só de equipe visível.
 
 **Geo-Rota: o colega vê só a última posição** (130, D-207). Da mesma cidade,
-em rota hoje, vista há até 30 min, ponto real — e só de quem deu ciência do
-texto v2 do rastro, que diz isso. Nunca a trilha. A conversa entre técnicos
+em rota hoje, vista há até 30 min, ponto real. Nunca a trilha. (Até a 166
+exigia a ciência v2 do rastro; saiu com a D-249.) A conversa entre técnicos
 é lida pelos dois e pela gestão (escolha do Emanuel, 24/10).
 
 **Sair do login apaga a fila de pontos do aparelho.** Quem é o técnico o
@@ -386,9 +394,12 @@ trava no BANCO (baixa e status) até chegar um ponto real. Sem satélite não
 trava (D-113). Modo desenvolvedor sozinho não trava; root e salto só
 acusam. iPhone não tem a marca de simulação.
 
-**O rastro só começa depois do "Estou ciente"**, gravado com a versão do
-texto. Texto novo = versão nova. Retenção: **90 dias**, expurgo diário
-(pg_cron).
+**O rastro liga sem o "Estou ciente"** (166, D-249 — mudou a regra da 097,
+que exigia a ciência antes). *"não precisa dizer quando o usuário logar (...)
+não precisa nada disso"* (Emanuel, 31/10). O aviso ao funcionário é da AFLINE
+(contrato/termo), não do sistema. A Geo-Rota não exige mais a ciência; a
+pesquisa de humor continua obrigatória. `ciencia_rastro` fica como histórico.
+Retenção: **90 dias**, expurgo diário (pg_cron).
 
 ---
 
@@ -515,6 +526,50 @@ e sem desatribuído) que voltaram em VT — depois de QUALQUER visita dele.
 
 **Só o ADMIN publica; todo o time lê.** No banco (RLS de `mural_post` e do bucket
 `mural`), não na tela. O autor é carimbado por gatilho.
+
+## Sincronismo com o TOA: por computador, a vez por bucket (167, D-251)
+
+**Quem importa à mão é o usuário comum** (Importar TOA: baixa a planilha no TOA e sobe).
+**Quem tem a extensão** escolhe no painel dela, **para aquele computador**, os buckets e
+os tempos — rota a cada 5/15/30/60 min; varredura a cada 5/15/30/60 min ou só no botão.
+A tela Sincronismo só acompanha.
+
+- **O bucket oferecido é o da árvore do TOA daquele Chrome E de uma cidade que a pessoa
+  vê no PulsoLine** (`bases_permitidas()`): o ADMIN, todas as cidades; os demais, a do
+  cadastro + "Cidades que acessa". Os dois logins juntos — escolha do Emanuel.
+- **Um bucket, um computador por vez** (pessoa + máquina). Parou 3 min, outro que marcou
+  assume sozinho; ou na hora, com "Assumir os marcados". Dois importando o mesmo bucket
+  é contrato em dobro na fila.
+- **Cada bucket é importado e varrido na cidade DELE**, não na cidade ativa do topo
+  (ver o cabeçalho `x-afline-cidade` em `security.md`). Trocar a cidade ativa para isso
+  foi recusado: mexeria na tela de quem usa o site com o mesmo login.
+- **Bucket da árvore sem cadastro aparece "fora da lista", com o porquê** — não cadastrado,
+  outra cidade, desligado, número diferente. Cadastrar é do ADMIN (Configurações › Buckets
+  do TOA); o prefixo do TOA não diz a cidade com certeza (ARN é Araguaína) — pergunte.
+
+## A varredura lê o TOA direto, só leitura (D-250)
+
+A extensão pede ao TOA, de dentro da aba em que a pessoa entrou, o que as telas de
+Detalhes e Equipamento pediriam (`Time/get` por bucket, `sync/write` por técnico). **Nunca
+grava no TOA** — nem `managedgroup`, nem `sync/write` com ação na pilha. Isso reabriu, por
+decisão do Emanuel, o caminho que a D-192 tinha fechado.
+
+**No contrato, Equipamento e Miscelânea são abas separadas, com contador** (D-252).
+Miscelânea = item sem serial. O contador conta a lista inteira da aba, inclusive "já
+estava no cliente"; sem leitura do TOA, a aba fica **sem número** (não "0").
+**Evento vindo da importação mostra "Operadora" em Quem** — é o TOA afirmando, não quem
+importou (que fica na dica do mouse).
+
+## Agrupamento da quebra (141 a 143, 168, 169; D-254, D-255)
+
+O agrupamento vem do painel da CLARO (coluna AH da *Quebra Qualificada*) e é gravado por
+**migration** — os códigos de baixa são globais (`empresa_id` nulo) e não há tela.
+**Pode ser outro na VT**: `agrupamento_quebra_vt` vale quando o grupo de serviço é
+**VISITA TECNICA** (escolha do Emanuel: o grupo de serviço, não o bucket _VT). Hoje só o
+301: instalação → PROCESSO VENDA ("Comercial"), VT → INFRA CLIENTE ("Causa Cliente"). A
+regra existe duas vezes e **muda junto**: `agrupamento_da_quebra()` no banco e
+`agrupamentoDaQuebra()` em `lib/metricas.ts`. O 205 (Falta Tap) é INFRA CLARO, como o 211
+(Falta NAP) da instalação.
 
 ## Em aberto — pergunte antes de assumir
 

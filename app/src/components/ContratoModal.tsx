@@ -8,7 +8,7 @@ import { equipeRotulo, mascaraTelefone, pts } from '../lib/formato'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { SeloLocal } from './TabelaContratos'
 import type { AcaoContrato } from './MenuContrato'
-import { EquipamentoToa } from './EquipamentoToa'
+import { EquipamentoToa, contagemToa, useEquipamentoToa } from './EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 
 /** O código de baixa com o destino dele (D-097): é o destino que diz
@@ -45,7 +45,7 @@ interface OS {
 }
 interface Evento {
   id: number; tipo: string; criado_em: string; observacao: string | null
-  login: string | null
+  login: string | null; origem: string | null
   de: Record<string, unknown> | null; para: Record<string, unknown> | null
   usuario: { nome: string } | null
   equipe: { codigo: string } | null
@@ -106,7 +106,7 @@ const SELECT = `
   ),
   visita_marcador ( id, indicador_id ),
   visita_evento (
-    id, tipo, criado_em, observacao, login, de, para,
+    id, tipo, criado_em, observacao, login, de, para, origem,
     usuario:usuario_id ( nome ),
     equipe:equipe_id ( codigo ),
     codigo_baixa:codigo_baixa_id ( codigo, descricao ),
@@ -175,8 +175,14 @@ export function ContratoModal({
 }) {
   const pagina = modo === 'pagina'
   const [v, setV] = useState<Visita | null>(null)
-  const [aba, setAba] = useState<'detalhe' | 'historico' | 'equipamento' | 'marcadores'>(
+  const [aba, setAba] = useState<'detalhe' | 'historico' | 'equipamento' | 'miscelanea' | 'marcadores'>(
     acaoInicial === 'marcadores' ? 'marcadores' : 'detalhe')
+  // D-252: o que o TOA mostra, lido uma vez para as abas Equipamento e Miscelânea
+  const itensToa = useEquipamentoToa(v?.id, v?.toa_varrido_em)
+  const contaToa = (t: 'EQUIPAMENTO' | 'MISCELANEA') => {
+    const n = contagemToa(itensToa, v?.toa_varrido_em, t)
+    return n === undefined ? '' : ` (${n})`
+  }
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -422,7 +428,8 @@ export function ContratoModal({
             : [['detalhe', 'Detalhe'],
                ['historico', `Histórico (${v?.visita_evento.length ?? 0})`],
                // 133: o equipamento do TOA tem aba própria aqui também.
-               ['equipamento', 'Equipamento'],
+               ['equipamento', `Equipamento${contaToa('EQUIPAMENTO')}`],
+               ['miscelanea', `Miscelânea${contaToa('MISCELANEA')}`],
                ['marcadores', `Marcadores (${marcados.length})`]] as const
           ).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(pagina && aba === a ? 'detalhe' : a)}
@@ -1085,7 +1092,9 @@ export function ContratoModal({
           ) : aba === 'equipamento' ? (
             /* 117 na aba dele (133): a lista de peças não disputa mais
                espaço com os dados do contrato. */
-            <EquipamentoToa visitaId={v.id} varridoEm={v.toa_varrido_em} />
+            <EquipamentoToa itens={itensToa} varridoEm={v.toa_varrido_em} tipo="EQUIPAMENTO" />
+          ) : aba === 'miscelanea' ? (
+            <EquipamentoToa itens={itensToa} varridoEm={v.toa_varrido_em} tipo="MISCELANEA" />
           ) : aba === 'historico' ? (
             v.visita_evento.length === 0 ? (
               <p className="text-sm text-graf-500">Sem histórico registrado.</p>
@@ -1125,7 +1134,10 @@ export function ContratoModal({
                         <td className="px-2 py-1.5 text-graf-400">
                           {e.equipe ? equipeRotulo(e.equipe.codigo) : '—'}</td>
                         <td className="px-2 py-1.5 text-graf-400">
-                          {e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
+                          {/* D-252: da importação, quem afirma é a Operadora (o TOA) */}
+                          {e.origem === 'IMPORTACAO'
+                            ? <span title={e.usuario?.nome ? `Importado por ${e.usuario.nome}` : undefined}>Operadora</span>
+                            : e.usuario?.nome ?? <span className="text-graf-600">sistema</span>}
                         </td>
                         {/* O login é o do TOA quando o evento veio da planilha,
                             e o e-mail de quem operou quando veio da tela. */}
