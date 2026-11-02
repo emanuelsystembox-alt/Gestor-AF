@@ -465,10 +465,10 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 - Manaus tem supervisor só no texto da planilha (12 de 68 equipes): cadastrar pela tela do
   supervisor, como São Luís, para o relatório sair completo.
 
-## Para a próxima atualização do app (pela atualização no ar, sem APK novo)
+## App — selos de prédio, casa e revisita (D-261)
 
-- Selos de prédio/casa e do vai-e-volta na Agenda (D-261) — prontos no código, não publicados
-  a pedido do Emanuel, para irem junto com os outros detalhes dele.
+Publicados pelo ar em 02/11 (update group `ee40469c`, runtime 0.6.0). Falta ver num celular
+(o técnico abre o app duas vezes para pegar a atualização).
 
 ## Segurança — auditoria de 02/11/2026 (D-258, migration 171)
 

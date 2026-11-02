@@ -11507,5 +11507,7 @@ e a visita anterior. Na tabela de contratos (Serviços e Equipes), ao lado do n�
 ao lado do bairro (5 nomes longos encurtam um pouco); no cabeçalho do contrato. Web publicada.
 
 **App:** os selos "🏢 Prédio", "🏠 Casa" e "🔁 VT da VT / Retorno do retorno / Revisita" na
-Agenda estão PRONTOS no código e **não publicados**, a pedido do Emanuel ("vamos deixar para a
-próxima atualização do app"). Não precisam de APK novo: vão pela atualização no ar.
+Agenda. Primeiro ficaram para a próxima atualização; quando ficou claro que não precisavam de APK
+novo, o Emanuel pediu para subir: publicados pelo ar em 02/11 (update group `ee40469c`,
+runtime 0.6.0; `app.json` e `eas.json` conferidos intactos). Chegam a quem tem o APK 0.6.0,
+na segunda vez que abrir o app. NÃO conferido num celular.
