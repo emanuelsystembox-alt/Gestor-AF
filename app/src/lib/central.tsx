@@ -74,7 +74,7 @@ export interface Sinal {
    *  sinal sem rótulo e sem cor porque o tipo do front ficou para trás
    *  do banco. Tipo novo no banco entra NESTA lista no mesmo dia. */
   tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO' | 'CERCA' | 'GPS'
-    | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO' | 'TEC1_RISCO'
+    | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO' | 'TEC1_RISCO' | 'RESUMO'
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean

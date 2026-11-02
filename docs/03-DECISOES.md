@@ -11596,3 +11596,27 @@ Medido como authenticated: `tec1_em_risco` 216 ms (77 ms são a régua de 30 dia
 `sinais_do_dia` foi de 139 para 275 ms em Manaus. **Não verificado:** acerto da previsão — não
 há histórico do estado de cada hora para testar para trás. Conferir em 03/11 à noite: dos
 contratos que receberam TEC1_RISCO, quantos fecharam SEM PADRÃO.
+
+### D-265 · O resumo do dia, às 18h, guardado por cidade (177)
+
+> "Resumo do dia automático às 18h para a coordenação: TEC1, quebras por agrupamento,
+> revisitas, quem ficou abaixo do ritmo, ocorrências do campo e humor" — pacote de 02/11;
+> onde chega, escolha do Emanuel: **na tela, com aviso no sino** (D-262).
+
+`gerar_resumo_do_dia()` fotografa a cidade ativa com as contas que já existem — `tec1_da_os`,
+`impacto_quebra`, `revisita_dos_contratos`, `ritmo_do_dia`; nenhuma regra escrita de novo. O
+pg_cron chama às 18h de Manaus (22h UTC) por `rodar_por_cidade()`, a porta única do relógio
+(a 175 passou a usá-la também; a lista de funções aceitas é fechada). Pelo relógio, nasce o
+sinal RESUMO no sino ("TEC1 94,0% · 4 quebrado(s) · 9 revisita(s)"), que leva à tela
+Inteligência › Resumo do dia. A gestão pode **Gerar agora** (refaz o de hoje; sem sinal —
+quem apertou já está vendo).
+
+**É foto, não painel ao vivo:** o rodapé diz a hora e se foi o relógio ou quem gerou.
+Humor só para `campo.humor`, ocorrências só para `campo.ocorrencias` (D-226): a tabela
+`resumo_dia` não tem policy, e só `resumo_do_dia()` lê, cortando por permissão. Humor conta
+entre os ESCALADOS (técnico com contrato no dia) — folga não é falta.
+
+O resumo carrega a **conferência da 176**: dos contratos avisados em TEC1_RISCO, quantos
+fecharam sem padrão. Em 02/11 os resumos foram gerados à mão às 18h22 (a tarefa nasceu depois
+das 18h): Manaus 69 contratos, TEC1 47/50, 4 quebrados (3 INFRA CLARO, 1 AGENDAMENTO), 9
+revisitas; São Luís 47, TEC1 32/32, 9 quebrados. Medido: 123 ms por cidade.

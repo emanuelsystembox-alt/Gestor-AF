@@ -29,8 +29,8 @@ import {
 // 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
 // que o controle precisa ver primeiro.
 const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1_RISCO', 'ATRASO', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS',
-  'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
-const ROTULO: Record<Sinal['tipo'], string> = {
+  'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO', 'RESUMO']
+export const ROTULO_SINAL: Record<Sinal['tipo'], string> = {
   AJUDA: 'Suporte técnico', TEC1: 'TEC1 / janela perdida', RITMO: 'Abaixo do ritmo',
   QUEBROU: 'Contratos quebrados', MATERIAL: 'Material sinalizado pelo campo',
   ABASTECIMENTO: 'Abastecimento aguardando aprovação',
@@ -41,6 +41,7 @@ const ROTULO: Record<Sinal['tipo'], string> = {
   LOCAL: 'Baixa longe do cliente', ATRASO: 'Janela acabando sem chegada',
   // 176: a previsão pela fila do técnico, antes do ATRASO.
   TEC1_RISCO: 'TEC1 em risco (previsão)',
+  RESUMO: 'Resumo do dia',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
@@ -48,6 +49,7 @@ const COR: Record<Sinal['tipo'], string> = {
   GPS: 'bg-red-600', CERCA: 'bg-indigo-500',
   DOIS_ATIVOS: 'bg-fuchsia-500', SUMIU_TOA: 'bg-orange-600',
   LOCAL: 'bg-cyan-500', ATRASO: 'bg-red-500', TEC1_RISCO: 'bg-orange-400',
+  RESUMO: 'bg-emerald-500',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -58,6 +60,7 @@ function destino(s: Sinal): string | null {
   // de vários, abre o técnico em Equipes e os contratos vão como etiquetas.
   if (s.tipo === 'QUEBROU' && s.contratos?.length === 1) return `/controle/visita/${s.contratos[0].visita_id}`
   if (s.tipo === 'MATERIAL') return '/almoxarifado?aba=sinalizacoes'
+  if (s.tipo === 'RESUMO') return '/controle/resumo'
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
   // 097: GPS e cerca abrem o técnico no Monitoramento.
   if ((s.tipo === 'GPS' || s.tipo === 'CERCA') && s.tecnico_id) return `/controle/monitor?tecnico=${s.tecnico_id}`
@@ -195,7 +198,7 @@ export function PainelCentral({ fechar, filtro, titulo }: {
             <section key={tipo} className="border-b border-graf-800 px-3 py-2.5">
               <h3 className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-graf-300">
                 <span aria-hidden className={`h-2 w-2 rounded-full ${COR[tipo]}`} />
-                {ROTULO[tipo]}
+                {ROTULO_SINAL[tipo]}
                 <span className="tabular ml-auto rounded bg-graf-800 px-1.5 text-graf-200">{doTipo.length}</span>
               </h3>
               <ul className="space-y-1">

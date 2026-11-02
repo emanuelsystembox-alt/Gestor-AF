@@ -74,6 +74,12 @@ const OPERACAO: Modulo = {
     // Sub-falhas saiu daqui: mora em Configurações, aba Sub-falhas (D-161).
   ],
 }
+/** 177 em diante: o que o sistema confere e resume sozinho (D-262). */
+const INTELIGENCIA: Modulo = {
+  chave: 'inteligencia', titulo: 'Inteligência', icone: 'indicadores', itens: [
+    { para: '/controle/resumo', rotulo: 'Resumo do dia', icone: 'relatorios', busca: 'resumo 18h fechamento dia tec1 quebras revisita ritmo humor' },
+  ],
+}
 const ALMOXARIFADO: Modulo = {
   chave: 'almoxarifado', titulo: 'Almoxarifado', icone: 'estoque', itens: [
     { para: '/almoxarifado', rotulo: 'Estoque', icone: 'estoque', busca: 'almoxarifado romaneio serial miscelanea carga' },
@@ -142,7 +148,7 @@ function useModulos(): Modulo[] {
   const filtrar = (m: Modulo): Modulo => ({ ...m, itens: m.itens.filter(i => !i.permissao || pode(i.permissao)) })
   return [
     COMUNICACAO,
-    ...(gestao ? [filtrar(OPERACAO)] : []),
+    ...(gestao ? [filtrar(OPERACAO), INTELIGENCIA] : []),
     ...(gestao && (pode('campo.humor') || pode('campo.ocorrencias'))
       ? [CAMPO_EQUIPE(pode('campo.humor'), pode('campo.ocorrencias'))] : []),
     ...(gestao && pode('qualidade.ver') ? [QUALIDADE] : []),
