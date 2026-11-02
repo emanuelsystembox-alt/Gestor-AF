@@ -18,7 +18,7 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
-import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
+import { SeloEdificacao, SeloOuvidoria, SeloRevisita, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { BarraInferior } from '../ui/BarraInferior'
 import { capaDoMural } from './Mural'
 import { cor, raio, sombraCard } from '../ui/tema'
@@ -73,6 +73,14 @@ export interface LinhaAgenda {
   casa_marcado_em: string | null
 }
 
+/** O que `sinais_das_visitas` devolve (174, D-261). */
+interface Sinal {
+  visita_id: string
+  edificacao: 'PREDIO' | 'CASA' | null
+  revisita: boolean
+  revisita_motivo: string | null
+}
+
 interface Producao {
   tecnico_id: string | null
   pontos: number
@@ -121,12 +129,22 @@ export default function Agenda({ navigation }: Props) {
   /** 163: a capa do Mural (o primeiro post no ar). Nulo = nada no
    *  ar, ou não deu para ler — nos dois casos o cartão não aparece. */
   const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
+  const [sinais, setSinais] = useState<Map<string, Sinal>>(new Map())
 
   const carregar = useCallback(async (dia: string) => {
     setErro(null)
     const { data: d, error } = await supabase.rpc('agenda_do_campo', { p_data: dia })
-    if (error) setErro(error.message)
-    else setLinhas((d ?? []) as LinhaAgenda[])
+    if (error) { setErro(error.message); return }
+    const ls = (d ?? []) as LinhaAgenda[]
+    setLinhas(ls)
+    // 174 (D-261): prédio, casa e o vai-e-volta, como no TOA. Falhar aqui
+    // não derruba a agenda — só não aparecem os selos.
+    if (ls.length) {
+      const { data: s } = await supabase.rpc('sinais_das_visitas', { p_visitas: ls.map(l => l.visita_id) })
+      const m = new Map<string, Sinal>()
+      for (const x of (s ?? []) as Sinal[]) m.set(x.visita_id, x)
+      setSinais(m)
+    } else setSinais(new Map())
   }, [])
 
   useEffect(() => {
@@ -572,8 +590,12 @@ export default function Agenda({ navigation }: Props) {
             {/* O que o controlador vê na linha do contrato, o técnico vê
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
                 muda como ele trata o cliente. */}
-            {(!!l.ouvidoria || !!l.segmento || !!l.tec1) && (
+            {(!!l.ouvidoria || !!l.segmento || !!l.tec1 || !!sinais.get(l.visita_id)?.edificacao
+              || !!sinais.get(l.visita_id)?.revisita) && (
               <View style={e.marcas}>
+                <SeloRevisita revisita={sinais.get(l.visita_id)?.revisita}
+                  motivo={sinais.get(l.visita_id)?.revisita_motivo} />
+                <SeloEdificacao edificacao={sinais.get(l.visita_id)?.edificacao} />
                 <SeloOuvidoria ouvidoria={l.ouvidoria} />
                 <SeloSegmento segmento={l.segmento} />
                 <SeloTec1 tec1={l.tec1} />

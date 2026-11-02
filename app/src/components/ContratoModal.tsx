@@ -9,6 +9,7 @@ import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { SeloLocal } from './TabelaContratos'
 import type { AcaoContrato } from './MenuContrato'
 import { EquipamentoToa, contagemToa, useEquipamentoToa } from './EquipamentoToa'
+import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 
 /** O código de baixa com o destino dele (D-097): é o destino que diz
@@ -179,6 +180,7 @@ export function ContratoModal({
     acaoInicial === 'marcadores' ? 'marcadores' : 'detalhe')
   // D-252: o que o TOA mostra, lido uma vez para as abas Equipamento e Miscelânea
   const itensToa = useEquipamentoToa(v?.id, v?.toa_varrido_em)
+  const sinalDoContrato = useSinaisDasVisitas(v?.id ? [v.id] : [])
   const contaToa = (t: 'EQUIPAMENTO' | 'MISCELANEA') => {
     const n = contagemToa(itensToa, v?.toa_varrido_em, t)
     return n === undefined ? '' : ` (${n})`
@@ -344,6 +346,8 @@ export function ContratoModal({
               <h2 className="truncate text-lg font-semibold">
                 Contrato {v?.contrato ?? '—'}
               </h2>
+              {/* 174 (D-261): prédio, casa e o vai-e-volta, como o TOA */}
+              <SinaisContrato s={sinalDoContrato.get(v?.id ?? '')} tamanho="md" />
               <SeloOuvidoria ouvidoria={v?.ouvidoria} grande />
               <SeloSegmento segmentacao={v?.segmentacao?.nome} grande />
             </div>

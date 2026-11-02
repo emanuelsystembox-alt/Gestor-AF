@@ -101,8 +101,8 @@ export interface VisitaLinha {
   tipo_servico: { nome: string } | null
   area: { codigo: string; apelido: string | null } | null
   equipe: { codigo: string; nome: string; supervisor_nome: string | null
-            login_toa: string | null } | null
-  tecnico: { nome: string; matricula: string } | null
+            login_toa: string | null; supervisor: { nome: string } | null } | null
+  tecnico: { nome: string; matricula: string; supervisor: { nome: string } | null } | null
   base: { nome: string } | null
   importacao: {
     arquivo_nome: string; criado_em: string
@@ -156,6 +156,17 @@ export interface Indicador { id: string; nome: string }
  * coluna nova no relatório sem campo no SELECT sai vazia em silêncio,
  * e foi exatamente assim que a pontuação sumiu do export.
  */
+/**
+ * O supervisor da visita, pela precedência da D-134 (D-260): o que alguém
+ * DECLAROU na tela do supervisor (o técnico) → o login ligado à equipe →
+ * o texto da planilha da equipe. "Lá que é o filtro do supervisor oficial"
+ * (Emanuel, 02/11). São Luís tem o primeiro e não o último; Manaus, o
+ * contrário — e o relatório só lia o último. A coluna e o filtro usam isto.
+ */
+export function supervisorDe(v: Pick<VisitaLinha, 'equipe' | 'tecnico'>): string | null {
+  return v.tecnico?.supervisor?.nome ?? v.equipe?.supervisor?.nome ?? v.equipe?.supervisor_nome ?? null
+}
+
 export const SELECT_RELATORIO = `
   id, toa_atividade_id, wo_numero, contrato, origem,
   cliente_nome, tipo_pessoa, tipo_residencia, telefones,
@@ -168,8 +179,8 @@ export const SELECT_RELATORIO = `
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome ),
   area:area_id ( codigo, apelido ),
-  equipe:equipe_id ( codigo, nome, supervisor_nome, login_toa ),
-  tecnico:tecnico_responsavel_id ( nome, matricula ),
+  equipe:equipe_id ( codigo, nome, supervisor_nome, login_toa, supervisor:supervisor_id ( nome ) ),
+  tecnico:tecnico_responsavel_id ( nome, matricula, supervisor:supervisor_id ( nome ) ),
   base:base_id ( nome ),
   importacao:importacao_id (
     arquivo_nome, criado_em, usuario:usuario_id ( nome, email )
@@ -442,7 +453,7 @@ function linhaVisita(v: VisitaLinha, l: Largura, locais?: Map<string, LocalBaixa
     v.tipo_atividade?.nome ?? '',
     v.tipo_atividade?.natureza ?? '',
     dia(v.data_agendada), hhmm(v.janela_inicio), hhmm(v.janela_fim),
-    v.equipe?.supervisor_nome ?? '', v.equipe?.codigo ?? '', v.equipe?.nome ?? '',
+    supervisorDe(v) ?? '', v.equipe?.codigo ?? '', v.equipe?.nome ?? '',
     v.equipe?.login_toa ?? '',
     v.tecnico?.nome ?? '', v.tecnico?.matricula ?? '',
     // "Login" no sistema atual é o login do técnico no TOA — que é

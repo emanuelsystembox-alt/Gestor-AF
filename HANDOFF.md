@@ -18,6 +18,14 @@
 > - 17 buckets novos cadastrados (28 no total).
 > - **Vídeo só pela câmera do app, em 720p** (até 60 s); galeria só foto; 5 arquivos órfãos
 >   do Storage apagados (D-256, atualização no ar `4b285ea5`).
+> - **Relatórios** (172, 173; D-259, D-260): nada carrega ao mexer nos filtros; cidades do login
+>   (várias num arquivo); % de verdade, cancelar e histórico de downloads; nome automático;
+>   **até 3 meses** (só admin@afline.com.br passa); pedido grande entra na **fila** (um por vez);
+>   supervisor pela precedência da D-134 (São Luís aparecia vazio).
+> - **Sinais do contrato** (174, D-261): prédio, casa e o vai-e-volta, como o TOA — Serviços,
+>   Equipes, Rota e página do contrato. No app está pronto e NÃO publicado (vai na próxima
+>   atualização do Emanuel, pelo ar).
+> - Rota do dia: o selo do serviço virou duas letras e a linha quebra em vez de cortar.
 > - **Auditoria de segurança** (171, D-258): o login ganhou freio de tentativas (não tinha
 >   nenhum), o site ganhou cabeçalhos contra iframe, o envio de evidência segue a regra do
 >   registro e o vínculo login↔técnico é conferido. SSH e senhas do lote ficam como estão,

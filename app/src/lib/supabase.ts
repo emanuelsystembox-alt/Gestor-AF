@@ -26,6 +26,27 @@ export const supabase = createClient(url, key, {
   },
 })
 
+/**
+ * Um cliente que lê UMA cidade, sem trocar a cidade ativa do topo (D-259).
+ *
+ * A mesma sessão do `supabase`, só com o cabeçalho `x-afline-cidade`: o
+ * banco responde aquela cidade — e SÓ se ela estiver entre as que o login
+ * pode ver (`bases_permitidas()`, 167/D-251); qualquer outra dá nenhuma
+ * cidade. É o que deixa o relatório juntar várias cidades num arquivo.
+ */
+const clientesPorCidade = new Map<string, typeof supabase>()
+export function naCidade(baseId: string): typeof supabase {
+  let c = clientesPorCidade.get(baseId)
+  if (!c) {
+    c = createClient(url, key, {
+      accessToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
+      global: { headers: { 'x-afline-cidade': baseId } },
+    }) as unknown as typeof supabase
+    clientesPorCidade.set(baseId, c)
+  }
+  return c
+}
+
 /** Situações possíveis de uma visita (espelha o CHECK da tabela). */
 export const SITUACOES = [
   'ENTRADA',

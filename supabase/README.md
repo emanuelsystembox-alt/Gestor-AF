@@ -206,6 +206,9 @@ As três últimas, para não repetir o esquecimento:
 | 133–166 | *Não indexadas aqui* — cada uma tem cabeçalho próprio no arquivo e a decisão em `docs/03-DECISOES.md` | ✓ |
 | 167 | **Sincronismo por computador, vez por bucket** — `bases_visiveis()` honra o cabeçalho `x-afline-cidade` (só cidade de `bases_permitidas()`); `sincronismo_bucket_vez`; `sincronismo_meus_buckets`, `sincronismo_pulso_buckets`, `sincronismo_soltar_buckets`; `sincronismo_pulso` (por cidade) passa a recusar as extensões 0.7 e anteriores (D-251) | ✓ |
 | 168 | **O 205 (Falta Tap) em INFRA CLARO**, como o 211 da instalação (D-254) | ✓ |
+| 174 | **Sinais do contrato** — `sinais_das_visitas`: prédio/casa e o vai-e-volta (VT da VT, retorno do retorno, O.S. de instalação não concluída), 30 dias (D-261) | ✓ |
+| 173 | **Relatórios: 3 meses, fila e supervisor oficial** — limite em `iniciar_download_relatorio` (exceção admin@afline.com.br); `vez_do_download` (um grande por vez); `relatorio_miscelanea` com a precedência do supervisor (D-260) | ✓ |
+| 172 | **Histórico de downloads dos Relatórios** — `relatorio_download`, `iniciar_download_relatorio`, `concluir_download_relatorio` (D-259) | ✓ |
 | 171 | **Auditoria de segurança** — envio de evidência pela mesma regra do registro (`pode_anexar_na_visita`); 8 funções de gatilho e `extrair_produtos` fora da API; `perfil_protege_campos` confere o técnico ligado ao login (D-258) | ✓ |
 | 170 | **Transferir não fixa a rota** — `transferir_visita` não toca mais em `rota_fixada_*`; devolve `rota_fixada` como estava (D-257, muda a D-131) | ✓ |
 | 169 | **O agrupamento da quebra pode ser outro na VT** — `codigo_baixa.agrupamento_quebra_vt`, `agrupamento_da_quebra()`, `impacto_quebra` com o grupo de serviço; 301: PROCESSO VENDA / na VT INFRA CLIENTE (D-255) | ✓ |

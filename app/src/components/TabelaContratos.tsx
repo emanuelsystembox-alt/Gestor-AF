@@ -8,6 +8,7 @@ import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBa
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 import { RelogioServico } from './RelogioServico'
 import { SeloLog } from './SeloLog'
+import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 
 /**
@@ -329,6 +330,8 @@ export function TabelaContratos({
   selecionados, aoSelecionar, aoSelecionarTodos,
 }: Props) {
   const mostra = { equipe: true, area: true, data: true, ...(colunas ?? {}) }
+  // 174 (D-261): prédio, casa e o vai-e-volta, como o TOA — Serviços e Equipes
+  const sinais = useSinaisDasVisitas(linhas.map(l => l.id))
   const temSelecao = !!(selecionados && aoSelecionar)
   const todosMarcados = temSelecao && linhas.length > 0
     && linhas.every(l => selecionados!.has(l.id))
@@ -494,6 +497,7 @@ export function TabelaContratos({
                   // 123: a ouvidoria sobe junto do número — é o que tem de ser visto primeiro
                   <div className="flex items-center gap-1.5 font-medium text-graf-200">
                     {v.contrato ?? '—'}
+                    <SinaisContrato s={sinais.get(v.id)} />
                     <SeloOuvidoria ouvidoria={v.ouvidoria} />
                   </div>
                 )}

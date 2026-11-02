@@ -571,6 +571,14 @@ regra existe duas vezes e **muda junto**: `agrupamento_da_quebra()` no banco e
 `agrupamentoDaQuebra()` em `lib/metricas.ts`. O 205 (Falta Tap) é INFRA CLARO, como o 211
 (Falta NAP) da instalação.
 
+## Relatórios (172, 173; D-259, D-260)
+
+**Até 3 meses por download, para todos — só o login admin@afline.com.br passa disso.** Pedido
+grande (mais de 31 dias ou 5.000 contratos) entra na fila: um grande por vez na empresa; o
+dia não espera. **O supervisor segue a D-134 em toda tela e relatório:** o declarado no técnico
+(a tela do supervisor) → o login ligado à equipe → o texto da planilha. Não leia só
+`equipe.supervisor_nome`: em São Luís ele está vazio.
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

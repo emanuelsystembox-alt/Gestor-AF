@@ -10,6 +10,7 @@ import { useAuth } from '../lib/auth'
 import { useAbrirContrato } from '../components/LinkContrato'
 import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
          temChaveDoMapa } from '../lib/mapaGoogle'
+import { SinaisContrato, useSinaisDasVisitas, type SinalContrato } from '../components/SinaisContrato'
 
 /**
  * Rota do Dia — a mesa de despacho (D-111, redesenhada).
@@ -207,15 +208,26 @@ const APELIDO_SITUACAO: Record<string, string> = {
   COM_IMPEDIMENTO: 'TICKET',
 }
 
+// D-259: duas letras — "tem sigla do contrato que eu não consigo ler (...)
+// bota somente duas letras no tipo de serviço, as iniciais" (Emanuel, 02/11).
+// "SERVIÇO", "ADESÃO" e "RETORNO CRED." não cabiam ao lado da situação e
+// viravam "V…". O nome inteiro vai no title do selo.
 const APELIDO_SERVICO: Record<string, string> = {
   'VISITA TECNICA': 'VT',
-  'MUDANCA DE ENDERECO': 'MUD. END.',
-  'RETORNO DE CREDENCIADA': 'RETORNO CRED.',
-  'MIGRACAO GPON': 'GPON',
-  'REINSTALACAO': 'REINST.',
-  'DESCONEXAO': 'DESCONEXÃO',
-  'ADESAO': 'ADESÃO',
-  'SERVICO': 'SERVIÇO',
+  'MUDANCA DE ENDERECO': 'ME',
+  'RETORNO DE CREDENCIADA': 'RC',
+  'MIGRACAO GPON': 'MG',
+  'REINSTALACAO': 'RE',
+  'DESCONEXAO': 'DE',
+  'ADESAO': 'AD',
+  'SERVICO': 'SE',
+}
+/** Grupo fora do de/para: as iniciais das palavras (sem "DE"), ou as duas
+ *  primeiras letras de uma palavra só. */
+function siglaServico(nome: string): string {
+  if (APELIDO_SERVICO[nome]) return APELIDO_SERVICO[nome]
+  const palavras = nome.split(/\s+/).filter(p => p && !/^(DE|DA|DO|E)$/i.test(p))
+  return (palavras.length > 1 ? palavras[0][0] + palavras[palavras.length - 1][0] : nome.slice(0, 2)).toUpperCase()
 }
 
 export default function Rota() {
@@ -237,6 +249,8 @@ export default function Rota() {
   const [paradasDoDia, setParadas] = useState<Parada[]>([])
   /** Refeicao, Na Base: o que explica o buraco na sequencia do dia. */
   const [jornadas, setJornadas] = useState<Parada[]>([])
+  // 174 (D-261): prédio, casa e o vai-e-volta no cartão, como o TOA
+  const sinais = useSinaisDasVisitas(paradasDoDia.map(p => p.visita_id))
   const [bairros, setBairros] = useState<BairroLinha[]>([])
   const [resumo, setResumo] = useState<Resumo | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -756,6 +770,7 @@ export default function Rota() {
                             {antes.map(j => <ChipJornada key={j.visita_id} j={j} />)}
                             <Trecho
                               parada={p} anterior={i > 0 ? t.paradas[i - 1] : null}
+                              sinal={sinais.get(p.visita_id)}
                               primeiro={i === 0}
                               arrastando={arrastando === p.visita_id}
                               onArrastar={setArrastando}
@@ -937,8 +952,9 @@ function ChipJornada({ j }: { j: Parada }) {
  * trecho: ninguém sabe de onde o técnico saiu (o TOA não manda a base).
  */
 function Trecho({ parada: p, anterior, primeiro, arrastando,
-                  onArrastar, onAbrir, onMover, podeMover }: {
+                  onArrastar, onAbrir, onMover, podeMover, sinal }: {
   parada: Parada
+  sinal?: SinalContrato
   anterior: Parada | null
   primeiro: boolean
   arrastando: boolean
@@ -953,9 +969,7 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
   const salto = km != null && km >= LIMITE_SALTO_KM
   const movel = podeMover && !TERMINAIS.includes(p.situacao)
   const cor = SITUACAO_INFO[p.situacao]?.cor ?? '#64748b'
-  const servico = p.tipo_servico
-    ? APELIDO_SERVICO[p.tipo_servico] ?? p.tipo_servico
-    : null
+  const servico = p.tipo_servico ? siglaServico(p.tipo_servico) : null
 
   /*
    * 144: de onde veio o cancelamento. Mesma regra de `origemCancelada`
@@ -993,7 +1007,7 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
   const rotulo = [
     p.contrato ? `contrato ${p.contrato}` : 'sem contrato',
     p.bairro ?? 'sem bairro',
-    servico ?? 'sem grupo de serviço',
+    p.tipo_servico ?? 'sem grupo de serviço',
     janela ? `janela ${janela}` : 'sem janela',
     `${hhmm(p.inicio) ?? 'sem início'}${encerrou ? ` até ${encerrou}` : ', em curso'}`,
     situacaoCheia,
@@ -1050,9 +1064,12 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
 
         <button onClick={onAbrir} title={rotulo} aria-label={rotulo}
           className="block w-full px-1.5 py-1 text-left">
-          <span className="block truncate text-[11px] font-semibold leading-tight
-                           text-graf-100">
-            {p.bairro ?? <span className="font-normal text-graf-400">sem bairro</span>}
+          <span className="flex items-center gap-1">
+            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold leading-tight
+                             text-graf-100">
+              {p.bairro ?? <span className="font-normal text-graf-400">sem bairro</span>}
+            </span>
+            <SinaisContrato s={sinal} />
           </span>
 
           {/* A janela é o COMBINADO; a execução é o que houve. As duas
@@ -1087,7 +1104,10 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
               155e: ela subiu para a linha do grupo de serviço -- eram
               duas linhas com uma etiqueta cada, e o cartão inteiro
               existia para caber nelas. */}
-          <span className="mt-1 flex items-center gap-1">
+          {/* D-259: quebra em vez de cortar — com a situação, o código e as
+              marcas, nem as duas letras do serviço cabiam em 104 px (medido:
+              19 de 69 selos cortados). Nada encolhe; o que não cabe desce. */}
+          <span className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
             <span title={situacaoCheia}
               className="shrink-0 truncate rounded-sm px-1 text-[8px]
                          font-bold uppercase tracking-wide"
@@ -1095,9 +1115,10 @@ function Trecho({ parada: p, anterior, primeiro, arrastando,
                        color: cor }}>
               {situacaoTxt}
             </span>
-            <span className="min-w-0 truncate rounded-sm bg-graf-800 px-1 text-[8px]
+            <span title={p.tipo_servico ?? 'sem grupo de serviço'}
+              className="shrink-0 rounded-sm bg-graf-800 px-1 text-[8px]
                              font-semibold uppercase tracking-wide text-graf-300">
-              {servico ?? 'sem grupo'}
+              {servico ?? '—'}
             </span>
             {/* O código é a prova do que aconteceu — e a etiqueta diz de
                 QUEM é a baixa, porque a da operadora e a nossa divergem. */}

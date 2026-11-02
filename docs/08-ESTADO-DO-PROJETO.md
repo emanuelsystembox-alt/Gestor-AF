@@ -454,6 +454,22 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Relatórios e sinais — o que ninguém verificou ainda (D-259 a D-261)
+
+- Download de **Miscelânea** e de **Humor** pela tela nova; o **CSV**; um mês inteiro com
+  todas as cidades.
+- **Dois pedidos grandes de pessoas diferentes** ao mesmo tempo pela tela (a fila foi testada
+  no banco) e o efeito do fôlego de 200 ms sobre quem baixa o dia durante um grande.
+- O vai-e-volta conferido contra o TOA num dia útil: o TOA e o nosso concordam? (Regra do
+  Emanuel, derivada do nosso banco, não do TOA.)
+- Manaus tem supervisor só no texto da planilha (12 de 68 equipes): cadastrar pela tela do
+  supervisor, como São Luís, para o relatório sair completo.
+
+## Para a próxima atualização do app (pela atualização no ar, sem APK novo)
+
+- Selos de prédio/casa e do vai-e-volta na Agenda (D-261) — prontos no código, não publicados
+  a pedido do Emanuel, para irem junto com os outros detalhes dele.
+
 ## Segurança — auditoria de 02/11/2026 (D-258, migration 171)
 
 **Aplicado:** freio de tentativas no login (`GOTRUE_RATE_LIMIT_HEADER` em

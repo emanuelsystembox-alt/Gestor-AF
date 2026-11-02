@@ -73,6 +73,31 @@ export function SeloTec1({ tec1 }: { tec1?: string | null }) {
   )
 }
 
+/**
+ * Prédio ou casa, e o vai-e-volta da revisita — como o TOA mostra (174,
+ * D-261). Quem decide é o banco (`sinais_das_visitas`); aqui só desenha.
+ * No app vai com a PALAVRA ao lado do desenho: no sol, um ícone sozinho
+ * pequeno não se lê.
+ */
+export function SeloEdificacao({ edificacao }: { edificacao?: 'PREDIO' | 'CASA' | null }) {
+  if (!edificacao) return null
+  return (
+    <View style={[e.selo, e.segmento]} accessibilityLabel={edificacao === 'PREDIO' ? 'Prédio' : 'Casa'}>
+      <Text style={[e.seloTexto, { color: cor.graf600 }]}>{edificacao === 'PREDIO' ? '🏢 Prédio' : '🏠 Casa'}</Text>
+    </View>
+  )
+}
+export function SeloRevisita({ revisita, motivo }: { revisita?: boolean; motivo?: string | null }) {
+  if (!revisita) return null
+  const texto = motivo === 'VT_DA_VT' ? 'VT da VT'
+    : motivo === 'RETORNO_DO_RETORNO' ? 'Retorno do retorno' : 'Revisita'
+  return (
+    <View style={[e.selo, { backgroundColor: '#f97316' }]} accessibilityLabel={`Revisita: ${texto}`}>
+      <Text style={[e.seloTexto, { color: cor.branco }]}>🔁 {texto}</Text>
+    </View>
+  )
+}
+
 const e = StyleSheet.create({
   selo: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

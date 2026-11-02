@@ -11391,3 +11391,121 @@ trava a empresa. Limite: ele barra quem ADIVINHA senha, não quem já sabe a do 
 - CSP completa no site (risco de derrubar tela; testar tela a tela antes).
 - Backup: o painel da Hostinger mostra backup **semanal**; os documentos dizem "sem backup".
   Conferir.
+
+### D-259 · Relatórios: nada carrega ao mexer, cidades do login, % e histórico de downloads (172); a Rota com siglas
+
+> "quando eu selecionar as datas, supervisores, ou algo do tipo o sistema não deve carregar na
+> hora (...) quero tirar a prévia por contratos, e colocar o status dos download, login que fez
+> o download, igual o da importação, precisa ter animação também e informar a % (...) a parte
+> de visitas, ordens, pontuação, sem regras, não preciso (...) campo cidade também conforme a
+> permissão de login (...) [o arquivo deve ter] data, mês, ano e hora (...) bota somente duas
+> letras no tipo de serviço" — Emanuel, 02/11.
+
+**Perguntado, o Emanuel escolheu:** várias cidades num arquivo só; duas letras no serviço da
+Rota; histórico visível como o da importação (quem abre Relatórios vê os downloads das
+cidades que acessa, de qualquer pessoa).
+
+**Relatórios** (`pages/Relatorios.tsx`):
+- **Nada pesado carrega ao mexer.** Antes cada data/filtro relia o período inteiro, e as
+  listas de equipe/supervisor saíam desses dados. Agora as listas vêm do cadastro das cidades
+  marcadas (equipe, tipo_servico — leves) e o período só é lido no **Baixar**. Medido: mudar
+  as datas não fez pedido nenhum; marcar uma cidade pediu só a lista de equipes dela.
+- **Cidades:** as do login (`minhas_cidades`: ADMIN todas). Cada uma é lida pelo cliente da
+  cidade (`naCidade` em `lib/supabase.ts`, cabeçalho `x-afline-cidade` da 167) — sem trocar a
+  cidade do topo. A coluna Operação diz a cidade de cada linha.
+- **A % é de verdade:** conta antes as visitas de cada cidade; cada uma "custa" 3 (linha,
+  pontos, local da baixa); avança por página. Animação (giro + barra), botão Cancelar, e o
+  navegador pergunta antes de sair da tela no meio.
+- **Nome automático:** `PulsoLine_<tipo>_DD-MM-AAAA_HHhMMmSSs.<ext>` — nunca sobrescreve.
+- **Saíram:** a prévia, os quatro cartões (visitas, O.S., pontuação, sem regra) e o aviso da
+  pontuação. As colunas do arquivo não mudaram (`lib/relatorio.ts` intocado).
+- **Histórico** (`relatorio_download`, 172): GERANDO → CONCLUIDO / ERRO / CANCELADO, gravado
+  por `iniciar_download_relatorio` / `concluir_download_relatorio` (autor pelo servidor;
+  humor exige `campo.humor`; cidades conferidas contra `bases_permitidas()`). GERANDO há mais
+  de 30 min aparece "Interrompido"; concluído sem linhas aparece "Sem linhas" e não gera
+  arquivo.
+- **Testado:** Manaus + São Luís, 01–02/11, por contrato: 0% → 100% em 7 s passando pelas
+  duas cidades; 150 linhas = 103 + 47 no banco (sem jornada); histórico "Concluído" com o
+  nome de quem baixou. Sem erro no console.
+
+**Rota do dia:** o selo do grupo de serviço virou duas letras (VT, AD, SE, MG, ME, RC, RE,
+DE; o nome inteiro no title). Medido: mesmo com duas letras, 19 de 69 selos ainda cortavam —
+o cartão tem 104 px e só o selo encolhia. A linha passou a **quebrar** (nada encolhe); depois:
+0 cortados.
+
+**NÃO VERIFICADO:** os tipos Miscelânea e Humor pelo download novo; um período longo (mês
+inteiro, todas as cidades); o CSV.
+
+### D-260 · Relatórios: até 3 meses, fila dos pedidos grandes e o supervisor oficial (173)
+
+> "vamos limitar o usuário até 3 meses (...) nem ADM pode puxar acima disso, somente o login
+> admin@afline.com.br (...) quando fizerem uma solicitação de 3 meses (...) fila de
+> processamento em massa, enquanto os outros fazem download do próprio dia sem ter muito
+> impacto" · "Já cadastrei em São Luís os supervisores de algumas equipes, por que não aparece
+> no download igual de Manaus?" · "o campo supervisor que deve ser lido é quando abre o nome do
+> supervisor e cadastra as equipes, lá que é o filtro do supervisor oficial" — Emanuel, 02/11.
+
+**Até 3 meses** (`de + 3 meses >= até`), para todos — o ADMIN inclusive. Única exceção: o
+login `admin@afline.com.br` (constante em `iniciar_download_relatorio` e em
+`pages/Relatorios.tsx`). Quem decide é o banco; a tela avisa e desliga o botão antes.
+Testado como outro login: 4 meses recusado; 3 meses exatos aceito; o admin@ passa.
+
+**Fila dos grandes:** grande = mais de 31 dias **ou** mais de 5.000 contratos (contados antes
+do registro — a contagem só devolve o número). Grande nasce `NA_FILA`; **um grande por vez na
+empresa** (`vez_do_download`); os pequenos (o dia, a semana) não entram na fila e não esperam.
+Quem espera vê a posição; quem gera manda sinal a cada 20 s; grande sem sinal há 90 s é dado
+como largado (CANCELADO, "a tela foi fechada") — a fila nunca trava. O grande também respira
+200 ms entre as páginas, para o banco atender os outros. Testado: A ganha a vez, B espera na
+posição 2, A termina e B começa; B largado sai sozinho. Na tela: São Luís, 40 dias → grande,
+267 linhas, concluído.
+
+**Por que não é um processamento no servidor:** o arquivo é montado no navegador de quem pede
+(como sempre foi); levar para a VPS seria um serviço novo rodando ao lado do banco, na máquina
+de 2 núcleos. A fila + o fôlego entre páginas tiram o pico sem isso. Se um dia não bastar,
+o próximo passo é esse serviço.
+
+**O supervisor:** São Luís cadastrou o supervisor **no técnico** (a tela do supervisor:
+`tecnico.supervisor_id`, 13 de 14) e nenhuma equipe tinha o texto da planilha; Manaus, o
+contrário (12 de 68 equipes com o texto, 0 técnicos). O relatório só lia o texto da planilha.
+Agora segue a precedência da D-134 — **1º o declarado no técnico, 2º o login ligado à equipe,
+3º o texto da planilha** — na coluna (`supervisorDe` em `lib/relatorio.ts`), no filtro e na
+miscelânea (`relatorio_miscelanea`, 173). Medido em 02/11: São Luís 61 de 61 contratos com
+supervisor (era 0); Manaus 71 de 93, como antes.
+
+**NÃO VERIFICADO:** dois pedidos grandes de pessoas diferentes ao mesmo tempo pela tela (a
+fila foi testada no banco); o efeito real do fôlego sobre quem baixa o dia durante um grande.
+
+### D-261 · Os sinais do contrato como o TOA: prédio, casa e o vai-e-volta (174)
+
+> "precisamos sinalizar nossos contratos igual ao do TOA: o que for prédio, colocar um desenho
+> de prédio, se for casa a mesma coisa, quando for revisita, colocar esse símbolo de vai e volta
+> (...) olhando nosso banco (...) ADESÃO, MDE, SERV, MIG e etc — o símbolo entra se não foi
+> atendido as mesmas O.S. anteriormente como concluído em nosso sistema no grupo de instalação
+> (...) para VT é se for VT da VT, ou retorno do retorno" — Emanuel, 02/11.
+
+**Perguntado, o Emanuel escolheu:** 30 dias para trás; VT da VT e retorno do retorno em
+qualquer situação da anterior; APTO e LOJA = prédio, CASA e BECO = casa (sem endereço, nada);
+nas quatro telas — Serviços, Rota do dia, página do contrato e o app.
+
+**A regra** (`sinais_das_visitas(uuid[])`, 174):
+- VISITA TECNICA → houve VT do mesmo contrato nos 30 dias antes;
+- RETORNO DE CREDENCIADA → houve retorno do mesmo contrato nos 30 dias;
+- qualquer outro grupo (instalação) → alguma O.S. de hoje (número da CLARO, 10 dígitos) já
+  esteve numa visita de instalação, nos 30 dias antes, que **não** foi concluída (inclusive
+  uma que ficou "em execução" sem fechar no nosso sistema);
+- sem grupo (a jornada): nada.
+
+É **outra coisa** que a revisita da D-245 (a do card do técnico e da janela do LOG): aquela é
+o serviço concluído que voltou. Não troque uma pela outra. DEFINER porque o técnico não vê as
+visitas de outras equipes e o sinal sairia falso; o escopo é empresa + cidades que o login
+acessa, e a resposta é só sinal e data (nada do cliente). Medido: 2.372 contratos (5 dias de
+Manaus) em 78 ms; testado como técnico (os 8 dele; 0 de outra cidade).
+
+**As telas:** desenhos em SVG (`components/SinaisContrato.tsx`; emoji muda de cara em cada
+sistema) — prédio e casa em cinza, o vai-e-volta em laranja como o do TOA; a dica diz o porquê
+e a visita anterior. Na tabela de contratos (Serviços e Equipes), ao lado do número; na Rota,
+ao lado do bairro (5 nomes longos encurtam um pouco); no cabeçalho do contrato. Web publicada.
+
+**App:** os selos "🏢 Prédio", "🏠 Casa" e "🔁 VT da VT / Retorno do retorno / Revisita" na
+Agenda estão PRONTOS no código e **não publicados**, a pedido do Emanuel ("vamos deixar para a
+próxima atualização do app"). Não precisam de APK novo: vão pela atualização no ar.

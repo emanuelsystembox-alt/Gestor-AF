@@ -54,10 +54,15 @@ export interface LocalBaixa {
  *  mandar 2.000 uuids numa chamada quando Serviços abre um mês. */
 const LOTE = 400
 
-export async function carregarLocais(ids: string[]): Promise<Map<string, LocalBaixa>> {
+/** `cliente`: o de uma cidade (`naCidade`, D-259) quando o relatório junta
+ *  várias; sem ele, a cidade ativa. `aoLote`: quantos ids já foram. */
+export async function carregarLocais(
+  ids: string[], cliente: Pick<typeof supabase, 'rpc'> = supabase, aoLote?: (feitos: number) => void,
+): Promise<Map<string, LocalBaixa>> {
   const m = new Map<string, LocalBaixa>()
   for (let i = 0; i < ids.length; i += LOTE) {
-    const { data, error } = await supabase.rpc('local_da_baixa', { p_visitas: ids.slice(i, i + LOTE) })
+    aoLote?.(i)
+    const { data, error } = await cliente.rpc('local_da_baixa', { p_visitas: ids.slice(i, i + LOTE) })
     if (error) throw error
     for (const l of (data ?? []) as LocalBaixa[]) m.set(l.visita_id, l)
   }
