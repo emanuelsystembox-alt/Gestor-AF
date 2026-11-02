@@ -23,8 +23,8 @@
 >   **até 3 meses** (só admin@afline.com.br passa); pedido grande entra na **fila** (um por vez);
 >   supervisor pela precedência da D-134 (São Luís aparecia vazio).
 > - **Sinais do contrato** (174, D-261): prédio, casa e o vai-e-volta, como o TOA — Serviços,
->   Equipes, Rota e página do contrato. No app está pronto e NÃO publicado (vai na próxima
->   atualização do Emanuel, pelo ar).
+>   Equipes, Rota e página do contrato. No app, publicado pelo ar (update `ee40469c`, sem
+>   APK novo).
 > - Rota do dia: o selo do serviço virou duas letras e a linha quebra em vez de cortar.
 > - **Auditoria de segurança** (171, D-258): o login ganhou freio de tentativas (não tinha
 >   nenhum), o site ganhou cabeçalhos contra iframe, o envio de evidência segue a regra do
