@@ -500,6 +500,14 @@ alvo e embaralha captura e bolha — o teste disse que o Esc da lista fechava ta
 contrato, e pela tecla real não fechava. Teste disparando no elemento, com
 `bubbles: true`. Ver D-240.
 
+**Mudar o que uma RPC DEVOLVE quebra o site publicado até ele ser republicado.** A 173
+trocou `iniciar_download_relatorio` de `uuid` para `jsonb` (`{id, status, pesado}`). O site no
+ar ainda tratava a resposta como o id e mandava o objeto inteiro para `concluir_…`: o botão
+Baixar ficou quebrado do momento da migration até o deploy (minutos). Parâmetro NOVO com
+default não quebra ninguém; RETORNO novo quebra. Quando a mudança de retorno for inevitável:
+tela pronta e compilada ANTES, migration e deploy em seguida, sem nada no meio — ou crie a
+função nova com outro nome e derrube a antiga depois do deploy. Ver D-260.
+
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso
 negativo. Baixe do ar e compare com o local.
