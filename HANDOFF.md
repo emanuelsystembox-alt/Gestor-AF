@@ -18,6 +18,10 @@
 > - 17 buckets novos cadastrados (28 no total).
 > - **Vídeo só pela câmera do app, em 720p** (até 60 s); galeria só foto; 5 arquivos órfãos
 >   do Storage apagados (D-256, atualização no ar `4b285ea5`).
+> - **Auditoria de segurança** (171, D-258): o login ganhou freio de tentativas (não tinha
+>   nenhum), o site ganhou cabeçalhos contra iframe, o envio de evidência segue a regra do
+>   registro e o vínculo login↔técnico é conferido. SSH e senhas do lote ficam como estão,
+>   por decisão do Emanuel.
 > - **Transferir não fixa mais a rota** (170, D-257): com o roteamento ligado, a próxima
 >   importação devolve o contrato — quem quer segurar desliga a chave.
 

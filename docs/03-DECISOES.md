@@ -11340,3 +11340,54 @@ corrigiu; agora é escolha de quem opera.
 
 Testado como `authenticated`, desfeito no fim: equipe mudou, `rota_fixada_em` ficou nulo,
 resposta `rota_fixada: false`. `testar_policies` 33/33.
+
+### D-258 · Auditoria de segurança de 02/11: o freio do login ligado; o resto, decidido
+
+> "agora atua na parte de segurança de nosso sistema, tanto app como site, vamos fechar as
+> brechas e reforçar o que precisar" · "vamos corrigir apenas o que é crítico, sobre as
+> senhas não vamos trocar nenhuma (...) [o SSH] ele acessa como está no momento (...)
+> obrigar a troca da senha no primeiro acesso — não precisa" — Emanuel, 02/11.
+
+**Conferido e em ordem:** só 22/80/443 abertas; Studio, Portainer e Netdata só pelo túnel;
+o Caddy publica só as rotas da API (`/`, `/pg`, `/graphql` dão 404 de fora); nenhum segredo
+de demonstração no `.env` do Supabase; cadastro livre de contas desligado (testado de fora:
+`signup_disabled`); `anon` não lê nada; nenhuma tabela sem RLS e nenhuma `SECURITY DEFINER`
+aberta ao `anon`; as definer sem checagem explícita (rota_*, qualidade_*, primeira_wo)
+filtram nas funções internas — um técnico real testado só recebeu os próprios dados;
+buckets privados com regra por contrato/pessoa/empresa; nenhum segredo nem planilha no Git,
+nem no histórico; `admin-usuarios` no ar igual ao Git.
+
+**Crítico, e o que foi feito:** o login não tinha freio nenhum (37 tentativas erradas
+seguidas, nenhuma barrada) e há contas com a senha comum do lote (D-177; 73 de 91 contas
+nunca entraram). O Emanuel decidiu **não trocar senha nenhuma e não obrigar troca no
+primeiro acesso**. Ligado o freio: nesta versão do GoTrue o limite só funciona com
+`GOTRUE_RATE_LIMIT_HEADER` — sem ele não há limite (e não era por falta de IP: o GoTrue já
+via o IP real). Posto em `/opt/supabase/docker-compose.afline.yml` (o `update.sh` não
+desfaz); limites padrão do Supabase. **Medido:** 160 tentativas da VPS → 32 respondidas,
+128 barradas (429); do IP do Emanuel, logo depois, resposta normal — o freio é por IP, não
+trava a empresa. Limite: ele barra quem ADIVINHA senha, não quem já sabe a do lote.
+
+**Publicado também:** cabeçalhos do site (`app/public/_headers`): `frame-ancestors 'none'`,
+`X-Frame-Options: DENY`, HSTS. Conferido no ar e o site abrindo.
+
+**Aplicado depois, no mesmo dia** ("aplique o que está pendente" — Emanuel):
+- **Migration 171** (`171_seguranca_upload_e_funcoes_internas.sql`): (A) subir arquivo de
+  evidência exige a mesma regra do registro (`pode_anexar_na_visita`) — testado com um
+  técnico real, desfeito no fim: contrato de hoje PASSA; contrato antigo é RECUSADO com o
+  recado do prazo; (B) 8 funções de gatilho e `extrair_produtos` fora da API — os gatilhos
+  continuam disparando (a `testar_campo` muda status e passou); (C) quem gerencia usuários
+  não liga outro login a técnico de outra cidade ou já ligado — testado com um gestor de
+  usuários real (não-ADMIN): recusado. Baterias depois: 33/33 e 29/29; nenhuma tabela sem
+  RLS; nenhuma definer aberta ao `anon`.
+- **`admin-usuarios`** subida para `/opt/supabase/volumes/functions/` (a anterior ficou como
+  `index.ts.antes-d258`), igual ao Git (md5), serviço de funções reiniciado e respondendo.
+  Confere `tecnico_id` (mesma empresa, mesma cidade do login novo, sem outro login) e
+  `perfil_acesso_id` (mesma empresa). NÃO testada a criação de verdade (exige sessão de
+  quem gerencia usuários).
+
+**Fica como está, por decisão:**
+- SSH com senha e root — o Alisson entra assim. Sem fail2ban.
+- Senhas do lote, sem troca obrigatória no primeiro acesso.
+- CSP completa no site (risco de derrubar tela; testar tela a tela antes).
+- Backup: o painel da Hostinger mostra backup **semanal**; os documentos dizem "sem backup".
+  Conferir.

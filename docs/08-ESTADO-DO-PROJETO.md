@@ -454,6 +454,21 @@ navegador diz "Nexus Manager". **O resto ainda é Gestor AF** — o pedido era a
 
 ---
 
+## Segurança — auditoria de 02/11/2026 (D-258, migration 171)
+
+**Aplicado:** freio de tentativas no login (`GOTRUE_RATE_LIMIT_HEADER` em
+`/opt/supabase/docker-compose.afline.yml`; ~30 por 5 min por IP, medido); cabeçalhos do
+site (`app/public/_headers`); 171 (envio de evidência pela regra do registro, funções
+internas fora da API, vínculo login↔técnico conferido); `admin-usuarios` nova na VPS.
+Baterias 33/33 e 29/29.
+
+**Decidido que fica:** SSH com senha e root (o Alisson entra assim), sem fail2ban; senhas
+do lote sem troca obrigatória (73 de 91 contas nunca entraram).
+
+**Em aberto:** CSP completa no site (testar tela a tela antes); conferir se a Hostinger faz
+mesmo o backup semanal que o painel mostra (os documentos dizem "sem backup"); testar a
+criação de login pela tela depois da `admin-usuarios` nova.
+
 ## Pendente depois da 170 — extensão 0.8.0, quebra na VT, abas do TOA, vídeo e transferência (D-250 a D-257)
 
 **Estado (02/11/2026):** migrations **167 a 170 aplicadas** (170: transferir não fixa a rota, D-257; `testar_policies` 33/33 depois dela); baterias 33/33 e 29/29

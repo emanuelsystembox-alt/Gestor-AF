@@ -110,6 +110,29 @@ Deno.serve(async (req: Request) => {
     if (erroRegra) return json({ erro: erroRegra.message }, 403)
     if (motivo) return json({ erro: String(motivo) }, 403)
 
+    // D-258 (auditoria de 02/11): o tecnico_id e o perfil_acesso_id iam
+    // direto para o cadastro, sem conferir. Um gestor de usuarios de uma
+    // cidade podia criar um login amarrado a um tecnico de OUTRA cidade (ou
+    // ja com login) e, pelo app, ver os contratos dele e agir como ele. O
+    // tecnico tem de ser desta empresa, da cidade do login novo, e livre.
+    if (corpo.tecnico_id) {
+      const { data: tec } = await admin.from("tecnico")
+        .select("id, empresa_id, base_id, usuario_id").eq("id", String(corpo.tecnico_id)).maybeSingle()
+      if (!tec || tec.empresa_id !== perfilAdmin?.empresa_id || tec.base_id !== base) {
+        return json({ erro: "Este tecnico nao e da cidade escolhida." }, 403)
+      }
+      const { count: ligados } = await admin.from("perfil")
+        .select("id", { count: "exact", head: true }).eq("tecnico_id", tec.id)
+      if (tec.usuario_id || (ligados ?? 0) > 0) return json({ erro: "Este tecnico ja tem login." }, 409)
+    }
+    if (corpo.perfil_acesso_id) {
+      const { data: pa } = await admin.from("perfil_acesso")
+        .select("empresa_id").eq("id", String(corpo.perfil_acesso_id)).maybeSingle()
+      if (!pa || (pa.empresa_id && pa.empresa_id !== perfilAdmin?.empresa_id)) {
+        return json({ erro: "Perfil de acesso invalido." }, 403)
+      }
+    }
+
     const senha = String(corpo.senha ?? "") || senhaTemporaria()
     const gerada = !corpo.senha
 

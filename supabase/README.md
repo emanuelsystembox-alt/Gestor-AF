@@ -206,6 +206,7 @@ As três últimas, para não repetir o esquecimento:
 | 133–166 | *Não indexadas aqui* — cada uma tem cabeçalho próprio no arquivo e a decisão em `docs/03-DECISOES.md` | ✓ |
 | 167 | **Sincronismo por computador, vez por bucket** — `bases_visiveis()` honra o cabeçalho `x-afline-cidade` (só cidade de `bases_permitidas()`); `sincronismo_bucket_vez`; `sincronismo_meus_buckets`, `sincronismo_pulso_buckets`, `sincronismo_soltar_buckets`; `sincronismo_pulso` (por cidade) passa a recusar as extensões 0.7 e anteriores (D-251) | ✓ |
 | 168 | **O 205 (Falta Tap) em INFRA CLARO**, como o 211 da instalação (D-254) | ✓ |
+| 171 | **Auditoria de segurança** — envio de evidência pela mesma regra do registro (`pode_anexar_na_visita`); 8 funções de gatilho e `extrair_produtos` fora da API; `perfil_protege_campos` confere o técnico ligado ao login (D-258) | ✓ |
 | 170 | **Transferir não fixa a rota** — `transferir_visita` não toca mais em `rota_fixada_*`; devolve `rota_fixada` como estava (D-257, muda a D-131) | ✓ |
 | 169 | **O agrupamento da quebra pode ser outro na VT** — `codigo_baixa.agrupamento_quebra_vt`, `agrupamento_da_quebra()`, `impacto_quebra` com o grupo de serviço; 301: PROCESSO VENDA / na VT INFRA CLIENTE (D-255) | ✓ |
 | 090 | **A importação vai para o dia de atuação** — `importacao.data_atuacao` (padrão: hoje em Manaus) manda no dia da visita, não a coluna Data da planilha (D-166) | ✓ |

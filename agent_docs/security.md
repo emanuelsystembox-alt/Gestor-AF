@@ -101,6 +101,24 @@ extensão usa para trabalhar em várias cidades sem mexer na tela de ninguém. O
 manda. Testado como `authenticated` (7 casos, D-251). Quem mexer em `bases_visiveis()`
 mantém isso — e a chave do cache da transação inclui o cabeçalho.
 
+**O freio do login depende de `GOTRUE_RATE_LIMIT_HEADER`** (D-258). Nesta versão do GoTrue,
+sem esse cabeçalho configurado **não há limite nenhum** de tentativas — o padrão do
+self-hosted vem sem. Está em `/opt/supabase/docker-compose.afline.yml`
+(`X-Forwarded-For`); o Caddy não confia em `X-Forwarded-For` vindo de fora, então não dá
+para trocar de "IP" mandando o cabeçalho. Quem recriar a pilha confere:
+`docker exec supabase-auth env | grep RATE_LIMIT_HEADER`.
+
+**Subir evidência segue a mesma regra de registrá-la** (171, D-258): a policy
+`evidencia_arquivo_enviar` chama `pode_anexar_na_visita(…, true)`. Mudou a regra do anexo?
+Ela vale nos dois lugares sozinha — não reescreva a condição na policy.
+
+**Login ↔ técnico só se liga dentro do escopo** (171 e `admin-usuarios`, D-258): o técnico
+tem de ser da mesma empresa, de cidade que quem cadastra acessa, e sem outro login. O
+gatilho `perfil_protege_campos` confere na edição; a função de borda, na criação.
+
+**Decidido em 02/11 e fica assim** (D-258): SSH com senha e root (o Alisson entra assim);
+senhas do lote sem troca obrigatória.
+
 **`SECURITY DEFINER` ignora o RLS.** Se a função faz algo privilegiado,
 cheque o papel **dentro** dela. Ver `importar_toa`, `baixar_os`.
 
