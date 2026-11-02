@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LinkContrato } from './LinkContrato'
-import { COM_ICONE, useCentral, type Sinal } from '../lib/central'
+import {
+  COM_ICONE, definirNotificacao, notificacaoLigada, notificacaoSuportada, useCentral, type Sinal,
+} from '../lib/central'
 
 /**
  * O painel que o sino abre (091, refeito na 095).
@@ -26,7 +28,7 @@ import { COM_ICONE, useCentral, type Sinal } from '../lib/central'
 
 // 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
 // que o controle precisa ver primeiro.
-const ORDEM: Sinal['tipo'][] = ['AJUDA', 'ATRASO', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS',
+const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1_RISCO', 'ATRASO', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS',
   'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO']
 const ROTULO: Record<Sinal['tipo'], string> = {
   AJUDA: 'Suporte técnico', TEC1: 'TEC1 / janela perdida', RITMO: 'Abaixo do ritmo',
@@ -37,13 +39,15 @@ const ROTULO: Record<Sinal['tipo'], string> = {
   // em branco, porque o tipo do front não acompanhou o do banco.
   DOIS_ATIVOS: 'Dois contratos em andamento', SUMIU_TOA: 'Sumiu do TOA em andamento',
   LOCAL: 'Baixa longe do cliente', ATRASO: 'Janela acabando sem chegada',
+  // 176: a previsão pela fila do técnico, antes do ATRASO.
+  TEC1_RISCO: 'TEC1 em risco (previsão)',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
   QUEBROU: 'bg-rose-500', MATERIAL: 'bg-violet-500', ABASTECIMENTO: 'bg-emerald-500',
   GPS: 'bg-red-600', CERCA: 'bg-indigo-500',
   DOIS_ATIVOS: 'bg-fuchsia-500', SUMIU_TOA: 'bg-orange-600',
-  LOCAL: 'bg-cyan-500', ATRASO: 'bg-red-500',
+  LOCAL: 'bg-cyan-500', ATRASO: 'bg-red-500', TEC1_RISCO: 'bg-orange-400',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -253,10 +257,36 @@ export function PainelCentral({ fechar, filtro, titulo }: {
         )}
       </div>
       {dados && (
-        <p className="border-t border-graf-800 px-3 py-1.5 text-[10px] text-graf-400">
-          atualizado {hora(dados.gerado_em)} · relê a cada minuto
-        </p>
+        <div className="flex items-center gap-2 border-t border-graf-800 px-3 py-1.5 text-[10px] text-graf-400">
+          <span>atualizado {hora(dados.gerado_em)} · relê a cada minuto</span>
+          <AvisoNoComputador />
+        </div>
       )}
     </div>
+  )
+}
+
+/** 175: liga o aviso do Windows para quando o site está em outra aba. */
+function AvisoNoComputador() {
+  const [ligado, setLigado] = useState(notificacaoLigada)
+  const [recusado, setRecusado] = useState(
+    notificacaoSuportada() && Notification.permission === 'denied')
+  if (!notificacaoSuportada()) return null
+  if (recusado) {
+    return <span className="ml-auto" title="Libere as notificações deste site no cadeado da barra de endereço">
+      avisos bloqueados no navegador</span>
+  }
+  return (
+    <button aria-pressed={ligado}
+      title="Avisa no computador quando chega sinal novo e o site está em outra aba"
+      onClick={async () => {
+        const r = await definirNotificacao(!ligado)
+        setLigado(r)
+        setRecusado(Notification.permission === 'denied')
+      }}
+      className={`ml-auto rounded px-1.5 py-0.5 ${
+        ligado ? 'bg-af-600/20 text-af-300' : 'hover:bg-graf-800 hover:text-graf-100'}`}>
+      {ligado ? 'Aviso no computador: ligado' : 'Avisar no computador'}
+    </button>
   )
 }

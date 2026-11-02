@@ -11511,3 +11511,88 @@ Agenda. Primeiro ficaram para a próxima atualização; quando ficou claro que n
 novo, o Emanuel pediu para subir: publicados pelo ar em 02/11 (update group `ee40469c`,
 runtime 0.6.0; `app.json` e `eas.json` conferidos intactos). Chegam a quem tem o APK 0.6.0,
 na segunda vez que abrir o app. NÃO conferido num celular.
+
+### D-262 · O pacote de inteligência operacional: o que entra, o que não entra, e a sugestão só no site
+
+Proposta de 02/11 (avisar antes de perder, sugerir sem decidir, conferir sozinho, o sistema
+fala primeiro, perguntar em português). O Emanuel aprovou tudo, com estas fronteiras:
+
+> "gostei de todas (...) exceto o envio de mensagem para o cliente, e envio de informação no
+> whatsapp do lider (...) sobre a questão de rota e sugestões vamos manter em nosso sistema do
+> controlador, nada será sugerido pelo app do técnico (...) isso é mais para quem acessa pelo
+> site." — Emanuel, 02/11.
+
+**Muda a D-088/D-089 só para a operação do dia, e só na web.** O sistema passa a poder
+SUGERIR redistribuição e ordem de paradas ao controlador, sempre com o motivo escrito ao lado
+e um clique de quem opera para aceitar. Nada muda sozinho, e nada é sugerido no app do
+técnico. Cadastro (login → equipe) continua sem sugestão: a D-089 vale como estava.
+
+**Perguntado, o Emanuel escolheu:**
+- Estoque × TOA: **só acusar** — vira fila de divergência para o almoxarifado; a posse
+  continua se movendo só por romaneio ou pelo campo (D-154, D-157 intactas).
+- Resumo das 18h: **na tela, com aviso no sino**. Sem WhatsApp, sem e-mail, sem Mural.
+- Assistente de dados (IA lendo números agregados): **fica para depois** — custo por
+  pergunta e chave da API ainda não decididos.
+- "Técnico parado": **medir no histórico antes** e trazer o número para aprovação.
+
+**Recusado:** mensagem ao cliente ("seu técnico está a caminho") e qualquer envio por
+WhatsApp. **Destravadores fora do pacote:** a LPU (depende da tabela) e o backup — perguntado
+à API da Hostinger em 02/11, a VPS `erp` tem **0 pontos de backup**; o painel mostra o recurso
+do plano, não um backup existente.
+
+### D-263 · Os sinais nascem pelo relógio, e o computador avisa (175)
+
+Até aqui um sinal só nascia quando alguém da gestão estava com o site aberto (a tela chama
+`sinais_do_dia` a cada minuto). Ninguém olhando = nenhum sinal, e o `criado_em` dizia a hora
+em que alguém ABRIU o site, não a hora do problema.
+
+`sinais_pelo_relogio()` roda pelo pg_cron a cada 5 min (06h–20h55 de Manaus) e, cidade por
+cidade com contrato hoje, chama a **mesma** `sinais_do_dia()` como o ADMIN mais antigo da
+empresa a chamaria com aquela cidade ativa (cabeçalho `x-afline-cidade`, D-251). Não existe
+segunda cópia da regra de sinal. A função é fechada a public, anon e authenticated: só o cron.
+Medido como authenticated: Manaus 139 ms, São Luís 83 ms; na primeira rodada criou 7 sinais
+que ninguém tinha visto.
+
+**Aviso no computador:** no rodapé do sino, "Avisar no computador" liga a notificação do
+sistema operacional (por pessoa e por navegador). Só dispara com o site em OUTRA aba — à
+vista, o toast já basta. Navegador que bloqueou diz "avisos bloqueados no navegador".
+
+O RITMO das 12h/15h/18h (D-167) já existia como sinal; o que faltava era ele nascer sem
+ninguém olhando e chegar a quem não está na aba. **Não verificado:** a notificação num
+Windows de verdade (precisa do clique de permissão de uma pessoa).
+
+### D-264 · TEC1 em risco, ao vivo (176)
+
+O TEC1 (D-187) só aparecia depois: "TEC1 perdido" quando o TOA fecha fora do padrão, e o
+ATRASO 30 min antes do fim da janela — tarde para mandar outro técnico.
+
+**A previsão** (`tec1_em_risco()`): para cada técnico (sem técnico, a equipe), a fila do dia
+na ordem do TOA — em execução, a caminho, e o resto pelo início planejado. Cada contrato ocupa
+deslocamento + duração; ninguém começa antes de a janela abrir. Prazo do livro: começar até o
+fim da janela e terminar antes de fim + tolerância (2 h / 1 h).
+
+**De onde vem cada número:** duração e deslocamento são a **mediana do próprio TOA**, por grupo
+de serviço, nos 30 dias anteriores (colunas "Duração" e "Tempo de Deslocamento" dos
+concluídos). Medido em 02/11: adesão 56 e 14 min (1.342), VT 48 e 16 (843), serviço 36 e 14
+(508), migração GPON 78,5 e 15 (290). Quando o TOA traz o deslocamento DAQUELE contrato, vale
+o dele.
+
+**Recusado: a posição do técnico na conta.** O rastro tinha 8 técnicos com ponto em 13 dias e
+17 trechos em movimento — pouco para tirar velocidade (deu 18 km/h, sem confiança). A
+distância, quando há ponto dos últimos 20 min, vai no aviso como informação ("a 9,2 km"). O
+início planejado pelo TOA também vai como informação, não como decisão.
+
+**O sinal** `TEC1_RISCO`: "TEC1 em risco" (sobra menos que `atraso_antecedencia_min`, 30) ou
+"TEC1 vai estourar" (a previsão já passa do prazo), só ANTES de o ATRASO começar — depois, o
+ATRASO fala do mesmo contrato. A chave leva o nível: o risco que vira "vai estourar" avisa de
+novo. Só contrato que conta no TEC1. Na barra, mora no ícone do relógio, que passou a se
+chamar "Janela em risco".
+
+**As regras de expurgo da janela e do tipo** saíram de dentro de `tec1_da_os` para
+`tec1_janela_conta()`, usada pelos dois. Conferido: `tec1_da_os` deu resultado idêntico antes
+e depois nas 7.516 O.S. dos últimos 60 dias (mesmo md5).
+
+Medido como authenticated: `tec1_em_risco` 216 ms (77 ms são a régua de 30 dias);
+`sinais_do_dia` foi de 139 para 275 ms em Manaus. **Não verificado:** acerto da previsão — não
+há histórico do estado de cada hora para testar para trás. Conferir em 03/11 à noite: dos
+contratos que receberam TEC1_RISCO, quantos fecharam SEM PADRÃO.

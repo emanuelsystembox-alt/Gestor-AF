@@ -74,7 +74,7 @@ export interface Sinal {
    *  sinal sem rótulo e sem cor porque o tipo do front ficou para trás
    *  do banco. Tipo novo no banco entra NESTA lista no mesmo dia. */
   tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO' | 'CERCA' | 'GPS'
-    | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO'
+    | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO' | 'TEC1_RISCO'
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean
@@ -144,11 +144,50 @@ interface Ctx {
  * abastecimento, dois ativos, sumiu do TOA). Decisão dele: cada coisa
  * conta num lugar só.
  */
-export const COM_ICONE: Sinal['tipo'][] = ['LOCAL', 'TEC1', 'ATRASO', 'RITMO']
+export const COM_ICONE: Sinal['tipo'][] = ['LOCAL', 'TEC1', 'ATRASO', 'TEC1_RISCO', 'RITMO']
 
 const CentralCtx = createContext<Ctx | null>(null)
 
 let proximoToast = 1
+
+/**
+ * 175: o aviso do SISTEMA OPERACIONAL, para quem está em outra aba ou outro
+ * programa. O toast só é visto por quem está olhando o site; o sinal de ritmo
+ * das 12h serve para chamar quem NÃO está (pacote de 02/11).
+ *
+ * Por pessoa e por navegador (localStorage): ligar é um clique no sino, e o
+ * navegador pede a permissão na hora. Com a aba à vista não duplica — o toast
+ * já basta.
+ */
+const CHAVE_NOTIFICAR = 'af.central.notificar'
+
+export function notificacaoSuportada(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window
+}
+
+export function notificacaoLigada(): boolean {
+  if (!notificacaoSuportada() || Notification.permission !== 'granted') return false
+  try { return localStorage.getItem(CHAVE_NOTIFICAR) === '1' } catch { return false }
+}
+
+/** Liga ou desliga. Devolve o estado final (o navegador pode recusar). */
+export async function definirNotificacao(ligar: boolean): Promise<boolean> {
+  if (!notificacaoSuportada()) return false
+  if (ligar && Notification.permission !== 'granted') {
+    const p = await Notification.requestPermission()
+    if (p !== 'granted') return false
+  }
+  try { localStorage.setItem(CHAVE_NOTIFICAR, ligar ? '1' : '0') } catch { /* sem armazenamento: vale só agora */ }
+  return notificacaoLigada()
+}
+
+function notificarSistema(x: Sinal) {
+  if (document.visibilityState === 'visible' || !notificacaoLigada()) return
+  try {
+    const n = new Notification(x.titulo, { body: x.detalhe ?? '', tag: `sinal-${x.id}` })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch { /* navegador que só notifica por service worker: fica o toast */ }
+}
 
 export function CentralProvider({ children }: { children: ReactNode }) {
   const { session, ehGestor, temPapel, pode } = useAuth()
@@ -199,8 +238,9 @@ export function CentralProvider({ children }: { children: ReactNode }) {
         for (const x of ativos) {
           if (!conhecidos.current.has(x.id)) {
             // GPS anormal e cerca chegam com o mesmo destaque do pedido de ajuda (097).
-            avisar({ tom: ['AJUDA', 'GPS', 'CERCA', 'ATRASO', 'SUMIU_TOA'].includes(x.tipo) ? 'ajuda' : 'sinal',
+            avisar({ tom: ['AJUDA', 'GPS', 'CERCA', 'ATRASO', 'TEC1_RISCO', 'SUMIU_TOA'].includes(x.tipo) ? 'ajuda' : 'sinal',
                      titulo: x.titulo, texto: x.detalhe ?? '' })
+            notificarSistema(x)
           }
         }
       }

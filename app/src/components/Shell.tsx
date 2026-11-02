@@ -345,7 +345,9 @@ const ALERTAS: {
     icone: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
   },
   {
-    chave: 'ATRASO', titulo: 'Janela acabando sem chegada', tipos: ['ATRASO'], cor: '#ef4444',
+    // 176: o TEC1 em risco (previsão pela fila) mora no mesmo relógio: é o
+    // aviso de antes; o ATRASO, o de 30 min antes do fim da janela.
+    chave: 'ATRASO', titulo: 'Janela em risco', tipos: ['TEC1_RISCO', 'ATRASO'], cor: '#ef4444',
     // relógio
     icone: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
   },
