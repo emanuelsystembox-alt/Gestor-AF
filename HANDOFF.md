@@ -2,6 +2,14 @@
 
 Última atualização: **02/11/2026**, por Claude (Opus 5.5).
 
+> **02/11/2026, noite — o pacote de inteligência operacional** (D-262 a D-271, migrations 175
+> a 183; menu **Inteligência** no site). Sinais nascem pelo relógio (pg_cron, 5 min) e o sino
+> avisa no computador; TEC1 em risco pela fila do técnico; resumo do dia às 18h; avisos de
+> importação/computador/sessão do TOA; auditoria da baixa; revisita por causa; risco de quebra;
+> conferência estoque × TOA (só acusa); redistribuição e ordem de paradas sugeridas (só no site).
+> **Esperando o Emanuel:** ligar a execução longa (p90), pesos da auditoria, prazo da devolutiva
+> (7 dias), e as perguntas de cada decisão. Assistente de dados adiado. **Backup: a VPS tem 0.**
+>
 > **01 e 02/11/2026 — a extensão e o sincronismo** (detalhe em `docs/03-DECISOES.md`,
 > D-250 a D-257; pendências em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente depois da 170"):
 > - **A varredura pede os dados direto ao TOA** (extensão 0.7.0, D-250): o bucket inteiro

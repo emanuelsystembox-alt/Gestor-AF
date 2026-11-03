@@ -86,6 +86,13 @@ parâmetro.
 ("cannot change return type"). Tem de derrubar — e função recriada do
 zero **nasce com a ACL aberta** (ver `security.md`).
 
+**`rodar_por_cidade` engole o erro de propósito — o cron diz "succeeded" com a função quebrada.**
+Uma cidade com defeito não pode calar as outras, então o erro vira `raise warning` e o
+`cron.job_run_details` registra sucesso. Em 02/11 `tec1_em_risco` ficou quebrada alguns minutos
+(alias `r` × variável `r`, a armadilha logo abaixo — de novo) e o relógio não acusou. Depois de
+mexer em qualquer função que `sinais_do_dia` chama, rode `sinais_do_dia()` como authenticated
+numa transação desfeita; não confie no cron. Ver D-267.
+
 **Variável record chamada `v` colide com alias `v` da tabela.** O
 plpgsql resolve `v.id` como a variável ainda não atribuída e estoura
 *"record v is not assigned yet"*.
