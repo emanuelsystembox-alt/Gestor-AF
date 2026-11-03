@@ -28,7 +28,8 @@ import {
 
 // 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
 // que o controle precisa ver primeiro.
-const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1_RISCO', 'ATRASO', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS',
+const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1_RISCO', 'ATRASO', 'SEM_IMPORTACAO', 'TOA_SESSAO',
+  'SEM_COMPUTADOR', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS', 'EXECUCAO_LONGA',
   'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO', 'RESUMO']
 export const ROTULO_SINAL: Record<Sinal['tipo'], string> = {
   AJUDA: 'Suporte técnico', TEC1: 'TEC1 / janela perdida', RITMO: 'Abaixo do ritmo',
@@ -42,6 +43,9 @@ export const ROTULO_SINAL: Record<Sinal['tipo'], string> = {
   // 176: a previsão pela fila do técnico, antes do ATRASO.
   TEC1_RISCO: 'TEC1 em risco (previsão)',
   RESUMO: 'Resumo do dia',
+  // 178: o sincronismo e a execução longa.
+  SEM_IMPORTACAO: 'Importação atrasada', SEM_COMPUTADOR: 'Bucket sem computador',
+  TOA_SESSAO: 'Sessão do TOA caiu', EXECUCAO_LONGA: 'Execução longa',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
@@ -50,6 +54,8 @@ const COR: Record<Sinal['tipo'], string> = {
   DOIS_ATIVOS: 'bg-fuchsia-500', SUMIU_TOA: 'bg-orange-600',
   LOCAL: 'bg-cyan-500', ATRASO: 'bg-red-500', TEC1_RISCO: 'bg-orange-400',
   RESUMO: 'bg-emerald-500',
+  SEM_IMPORTACAO: 'bg-yellow-500', SEM_COMPUTADOR: 'bg-stone-400',
+  TOA_SESSAO: 'bg-pink-500', EXECUCAO_LONGA: 'bg-teal-500',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -61,6 +67,9 @@ function destino(s: Sinal): string | null {
   if (s.tipo === 'QUEBROU' && s.contratos?.length === 1) return `/controle/visita/${s.contratos[0].visita_id}`
   if (s.tipo === 'MATERIAL') return '/almoxarifado?aba=sinalizacoes'
   if (s.tipo === 'RESUMO') return '/controle/resumo'
+  // 178: os três do sincronismo abrem a tela que mostra a vez e as rodadas.
+  if (s.tipo === 'SEM_IMPORTACAO' || s.tipo === 'SEM_COMPUTADOR' || s.tipo === 'TOA_SESSAO')
+    return '/controle/sincronismo'
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
   // 097: GPS e cerca abrem o técnico no Monitoramento.
   if ((s.tipo === 'GPS' || s.tipo === 'CERCA') && s.tecnico_id) return `/controle/monitor?tecnico=${s.tecnico_id}`

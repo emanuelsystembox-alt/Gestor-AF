@@ -11702,3 +11702,30 @@ não foram lidos pela varredura.
 Sem devolutiva registrada não dá para tirar o prazo do dado; o que se mede é quantos entram
 hoje em Manaus: 3 dias 190, 7 dias 87, 10 dias 55, 14 dias 0. Também a confirmar: a tratativa
 não se desfaz; o serial do TOA casa com o da carga do Atlas com `*` na frente.
+
+### D-269 · Avisos operacionais: importação atrasada, bucket sem computador, sessão do TOA e execução longa (178)
+
+Do pacote de 02/11 (D-262): o que hoje depende de alguém olhar vira sinal no sino, dentro de
+`sinais_do_dia()` (nunca numa cópia para o relógio).
+- **SEM_IMPORTACAO** — bucket em uso (importação aplicada nos últimos 7 dias) sem importação
+  com sucesso há **120 min**, entre 08h e 18h. Medido o intervalo entre importações: p50
+  44/48/30 min, p95 102/75/109 (MAN-AFLINE, MAN_01_VT, SLS_02_VT); o ritmo em uso é 60 min.
+  Simulado desde 22/10: 24 avisos em 28 bucket-dias (com 90 min seriam 43).
+- **SEM_COMPUTADOR** — 10 min sem pulso (não há histórico do pulso para medir).
+- **TOA_SESSAO** — a vez está com `toa_sessao = 'CAIU'` e o computador continua pulsando. Pode
+  ficar aceso até 60 min depois de a pessoa entrar de novo no TOA (a extensão só grava OK na
+  próxima baixa que dá certo).
+- `rodar_por_cidade` passou a rodar os sinais também na cidade com bucket em uso e nenhum
+  contrato no dia — é justamente o dia em que a planilha não chegou.
+
+**Técnico parado: o rastro não serve** (688 pontos, 8 técnicos, 18 técnico-dias). A
+alternativa é **EXECUCAO_LONGA**: contrato em execução além de um percentil alto da
+"Duração" do TOA do grupo (p90: adesão 116, VT 86, serviço 99, migração 139 min), só quando a
+última planilha que ainda o mostrava INICIADO chegou depois de início + limite (sem isso, ~53
+avisos falsos por dia). Com p90: ~10 avisos/dia em Manaus; p95: ~5. **DESLIGADO**, esperando
+o Emanuel (D-262 — "medir antes"). Recomendação: p90. Para ligar:
+`update parametro set valor='{"ligado":true,"percentil":90}' where chave='execucao_longa'`.
+
+120 min, a janela 08h–18h e os 10 min foram tirados do dado, sem perguntar — trocar é
+parâmetro (`sincronismo_alerta`). Medido: `sinais_do_dia` 274–280 ms (desligada), 305 ms
+ligada. **Não verificado:** a execução longa num dia de operação ao vivo.
