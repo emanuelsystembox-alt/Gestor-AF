@@ -78,6 +78,8 @@ const OPERACAO: Modulo = {
 const INTELIGENCIA: Modulo = {
   chave: 'inteligencia', titulo: 'Inteligência', icone: 'indicadores', itens: [
     { para: '/controle/resumo', rotulo: 'Resumo do dia', icone: 'relatorios', busca: 'resumo 18h fechamento dia tec1 quebras revisita ritmo humor' },
+    // 180: a revisita agrupada pela causa provável.
+    { para: '/controle/revisita', rotulo: 'Revisita por causa', icone: 'sincronismo', busca: 'revisita retorno vt modelo decoder emta equipamento tecnico area bairro taxa' },
   ],
 }
 const ALMOXARIFADO: Modulo = {

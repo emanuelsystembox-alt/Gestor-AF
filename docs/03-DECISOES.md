@@ -11620,3 +11620,28 @@ O resumo carrega a **conferência da 176**: dos contratos avisados em TEC1_RISCO
 fecharam sem padrão. Em 02/11 os resumos foram gerados à mão às 18h22 (a tarefa nasceu depois
 das 18h): Manaus 69 contratos, TEC1 47/50, 4 quebrados (3 INFRA CLARO, 1 AGENDAMENTO), 9
 revisitas; São Luís 47, TEC1 32/32, 9 quebrados. Medido: 123 ms por cidade.
+
+### D-266 · Revisita por causa: equipamento, técnico, área e bairro (180)
+
+Do pacote de 02/11 (D-262): agrupar as revisitas para responder "o decoder X volta em VT
+três vezes mais". `revisita_por_causa(p_de, p_ate, p_grupo, p_min_amostra)` chama
+`revisita_dos_contratos` UMA vez com o array inteiro — a regra da D-245 não foi reescrita. A
+taxa é revisitas ÷ serviços concluídos do mesmo recorte, e a revisita conta para o serviço
+ANTERIOR (como a D-246). Recorte com menos serviços que a amostra mínima (padrão 20) vem
+marcado e fica fora do ranking: 3 de 3 não é "o pior modelo".
+
+**De onde vem o modelo:** a planilha do TOA não tem equipamento; `equipamento_movimento` tem 1
+linha no banco. Só a varredura (`visita_equipamento_toa`) tem modelo, e o INSTALADO quase
+nunca traz (17 de 530 linhas), enquanto a seção CLIENTE traz em 1.574 de 1.599. Por isso o
+recorte é **o equipamento que ficou no cliente depois da visita anterior** (instalado + o que
+já estava − o retirado). Sem modelo aparece como "modelo não informado", "não lido do TOA" ou
+"sem equipamento no TOA" — nenhuma visita some. Cobertura em Manaus desde 17/10: 281 de 2.760
+concluídas (10,2%) têm modelo; VT 162/649, ADESÃO 8/1.183 — hoje o recorte por equipamento
+serve quase só para VT.
+
+Medido como authenticated: Manaus 30 dias 153 ms (só há dado desde 17/10), São Luís 54 ms.
+Geral 126 de 2.760 serviços voltaram (4,6%), o mesmo que `revisita_dos_contratos` direto.
+Tela Inteligência › Revisita por causa. **Para o Emanuel confirmar:** (1) "modelo" = o que
+ficou no cliente; (2) amostra mínima 20; (3) revisita em OUTRA cidade não conta. **Não
+verificado:** a tela no navegador (sessão de teste expirada); bairros com grafias diferentes
+("D PEDRO" e "D PEDRO I") não foram juntados.

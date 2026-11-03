@@ -30,6 +30,8 @@ const Qualidade = lazy(() => import('./pages/Qualidade'))
 // 163: o Mural Nexus -- o canal da empresa com o time.
 const Mural = lazy(() => import('./pages/Mural'))
 const Resumo = lazy(() => import('./pages/Resumo'))
+// 180: de onde vêm as revisitas — equipamento, técnico, área e bairro (D-262).
+const RevisitaCausa = lazy(() => import('./pages/RevisitaCausa'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -178,6 +180,9 @@ function Rotas() {
         {/* 177: a foto das 18h, por cidade (D-262). */}
         <Route path="/controle/resumo" element={
           <Protegida exige="GESTAO"><Resumo /></Protegida>} />
+        {/* 180: revisita por causa (D-262). */}
+        <Route path="/controle/revisita" element={
+          <Protegida exige="GESTAO"><RevisitaCausa /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
 
