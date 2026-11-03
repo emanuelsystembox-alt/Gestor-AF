@@ -130,6 +130,7 @@ tarefa pedir.
 | Arquivo | Para quê |
 |---|---|
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
+| `docs/13-CONEXOES-E-CHAVES.md` | **MCPs, logins e chaves**: onde cada um mora e `conferir-conexoes.ps1` |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
 | `docs/03-DECISOES.md` | as 271 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |

@@ -115,6 +115,7 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 | App (local) | `cd app; npm install; npm run dev` → localhost:5173 |
 | **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://pulsoline.grupoafline.com.br** (o `gestor-af.pages.dev` redireciona) — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
+| **Conexões e chaves** | `docs/13-CONEXOES-E-CHAVES.md` — nesta máquina tudo já está conectado; confira com `powershell -ExecutionPolicy Bypass -File .\conferir-conexoes.ps1` |
 | Login | `admin@afline.com.br` · senha só com o Emanuel |
 | **Extensão do Chrome (TOA)** | `extensao-toa/` (**0.6.0**) — baixa a planilha do TOA sozinha e **varre** nome, equipamento e material pelas telas (D-189 a D-197). Instalada sem compactação no Chrome de quem opera. Usar: `extensao-toa/README.md` · mexer: `docs/11-EXTENSAO-TOA.md` |
 
