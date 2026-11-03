@@ -579,6 +579,26 @@ dia não espera. **O supervisor segue a D-134 em toda tela e relatório:** o dec
 (a tela do supervisor) → o login ligado à equipe → o texto da planilha. Não leia só
 `equipe.supervisor_nome`: em São Luís ele está vazio.
 
+## Inteligência operacional (175 em diante; D-262 a D-265)
+
+**O sistema SUGERE na web do controlador; nunca no app do técnico, e nunca decide sozinho.**
+Muda a D-088 só para a operação do dia (redistribuição, ordem de paradas): motivo escrito ao
+lado e um clique de quem opera. Cadastro continua sem sugestão (D-089). *"nada será sugerido
+pelo app do técnico (...) isso é mais para quem acessa pelo site"* (Emanuel, 02/11).
+Nada de mensagem ao cliente nem WhatsApp. Estoque × TOA **só acusa** (D-157 intacta).
+
+**Os sinais nascem pelo relógio** (175): o pg_cron chama `sinais_do_dia()` a cada 5 min,
+cidade por cidade, pela porta única `rodar_por_cidade()`. Regra de sinal nova vai DENTRO de
+`sinais_do_dia()`, nunca numa segunda cópia para o relógio.
+
+**TEC1 em risco** (176) usa a mediana do PRÓPRIO TOA ("Duração" e "Tempo de Deslocamento",
+30 dias, por grupo). A posição do técnico é informação, não entra na conta (rastro ralo).
+As regras de expurgo da janela moram em `tec1_janela_conta()` — o livro do TEC1 e a previsão
+usam a mesma.
+
+**O resumo do dia é foto das 18h** (177), na tela e no sino; humor e ocorrências cortados
+por permissão dentro de `resumo_do_dia()`.
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)
