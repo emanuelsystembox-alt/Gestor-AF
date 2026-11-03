@@ -11645,3 +11645,60 @@ Tela Inteligência › Revisita por causa. **Para o Emanuel confirmar:** (1) "mo
 ficou no cliente; (2) amostra mínima 20; (3) revisita em OUTRA cidade não conta. **Não
 verificado:** a tela no navegador (sessão de teste expirada); bairros com grafias diferentes
 ("D PEDRO" e "D PEDRO I") não foram juntados.
+
+### D-267 · Auditoria automática da baixa, e a régua guardada (179)
+
+Do pacote de 02/11 (D-262): uma fila só do que é suspeito, com nota e motivos.
+`auditoria_da_baixa(p_de, p_ate)` (gestão, cidade ativa, até 31 dias) avalia cada contrato em
+cinco critérios, cada um SUSPEITO, OK, NÃO AVALIADO (com o porquê) ou NÃO SE APLICA — "não
+avaliado" não é "ok" (regra 6). Entra na fila quem tem nota > 0.
+- **Longe do endereço:** `local_da_baixa()`, como sempre (raio 200 m), uma chamada por lote.
+- **Execução curta:** abaixo do **p10** da "Duração" do TOA do grupo de serviço (30 dias, só
+  concluídos de fato, sem jornada; grupo com menos de 20 concluídos fica "não avaliado").
+- **Mesmo serial em dois contratos DIFERENTES** (o mesmo contrato em outro dia é revisita).
+- **Equipamento lançado diferente do que o TOA mostra.**
+- **Foto da galeria** (`da_galeria`, D-213).
+
+**Pesos — proposta para o Emanuel aprovar:** serial 40, local 30, equipamento 25, duração 20,
+galeria 15 (constantes na função; mudar é migration). Também a aprovar: o p10 como corte e a
+amostra mínima de 20.
+
+**A régua guardada** `regua_servico` (p10/p50/p75 da duração e p50 do deslocamento por grupo)
+é recalculada pelo pg_cron às 05h10 de Manaus. A 176 passou a lê-la em vez de calcular a
+mediana ao vivo: −77 ms, e a mediana geral deixou de incluir jornada (Na Base, Refeição) —
+defeito pequeno da 176. Os números da previsão mudaram: adesão 56→60, migração GPON 78,5→87,
+geral 49→54.
+
+**Defeito que eu causei e consertei:** a troca na 176 usou o alias `r` na tabela, e `r` é a
+variável record do laço — *"record r is not assigned yet"*, a armadilha que já está em
+`traps.md`. `tec1_em_risco` (e com ela `sinais_do_dia`, que a chama) falhou por alguns minutos
+na noite de 02/11 até o conserto (alias `rg`). O cron não acusou: `rodar_por_cidade` engole o
+erro por cidade de propósito, para uma não calar as outras — o aviso fica só no log do Postgres.
+
+Medido como authenticated: Manaus 7 dias 143–398 ms (1.601 contratos, 119 na fila), 30 dias
+~300 ms (3.169, 234 na fila). Hoje quase só a execução curta enche a fila (223 de 234):
+serial, equipamento e galeria dependem da varredura (desde 20/10, ~22% dos concluídos) e do
+lançamento do campo (`equipamento_movimento` tem 1 linha) — zero é o dado, não a regra.
+Tela Inteligência › Auditoria da baixa. **Não verificado:** a tela no navegador; nenhum
+suspeito foi conferido com a operação.
+
+### D-268 · Estoque conferido pelo TOA: só acusa (182)
+
+Escolha do Emanuel (D-262): **só acusar**. `conferencia_estoque_toa(p_de, p_ate)`
+(`almoxarifado.ver`, cidade ativa, até 92 dias) compara o que a varredura leu do TOA com a
+carga e com o lançamento do campo: CARGA_DE_OUTRO, FORA_DA_CARGA, POSSE_NAO_BAIXADA,
+SEM_CADASTRO, RETIRADO_SEM_DEVOLUTIVA e LANCADO_SEM_TOA. Nada move posse nem saldo (D-154,
+D-157 intactas). Contrato encerrado e não lido pela varredura conta à parte como "não
+conferido". Tratar (`tratar_divergencia_toa`, `almoxarifado.editar`, motivo obrigatório) tira
+da fila e não corrige estoque. Aba Almoxarifado › Conferência TOA (`?aba=conferencia`).
+
+**O achado:** o cadastro do almoxarifado tem **33 peças** (a amostra de 22/09); a carga de
+15.603 nunca foi importada e há 0 devolutivas. Em Manaus, 30 dias: 507 instalados lidos, todos
+SEM_CADASTRO; as três divergências de carga dão 0 porque **não há carga para comparar**, não
+porque a carga está certa (a tela mostra "peças no cadastro: 33"). 2.541 de 3.223 encerrados
+não foram lidos pela varredura.
+
+**Prazo da devolutiva — proposta para o Emanuel aprovar:** 7 dias (`retirado_devolutiva_dias`).
+Sem devolutiva registrada não dá para tirar o prazo do dado; o que se mede é quantos entram
+hoje em Manaus: 3 dias 190, 7 dias 87, 10 dias 55, 14 dias 0. Também a confirmar: a tratativa
+não se desfaz; o serial do TOA casa com o da carga do Atlas com `*` na frente.

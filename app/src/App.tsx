@@ -32,6 +32,8 @@ const Mural = lazy(() => import('./pages/Mural'))
 const Resumo = lazy(() => import('./pages/Resumo'))
 // 180: de onde vêm as revisitas — equipamento, técnico, área e bairro (D-262).
 const RevisitaCausa = lazy(() => import('./pages/RevisitaCausa'))
+// 179: a fila do que é suspeito na baixa, com nota e motivos (D-262).
+const Auditoria = lazy(() => import('./pages/Auditoria'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -183,6 +185,9 @@ function Rotas() {
         {/* 180: revisita por causa (D-262). */}
         <Route path="/controle/revisita" element={
           <Protegida exige="GESTAO"><RevisitaCausa /></Protegida>} />
+        {/* 179: auditoria automática da baixa — a fila acusa, quem opera julga. */}
+        <Route path="/controle/auditoria" element={
+          <Protegida exige="GESTAO"><Auditoria /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
 

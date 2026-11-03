@@ -11,6 +11,8 @@ import { Cargas } from '../components/Cargas'
 import { BaixaContrato } from '../components/BaixaContrato'
 import { Movimentacoes } from '../components/Movimentacoes'
 import { Sinalizacoes } from '../components/Sinalizacoes'
+// 182: o que o TOA diz instalado/retirado contra a carga — só acusa (D-262).
+import { ConferenciaToa } from '../components/ConferenciaToa'
 import { useCentral } from '../lib/central'
 
 /**
@@ -125,8 +127,11 @@ export default function Almoxarifado() {
    *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
    *  atravessa as tres no mesmo atendimento de balcao. */
   // A central leva direto à aba pelo endereço (?aba=sinalizacoes, 091).
-  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes' | 'sinalizacoes'>(
-    () => new URLSearchParams(window.location.search).get('aba') === 'sinalizacoes' ? 'sinalizacoes' : 'posicao')
+  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes' | 'sinalizacoes' | 'conferencia'>(
+    () => {
+      const a = new URLSearchParams(window.location.search).get('aba')
+      return a === 'sinalizacoes' || a === 'conferencia' ? a : 'posicao'
+    })
   const { dados: central } = useCentral()
   const [posicao, setPosicao] = useState<Posicao | null>(null)
   const [posses, setPosses] = useState<Posse[]>([])
@@ -286,7 +291,8 @@ export default function Almoxarifado() {
              ['miscelanea', 'Material e ferramenta'],
              ['baixa', 'Baixa por contrato'],
              ['movimentacoes', 'Movimentações e pesquisa'],
-             ['sinalizacoes', 'Sinalizações do campo']] as const).map(([a, rot]) => (
+             ['sinalizacoes', 'Sinalizações do campo'],
+             ['conferencia', 'Conferência TOA']] as const).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 aba === a ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
@@ -306,6 +312,7 @@ export default function Almoxarifado() {
         {aba === 'baixa' && <BaixaContrato podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'movimentacoes' && <Movimentacoes />}
         {aba === 'sinalizacoes' && <Sinalizacoes podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'conferencia' && <ConferenciaToa podeTratar={pode('almoxarifado.editar')} />}
 
         {aba === 'posicao' && (<>
 
