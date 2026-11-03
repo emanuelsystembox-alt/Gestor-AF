@@ -63,7 +63,35 @@ Conferir: `claude mcp list` (mostra estado de cada um, sem mostrar segredo).
 
 ---
 
-## 3. Se for OUTRO computador
+## 3. Mesmo computador, OUTRA conta do Claude (o caso combinado em 02/11)
+
+O que é do **Windows** fica; o que é da **conta do claude.ai** troca.
+
+**Continua igual, sem fazer nada:** SSH da VPS, Wrangler, EAS, Git, os dois `.env`, o MCP
+`hostinger-api` (está no `~/.claude.json`), os plugins instalados (`~/.claude/plugins`), as
+regras e hooks do projeto (`.claude/`), a **memória** do projeto
+(`~/.claude/projects/…NGESTOR-AFLINE/memory/` — a outra conta lê a mesma) e as ferramentas
+embutidas do app (navegador, terminal).
+
+**Fica com a conta antiga (a nova não vê):** os conectores do claude.ai — Docs, Figma, o
+Expo duplicado (`mcp__6a480db0…`) e o Supabase da nuvem (que não se usa). Nada do projeto
+depende deles: o Expo vem pelo plugin, e o banco pelo SSH. O histórico das conversas também
+fica na conta antiga — o que importa está no Git, no `HANDOFF.md` e na memória.
+
+**Os logins de MCP por OAuth** (o plugin do Expo) moram em `~/.claude/.credentials.json`, no
+mesmo arquivo do login do claude.ai. Para trocar de conta, use **`/login`** (ou o login do app)
+— não `/logout` antes, que pode limpar o arquivo. Se depois o `conferir-conexoes.ps1` acusar o
+Expo, é um clique: `/mcp` → `plugin:expo:expo` → autenticar.
+
+**Atenção — o gateway:** `~/.claude/settings.json` tem em `env` um `ANTHROPIC_BASE_URL`
+(`apiclaude.pulsecoding.com.br`) e um `ANTHROPIC_AUTH_TOKEN`. No Claude Code de terminal, essas
+variáveis **passam por cima do login**: a conta nova logaria, mas os pedidos continuariam saindo
+pelo gateway, com o token antigo. Se a ideia é a conta nova pagar o uso, o Emanuel tira esse
+bloco `env` do arquivo (é configuração dele, de todos os projetos — não é do repositório).
+
+**Depois de trocar:** rodar `conferir-conexoes.ps1` na sessão nova.
+
+## 4. Se for OUTRO computador
 
 Nada disso viaja pelo Git, e nenhum valor deve passar pelo chat. Em outra máquina:
 
@@ -82,7 +110,7 @@ Nada disso viaja pelo Git, e nenhum valor deve passar pelo chat. Em outra máqui
 
 ---
 
-## 4. Nunca
+## 5. Nunca
 
 - Escrever valor de chave, token ou senha neste repositório (inclusive em `.mcp.json`).
 - Usar o MCP do Supabase da nuvem — o banco é o da VPS.
