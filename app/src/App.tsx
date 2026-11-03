@@ -34,6 +34,8 @@ const Resumo = lazy(() => import('./pages/Resumo'))
 const RevisitaCausa = lazy(() => import('./pages/RevisitaCausa'))
 // 179: a fila do que é suspeito na baixa, com nota e motivos (D-262).
 const Auditoria = lazy(() => import('./pages/Auditoria'))
+// 181: o risco de quebra dos contratos de hoje, com os motivos (D-262).
+const RiscoQuebra = lazy(() => import('./pages/RiscoQuebra'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -188,6 +190,9 @@ function Rotas() {
         {/* 179: auditoria automática da baixa — a fila acusa, quem opera julga. */}
         <Route path="/controle/auditoria" element={
           <Protegida exige="GESTAO"><Auditoria /></Protegida>} />
+        {/* 181: risco de quebra antes do despacho — sugestão, nada muda sozinho. */}
+        <Route path="/controle/risco-quebra" element={
+          <Protegida exige="GESTAO"><RiscoQuebra /></Protegida>} />
         <Route path="/controle/administracao" element={
           <Protegida exige="GESTAO"><Administracao /></Protegida>} />
 

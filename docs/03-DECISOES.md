@@ -11729,3 +11729,38 @@ o Emanuel (D-262 — "medir antes"). Recomendação: p90. Para ligar:
 120 min, a janela 08h–18h e os 10 min foram tirados do dado, sem perguntar — trocar é
 parâmetro (`sincronismo_alerta`). Medido: `sinais_do_dia` 274–280 ms (desligada), 305 ms
 ligada. **Não verificado:** a execução longa num dia de operação ao vivo.
+
+### D-270 · Risco de quebra antes do despacho (181)
+
+Do pacote de 02/11 (D-262): os contratos de hoje com cara de improdutivo, com os motivos, para a
+COP ligar antes ou mandar ao técnico mais experiente. **Sugestão, só no site** — nada muda
+sozinho, nada no app.
+
+**Os pesos não foram inventados: saem do histórico da própria cidade** (60 dias antes do dia,
+`risco_quebra_fator`, recalculada às 05h30 de Manaus e, se faltar, na primeira leitura do dia).
+Um fator só entra com ≥ 30 contratos, piso de Wilson (95%) acima da taxa da cidade e razão
+suavizada ≥ 1,25. A cidade precisa de 300 contratos com resultado; abaixo disso a tela diz "sem
+histórico", não "baixo". Faixas: ALTO = produto das razões ≥ 2× a cidade; MÉDIO = algum motivo;
+BAIXO = nenhum.
+
+**Validado para trás em Manaus** (régua 17–26/10, teste 27/10–01/11, fora do cálculo):
+
+| faixa | contratos | quebra real | quebra por AGENDAMENTO |
+|---|---:|---:|---:|
+| ALTO | 60 | 38,3% | 30,0% |
+| MÉDIO | 233 | 21,9% | 15,0% |
+| BAIXO | 1.017 | 13,0% | 5,8% |
+| média | 1.310 | 15,7% | 8,5% |
+
+Dia a dia (22/10–01/11, cada dia só com a régua dos anteriores): ALTO 36,8%, MÉDIO 21,4%, BAIXO
+12,2%. São Luís não foi validada (123 contratos com resultado). Aceitos hoje: bairros
+(Adrianópolis 41,9%, Ponta Negra, Santo Antônio, Centro), "passou e não concluiu" (30,3%) e o
+grupo SERVIÇO (25,5%). **Recusados**, com os números no arquivo: contador de log (sem degrau),
+cliente ausente anterior sozinho (33 contratos), segmentação, janela, edificação, vai-e-volta,
+revisita; área, telefones e tipo de pessoa estão vazios em 100%. Os fatores se multiplicam como
+se fossem independentes — simplificação conhecida.
+
+O "fora" (cancelado pela central, desatribuído, 800) e a quebra por O.S. foram reescritos a
+partir de `impacto_quebra`, porque não há função para eles — dívida a extrair. Medido: primeira
+leitura do dia 339–468 ms, seguintes 3–4 ms. Tela Inteligência › Risco de quebra. **Não
+verificado:** a lista com contratos em aberto (era noite), a tela no navegador.
