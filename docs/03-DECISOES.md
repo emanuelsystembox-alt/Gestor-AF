@@ -11764,3 +11764,36 @@ O "fora" (cancelado pela central, desatribuído, 800) e a quebra por O.S. foram 
 partir de `impacto_quebra`, porque não há função para eles — dívida a extrair. Medido: primeira
 leitura do dia 339–468 ms, seguintes 3–4 ms. Tela Inteligência › Risco de quebra. **Não
 verificado:** a lista com contratos em aberto (era noite), a tela no navegador.
+
+### D-271 · Sugestões no site: redistribuição e ordem de paradas (183)
+
+A exceção da D-262 à D-088, só para a operação do dia e só na web: o sistema sugere com o
+motivo ao lado, e quem opera aceita com um clique. Nada no app do técnico.
+
+**A fila virou uma função só**, `fila_do_dia()`: `tec1_em_risco()` lê dela (mesmo jsonb), e a
+redistribuição usa a mesma conta — sem segunda cópia. Lê a régua guardada (179). Equivalência
+conferida com cópias das duas versões fixadas em 30/10 às 09:00: 318 linhas, 0 diferentes.
+
+**Redistribuição** (`sugestoes_redistribuicao()`, Equipes, só no dia corrente). Gatilho:
+contrato em EM_RISCO / VAI_ESTOURAR, ou ticket de suporte aberto pelo campo (lido de
+`central_do_controle()->'ajuda'`, a regra da D-167). Destino: mesma `tecnico.skill`, em rota
+hoje na cidade ativa, outra equipe, sem risco nem suporte aberto; ele pega o contrato DEPOIS
+da fila dele, e só entra quem chega na janela. Ordem: o mais perto em linha reta; até 3.
+Aceitar chama a mesma `transferir_visita` (permissão `servicos.transferir`), com o motivo
+"Sugestão aceita: …", e vale a D-257 (transferir não fixa a rota).
+
+**Ordem das paradas** (`ordem_sugerida(p_data)`, Rota do dia). A janela que fecha primeiro vem
+primeiro; dentro da mesma janela, o mais perto. Só informação: a ordem real é do TOA. Não é
+oferecida se puser mais contratos fora da janela que a do TOA. Km em **linha reta**. O tempo
+ganho só aparece com velocidade medida no rastro (≥ 30 trechos); hoje há 11, e a tela diz
+"tempo sem velocidade medida" — o "Tempo de Deslocamento" do TOA não acompanha a distância (r² =
+0,007 em 2.434 trechos). Contra a ordem executada em Manaus, 26 a 31/10: 17,8 a 63,5 km
+oferecidos por dia (2,3 a 48,8 líquidos), 3–8% do km do dia, em 12 a 25 técnicos.
+
+**Defeito herdado, a decidir:** `transferir_visita` apaga o `tecnico_responsavel_id`, e o
+contrato transferido vira uma fila "da equipe" separada — o técnico que recebeu parece mais
+livre do que está. A redistribuição soma as duas filas pela pessoa; o conserto de verdade mexe
+na transferência. **Para o Emanuel:** o mínimo de 30 trechos para mostrar tempo; excluir quem
+está em risco ou com suporte de receber; no suporte, mover todos os próximos ou só a próxima
+janela. **Não verificado:** a transferência pela sugestão (a RPC não foi chamada nos testes) e
+as sugestões num dia real (às 18h40 a fila estava vazia).

@@ -11,6 +11,7 @@ import { useAbrirContrato } from '../components/LinkContrato'
 import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
          temChaveDoMapa } from '../lib/mapaGoogle'
 import { SinaisContrato, useSinaisDasVisitas, type SinalContrato } from '../components/SinaisContrato'
+import { OrdemSugerida } from '../components/OrdemSugerida'
 
 /**
  * Rota do Dia — a mesa de despacho (D-111, redesenhada).
@@ -630,6 +631,10 @@ export default function Rota() {
               </button>
             ) : undefined} />
         ) : (<>
+
+          {/* 183 (D-262): ordem sugerida — só informação, a ordem real é do TOA */}
+          <OrdemSugerida key={atualizadoEm?.getTime()} data={data} login={foco}
+            aoAbrir={abrirContrato} />
 
           {/* ====== 1. a mesa ====== */}
           <section className="card-controle overflow-hidden">
