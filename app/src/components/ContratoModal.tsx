@@ -378,7 +378,10 @@ export function ContratoModal({
             </button>
             {/* 160: os marcadores ao lado do + O.S., numa lista que abre
                 (Emanuel, 31/10). Na janela pequena eles têm aba própria. */}
-            {pagina && <MarcadoresDoContrato visitaId={id} />}
+            {/* O "Marcadores…" do botão direito chega aqui como acaoInicial:
+                na página cheia não há aba para abrir, então abre a lista. */}
+            {pagina && <MarcadoresDoContrato visitaId={id}
+              abrirJa={acaoInicial === 'marcadores'} />}
             <button onClick={() => setAcao(acao === 'status' ? null : 'status')}
               title="Levar o contrato para o status que você escolher — o sistema da CLARO não volta status"
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300

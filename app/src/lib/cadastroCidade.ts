@@ -398,7 +398,12 @@ export async function lerPreenchida(arquivo: File, c: Catalogos): Promise<Planil
       data_nascimento: nasc ?? '', matricula_ponto: s('matricula_ponto'), apelido: s('apelido'),
       data_contratacao: contr ?? '',
     }, { exigeEmail: !!s('email'), exigeDocumentos: querAcesso })
-    for (const msg of Object.values(e)) problemas.push({ aba: 'Pessoas', linha: p.linha, msg })
+    // A mensagem diz QUAL coluna: "Obrigatório para cadastrar." sozinho
+    // deixava a pessoa caçando a célula vazia (Emanuel, 03/11).
+    for (const [k, msg] of Object.entries(e)) {
+      const titulo = cols.pessoas.find(x => x.chave === (k === 'data_nascimento' ? 'nascimento' : k))?.titulo
+      problemas.push({ aba: 'Pessoas', linha: p.linha, msg: titulo ? `${titulo}: ${msg}` : msg })
+    }
 
     const perfil = c.perfis.find(x => norm(x.nome) === norm(s('perfil')))
     if (perfil) { p.perfil_acesso_id = perfil.id; p.papel = perfil.papel ?? '' }
