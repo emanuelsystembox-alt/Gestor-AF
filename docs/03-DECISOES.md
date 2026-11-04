@@ -12299,7 +12299,8 @@ um pouco diferentes (Na Base 07:55–08:12 e 07:58–08:05). Não era a tela: er
   iniciada) veio em 5 importações e foi trocada por outra, com outro número; a antiga ficou —
   `desatribuir_ausentes` não olha jornada (D-191: "Jornada não conta"). **2 apontamentos.**
 
-Os 14 ficam para apagar com a confirmação do Emanuel (exclusão definitiva, registrada). **Em aberto:**
+Os 14 foram **apagados** com a autorização do Emanuel (*"pode apagar esses registros de almoço e refeição
+duplicado"*), pela exclusão definitiva registrada (12 em São Luís, 2 em Manaus); depois, 0 pares repetidos. **Em aberto:**
 jornada que some da planilha do bucket deve sair sozinha (a D-191 deixou jornada de fora de
 propósito)? E a importação deveria recusar arquivo cujo nome diz outro dia que o dia de atuação
 (hoje a prévia só avisa, D-166)?
