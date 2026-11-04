@@ -20,8 +20,8 @@ import { fotosDosTecnicos } from '../lib/foto'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { BarraComposicao } from '../components/telemetria'
 import {
-  FILTRO_VAZIO, SEM_JANELA, SEM_SEGMENTO, SEM_STATUS, janelaDe, passaNoFiltro, quantosLigados,
-  SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela,
+  FILTRO_VAZIO, SEM_JANELA, SEM_LOG, SEM_SEGMENTO, SEM_STATUS, janelaDe, logDe, passaNoFiltro, quantosLigados, temRevD10,
+  SITUACOES_DE_TELA, infoSituacaoDeTela, origemCancelada, situacaoDeTela,
   type FiltroContrato,
 } from '../lib/filtroContratos'
 import { LinkContrato, useAbrirContrato } from '../components/LinkContrato'
@@ -718,6 +718,12 @@ export default function Equipes() {
       segmentos: uniq(cs.map(v => v.segmentacao?.nome)),
       semSegmento: cs.some(v => !v.segmentacao?.nome),
       ouvidorias: cs.filter(v => v.ouvidoria).length,
+      // D-290: LOG do TOA e REV D-10
+      revD10: cs.filter(temRevD10).length,
+      log0: cs.filter(v => logDe(v) === 0).length,
+      log1: cs.filter(v => logDe(v) === 1).length,
+      log2: cs.filter(v => (logDe(v) ?? -1) >= 2).length,
+      semLog: cs.filter(v => logDe(v) === null).length,
       // Desatribuído e Cancelado pela central à parte (origem — filtroContratos.ts).
       situacoes: SITUACOES_DE_TELA.filter(s => cs.some(v => situacaoDeTela(v) === s)),
       /* 155f: a contagem de cada situação, para a barra de pílulas.
@@ -738,12 +744,30 @@ export default function Equipes() {
     }
   }, [contratosDia])
 
+  /**
+   * D-288: Auditar e Cancelado pela central por equipe — MOSTRADOS, não
+   * contados. "Mostrar sem contar" (Emanuel, 03/11): a conta da equipe segue
+   * a D-225 (ninguém foi ao endereço), mas a equipe e os contratos aparecem.
+   */
+  const foraPorEquipe = useMemo(() => {
+    const m = new Map<string, { auditar: number; central: number }>()
+    for (const v of contratosDia ?? []) {
+      const o = origemCancelada(v)
+      if (!o || !v.equipe_id) continue
+      const x = m.get(v.equipe_id) ?? { auditar: 0, central: 0 }
+      if (o === 'DESATRIBUIDO') x.auditar++; else x.central++
+      m.set(v.equipe_id, x)
+    }
+    return m
+  }, [contratosDia])
+
   const eqFiltradas = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return painelVisto.filter(e => {
       if (area !== 'TODAS' && e.area !== area) return false
       if (supervisor !== 'TODOS' && e.supervisor !== supervisor) return false
-      if (soAtivas && e.visitas === 0) return false
+      // D-288: a equipe que só tem Auditar/Cancelado pela central não some
+      if (soAtivas && e.visitas === 0 && !foraPorEquipe.has(e.equipe_id)) return false
       // Enquanto o dia carrega, ninguém some: esconder equipe por falta
       // de dado seria dizer "não tem" quando é "ainda não sei".
       if (filtrando && contratosDia && !passamPorEquipe.has(e.equipe_id)) return false
@@ -751,7 +775,7 @@ export default function Equipes() {
       return [e.codigo, e.nome, e.supervisor, e.area, e.login_toa]
         .some(x => x?.toLowerCase().includes(t))
     })
-  }, [painelVisto, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe])
+  }, [painelVisto, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe, foraPorEquipe])
 
   const grupos = useMemo(() => {
     const ordenadas = [...eqFiltradas].sort((a, b) =>
@@ -1014,6 +1038,20 @@ export default function Equipes() {
                     onChange={e => mudaFiltro('soOuvidoria', e.target.checked)} />
                   Só ouvidoria <span className="tabular text-graf-400">({opContrato.ouvidorias})</span>
                 </label>
+                {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10 */}
+                <select value={filtro.log} aria-label="LOG do TOA"
+                  onChange={e => mudaFiltro('log', e.target.value)} className={sel}>
+                  <option value="TODOS">Todo LOG</option>
+                  <option value="0">LOG 0 ({opContrato.log0})</option>
+                  <option value="1">LOG 1 ({opContrato.log1})</option>
+                  <option value="2+">LOG 2 ou mais ({opContrato.log2})</option>
+                  {opContrato.semLog > 0 && <option value={SEM_LOG}>Sem LOG ({opContrato.semLog})</option>}
+                </select>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                  <input type="checkbox" checked={filtro.soRevD10} className="accent-af-600"
+                    onChange={e => mudaFiltro('soRevD10', e.target.checked)} />
+                  Só REV D-10 <span className="tabular text-graf-400">({opContrato.revD10})</span>
+                </label>
                 <select value={filtro.origem} aria-label="Origem"
                   onChange={e => mudaFiltro('origem', e.target.value)} className={sel}>
                   <option value="TODAS">Toda origem</option>
@@ -1093,14 +1131,7 @@ export default function Equipes() {
                       <strong className="text-graf-300">
                         {infoSituacaoDeTela(filtro.situacao).label}
                       </strong>{' '}
-                      não entra na contagem da equipe — ninguém foi ao endereço. Por isso a
-                      lista fica vazia com <em>Só com serviço no dia</em> marcado.
-                      {soAtivas && (
-                        <button onClick={() => setSoAtivas(false)}
-                          className="ml-1 text-af-400 underline underline-offset-2">
-                          desmarcar e ver de quem são
-                        </button>
-                      )}
+                      aparece na equipe, mas não entra nos números dela — ninguém foi ao endereço.
                     </p>
                   )}
                 </div>
@@ -1502,6 +1533,15 @@ export default function Equipes() {
 
                                 <td className="tabular px-3 py-2.5 text-center">
                                   {e.visitas || <span className="text-graf-600">—</span>}
+                                  {/* D-288: mostrados, fora da conta da equipe (D-225) */}
+                                  {foraPorEquipe.has(e.equipe_id) && (
+                                    <div className="mt-0.5 whitespace-nowrap text-[10px] text-graf-400"
+                                      title="Não entram na conta da equipe — ninguém foi ao endereço (D-225)">
+                                      {[foraPorEquipe.get(e.equipe_id)!.auditar && `${foraPorEquipe.get(e.equipe_id)!.auditar} auditar`,
+                                        foraPorEquipe.get(e.equipe_id)!.central && `${foraPorEquipe.get(e.equipe_id)!.central} canc. central`]
+                                        .filter(Boolean).join(' · ')}
+                                    </div>
+                                  )}
                                   {/* Com filtro ligado, quantos DESTES passam.
                                       O número grande continua o do dia. */}
                                   {filtrando > 0 && contratosDia && (

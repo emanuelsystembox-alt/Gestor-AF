@@ -53,13 +53,20 @@ export const ORIGEM_CANCELADA_INFO: Record<OrigemCancelada, { label: string; cor
 
 type ParaOrigem = Pick<ContratoLinha, 'situacao' | 'status_toa'> & {
   ordem_servico: { baixa_afline?: { codigo: number } | null }[]
+  motivo_fechamento_toa?: string | null
 }
 
-/** De onde veio o cancelamento — nulo quando não é um dos dois menus. */
+const semAcento = (s: string | null | undefined) =>
+  (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase()
+
+/** De onde veio o cancelamento — nulo quando não é um dos dois menus.
+ *  198 (D-289): "Cancelado no Sistema NETSMS" (vem com "não concluído") também
+ *  é cancelado pela central — a mesma regra de `cancelado_pela_central()` no banco. */
 export function origemCancelada(v: ParaOrigem): OrigemCancelada | null {
   if (v.situacao !== 'CANCELADA') return null
   if (v.ordem_servico.some(o => o.baixa_afline?.codigo === 800)) return 'DESATRIBUIDO'
-  if ((v.status_toa ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase() === 'CANCELADO') {
+  if (semAcento(v.status_toa) === 'CANCELADO'
+      || semAcento(v.motivo_fechamento_toa).includes('CANCELADO NO SISTEMA')) {
     return 'CANCELADO_CENTRAL'
   }
   return null
@@ -98,18 +105,33 @@ export interface FiltroContrato {
   segmento: string
   /** Só os casos críticos de ouvidoria (123). */
   soOuvidoria: boolean
+  /** D-290: o "Contador de log" do TOA — 'TODOS', '0', '1', '2+' ou SEM_LOG. */
+  log: string
+  /** D-290: só os contratos com o marcador REV D-10 (automático ou manual). */
+  soRevD10: boolean
 }
 
 export const SEM_JANELA = '__sem_janela__'
 export const SEM_STATUS = '__sem_status__'
 export const SEM_BUCKET = '__sem_bucket__'
 export const SEM_SEGMENTO = '__sem_segmento__'
+export const SEM_LOG = '__sem_log__'
 
 export const FILTRO_VAZIO: FiltroContrato = {
   situacao: 'TODAS', grupo: 'TODOS', origem: 'TODAS', resultado: 'TODOS',
   culpa: 'TODAS', janela: 'TODAS', statusToa: 'TODOS', buckets: [],
-  segmento: 'TODOS', soOuvidoria: false,
+  segmento: 'TODOS', soOuvidoria: false, log: 'TODOS', soRevD10: false,
 }
+
+/** O LOG do contrato como número; nulo quando o TOA não mandou ("log ?"). */
+export function logDe(v: Pick<ContratoLinha, 'contador_log'>): number | null {
+  const n = Number.parseInt(String(v.contador_log ?? '').trim(), 10)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Tem o marcador REV D-10 (193) — o nome vem no embed de `visita_marcador`. */
+export const temRevD10 = (v: Pick<ContratoLinha, 'visita_marcador'>) =>
+  (v.visita_marcador ?? []).some(m => m.indicador?.nome === 'REV D-10')
 
 /** `08:00–12:00` — a janela como a coluna Janela escreve. Nula quando o
  *  contrato não tem janela; aí o filtro usa SEM_JANELA. */
@@ -132,6 +154,13 @@ export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
   if (f.origem !== 'TODAS' && v.origem !== f.origem) return false
   if (f.buckets.length && !f.buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
   if (f.soOuvidoria && !v.ouvidoria) return false
+  if (f.soRevD10 && !temRevD10(v)) return false
+  if (f.log !== 'TODOS') {
+    const n = logDe(v)
+    if (f.log === SEM_LOG ? n !== null
+        : f.log === '2+' ? (n === null || n < 2)
+        : n !== Number(f.log)) return false
+  }
   if (f.segmento !== 'TODOS') {
     const s = v.segmentacao?.nome ?? null
     if (f.segmento === SEM_SEGMENTO ? s !== null : s !== f.segmento) return false

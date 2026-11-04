@@ -12,8 +12,8 @@ import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
 import {
-  FILTRO_VAZIO, SEM_SEGMENTO, SITUACOES_DE_TELA, ehSituacaoDeTela, infoSituacaoDeTela,
-  passaNoFiltro, situacaoDeTela, type FiltroContrato, type SituacaoDeTela,
+  FILTRO_VAZIO, SEM_LOG, SEM_SEGMENTO, SITUACOES_DE_TELA, ehSituacaoDeTela, infoSituacaoDeTela,
+  logDe, passaNoFiltro, situacaoDeTela, temRevD10, type FiltroContrato, type SituacaoDeTela,
 } from '../lib/filtroContratos'
 import { tecnologiaTxt } from '../lib/relatorio'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
@@ -186,6 +186,9 @@ export default function Servicos() {
   // 123: segmento do cliente e caso crítico (ouvidoria)
   const [segmento, setSegmento] = useState('TODOS')
   const [soOuvidoria, setSoOuvidoria] = useState(false)
+  // D-290: LOG do TOA e REV D-10 (Emanuel, 03/11)
+  const [log, setLog] = useState('TODOS')
+  const [soRevD10, setSoRevD10] = useState(false)
   const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
   const [culpa, setCulpa] = useState('TODAS')
   const [soProdutivas, setSoProdutivas] = useState(true)
@@ -464,11 +467,17 @@ export default function Servicos() {
     segmentos: [...new Set(base.map(v => v.segmentacao?.nome).filter((x): x is string => !!x))].sort(),
     semSegmento: base.some(v => v.tipo_atividade?.natureza !== 'JORNADA' && !v.segmentacao?.nome),
     ouvidorias: base.filter(v => v.ouvidoria).length,
+    revD10: base.filter(temRevD10).length,
+    log0: base.filter(v => logDe(v) === 0).length,
+    log1: base.filter(v => logDe(v) === 1).length,
+    log2: base.filter(v => (logDe(v) ?? -1) >= 2).length,
+    semLog: base.filter(v => v.tipo_atividade?.natureza !== 'JORNADA' && logDe(v) === null).length,
   }), [base])
 
   const filtro = useMemo<FiltroContrato>(() => ({
     ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria,
-  }), [situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria])
+    log, soRevD10,
+  }), [situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria, log, soRevD10])
 
   /**
    * ┌─ as etiquetas contam o que o FILTRO deixa (24/10) ─────────────────┐
@@ -527,7 +536,7 @@ export default function Servicos() {
   // de um filtro que agora tem 2 páginas é cair num vazio sem explicação.
   useEffect(() => { setPagina(1) },
     [situacao, busca, area, supervisor, equipe, grupo, origem, resultado,
-     culpa, soProdutivas, de, ate, tecnologia, buckets, segmento, soOuvidoria])
+     culpa, soProdutivas, de, ate, tecnologia, buckets, segmento, soOuvidoria, log, soRevD10])
   // A lista pode encolher por baixo (chegou baixa ao vivo, filtro do
   // Realtime): a página nunca passa do fim.
   const paginaAtual = Math.min(pagina, paginas)
@@ -575,13 +584,14 @@ export default function Servicos() {
   const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
     equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
     culpa !== 'TODAS', tecnologia !== 'TODAS', buckets.length > 0,
-    segmento !== 'TODOS', soOuvidoria,
+    segmento !== 'TODOS', soOuvidoria, log !== 'TODOS', soRevD10,
     busca.trim() !== ''].filter(Boolean).length
 
   function limpar() {
     setSituacao('TODAS'); setArea('TODAS'); setSupervisor('TODOS'); setEquipe('TODAS')
     setGrupo('TODOS'); setOrigem('TODAS'); setResultado('TODOS'); setCulpa('TODAS'); setBusca('')
     setTecnologia('TODAS'); setBuckets([]); setSegmento('TODOS'); setSoOuvidoria(false)
+    setLog('TODOS'); setSoRevD10(false)
   }
 
   function exportar() {
@@ -786,6 +796,20 @@ export default function Servicos() {
               <input type="checkbox" checked={soOuvidoria} className="accent-af-600"
                 onChange={e => setSoOuvidoria(e.target.checked)} />
               Só ouvidoria <span className="tabular text-graf-400">({opCliente.ouvidorias})</span>
+            </label>
+            {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10 */}
+            <select value={log} onChange={e => setLog(e.target.value)} className={sel}
+              aria-label="LOG do TOA">
+              <option value="TODOS">Todo LOG</option>
+              <option value="0">LOG 0 ({opCliente.log0})</option>
+              <option value="1">LOG 1 ({opCliente.log1})</option>
+              <option value="2+">LOG 2 ou mais ({opCliente.log2})</option>
+              {opCliente.semLog > 0 && <option value={SEM_LOG}>Sem LOG ({opCliente.semLog})</option>}
+            </select>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+              <input type="checkbox" checked={soRevD10} className="accent-af-600"
+                onChange={e => setSoRevD10(e.target.checked)} />
+              Só REV D-10 <span className="tabular text-graf-400">({opCliente.revD10})</span>
             </label>
             <select value={origem} onChange={e => setOrigem(e.target.value)} className={sel}>
               <option value="TODAS">Toda origem</option>

@@ -7,6 +7,7 @@ import { Alerta, Esqueleto, Pill } from '../components/ui'
 import { EquipamentoToa, contagemToa, useEquipamentoToa } from '../components/EquipamentoToa'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
+import { AnexarEvidencia } from '../components/AnexarEvidencia'
 import { carregarProvas, type Prova } from '../lib/prova'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
 import { ProvaDoContrato } from '../components/ProvaDoContrato'
@@ -815,6 +816,8 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
         {aba === 'responder' && (
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-3">
+              {/* "em cima da caixa de resposta ao técnico" (Emanuel, 03/11) */}
+              <AnexarEvidencia visitaId={v.id} aoEnviar={carregar} />
               <section className={`card-controle p-4 ${temPedidoDeAjuda ? 'ring-1 ring-orange-500/60' : ''}`}>
                 <ResponderTecnico semMoldura
                   visita={{ id: v.id, situacao: v.situacao,

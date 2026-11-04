@@ -18,7 +18,7 @@ import {
 import { escolherDaGaleria } from '../lib/galeria'
 import { VisorEvidencia } from '../ui/VisorEvidencia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
-import { SeloOuvidoria, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
+import { SeloOuvidoria, SeloRevD10, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
@@ -374,6 +374,19 @@ export default function Visita({ route, navigation }: Props) {
   // 192: os números que o cliente já deu em atendimentos anteriores do mesmo
   // contrato — "quando esse contrato voltar de novo, já aparecer para o
   // técnico" (Emanuel, 03/11). O banco já tira os que estão nesta visita.
+  // 193: o marcador REV D-10 do contrato (texto da observação do automático,
+  // ou vazio se alguém marcou à mão); nulo = não é revisita
+  const [revD10, setRevD10] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    supabase.from('visita_marcador')
+      .select('observacao, indicador_qualidade!inner(nome)')
+      .eq('visita_id', id).eq('indicador_qualidade.nome', 'REV D-10')
+      .maybeSingle()
+      .then(({ data }) => { if (vivo) setRevD10(data ? (data.observacao ?? '') : null) })
+    return () => { vivo = false }
+  }, [id])
+
   const [telAnteriores, setTelAnteriores] = useState<{ telefone: string; origem: string; visto_em: string }[]>([])
   useEffect(() => {
     let vivo = true
@@ -803,11 +816,22 @@ export default function Visita({ route, navigation }: Props) {
           </Aviso>
         )}
 
+        {/* 193: revisita — "o marcador revisita deve aparecer para o técnico
+            também (...) o app dele deve aparecer o informativo" (03/11). */}
+        {revD10 != null && (
+          // vermelho suave, como o marcador na web (Emanuel, 03/11)
+          <Aviso tipo="erro">
+            {`REV D-10 · revisita${revD10.startsWith('Automático:')
+              ? ` — atendimento anterior: ${revD10.replace('Automático: ', '')}` : ''}.`}
+          </Aviso>
+        )}
+
         {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). */}
-        {(!!v.ouvidoria || !!v.segmentacao?.nome || !!v.tec1) && (
+        {(!!v.ouvidoria || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null) && (
           <View style={e.marcas}>
             <SeloOuvidoria ouvidoria={v.ouvidoria} />
             <SeloSegmento segmento={v.segmentacao?.nome} />
+            <SeloRevD10 ativo={revD10 != null} />
             <SeloTec1 tec1={v.tec1} />
           </View>
         )}

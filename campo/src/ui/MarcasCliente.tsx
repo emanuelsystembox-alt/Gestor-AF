@@ -98,6 +98,19 @@ export function SeloRevisita({ revisita, motivo }: { revisita?: boolean; motivo?
   )
 }
 
+/** 193: o marcador REV D-10 (revisita em 30 dias), ao lado do segmento, em
+ *  vermelho suave como na web — "a ideia era esse marcador aparecer ao lado
+ *  do segmento, ex: Purple" (Emanuel, 03/11). */
+export function SeloRevD10({ ativo }: { ativo?: boolean }) {
+  if (!ativo) return null
+  return (
+    <View style={[e.selo, { backgroundColor: cor.af100, borderWidth: 1, borderColor: cor.af500 }]}
+      accessibilityLabel="Marcador REV D-10: revisita">
+      <Text style={[e.seloTexto, { color: cor.af700 }]}>REV D-10</Text>
+    </View>
+  )
+}
+
 const e = StyleSheet.create({
   selo: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

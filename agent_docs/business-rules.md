@@ -90,6 +90,10 @@ Auditar) como sempre. Concluído com código continua fechando sozinho. *"se tev
 sistema leva o contrato até em execução, depois disso o técnico precisa baixar manual"*
 (Emanuel, 03/11). **E o status posto à mão não volta pela importação** — só avança, até Em
 execução ("Vale o do técnico").
+**"Cancelado no Sistema NETSMS"** (vem como "não concluído") é cancelado pela central, e
+**movimento** é o TOA ter mostrado em rota/iniciado numa importação ou alguém ter mexido — não a
+conversão de "não concluído" em Em execução (198, D-289). `cancelado_pela_central()` no banco e
+`origemCancelada()` na web mudam juntas.
 
 **Mais de um contrato em andamento vindo do TOA é AVISADO, não corrigido**
 (129, D-206): aviso no sino do técnico e sinal na central. Nada muda sozinho.
@@ -263,6 +267,8 @@ alimenta o painel do técnico, o ranking e a central; não some de outro jeito.
   antes da meta, por decisão do Emanuel (27/09).
 - **O chat é uma conversa por técnico**, compartilhada pelos
   controladores que enxergam a equipe dele. Autor carimbado pelo servidor.
+  **Supervisor e coordenador falam com qualquer técnico da cidade** (196, D-287),
+  não só com o time deles — `equipes_do_chat()`.
 - **Sinalizar material não move nada** (nem saldo, nem posse): é pedido.
   Recusar exige motivo; a resposta volta como aviso ao técnico.
 - **O técnico pede abastecimento** do carro que está no nome dele; nasce
@@ -541,6 +547,13 @@ D-246), e é diferente por skill. Conta para quem fez o serviço ANTERIOR; servi
 período, retorno até 30 dias depois. ADESÃO: concluídos que voltaram como retorno ou
 VT. MANUTENÇÃO: VTs concluídas, reagendadas ou canceladas (sem cancelado pela central
 e sem desatribuído) que voltaram em VT — depois de QUALQUER visita dele.
+
+**O marcador REV D-10 é automático** (193, D-285) e a regra é OUTRA, mais estreita que a
+Revisita: VT ← VT; Retorno ← Retorno ou grupo de instalação (Adesão, Migração GPON,
+Reinstalação, Mudança de endereço); anterior concluída, até 30 dias; nunca em Auditar nem em
+cancelado pela central. Só de 03/11 em diante. A visita anterior vem de
+`revisita_dos_contratos` — não reescreva a busca. **Tirado à mão, não volta naquele contrato**
+(194, D-286) — só noutro dia, se acontecer de novo. O técnico vê o aviso no app.
 
 ## Mural Nexus (163, D-245)
 

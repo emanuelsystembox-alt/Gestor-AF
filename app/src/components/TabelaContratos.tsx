@@ -102,7 +102,7 @@ export const SELECT_CONTRATO = `
     sub_falha:sub_falha_id ( nome, categoria ),
     baixa_em
   ),
-  visita_marcador ( id, indicador_id, cumprido ),
+  visita_marcador ( id, indicador_id, cumprido, observacao, indicador:indicador_id ( nome ) ),
   evidencias:evidencia ( count ),
   equipamentos:equipamento_movimento ( count )
 `
@@ -119,7 +119,10 @@ export type OSDupla = Visita['ordem_servico'][number] & {
   baixa_em: string | null
 }
 
-export interface Marcador { id: string; indicador_id: string; cumprido: boolean | null }
+export interface Marcador {
+  id: string; indicador_id: string; cumprido: boolean | null; observacao?: string | null
+  indicador?: { nome: string } | null
+}
 
 export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   contrato: string | null
@@ -591,7 +594,7 @@ export function TabelaContratos({
                   // pontos nem segmento continua tendo tempo correndo.
                   const emAndamento = v.situacao === 'EM_DESLOCAMENTO' || v.situacao === 'EM_EXECUCAO'
                   const temTempo = emAndamento || (!!v.inicio && !!v.fim)
-                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip && !temTempo) return null
+                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip && !temTempo && !marcados.length) return null
                   return (
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       {p?.achou && <span
@@ -601,6 +604,20 @@ export function TabelaContratos({
                         ★ {pts(p.pontos_claro)}
                       </span>}
                       <SeloSegmento segmentacao={v.segmentacao?.nome} />
+                      {/* Marcadores ao lado do segmento, nas duas visões — embaixo
+                          das O.S. o REV D-10 passava despercebido (Emanuel, 03/11). */}
+                      {marcados.map(({ m, ind }) => (
+                        <span key={m.id}
+                          title={m.observacao ?? `Marcador ${ind!.nome}`}
+                          // REV D-10 em vermelho suave: é a revisita, pede atenção
+                          // ("vamos pintar esse marcador de vermelho suave", 03/11)
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase
+                                      tracking-wide ring-1 ${ind!.nome === 'REV D-10'
+                                        ? 'bg-af-900/40 text-af-200 ring-af-700/50'
+                                        : 'bg-sky-900/40 text-sky-300 ring-sky-700/40'}`}>
+                          {ind!.nome}
+                        </span>
+                      ))}
                       {/* 138: o relógio do serviço, ao lado do segmento —
                           "é onde estou vendo espaço" (Emanuel, 25/10). */}
                       <RelogioServico v={{
@@ -945,19 +962,6 @@ export function TabelaContratos({
                   </div>
                 )}
 
-                {/* Marcadores — os indicadores de qualidade apontados. */}
-                {detalhada && marcados.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {marcados.map(({ m, ind }) => (
-                      <span key={m.id}
-                        className="rounded bg-sky-900/40 px-1.5 py-0.5 text-[10px]
-                                   font-medium uppercase tracking-wide text-sky-300
-                                   ring-1 ring-sky-700/40">
-                        {ind!.nome}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </td>
 
               {/* A data mora onde o contrato morava. Sem ela a busca por

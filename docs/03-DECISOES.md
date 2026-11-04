@@ -12099,3 +12099,145 @@ arquivo foi restaurado.
 O procedimento da carga ficou em `docs/14-CARGA-HISTORICA.md`, com os dois scripts em
 `app/scripts/carga-historica/` (cidade, prefixo da WO, fuso e período configuráveis no topo;
 WO "0" já vira vazia; testados de ponta a ponta com entrada vazia). `*.jsonl` no `.gitignore`.
+
+### D-285 · Marcador REV D-10 automático (193)
+
+*"subir marcador automático de REV D-10, ele considerar uma revisita 30 dias quando for uma VT
+da VT, ou um Retorno do Retorno, ou grupo de o.s de instalação para retorno (...) desconsiderar
+quando o contrato estiver em auditar (...) e quando for identificado no toa que o contrato foi
+cancelado pela central"* (Emanuel, 03/11). Perguntado o par da VT: **"VT para VT e Retorno para
+Retorno, e grupo de instalação para Retorno"** — recusado o "qualquer → VT" do card de Revisita
+(D-245). Perguntado o alcance: **"só de hoje em diante"** — o histórico do ngestor fica sem.
+
+`aplicar_rev_d10()` usa a visita anterior de `revisita_dos_contratos` (a concluída mais recente
+do mesmo contrato — a busca não é reescrita) e o par: VISITA TECNICA ← VISITA TECNICA;
+RETORNO DE CREDENCIADA ← RETORNO, ADESAO, MIGRACAO GPON, REINSTALACAO, MUDANCA DE ENDERECO;
+anterior concluída, até 30 dias. Fora: Auditar (800 do sistema) e cancelado pela central
+(Cancelada + "cancelado" no TOA); se cair num deles, o marcador automático sai. O pg_cron roda a
+cada 5 min (UTC 10–23), contratos de hoje e amanhã.
+
+O automático grava observação "Automático: VISITA TECNICA de 22/10/2026, 12 dia(s) antes, equipe
+109" — é por ela que o sistema só tira o que ele pôs; marcação manual (a tela grava sem autor
+nem observação) nunca é tocada. No primeiro rodar: 12 contratos de 03/11, todos VT → VT; 0 em
+Auditar ou cancelado pela central; um marcado que caiu em Auditar perdeu o marcador na rodada
+seguinte (transação desfeita).
+
+**Limite conhecido:** quem desmarcar à mão um REV D-10 automático vê ele voltar em até 5 min,
+enquanto a regra valer — não há registro de "desmarcado por alguém".
+
+### D-286 · REV D-10 na lista, em vermelho suave, no app do técnico; tirado à mão não volta (194)
+
+Pedidos de 03/11, em sequência: *"o marcador deve aparecer também na tela dos contratos"*;
+*"vamos pintar esse marcador de vermelho suave"*; *"se alguém retirar o marcador do sistema
+manual, o sistema não deve importar de novo para aquele contrato ok, somente quando for outro
+dia e acontece de novo"*; *"o marcador revisita deve aparecer para o técnico também (...) o app
+dele deve aparecer o informativo"*.
+
+- **Lista de contratos:** os marcadores saíram de baixo das O.S. (só na visão Detalhada) e foram
+  para a coluna do contrato, ao lado do segmento, nas duas visões. O REV D-10 em vermelho suave;
+  os demais continuam azuis. O texto do mouse é a observação do automático ("VISITA TECNICA de
+  22/10/2026, 12 dia(s) antes, equipe 109").
+- **Tirado à mão não volta (194):** a retirada de um REV D-10 automático por gente fica em
+  `rev_d10_recusado` (por visita; gatilho DEFINER, tabela com RLS e sem acesso direto), e
+  `aplicar_rev_d10` pula essa visita. Outro dia é outra visita: marca de novo se a regra valer.
+  A retirada do próprio relógio (Auditar, cancelado pela central) não conta como recusa
+  (`app.origem = 'REV_D10'`). Testado como o admin, desfeito: desmarcou → 1 recusa → relógio não
+  recolocou; relógio tirou por Auditar → recusas continuaram 1. Isso tira o "limite conhecido" da
+  D-285.
+- **App do técnico** (OTA preview 0.6.0, grupo 431110f7): a visita com REV D-10 mostra um aviso em
+  vermelho claro — "REV D-10 · revisita — atendimento anterior: …" no automático, "REV D-10 ·
+  revisita." no manual. O técnico lê pelo RLS que já existia (`vm_leitura`, `iq_leitura`):
+  conferido como o técnico de um contrato marcado. A EAS reescreveu o `app.json` de novo;
+  restaurado.
+
+**Complemento (03/11, mesma noite):** *"a ideia era esse marcador aparecer ao lado do segmento,
+ex: Purple, ter informativo do marcador vermelho"*. No app, o selo **REV D-10** (vermelho suave:
+fundo `af100`, borda `af500`, texto `af700`) entrou na fileira de selos do cartão da Agenda, ao
+lado do segmento, e na mesma fileira da tela da visita; o aviso dentro da visita continua. A
+Agenda pergunta `visita_marcador` só pelos contratos dela (uns 10 — a lista de ids vai na URL,
+e os ~600 do dia inteiro estouram o tamanho). Medido pela API: equipe 004, 9 contratos, 4 com o
+marcador. OTA preview 0.6.0, grupo 6d00c3a3; `app.json` restaurado de novo.
+
+### D-287 · Evidência pelo site, código 801, chat da cidade e o cancelado visível no app (195–197)
+
+Pedidos do Emanuel, 03/11 à noite.
+
+1. **O site anexa foto e vídeo** — *"vamos dar acesso ao COP para enviar evidências também para
+   o contrato (...) em cima da caixa de resposta ao técnico"*. O banco já permitia
+   (`pode_anexar_na_visita`: gestão com a permissão "Anexar"; a policy do bucket chama a mesma).
+   Faltava a tela: `AnexarEvidencia` na aba Responder, acima de "Responder ao técnico" — tipo
+   (a lista do app, duplicada de propósito), observação, um ou vários arquivos (JPG/PNG/WEBP/
+   HEIC, MP4/MOV, até 50 MB — o que o bucket aceita). Mesmo caminho do app (`<visita>/<nome>` +
+   `registrar_evidencia`), marcado como da galeria e sem posição: arquivo do computador não tem
+   hora nem GPS confiáveis. Se a linha não entrar, o arquivo é apagado do bucket.
+2. **Código 801 · Transbordo para CLARO / PARCEIRO** (195), sem sub-falha — *"para quando o
+   usuário quiser justificar para onde o contrato foi"*. Global, por migration; mesma família,
+   natureza e destino do 800 (Cancelada). Não é o "Auditar": esse continua sendo só o 800 que o
+   sistema põe. Aparece no site e no app sozinho (os dois leem a lista do banco).
+3. **Supervisor e coordenador conversam com qualquer técnico da cidade** (196) — *"ele não fica
+   limitado somente o time dele"*. `equipes_do_chat()` = a carteira + todas as equipes da cidade
+   ativa para SUPERVISOR e COORDENADOR, em `conversas_do_controle`, `enviar_mensagem`,
+   `marcar_conversa_lida` e na leitura de `mensagem` e `mensagem_colega`. Controlador fica na
+   carteira (o pedido foi dos dois). Medido: o supervisor via 0 equipes no chat, passou a 135, e
+   mandou mensagem a técnico de fora da equipe dele (desfeito). O coordenador já via a cidade.
+4. **O técnico vê para onde foi o contrato** (197) — *"se ele foi auditado ou cancelado, ele
+   precisa ter essa ciência (...) o contrato não pode sumir da linha dele no app"*. Medido: os
+   cancelados pela central (40) e os auditados do dia ficaram na equipe do técnico — estavam em
+   "Baixadas" como "Cancelada". `origem_do_cancelamento` (INVOKER, mesma regra da web) e, no
+   app, a etiqueta vira **Auditar** ou **Cancelado pela central**, com a cor da web e uma linha
+   ("Saiu da sua rota no TOA — vai para auditoria." / "A central cancelou no TOA."). Conferido
+   como técnico: 2 cancelados na agenda, 1 de cada.
+5. **"Ainda não apareceu" o REV D-10 no celular do Nicacio:** o último registro do aparelho dele
+   (`erro_app`, 31/10) veio do app **0.5.0**. As atualizações (OTA) são da 0.6.0; quem está no
+   0.5.0 não recebe nenhuma — nem o selo, nem os telefones, nem o aviso. Precisa instalar o APK
+   0.6.0 (build de 03/11, link válido até 17/11). OTA preview 0.6.0, grupo 0fe48a8d.
+
+**Equipes (respondido, D-288):** a tela Equipes deixava Auditar e Cancelado pela central fora da
+CONTAGEM da equipe (D-225, decisão de 26/10) — perguntado se muda.
+
+### D-288 · Equipes mostra Auditar e Cancelado pela central, sem contar
+
+Perguntado se a tela Equipes muda a D-225 (Auditar e Cancelado pela central fora da contagem da
+equipe): **"Mostrar sem contar"** (Emanuel, 03/11; recusados "mostrar e contar" e "deixar como
+está"). A conta da equipe continua a da D-225 — ninguém foi ao endereço. O que mudou: a equipe
+que tem um desses não some com "Só com serviço no dia"; ao lado do número de contratos aparece
+"N auditar · M canc. central" (fora da conta, com a razão no texto do mouse); e filtrar por um dos
+dois mostra as equipes em vez da tabela vazia — em 03/11, 8 de 42 equipes com cancelado pela
+central. A origem sai de `origemCancelada` (lib/filtroContratos.ts), a mesma da lista e do app.
+
+### D-289 · "Cancelado no Sistema NETSMS" é cancelado pela central; movimento é o que aconteceu (198)
+
+*"227087074 - esses cancelados que não teve nenhuma movimentação de status de deslocamento e em
+execução, não deveria ser puxado direto para cancelado central como combinamos?"* e *"se tiver a
+informação de cancelado no sistema netsms, vamos puxar para cancelado central se não tiver
+status ok?"* (Emanuel, 03/11).
+
+Dois furos na 189 (D-278): o TOA não manda "cancelado" nesses — manda **"não concluído" com o
+motivo "Cancelado no Sistema NETSMS"**, sem código, e `situacao_do_toa` leva "não concluído" a
+Em execução; e a 189 contava como movimento o próprio evento da entrada ("Entrada → Em
+execução"). O 227087074 é de 02/11, importado às 22:51 de 03/11 já assim — só um evento.
+
+- `cancelado_pela_central(status, motivo)`: "cancelado" OU motivo com "Cancelado no Sistema". Usada
+  na importação, em `origem_do_cancelamento` (app), em `aplicar_rev_d10` e, no front,
+  `origemCancelada` (lib/filtroContratos.ts — a mesma conta, escrita duas vezes; mudam juntas).
+- `teve_movimento(visita)`: alguma importação viu o TOA **em rota ou iniciado**
+  (`importacao_linha`), ou alguém mudou o status à mão (`bloqueado_em`, evento do campo). A
+  conversão de "não concluído"/"concluído" em Em execução não é movimento.
+- Sem movimento → **Cancelada** (aparece como Cancelado pela central). Com movimento → Em execução
+  até a baixa do técnico (D-278, intacta). "Liberado no Sistema NETSMS" **não** é cancelamento.
+
+Testado com dado real, desfeito: contrato que andou + NETSMS → ficou Em execução; que nunca andou
+→ Cancelada. Corrigidos 5 que estavam parados (4 do print + 1), sem aviso ao técnico. Baterias
+33/33 e 29/29.
+
+### D-290 · Filtros de LOG e REV D-10 em Serviços e Equipes
+
+*"adicione o filtro de log e revisita d-10 tanto na tela de equipes, como na tela de serviços"*
+— *"no site"* (Emanuel, 03/11).
+
+Na regra comum dos filtros (`lib/filtroContratos.ts`, usada pelas duas telas): **LOG** pelo
+"Contador de log" do TOA — Todo LOG / LOG 0 / LOG 1 / LOG 2 ou mais / Sem LOG ("log ?") — e
+**Só REV D-10** (marcador automático ou manual; o nome do marcador passou a vir no embed de
+`visita_marcador`). Cada opção mostra quantos contratos do dia tem; entram no "limpar filtros".
+Conferido na tela, 03/11: LOG 0 305, LOG 1 21, LOG 2+ 12, sem LOG 1; Só REV D-10 = 10 contratos
+em Serviços e 6 equipes (4+2+1+1+1+1 = 10) em Equipes; LOG 2+ deixou 12 linhas, todas LOG 2/3.

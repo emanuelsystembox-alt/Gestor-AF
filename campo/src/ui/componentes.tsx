@@ -52,12 +52,17 @@ export function Cartao({ children, style }: { children: ReactNode; style?: ViewS
   return <View style={[e.cartao, style]}>{children}</View>
 }
 
-export function Etiqueta({ situacao }: { situacao: string }) {
-  const c = corSituacao(situacao)
+export function Etiqueta({ situacao, rotulo, corForcada }: {
+  situacao: string
+  /** 197: a origem do cancelamento ("Auditar", "Cancelado pela central") no lugar de "Cancelada". */
+  rotulo?: string
+  corForcada?: string
+}) {
+  const c = corForcada ?? corSituacao(situacao)
   return (
     <View style={[e.etiqueta, { backgroundColor: c + '1a', borderColor: c + '55' }]}>
       <View style={[e.bolinha, { backgroundColor: c }]} />
-      <Text style={[e.etiquetaTexto, { color: c }]}>{rotuloSituacao(situacao)}</Text>
+      <Text style={[e.etiquetaTexto, { color: c }]}>{rotulo ?? rotuloSituacao(situacao)}</Text>
     </View>
   )
 }

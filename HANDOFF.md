@@ -1,6 +1,29 @@
 # Passagem de bastão — leia isto primeiro
 
-Última atualização: **02/11/2026**, por Claude (Opus 5.5).
+Última atualização: **03/11/2026**, por Claude (Opus 5.5).
+
+> **03/11/2026 — status do TOA, histórico do ngestor, REV D-10** (D-272 a D-290, migrations
+> 184 a 198; pendências em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente depois da 198"):
+> - **Encerrado não reabre pela importação** (184). **O TOA não encerra o que já andou** (189,
+>   198): cancelado no TOA — inclusive "não concluído · Cancelado no Sistema NETSMS" — sem
+>   movimento vai para Cancelado pela central; com movimento (TOA em rota/iniciado numa
+>   importação, ou mão de alguém) fica Em execução até a baixa do técnico. Status posto à mão
+>   não volta. `cancelado_pela_central()` / `teve_movimento()` no banco; `origemCancelada()` na web.
+> - **Banco zerado até 02/11** (D-279, sem backup) e **histórico do ngestor jan–out carregado**
+>   (97.600 contratos, D-282). Procedimento para outras cidades: `docs/14-CARGA-HISTORICA.md`.
+>   Telefones de atendimentos anteriores aparecem no contrato de hoje e no app (192).
+> - **Local da baixa:** primeiro onde o técnico marcou a casa, depois o GPS do app, depois o
+>   rastro (191); selo limpo. **Distância ao vivo** em deslocamento/execução (190).
+> - **REV D-10 automático** (193, 194): VT←VT, Retorno←Retorno/instalação, 30 dias, fora de
+>   Auditar e cancelado pela central; tirado à mão não volta. Na lista (vermelho suave), no app
+>   (selo e aviso) e nos filtros de Serviços e Equipes, junto com o filtro de **LOG** (D-290).
+> - Site: anexar foto/vídeo na aba Responder; Equipes mostra Auditar/Cancelado pela central
+>   sem contar (D-288); busca por número ignora os filtros (D-283). Código **801 Transbordo**
+>   (195). Supervisor e coordenador conversam com a cidade (196). No app, o cancelado diz se
+>   foi Auditar ou cancelado pela central (197). Planilha do TOA sem "ID da Atividade" entra
+>   pela WO (187).
+> - **O APK 0.5.0 não recebe atualização:** quem estiver nele (o Nicacio estava) não vê nada
+>   disso no app. Instalar o 0.6.0.
 
 > **02/11/2026, noite — o pacote de inteligência operacional** (D-262 a D-271, migrations 175
 > a 183; menu **Inteligência** no site). Sinais nascem pelo relógio (pg_cron, 5 min) e o sino

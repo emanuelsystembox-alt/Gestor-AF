@@ -45,6 +45,8 @@ export interface Visita {
   contrato?: string | null
   /** "Status da Atividade" do TOA — separa "Cancelado pela central". */
   status_toa?: string | null
+  /** 198: "Cancelado no Sistema NETSMS" = cancelado pela central (origemCancelada). */
+  motivo_fechamento_toa?: string | null
   /** "Contador de log" do TOA: quantas vezes o contrato já voltou para a
    *  agenda (144). Nulo = a linha não trouxe a coluna. Nulo não é zero. */
   contador_log?: string | null

@@ -18,11 +18,20 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
-import { SeloEdificacao, SeloOuvidoria, SeloRevisita, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
+import { SeloEdificacao, SeloOuvidoria, SeloRevD10, SeloRevisita, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
 import { BarraInferior } from '../ui/BarraInferior'
 import { capaDoMural } from './Mural'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
+
+// 197: o cancelado diz para onde foi — o mesmo rótulo e a mesma cor da web
+// (ORIGEM_CANCELADA_INFO em app/src/lib/filtroContratos.ts). "O técnico
+// precisa saber no app para onde foi o contrato de sua linha" (03/11).
+type OrigemCanc = 'AUDITAR' | 'CANCELADO_CENTRAL'
+const ORIGEM_CANC: Record<OrigemCanc, { rotulo: string; cor: string; motivo: string }> = {
+  AUDITAR: { rotulo: 'Auditar', cor: '#b08640', motivo: 'Saiu da sua rota no TOA — vai para auditoria.' },
+  CANCELADO_CENTRAL: { rotulo: 'Cancelado pela central', cor: '#b65a55', motivo: 'A central cancelou no TOA.' },
+}
 
 export interface LinhaAgenda {
   visita_id: string
@@ -130,6 +139,8 @@ export default function Agenda({ navigation }: Props) {
    *  ar, ou não deu para ler — nos dois casos o cartão não aparece. */
   const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
   const [sinais, setSinais] = useState<Map<string, Sinal>>(new Map())
+  const [revD10, setRevD10] = useState<Set<string>>(new Set())
+  const [origemCanc, setOrigemCanc] = useState<Map<string, OrigemCanc>>(new Map())
 
   const carregar = useCallback(async (dia: string) => {
     setErro(null)
@@ -144,7 +155,20 @@ export default function Agenda({ navigation }: Props) {
       const m = new Map<string, Sinal>()
       for (const x of (s ?? []) as Sinal[]) m.set(x.visita_id, x)
       setSinais(m)
-    } else setSinais(new Map())
+      // 193: quais têm o marcador REV D-10 (automático ou manual)
+      const { data: mk } = await supabase.from('visita_marcador')
+        .select('visita_id, indicador_qualidade!inner(nome)')
+        .in('visita_id', ls.map(l => l.visita_id))
+        .eq('indicador_qualidade.nome', 'REV D-10')
+      setRevD10(new Set(((mk ?? []) as { visita_id: string }[]).map(x => x.visita_id)))
+      // 197: para onde foi o cancelado — Auditar ou cancelado pela central
+      const canc = ls.filter(l => l.situacao === 'CANCELADA').map(l => l.visita_id)
+      if (canc.length) {
+        const { data: oc } = await supabase.rpc('origem_do_cancelamento', { p_visitas: canc })
+        setOrigemCanc(new Map(((oc ?? []) as { visita_id: string; origem: OrigemCanc | null }[])
+          .filter(x => x.origem).map(x => [x.visita_id, x.origem!])))
+      } else setOrigemCanc(new Map())
+    } else { setSinais(new Map()); setRevD10(new Set()); setOrigemCanc(new Map()) }
   }, [])
 
   useEffect(() => {
@@ -553,7 +577,9 @@ export default function Agenda({ navigation }: Props) {
                   {hhmm(l.janela_inicio)}{l.janela_fim ? `–${hhmm(l.janela_fim)}` : ''}
                 </Text>
               )}
-              <Etiqueta situacao={l.situacao} />
+              <Etiqueta situacao={l.situacao}
+                rotulo={origemCanc.get(l.visita_id) ? ORIGEM_CANC[origemCanc.get(l.visita_id)!].rotulo : undefined}
+                corForcada={origemCanc.get(l.visita_id) ? ORIGEM_CANC[origemCanc.get(l.visita_id)!].cor : undefined} />
 
               {/* Quanto vale, onde o olho cai primeiro. É o mesmo número
                   que a produção do mês soma — dois valores diferentes na
@@ -563,6 +589,11 @@ export default function Agenda({ navigation }: Props) {
                 ? <Text style={e.pontos}>{num2(Number(l.pontos))} pts</Text>
                 : <Text style={e.semPontos}>sem regra</Text>}
             </View>
+            {origemCanc.has(l.visita_id) && (
+              <Text style={[e.motivoCanc, { color: ORIGEM_CANC[origemCanc.get(l.visita_id)!].cor }]}>
+                {ORIGEM_CANC[origemCanc.get(l.visita_id)!].motivo}
+              </Text>
+            )}
 
             {/* O grupo (ADESAO, SERVICO, MUDANCA DE ENDERECO…) e, embaixo, o
                 tipo do TOA (Instalacao, Mudanca de Pacote…) — o que a coluna
@@ -591,13 +622,14 @@ export default function Agenda({ navigation }: Props) {
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
                 muda como ele trata o cliente. */}
             {(!!l.ouvidoria || !!l.segmento || !!l.tec1 || !!sinais.get(l.visita_id)?.edificacao
-              || !!sinais.get(l.visita_id)?.revisita) && (
+              || !!sinais.get(l.visita_id)?.revisita || revD10.has(l.visita_id)) && (
               <View style={e.marcas}>
                 <SeloRevisita revisita={sinais.get(l.visita_id)?.revisita}
                   motivo={sinais.get(l.visita_id)?.revisita_motivo} />
                 <SeloEdificacao edificacao={sinais.get(l.visita_id)?.edificacao} />
                 <SeloOuvidoria ouvidoria={l.ouvidoria} />
                 <SeloSegmento segmento={l.segmento} />
+                <SeloRevD10 ativo={revD10.has(l.visita_id)} />
                 <SeloTec1 tec1={l.tec1} />
               </View>
             )}
@@ -734,6 +766,7 @@ function LinhaFicha({ rotulo, valor, forte }: { rotulo: string; valor: string; f
 }
 
 const e = StyleSheet.create({
+  motivoCanc: { fontSize: 13, fontWeight: '600', marginTop: 6 },
   obsCop: {
     backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc',
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 6,

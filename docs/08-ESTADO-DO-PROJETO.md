@@ -431,6 +431,51 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente depois da 198 — 03/11/2026 (D-272 a D-290)
+
+### Ação na operação (não precisa de código)
+
+- **Celulares no APK 0.5.0 não recebem atualização pelo ar.** O último registro do aparelho do
+  Nicacio (`erro_app`, 31/10) veio do 0.5.0 — ele não vê selo REV D-10, telefones antigos, aviso
+  do REV, nem "Auditar/Cancelado pela central" no app. Instalar o APK 0.6.0 (build `73a86cf3`,
+  link da EAS válido até **17/11/2026**) e conferir os outros aparelhos.
+- **Próximas cargas históricas** (outras cidades): seguir `docs/14-CARGA-HISTORICA.md`. A carga
+  não confere duplicata com contrato que já existe no período — perguntar antes como tratar.
+
+### Depende do Emanuel
+
+- **Material gasto (miscelânea) em contrato apagado do banco:** volta para o saldo do técnico ou
+  continua baixado? Hoje `miscelanea_movimento` trava o "Apagar do banco" (D-277).
+- **"Liberado no Sistema NETSMS"** (vem como "não concluído", sem código) fica Em execução
+  esperando código — não é cancelamento (D-289). Confirmar se é isso mesmo.
+- **Planilha do ngestor de jun–out** veio com ~5 mil linhas por mês contra ~14 mil de jan–mai:
+  conferir na origem se está completa (D-282).
+- **Coordenada do TOA:** a da planilha bate com a casa marcada (mediana 92 m); a da varredura
+  (`toa_geo_lat/lng`) não (mediana 964 m, D-281). Vale descobrir de onde a varredura tira a dela.
+
+### Verificação que ninguém fez ainda
+
+- No celular (0.6.0): o aviso "Cancelado no TOA — dê a baixa"; o selo REV D-10 na Agenda; os
+  telefones de atendimentos anteriores; "Auditar / Cancelado pela central" no cartão.
+- O selo de aproximação "chegando" com um técnico em deslocamento de verdade (D-280).
+- Anexar evidência pelo site com arquivo real (só a tela foi conferida, D-287).
+- Uma rodada do relógio do REV D-10 com contrato novo entrando (o primeiro rodar foi à mão).
+- A carga do ngestor nos relatórios de meses passados (pontos pelas regras de hoje, TEC1 do
+  "Tec Um"; 873 contratos sem área e 742 O.S. sem tipo).
+
+### Melhorias técnicas conhecidas
+
+- Cenário em `testar_campo()` para `observar_baixa` (185).
+- **A EAS reescreve o `campo/app.json` a cada `eas update`** (permissões duplicadas e um segundo
+  `runtimeVersion`) — em 03/11 aconteceu em todas as publicações e o arquivo foi restaurado de
+  cópia. Ver em `traps.md`; vale achar a configuração que impede.
+- Atualização pelo ar entra só no segundo abrir do app (`checkAutomatically` padrão); dá para
+  aplicar no primeiro abrir.
+- Contrato desatribuído que volta 1 segundo depois (o mesmo contrato em dois buckets) — visto,
+  não investigado.
+- A sugestão de redistribuição saiu da tela (D-274); componente e RPC ficaram para quando voltar.
+- `docs/03-DECISOES.md` tem o **D-151 duas vezes** (veio de antes de 03/11).
+
 ## Pendente em 30/10/2026 — o sistema vira NEXUS MANAGER (D-242)
 
 A **entrada** (`pages/Login.tsx`) já é Nexus Manager: letreiro como título, símbolo
