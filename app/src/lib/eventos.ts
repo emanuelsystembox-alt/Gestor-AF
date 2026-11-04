@@ -32,6 +32,8 @@ export const EVENTO_ROTULO: Record<string, string> = {
   // 096: a resposta do técnico à pergunta do melhor contato (o número
   // não viaja no evento; mora em contato_cliente).
   CONTATO:         'Melhor contato do cliente',
+  // 185: a observação escrita depois da baixa (o texto anterior vai no `de`).
+  OBSERVACAO_BAIXA: 'Observação da baixa',
 }
 
 export const rotuloEvento = (tipo: string) =>

@@ -25,7 +25,6 @@ import {
   type FiltroContrato,
 } from '../lib/filtroContratos'
 import { LinkContrato, useAbrirContrato } from '../components/LinkContrato'
-import { SugestaoRedistribuicao } from '../components/SugestaoRedistribuicao'
 
 /**
  * Equipes de campo.
@@ -920,9 +919,9 @@ export default function Equipes() {
           </div>
         </section>
 
-        {/* 183 (D-262): sugestão de redistribuição — só o dia corrente;
-            aceitar chama a mesma transferir_visita */}
-        {ehHoje && <SugestaoRedistribuicao aoTransferir={atualizarTudo} />}
+        {/* A sugestão de redistribuição (183, D-262) saiu da tela em 03/11 —
+            "retire essa ação por enquanto, não ficou bom" (Emanuel). O
+            componente e a RPC (só leitura) ficam para quando voltar. */}
 
         {/* ====== filtros ====== */}
         <section className="card-controle flex flex-wrap items-center gap-2 p-3">

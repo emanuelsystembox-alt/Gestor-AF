@@ -97,8 +97,10 @@ export async function lerPlanilhaTOA(arquivo: File): Promise<ResultadoLeitura> {
       if (texto !== '') obj[chaves[c]] = texto
     }
     // Sem ID da Atividade não há chave de deduplicação (D-004): a linha
-    // não pode entrar, senão a reimportação duplicaria.
-    if (obj['ID da Atividade']) linhas.push(obj)
+    // não pode entrar, senão a reimportação duplicaria. 187: há exportação
+    // do TOA SEM a coluna do ID — a linha com WO sobe, e o banco completa o
+    // ID pela WO do contrato do dia (só o que já existe).
+    if (obj['ID da Atividade'] || obj['Número da WO']) linhas.push(obj)
     else descartadas++
   }
 
@@ -108,12 +110,17 @@ export async function lerPlanilhaTOA(arquivo: File): Promise<ResultadoLeitura> {
 /** Confere se a planilha é mesmo do TOA antes de subir qualquer coisa. */
 export function validarPlanilha(r: ResultadoLeitura): string[] {
   const problemas: string[] = []
-  const obrigatorias = ['ID da Atividade', 'Data', 'Status da Atividade']
+  const obrigatorias = ['Data', 'Status da Atividade']
 
   for (const col of obrigatorias) {
     if (!r.cabecalhos.includes(col)) {
       problemas.push(`Coluna obrigatória ausente: "${col}"`)
     }
+  }
+  // 187: o ID pode faltar se houver a WO (o banco acha o contrato do dia
+  // por ela). Sem os dois, nenhuma linha tem chave.
+  if (!r.cabecalhos.includes('ID da Atividade') && !r.cabecalhos.includes('Número da WO')) {
+    problemas.push('Coluna obrigatória ausente: "ID da Atividade" (ou, na falta dela, "Número da WO")')
   }
   if (!r.cabecalhos.includes('Tipo de Atividade__2')) {
     problemas.push(
@@ -123,10 +130,14 @@ export function validarPlanilha(r: ResultadoLeitura): string[] {
     )
   }
   if (r.linhas.length === 0) {
-    problemas.push('Nenhuma linha com "ID da Atividade" preenchido.')
+    problemas.push('Nenhuma linha com "ID da Atividade" ou "Número da WO" preenchido.')
   }
   return problemas
 }
+
+/** 187: a planilha veio sem a coluna "ID da Atividade" (outra visão do TOA)? */
+export const semIdDaAtividade = (r: ResultadoLeitura) =>
+  !r.cabecalhos.includes('ID da Atividade')
 
 /** Quantas O.S. a linha carrega (1..10). Só para mostrar na prévia. */
 export function contarOS(linha: LinhaTOA): number {

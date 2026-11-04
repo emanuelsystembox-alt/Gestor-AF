@@ -11797,3 +11797,305 @@ na transferência. **Para o Emanuel:** o mínimo de 30 trechos para mostrar temp
 está em risco ou com suporte de receber; no suporte, mover todos os próximos ou só a próxima
 janela. **Não verificado:** a transferência pela sugestão (a RPC não foi chamada nos testes) e
 as sugestões num dia real (às 18h40 a fila estava vazia).
+
+### D-272 · Contrato encerrado não reabre pela importação (184)
+
+*"contratos ja concluídos, estão saindo do concluido e retornando para execução (...) contratos
+fechados não devem voltar quando ja encerrados — como concluido, cancelado, reagendado"*
+(Emanuel, 03/11).
+
+**O defeito.** `situacao_do_toa('concluído')` é EM_EXECUCAO (D-097: o status diz que a atividade
+fechou; o resultado é o código). No contrato que o campo baixou, a baixa automática não age
+(128), e o caminho do contrato tocado pelo campo (`bloqueado_em`) gravava o status do TOA por
+cima da Concluída, com um CONFLITO_TOA a cada importação. Medido: o 3159369 foi concluído pelo
+técnico **quatro vezes** em 03/11 (08:33, 08:43, 09:21, 10:14) e reaberto às 08:37, 09:07 e
+09:37. Em 7 dias, 13 Concluídas e 2 Reagendamentos reabertos — todos pela importação, nenhum
+pelo campo ou pela web.
+
+**A regra.** Encerrado (`situacoes_terminais()`) só muda pelo **código**: a baixa automática,
+quando vale para o contrato (128), e só para outro encerrado. O status do TOA não reabre nada.
+**Exceção mantida:** o Desatribuído do próprio sistema (800, `desatribuido_em`) volta quando
+reaparece — é a D-191. Dos 100 "Cancelada → aberto" da semana, todos eram desse tipo. Corrigir
+um encerrado continua sendo do controlador, pela reversão com motivo (D-030).
+
+**Dado corrigido:** os 5 que continuavam reabertos em 03/11 (1018741, 224048132, 2936442,
+8546778, 8981806) voltaram à situação do campo, com evento — todos tinham a baixa da AFLINE
+em todas as O.S. com o mesmo destino.
+
+**Verificado:** a 184 numa transação desfeita, reimportando o último arquivo que trouxe o
+3159369 — continuou Concluído, nenhum encerrado reaberto. **Não verificado:** uma importação
+real depois do deploy (a próxima da extensão confirma: zero CONFLITO_TOA saindo de encerrado).
+
+**Visto de passagem, não mexido:** Desatribuído que volta **1 segundo depois** (08:07:30 →
+08:07:31 no 212199577, e a mesma coisa nos contratos da tela de Redistribuição). Parece o mesmo
+contrato em dois buckets: um arquivo desatribui, o outro devolve. Fica para investigar.
+
+### D-273 · A observação da baixa depois de baixada (185)
+
+*"coloca na baixa a observação - mesmo apos baixado técnico consegue colocar observação da
+baixa"* (Emanuel, 03/11). `observar_baixa(p_os, p_observacao)` escreve ou reescreve
+`ordem_servico.baixa_observacao` de uma O.S. **já baixada** — sem tocar no código, na sub-falha
+nem na situação (trava 2 intacta). Quem e quando: a porta do anexo, `pode_anexar_na_visita`
+sem o prazo extra da evidência — o campo, na equipe dele e só no contrato do dia (trava 3). O
+texto anterior vai no `de` do evento `OBSERVACAO_BAIXA`; o autor é carimbado no servidor
+(D-061). Escolhido **reescrever com histórico** em vez de acumular textos: a tela mostra uma
+observação só, e a anterior não se perde.
+
+**Testado como authenticated (técnico da equipe 114):** grava na O.S. de hoje; recusa O.S. sem
+baixa; recusa contrato de 02/11. As duas baterias, 33/33 e 29/29. **Falta:** um cenário próprio
+em `testar_campo()` (a regra reaproveita a do anexo, que já tem os dela).
+
+### D-274 · Retiradas e acréscimos de 03/11
+
+- **Redistribuição sugerida saiu da tela de Equipes** — *"retire essa ação por enquanto, não
+  ficou bom"*. O componente e a RPC (só leitura) ficam. Na volta, duas coisas que a tela mostrou
+  errado: o técnico sugerido era quase sempre o mesmo (EDVAR, 0 na fila) e aparecia como **"sem
+  coordenada"** — ele não mandou nenhum ponto de rastro no dia, então a posição dele é
+  **desconhecida**, não o endereço sem coordenada. O rótulo tem de dizer isso, e quem tem
+  posição desconhecida talvez não deva ser sugerido.
+- **Três tipos novos de foto/vídeo no app**: Mini isolador, Teste de velocidade, Consultivo.
+  O banco aceita qualquer tipo; a web mostra a chave.
+- **Evidência não tem limite de 5.** Conferido no banco, no Storage e nas duas telas: não há
+  trava; já houve contrato com 14.
+- **"sem GPS" na foto da galeria virou a distância do ENVIO** — *"era pra dizer que o envio foi
+  fora da localização do cliente"* (Emanuel, 03/11). A etiqueta olhava só a coordenada do
+  ARQUIVO, que a galeria quase nunca traz (136 de 136 na semana). O envio (135) estava gravado:
+  na foto do Emanuel, 7,8 km do cliente. Agora, no app e na miniatura da web: da galeria conta o
+  envio; da câmera, a captura; "no local" até 200 m (`raio_baixa_m`), "fora do local · X km"
+  acima; "cliente sem coordenada" nunca sai como dentro do raio; "sem GPS" só sem posição
+  nenhuma. A conta existe nos dois projetos (`localDaEvidencia`) e muda junto.
+
+### D-275 · O rastro se lê pelo escopo de leitura: o Coordenador vê (186)
+
+*"por que o meu login de admin aparece a localização e login da victoria não aparece? de onde
+o técnico baixou?"* (Emanuel, 03/11). Perguntado se o Coordenador vê o rastro: **"Ver o rastro
+inteiro"** (oferecidos também: só o local da baixa; deixar como estava).
+
+O local da baixa tem duas fontes (135, 155h): **APP** (GPS da baixa no celular) e **RASTRO**
+(baixa dada no TOA — o ponto do rastro mais perto do cliente durante a execução). A Victoria
+(COORDENADOR) já era gestão (`tem_papel('CONTROLADOR')` conta o Coordenador, 158b) e já via a
+trilha no Monitor e na fila do dia (DEFINER, `ve_cidade_inteira()`), mas a policy da TABELA
+`rastro_ponto` pedia `equipes_visiveis()` — a carteira, 0 equipes para ela. `local_da_baixa` é
+INVOKER: sem pontos, o chip "2 m · rastro" sumia calado. Medido como authenticated nos mesmos 4
+contratos: 1 local para ela, 3 para o admin; depois da 186, 3 e 3 (dia inteiro: 52 ms).
+
+A policy passou a `equipes_legiveis()` (156a), o mesmo alcance do Monitor. Continua só gestão e
+só SELECT; `eh_gestao()` não foi alargada. Vale para os 2 Coordenadores e os 2 Supervisores.
+Baterias 33/33 e 29/29.
+
+### D-276 · Planilha do TOA sem "ID da Atividade": o contrato se acha pela WO (187)
+
+*"o sistema precisa aceitar essa planilha também, deve ter uma coluna ou outra diferente do
+padrão"* (Emanuel, 03/11, com `Atividades-MAN-AFLINE_01_VT_03_11_26 (3).xlsx`). Comparada
+com a de 26/10 do mesmo bucket: a ordem das colunas muda (o leitor é por nome, não importa),
+faltam `DATA AGENDA MDU` e `ID SGD` (ninguém lê) e falta **`ID da Atividade`**, a chave do
+contrato (D-004). Sem ela as 69 linhas eram descartadas.
+
+**Derivado do dado:** as 55 WOs do arquivo existiam no dia, cada uma com UM ID; no histórico
+inteiro, **0** WOs com dois IDs no mesmo dia e cidade. Então `importar_toa_interno`, antes do
+laço, completa o ID pela WO (mesma cidade, mesmo dia de atuação, um ID só) — **na linha**
+(`importacao_linha.dados`), porque `desatribuir_ausentes` lê a linha. O leitor da web e da
+extensão (`lib/toa.ts`) deixa subir a linha que tem WO sem ID; a prévia avisa.
+
+**Recusado:** criar contrato com chave inventada (a WO no lugar do ID). Quando a planilha com o
+ID chegasse, o contrato nasceria em dobro. WO sem contrato no dia e jornada (sem WO) ficam de
+fora, com o porquê na linha. Simulado com o arquivo: 55 atualizados, 0 erros, 0 criados.
+
+**A reconciliação (D-191) vale igual.** A primeira versão fazia a planilha sem ID só atualizar
+(o arquivo tinha 69 linhas e a extensão tinha visto 84; simulado, desatribuiria 10). O Emanuel
+corrigiu: *"a regra pode ser a mesma, esse arquivo só tem menos porque é das 9 da manhã"*. A
+exceção e a coluna `importacao.sem_id_atividade` saíram na mesma 187. Vale o que a D-191 já
+diz: planilha antiga desatribui o que entrou depois — a extensão devolve na rodada seguinte.
+
+### D-277 · Apagar do banco não trava na casa marcada do cliente (188)
+
+*"tentem apagar em massa esses contratos de hoje, está dando erro, são de São Luís"*
+(Emanuel, 03/11). O "Apagar do banco" de Serviços estourava em
+`casa_cliente_visita_id_fkey`: `casa_cliente` aponta para a visita sem `ON DELETE`, e em São
+Luís 39 dos 171 contratos do dia tinham casa marcada (69 marcações) — um só na seleção
+derrubava o lote inteiro.
+
+A marcação é do **cliente** (empresa + contrato + endereço) e serve às próximas visitas;
+`visita_id` só diz onde foi feita. `excluir_visitas_definitivo` agora solta o elo
+(`visita_id = null`) antes do delete — o mesmo que já fazia com a reincidência. Testado como o
+admin, com São Luís, numa transação desfeita: 39 apagados, 69 casas preservadas.
+
+**Recusado:** apagar a casa junto (perderia a posição verdadeira do cliente por causa de um
+contrato errado). **Não mexido:** `miscelanea_movimento` também trava o delete, mas é o razão
+do saldo do técnico (D-157): o que fazer com material gasto num contrato apagado é pergunta para
+o Emanuel. Hoje nenhum dos contratos tem material.
+
+### D-278 · O TOA não encerra o que já andou; o status posto à mão não volta (189)
+
+*"se teve status o sistema leva o contrato até em execução, depois disso o técnico precisa
+baixar manual (...) agora quando não há movimentação de status, o sistema pode puxar o contrato
+direto pra cancelado, ou auditar"* (Emanuel, 03/11). O caso: o técnico pede ao cliente que
+cancele para não pesar no indicador; o contrato sai da linha dele no TOA e virava Cancelada
+sozinho, sem a baixa dele.
+
+O de/para pedido (em rota → Em deslocamento, pendente → Entrada, iniciado → Em execução;
+concluído e não concluído pelo código) **já era** o de `situacao_do_toa` e não mudou.
+
+**Medido antes (7 dias, produtivos encerrados):** ~1.410 com movimento fecharam pelo código
+(concluído/reagendado); **12** com movimento foram cancelados pela central; ~305 sem movimento
+foram cancelados/auditados; técnicos deram baixa manual em **2**. Perguntado o alcance:
+**"Só cancelado e sumiu"** (recusado: todo encerramento, que poria ~1.400 baixas por semana na
+mão do técnico). Perguntado o status manual: **"Vale o do técnico"** (recusado: espelhar o TOA,
+como era desde a 128).
+
+- **Cancelado no TOA + o contrato já andou** (evento de Em deslocamento/Em execução, situação
+  atual, ou alguém mudou à mão — `bloqueado_em`) → **Em execução**, sem baixa automática, até a
+  baixa do técnico. UM aviso ("Cancelado no TOA — dê a baixa"), mesmo com a importação a cada
+  15 min. Ticket de suporte fica como está. Sem movimento: Cancelada, como sempre.
+- **Sumiu da planilha em deslocamento** → Em execução + o aviso de sumiço. Em execução continua;
+  Entrada continua indo para Auditar (D-191); Atribuída e Ticket de suporte só acusados.
+- **Status posto à mão não volta pela importação.** Avança até Em execução; encerrar continua
+  sendo pelo código (concluído) ou pela baixa.
+- **Encerrado não reabre** (184) — a regra só vale para o que está aberto.
+
+**Consequência:** o contrato segurado conta como "em execução" na trava de um status por técnico
+(D-169: `finalizado_toa` é só concluído/não concluído). Pelo app, o técnico não sai para o
+próximo antes de dar a baixa dele — o que é a própria regra. A importação não é travada.
+
+Testado com dado real numa transação desfeita (4 casos: em andamento + cancelado; entrada sem
+movimento + cancelado; manual em execução + TOA pendente; em deslocamento + sumiu). Baterias
+33/33 e 29/29.
+
+### D-279 · Banco zerado até 02/11/2026: só os contratos de 03/11 em diante
+
+*"apague todo o nosso banco do dia 02/11/2026 para trás, de contratos (...) vamos deixar apenas
+os dados de hoje"* (Emanuel, 03/11). Perguntado, com os números na mesa: **"Sim, sem cópia"**
+(oferecida uma cópia do banco na VPS antes) e **"Sim, deixar só hoje"** (importações e rastro
+juntos).
+
+Apagado em 03/11 ~20h30 (Manaus), numa transação: **6.310 contratos** de 17/10 a 02/11, com o
+que vai em cascata (7.512 O.S., 33.651 eventos, 31.952 avisos, 632 reincidências, 10
+evidências), **417 importações** (78.695 linhas, 390 rodadas de sincronismo) e **1.073 pontos
+de rastro**. Os 10 arquivos de foto/vídeo saíram antes pela API do Storage (o banco não deixa
+apagar `storage.objects` por SQL). O que ficou e apontava para o que saiu perdeu o elo (691
+reincidências de hoje com a visita anterior). Ficaram 592 contratos de 03/11.
+
+**Não há como recuperar** — a VPS não tem backup. Com isso, produção, pontos, TEC1 e
+relatórios até 02/11 não existem mais, e o que olha para trás (revisita em 30 dias, mediana do
+"TEC1 em risco") começa do zero em 03/11.
+
+### D-280 · A distância do técnico até a casa do cliente, ao vivo (190)
+
+*"quando o contrato estiver em deslocamento, em execução, o sistema deve atualizar em tempo real
+a localização do técnico com relação a casa do assinante, deve mostrar se de fato o
+deslocamento (...) está diminuindo o raio, a mesma coisa para quando estiver em execução, se a
+localização mapeada está no raio de 200 metros"* (Emanuel, 03/11).
+
+`aproximacao_do_tecnico(uuid[])` (INVOKER — quem não lê o rastro não recebe linha): para o
+contrato produtivo em deslocamento/execução de hoje, o último ponto real do rastro do técnico e
+o de pelo menos 2 min antes, os dois medidos até a coordenada do endereço (a mesma de
+`local_da_baixa`). Na tabela de contratos (Serviços, Equipes, Monitor), um selo ◎ ao lado da
+situação: **chegando −X / se afastando +X / parado / chegou** no deslocamento; **no raio / fora
+do raio** na execução (`raio_baixa_m`). Variação menor que 50 m ou que a precisão do GPS é
+"parado". Ponto com mais de 10 min mostra a idade e fica cinza; ponto de saída do app diz "app
+fechado" — no Expo Go o rastro para com o app fechado. Endereço sem coordenada: "sem coord. do
+endereço", nunca "no raio". A tela pergunta de novo a cada minuto, só com a aba à vista.
+
+**Jornada fica de fora** (Na Base, Refeição): não tem casa de cliente — na primeira medição,
+eram 128 dos 139 "em execução" de Manaus. 17 ms como authenticated. O local do encerramento
+continua sendo o de `local_da_baixa` (135/155h): o ponto do rastro mais perto do cliente.
+
+**Visto e não mexido:** onde há as duas, a coordenada da planilha e a da varredura do TOA
+(`toa_geo_lat/lng`) diferem em média 4,7 km (154 contratos de 03/11). O selo e o local da baixa
+usam a da planilha. Se ela estiver errada, "fora do raio" mente — vale conferir qual das duas é
+a casa.
+
+### D-281 · Onde o técnico estava na baixa: primeiro onde ele marcou a casa (191)
+
+*"eu quero é pegar a localização mais assertiva do técnico no momento da baixa (...) temos que
+pegar a mais correta que é onde o técnico diz que é a casa do cliente, se ele não responder,
+aí sim pegamos do gps dele normalmente"* — e, sobre o "rastro ±3 m" do selo, *"tira ele"*
+(Emanuel, 03/11).
+
+`local_da_baixa` agora escolhe a posição do técnico nesta ordem: **CASA** (a resposta "Você está
+na casa do cliente?" da 156e, dada nesta visita — GPS fresco na porta, nunca simulado) →
+**APP** (o registro do campo com GPS, o mais longe do endereço, D-170) → **RASTRO** (baixa no
+TOA, o ponto mais perto durante a execução, 155h). A marca vem de `casa_marcada_na_visita`,
+DEFINER com o escopo de `casa_do_cliente` — `casa_cliente` não tem policy.
+
+**A referência continua a coordenada da planilha do TOA.** Medido em 03/11, 60 casas marcadas:
+mediana de 92 m até ela (38 dentro de 200 m), 964 m até a da varredura. Recusado: usar a casa
+marcada como referência da distância — quem marca a casa na hora da baixa ficaria "no raio" por
+construção, e o selo não diria mais nada.
+
+Em São Luís, no dia: de 24 APP + 38 RASTRO para 40 CASA (mediana 76 m, 27 dentro) + 3 APP + 21
+RASTRO. **O selo mostra só o resultado** (⌖ 47 m / FORA DO RAIO · 4,9 km); a origem e a precisão
+do GPS ficam no texto do mouse e na página do contrato.
+
+### D-282 · Histórico de janeiro a outubro/2026 carregado do ngestor (192)
+
+*"gostaria muito de pesquisar um contrato ou uma WO e aparecer o histórico deles, quem
+executou (...) o número da equipe que baixou, se o contrato ficou aberto (...) temos que pegar
+os nomes (...) os números de telefone já subir no nosso sistema, para quando esse contrato
+voltar de novo, já aparecer para o técnico"* (Emanuel, 03/11, com a planilha anual do ngestor,
+97.600 linhas, Manaus e São Luís, jan–out/2026). Perguntado e respondido: **"Entram em tudo"**
+(produtividade, pontos, relatórios, indicadores); equipe que não existe é **criada com o nome
+da planilha, ativa** — *"se eu quiser olhar 2 meses para trás como estava a rota da equipe 001
+(...) o sistema deve mostrar"*; aberto entra **como estava**.
+
+**Carregado em 03/11, numa transação, depois de um ensaio desfeito:** 97.600 contratos,
+139.629 O.S. (a célula traz até 11 O.S. — separadas), 94.989 eventos de baixa, 93 equipes
+criadas. Marca por dentro: `visita.importacao_id` = importação `fonte = 'NGESTOR'`,
+`arquivo_path = 'carga-historica-ngestor'` (uma por cidade) — é por ela que se desfaz.
+
+De/para (derivado da planilha e do cadastro): situação do ngestor → a nossa; código do ngestor
+→ baixa da AFLINE e código do TOA → baixa da operadora, em todas as O.S. da visita (95% e 99,5%
+batem com o cadastro; -4, 600 e "sem número" ficam sem código); grupo de serviço pelo nome (6
+de 6); tipo de atividade pelo par mais frequente grupo → atividade no dado de 03/11; tipo de O.S.
+pela descrição (99%); WO com o prefixo da cidade (`00121|` Manaus, `00696|` São Luís, como o
+TOA manda); equipe pelo nome, depois pelo número (o "049 - EQUIPE - THIAGO" é a 049); TEC1 do
+"Tec Um"; `fim` e `situacao_em` da data/hora da situação (fuso de cada cidade); nome, telefones,
+tipo de pessoa e de residência, endereço e coordenada do cliente. O evento de baixa leva quem
+baixou (o login do ngestor — o técnico não vem na planilha) e, quando houver, onde a equipe
+estava (`Lat/Lng_Equipe`, origem MOBILE: o "onde baixou" funciona no histórico). O resto
+(marcadores, equipamento, monitor, sub-falha…) fica em `dados_origem`.
+
+Sem aviso nem sinal: os 28 de "dois em andamento" que a carga disparou foram apagados na mesma
+transação. 61 WO "0" da planilha ficaram sem WO. Arquivos temporários com dado de cliente
+apagados da VPS e da máquina.
+
+**Telefones de atendimentos anteriores** (`telefones_do_cliente`, DEFINER, escopo de
+`casa_do_cliente`): os números das outras visitas do mesmo contrato e o melhor contato
+informado, sem repetir o que já está na visita. O app mostra até 3 com "Ligar". Medido: 120
+dos 422 contratos de 03/11 já têm histórico. Produtividade de maio (9.319 contratos de Manaus)
+em 0,6 s como authenticated.
+
+**Visto e não mexido:** de junho a outubro a planilha tem ~5 mil linhas por mês, contra ~14 mil
+de janeiro a maio — pode ter vindo incompleta. 873 contratos sem área (vazia na planilha).
+
+### D-283 · O histórico pesquisado ignora os filtros da lista; o telefone antigo aparece no contrato de hoje
+
+*"226670442 estou pesquisando esse contrato (...) ele caiu dia 30/10 por que ele não aparece?"*
+e *"os contratos antigos não estão espelhando nos contratos de hoje (...) o número de
+telefone"* (Emanuel, 03/11).
+
+1. **Serviços:** número pesquisado em "todas as vezes que veio na agenda" é o histórico do
+   contrato — bucket, área, equipe, grupo, origem e os demais filtros da lista não cortam visita
+   (só a etiqueta de situação clicada). O histórico do ngestor (D-282) não tem bucket, e o
+   filtro de bucket escondia 2 das 3 visitas do 226670442. O aviso da busca diz "sem os filtros
+   da lista". "Limitar ao período" volta a aplicar tudo.
+2. **Página do contrato:** o campo Telefones mostra também os de atendimentos anteriores
+   (`telefones_do_cliente`, 192), com a origem e a data ("atendimento de 30/10", "melhor
+   contato de …"). Nenhum contrato de 03/11 veio com telefone do TOA; 128 dos 422 ganharam
+   número do histórico.
+
+### D-284 · Telefones: todos os do histórico, sem anotação; a carga em massa documentada
+
+*"se no histórico tiver mais de um número, tem que trazer sempre todos para os contratos
+atuais. e retire esse aviso, não precisa"* e *"documente essa prática que fizemos de importação
+em massa de contratos antigos, em breve faremos de outras cidades"* (Emanuel, 03/11).
+
+`telefones_do_cliente` (192) devolve todos os números, sem o limite de 6; a página do contrato
+os lista sem "· atendimento de 30/10 / melhor contato de 03/11", e o app mostra um "Ligar" por
+número, sem o rótulo. Atualização do app enviada (preview, runtime 0.6.0, grupo 224ca573); a
+EAS reescreveu o `app.json` de novo (permissões duplicadas e um segundo `runtimeVersion`) e o
+arquivo foi restaurado.
+
+O procedimento da carga ficou em `docs/14-CARGA-HISTORICA.md`, com os dois scripts em
+`app/scripts/carga-historica/` (cidade, prefixo da WO, fuso e período configuráveis no topo;
+WO "0" já vira vazia; testados de ponta a ponta com entrada vazia). `*.jsonl` no `.gitignore`.

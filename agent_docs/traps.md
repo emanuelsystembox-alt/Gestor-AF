@@ -611,6 +611,19 @@ vêm vazias na jornada (109 de 340 linhas). E o código do TOA não é o nosso
 (BLM = Belém/BEL, GUR = Gurupi/GRP). `bucket_do_arquivo()` lê o nome e
 aceita a cópia "(1)" do navegador. Ver D-180.
 
+**O TOA deixa cada um montar as colunas da exportação — e pode vir sem o "ID da
+Atividade".** Em 03/11 um arquivo do MAN-AFLINE_01_VT veio sem ele (e sem `DATA AGENDA
+MDU` e `ID SGD`, com a ordem trocada): todas as linhas eram descartadas, caladas. Desde a
+187 o banco completa o ID pela WO do contrato do dia — na LINHA, porque a reconciliação lê
+a linha. Contrato novo não entra sem o ID: chave inventada vira contrato em dobro. Ver D-276.
+
+**Carga em massa por fora da importação tropeça nos gatilhos.** Na carga do
+ngestor (D-282): `janela_imediata` é coluna gerada; o gatilho da O.S.
+(`aplica_grupo_servico`) regrava o grupo da visita; o aviso de "dois em andamento"
+só dispara com `app.origem = 'IMPORTACAO'`; evento `SITUACAO` de importação vira
+aviso. Procedimento e contramedidas em `docs/14-CARGA-HISTORICA.md` — ensaie com
+`rollback` antes.
+
 **Códigos de baixa vêm com caixa inconsistente.** `409 - Servico
 Concluido` e `409 - SERVICO CONCLUIDO` são o mesmo. Guardamos `codigo`
 como inteiro; `extrai_codigo()` lê só o número do início.

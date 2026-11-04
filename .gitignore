@@ -39,3 +39,6 @@ vite.config.ts.timestamp-*
 # Código de terceiros só para estudo (ex.: a extensão do concorrente).
 # É deles por direito autoral: não entra no nosso repositório.
 referencia/
+
+# carga historica: saida do exportador tem dado de cliente (LGPD)
+*.jsonl

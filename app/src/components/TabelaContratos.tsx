@@ -10,6 +10,7 @@ import { RelogioServico } from './RelogioServico'
 import { SeloLog } from './SeloLog'
 import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
+import { idadeMin, tendencia, useAproximacao, type Aproximacao } from '../lib/aproximacao'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -257,8 +258,9 @@ export function corBaixaAfline(natureza: string | null | undefined): string {
 }
 
 /**
- * O selo "onde baixou" (096): a distância entre a baixa do campo e a casa
- * do cliente, com a precisão do GPS. Verde dentro do raio, vermelho fora.
+ * O selo "onde baixou" (096): a distância entre o técnico na baixa e a casa
+ * do cliente. Verde dentro do raio, vermelho fora. De onde veio a posição e
+ * a precisão do GPS ficam no texto do mouse (191).
  * Sem coordenada do endereço, diz isso — não pinta de verde o que não
  * sabe (regra 6). Clicar abre o mapa com os dois pontos.
  */
@@ -270,15 +272,21 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
   // rastro do celular, e a tela diz isso. Medida de outra fonte não pode
   // passar por registro do campo.
   const doRastro = local.fonte === 'RASTRO'
-  const deOnde = doRastro
+  // 191: a origem fica no texto do mouse; no selo, só o resultado
+  // ("tira ele" — Emanuel, 03/11, sobre o "rastro ±3 m" do selo)
+  const deOnde = local.fonte === 'CASA'
+    ? 'Onde o técnico marcou a casa do cliente nesta visita'
+    : doRastro
     ? `O ponto do RASTRO do celular mais perto do cliente durante a execução`
       + ` (${local.registros} ponto(s)`
       + `${local.minutos_do_ponto != null ? `, ${local.minutos_do_ponto} min da hora que o TOA encerrou` : ''})`
-    : 'Registro do campo com GPS'
+    : 'GPS da baixa pelo aplicativo'
   const titulo = semEndereco
     ? `${deOnde}, mas o endereço veio do TOA sem coordenada — não dá para medir.${prec ? ' Precisão do GPS:' + prec : ''}`
     : `${fora ? 'FORA do raio' : 'Dentro do raio'} de ${local.raio_m} m: ${deOnde}, a ${textoDistancia(local.distancia_m)}${prec ? ' (GPS' + prec + ')' : ''}. `
-      + (doRastro ? 'A baixa foi dada no TOA. ' : `${local.registros} registro(s) do campo neste contrato${local.registros_fora ? ', ' + local.registros_fora + ' fora do raio' : ''}. `)
+      + (doRastro ? 'A baixa foi dada no TOA. '
+        : local.fonte === 'CASA' ? ''
+        : `${local.registros} registro(s) do campo neste contrato${local.registros_fora ? ', ' + local.registros_fora + ' fora do raio' : ''}. `)
       + 'Clique para ver no mapa.'
   const cor = semEndereco
     ? 'bg-graf-800 text-graf-300 ring-graf-600/50'
@@ -294,9 +302,76 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
         : <>
             {fora && !compacto && <span className="uppercase tracking-wide">fora do raio ·</span>}
             <span className="tabular">{textoDistancia(local.distancia_m)}</span>
-            {doRastro && <span className="font-normal opacity-80">· rastro</span>}
-            {prec && !compacto && <span className="font-normal opacity-80">{prec}</span>}
           </>}
+    </a>
+  )
+}
+
+/**
+ * O selo "a que distância está" (190): só em deslocamento e em execução.
+ * No deslocamento, se a distância está diminuindo; na execução, se está no
+ * raio. Ponto com mais de 10 min diz a idade — app fechado não é "parado".
+ */
+export function SeloAproximacao({ a, compacto = false }: { a: Aproximacao; compacto?: boolean }) {
+  const idade = idadeMin(a)
+  const velho = idade > 10
+  const prec = a.precisao_m != null ? ` (GPS ±${Math.round(Number(a.precisao_m))} m)` : ''
+  const mapa = a.cliente_lat != null && a.cliente_lng != null
+    ? `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${a.cliente_lat},${a.cliente_lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${a.lat},${a.lng}`
+  const quando = idade === 0 ? 'agora' : `há ${idade} min`
+  const fechado = a.motivo === 'SAIU' ? ' · app fechado' : ''
+
+  if (a.distancia_m == null) {
+    return (
+      <a href={mapa} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+        title={`Último ponto do técnico ${quando}${prec}, mas o endereço veio do TOA sem coordenada — não dá para medir.`}
+        className="inline-flex items-center gap-1 rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-semibold text-graf-300 ring-1 ring-graf-600/50 hover:brightness-125">
+        <span aria-hidden>◎</span>sem coord. do endereço
+      </a>
+    )
+  }
+
+  const t = tendencia(a)
+  const execucao = a.situacao === 'EM_EXECUCAO'
+  let rotulo: string
+  let cor: string
+  if (execucao) {
+    rotulo = a.no_raio ? 'no raio' : 'fora do raio'
+    cor = a.no_raio ? 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/50'
+                    : 'bg-af-900/50 text-af-200 ring-af-600/60'
+  } else if (a.no_raio) {
+    rotulo = 'chegou'
+    cor = 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/50'
+  } else if (t.tipo === 'CHEGANDO') {
+    rotulo = 'chegando'
+    cor = 'bg-sky-900/40 text-sky-300 ring-sky-700/50'
+  } else if (t.tipo === 'AFASTANDO') {
+    rotulo = 'se afastando'
+    cor = 'bg-amber-900/40 text-amber-300 ring-amber-700/50'
+  } else {
+    rotulo = t.tipo === 'PARADO' ? 'parado' : 'a caminho'
+    cor = 'bg-graf-800 text-graf-300 ring-graf-600/50'
+  }
+  if (velho) cor = 'bg-graf-800 text-graf-300 ring-graf-600/50'
+
+  const variacao = t.delta != null && t.tipo !== 'PARADO'
+    ? ` ${t.delta < 0 ? '−' : '+'}${textoDistancia(Math.abs(t.delta))}` : ''
+  const titulo = `${execucao ? 'Em execução' : 'Em deslocamento'}: o técnico está a ${textoDistancia(a.distancia_m)} `
+    + `da casa do cliente${prec}, no ponto de ${quando}${fechado}. `
+    + (a.distancia_antes_m != null && a.antes_em
+        ? `Antes (${new Date(a.antes_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}): ${textoDistancia(a.distancia_antes_m)}. `
+        : 'Sem ponto anterior para comparar. ')
+    + `Raio: ${a.raio_m} m. Clique para ver no mapa.`
+
+  return (
+    <a href={mapa} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title={titulo}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 hover:brightness-125 ${cor}`}>
+      <span aria-hidden>◎</span>
+      {!compacto && <span className="uppercase tracking-wide">{rotulo} ·</span>}
+      <span className="tabular">{textoDistancia(a.distancia_m)}</span>
+      {!compacto && !execucao && variacao && <span className="font-normal opacity-80">{variacao}</span>}
+      {(velho || fechado) && <span className="font-normal opacity-80">· {quando}{fechado}</span>}
     </a>
   )
 }
@@ -332,6 +407,10 @@ export function TabelaContratos({
   const mostra = { equipe: true, area: true, data: true, ...(colunas ?? {}) }
   // 174 (D-261): prédio, casa e o vai-e-volta, como o TOA — Serviços e Equipes
   const sinais = useSinaisDasVisitas(linhas.map(l => l.id))
+  // 190: só quem está a caminho ou executando — o resto não muda de lugar
+  const aproximacao = useAproximacao(linhas
+    .filter(l => l.situacao === 'EM_DESLOCAMENTO' || l.situacao === 'EM_EXECUCAO')
+    .map(l => l.id))
   const temSelecao = !!(selecionados && aoSelecionar)
   const todosMarcados = temSelecao && linhas.length > 0
     && linhas.every(l => selecionados!.has(l.id))
@@ -631,6 +710,12 @@ export function TabelaContratos({
                 {locais?.get(v.id) && (
                   <div className="mt-1">
                     <SeloLocal local={locais.get(v.id)!} compacto={!detalhada} />
+                  </div>
+                )}
+                {/* 190: a caminho ou executando — a que distância está agora */}
+                {aproximacao.get(v.id) && (
+                  <div className="mt-1">
+                    <SeloAproximacao a={aproximacao.get(v.id)!} compacto={!detalhada} />
                   </div>
                 )}
                 {/* ┌─ a palavra do TOA, ao lado da nossa ────────────────┐

@@ -93,6 +93,8 @@ interface Evid {
   usuario_id: string | null
   /** Veio da galeria, não da câmera (132). */
   da_galeria: boolean | null
+  /** 135: onde o CELULAR estava no envio — na galeria, a única coordenada honesta. */
+  envio_lat: number | null; envio_lng: number | null
 }
 interface Equip {
   id: string; operacao: string; serial: string
@@ -146,6 +148,28 @@ interface Casa {
 /** Uma peça que está na mão do técnico (`minha_carga`, 086-B). */
 interface PecaNaMao { serial: string; tipo: string | null; modelo: string | null }
 
+/** `raio_baixa_m` (Emanuel, 27/09, D-170) — o mesmo da web. */
+const RAIO_M = 200
+
+/**
+ * De onde a evidência prova presença (Emanuel, 03/11: "era pra dizer que o
+ * envio foi fora da localização do cliente"). Da galeria vale o ENVIO (135):
+ * a coordenada do arquivo pode ser de outro dia, e quase nunca vem. Da câmera,
+ * a captura. "sem GPS" só quando não há posição nenhuma. Acusa, não bloqueia.
+ */
+function localDaEvidencia(
+  f: Evid, cli: { lat: number | null; lng: number | null },
+): { texto: string; tom: 'ok' | 'longe' | 'neutro' } {
+  const lat = f.da_galeria ? f.envio_lat : (f.lat ?? f.envio_lat)
+  const lng = f.da_galeria ? f.envio_lng : (f.lng ?? f.envio_lng)
+  if (lat == null || lng == null) return { texto: 'sem GPS', tom: 'longe' }
+  if (cli.lat == null || cli.lng == null) return { texto: 'cliente sem coordenada', tom: 'neutro' }
+  const d = distanciaM(Number(lat), Number(lng), Number(cli.lat), Number(cli.lng))
+  if (d <= RAIO_M) return { texto: 'no local', tom: 'ok' }
+  const dist = d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`
+  return { texto: `fora do local · ${dist}`, tom: 'longe' }
+}
+
 const SELECT = `
   id, contrato, cliente_nome, telefones,
   logradouro, complemento, bairro, cep, lat, lng,
@@ -163,7 +187,8 @@ const SELECT = `
   ),
   evidencia (
     id, tipo, midia, arquivo_path, mime, tamanho_bytes, duracao_seg,
-    lat, lng, precisao_m, capturada_em, login, os_id, usuario_id, da_galeria
+    lat, lng, precisao_m, capturada_em, login, os_id, usuario_id, da_galeria,
+    envio_lat, envio_lng
   ),
   equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login, tecnico_id ),
   status_toa:dados_origem->>"Status da Atividade",
@@ -206,6 +231,11 @@ export default function Visita({ route, navigation }: Props) {
   // impedimento
   const [pedindoObs, setPedindoObs] = useState(false)
   const [obsEtapa, setObsEtapa] = useState('')
+
+  // 185: a observação da baixa escrita depois de baixada (Emanuel, 03/11)
+  const [obsOs, setObsOs] = useState<string | null>(null)
+  const [obsOsTexto, setObsOsTexto] = useState('')
+  const [obsOsSalvando, setObsOsSalvando] = useState(false)
 
   // evidência e equipamento
   const [escolhendoTipo, setEscolhendoTipo] = useState<'FOTO' | 'VIDEO' | 'GALERIA' | null>(null)
@@ -340,6 +370,18 @@ export default function Visita({ route, navigation }: Props) {
     setCasa(((data ?? []) as Casa[])[0] ?? null)
   }, [id])
   useEffect(() => { lerCasa() }, [lerCasa])
+
+  // 192: os números que o cliente já deu em atendimentos anteriores do mesmo
+  // contrato — "quando esse contrato voltar de novo, já aparecer para o
+  // técnico" (Emanuel, 03/11). O banco já tira os que estão nesta visita.
+  const [telAnteriores, setTelAnteriores] = useState<{ telefone: string; origem: string; visto_em: string }[]>([])
+  useEffect(() => {
+    let vivo = true
+    supabase.rpc('telefones_do_cliente', { p_visita: id }).then(({ data }) => {
+      if (vivo) setTelAnteriores((data ?? []) as typeof telAnteriores)
+    })
+    return () => { vivo = false }
+  }, [id])
 
   async function marcarCasa() {
     setMarcandoCasa(true); setRecadoCasa(null)
@@ -537,6 +579,18 @@ export default function Visita({ route, navigation }: Props) {
   }
 
   /** Apagar não volta: o arquivo sai do servidor (127). Pergunta antes. */
+  /** 185: quem pode e até quando é o banco que diz (`observar_baixa`). */
+  async function salvarObsBaixa(osId: string) {
+    setObsOsSalvando(true)
+    const { error } = await supabase.rpc('observar_baixa', {
+      p_os: osId, p_observacao: obsOsTexto,
+    })
+    setObsOsSalvando(false)
+    if (error) { setErro(error.message); return }
+    setObsOs(null)
+    await recarregar()
+  }
+
   function confirmarApagar(f: Evid) {
     const nome = f.midia === 'VIDEO' ? 'vídeo' : 'foto'
     Alert.alert(
@@ -822,6 +876,15 @@ export default function Visita({ route, navigation }: Props) {
                 aoTocar={() => Linking.openURL(`tel:${t.replace(/\D/g, '')}`)}
               />
             ))}
+            {/* todos os números do histórico, sem rótulo de origem (Emanuel, 03/11) */}
+            {telAnteriores.map(t => (
+              <Botao
+                key={t.telefone}
+                titulo={`Ligar para ${t.telefone}`}
+                tom="discreto"
+                aoTocar={() => Linking.openURL(`tel:${t.telefone.replace(/\D/g, '')}`)}
+              />
+            ))}
           </View>
 
           {/* 096: o melhor contato, quando concluído. Sem resposta ainda
@@ -907,8 +970,34 @@ export default function Visita({ route, navigation }: Props) {
                   {os.baixa_afline.codigo} · {os.baixa_afline.descricao}
                 </Text>
                 {os.sub_falha && <Text style={e.baixaMiudo}>{os.sub_falha.nome}</Text>}
-                {!!os.baixa_observacao && (
+                {!!os.baixa_observacao && obsOs !== os.id && (
                   <Text style={e.baixaMiudo}>{os.baixa_observacao}</Text>
+                )}
+                {/* 185: o código não muda, a observação sim — enquanto o
+                    contrato é do dia, a mesma regra do anexo. */}
+                {obsOs === os.id ? (
+                  <View style={{ gap: 8, marginTop: 6 }}>
+                    <TextInput
+                      value={obsOsTexto} onChangeText={setObsOsTexto}
+                      placeholder="Observação da baixa"
+                      placeholderTextColor={cor.graf300}
+                      multiline maxLength={500} autoFocus
+                      style={e.campo}
+                    />
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }}
+                        aoTocar={() => setObsOs(null)} />
+                      <Botao titulo="Salvar" style={{ flex: 1 }} carregando={obsOsSalvando}
+                        aoTocar={() => salvarObsBaixa(os.id)} />
+                    </View>
+                  </View>
+                ) : podeAnexar && (
+                  <Pressable hitSlop={8}
+                    onPress={() => { setObsOs(os.id); setObsOsTexto(os.baixa_observacao ?? '') }}>
+                    <Text style={e.trocar}>
+                      {os.baixa_observacao ? 'Editar observação' : 'Escrever observação'}
+                    </Text>
+                  </Pressable>
                 )}
                 {/* Sem "trocar código" para o campo. A baixa é o que a
                     AFLINE afirmou; desfazer é do controlador. */}
@@ -1003,9 +1092,11 @@ export default function Visita({ route, navigation }: Props) {
                   {f.capturada_em ? carimbo(f.capturada_em) : ''}
                   {f.tamanho_bytes ? ` · ${tamanho(f.tamanho_bytes)}` : ''}
                 </Text>
-                {f.lat == null && (
-                  <Text style={e.semGpsMini}>sem GPS</Text>
-                )}
+                {(() => {
+                  const l = localDaEvidencia(f, v)
+                  return <Text style={[e.semGpsMini, l.tom === 'ok' && { color: cor.verde900 },
+                    l.tom === 'neutro' && { color: cor.graf500 }]}>{l.texto}</Text>
+                })()}
                 {/* 127: quem enviou apaga o errado, de verdade, só no dia. */}
                 {podeAnexar && f.usuario_id === session?.user.id && (
                   <Pressable onPress={() => confirmarApagar(f)} hitSlop={8}

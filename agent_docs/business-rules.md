@@ -76,6 +76,21 @@ código fecha pelo código; se alguma O.S. tem baixa da AFLINE, a do campo é
 respeitada. E a importação grava direto a situação do código — nunca
 "Em execução" e de volta, que mandava 2 avisos ao técnico a cada hora.
 
+**Encerrado não reabre pela importação** (184, D-272). Concluída, Cancelada e
+Reagendamento só mudam pelo CÓDIGO (a baixa automática, quando vale — e só para
+outro encerrado); o status do TOA não reabre nada. *"contratos fechados não devem
+voltar quando ja encerrados"* (Emanuel, 03/11). **Exceção:** o Desatribuído do
+próprio sistema (800, `desatribuido_em`) volta quando reaparece (D-191). Reabrir é
+do controlador, pela reversão com motivo (D-030).
+
+**O TOA não encerra o que já andou** (189, D-278). Cancelado no TOA (ou sumiu da planilha
+em deslocamento) depois de o contrato ter estado em deslocamento/execução → fica **Em
+execução** até a baixa do técnico, com um aviso. Sem movimento nenhum, cancela (ou vai para
+Auditar) como sempre. Concluído com código continua fechando sozinho. *"se teve status o
+sistema leva o contrato até em execução, depois disso o técnico precisa baixar manual"*
+(Emanuel, 03/11). **E o status posto à mão não volta pela importação** — só avança, até Em
+execução ("Vale o do técnico").
+
 **Mais de um contrato em andamento vindo do TOA é AVISADO, não corrigido**
 (129, D-206): aviso no sino do técnico e sinal na central. Nada muda sozinho.
 
@@ -358,7 +373,7 @@ app vira ponto `SAIU` ("app fechado" na trilha, não "parado"). Sem
 contrato produtivo de hoje em aberto, o segundo plano **desliga
 sozinho**: rastrear o técnico fora da rota não foi pedido e é dado
 pessoal de empregado. O técnico **sabe** que é registrado (aviso na
-Agenda — o aviso saiu na D-249). Só a gestão lê o rastro (a TRILHA), e só de equipe visível.
+Agenda — o aviso saiu na D-249). Só a gestão lê o rastro (a TRILHA), no alcance de leitura dela — `equipes_legiveis()`, a cidade, o mesmo do Monitor (186, D-275; o Coordenador conta como gestão).
 
 **Geo-Rota: o colega vê só a última posição** (130, D-207). Da mesma cidade,
 em rota hoje, vista há até 30 min, ponto real. Nunca a trilha. (Até a 166
@@ -368,6 +383,11 @@ exigia a ciência v2 do rastro; saiu com a D-249.) A conversa entre técnicos
 **Sair do login apaga a fila de pontos do aparelho.** Quem é o técnico o
 servidor decide pelo login (D-061); ponto de um login não sobe na sessão
 de outro.
+
+**A posição do técnico na baixa** (191, D-281): primeiro onde ele marcou a casa do cliente
+nesta visita; sem marca, o GPS da baixa pelo app; baixa no TOA, o rastro. A referência da
+distância é sempre a coordenada da planilha do TOA (não a casa marcada — senão quem marca na
+hora fica "no raio" por construção).
 
 **O local da baixa acusa, não bloqueia.** Raio de **200 m**
 (`raio_baixa_m`, Emanuel, 27/09). Vale o registro do campo **mais longe**

@@ -1330,7 +1330,8 @@ function MapaMonitor({ tecnicos, selecionado, trilha, contratos, locais, paradas
         const ondeBaixou = !l ? 'sem registro de onde baixou'
           : l.fora_do_raio == null ? 'endereço sem coordenada — não dá para medir'
           : `${l.fora_do_raio ? 'FORA' : 'dentro'} do raio · ${textoDistancia(l.distancia_m)} do endereço`
-            + (l.fonte === 'RASTRO' ? ' (rastro do celular)' : ' (baixa pelo app)')
+            + (l.fonte === 'RASTRO' ? ' (rastro do celular)'
+              : l.fonte === 'CASA' ? ' (casa marcada pelo técnico)' : ' (baixa pelo app)')
         const caixa = document.createElement('div')
         caixa.style.cssText = 'font:12px system-ui,sans-serif;color:#111827;max-width:240px'
         const linha = (txt: string, estilo = '') => {

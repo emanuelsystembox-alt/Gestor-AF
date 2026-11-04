@@ -41,10 +41,11 @@ export interface LocalBaixa {
   fora_do_raio: boolean | null
   registros: number
   registros_fora: number
-  /** De onde saiu a posição (135): APP = registro do campo com GPS;
-   *  RASTRO = o ponto do rastro mais perto do cliente durante a
+  /** De onde saiu a posição, nesta ordem (191): CASA = onde o técnico
+   *  marcou a casa do cliente nesta visita; APP = registro do campo com
+   *  GPS; RASTRO = o ponto do rastro mais perto do cliente durante a
    *  execução, quando a baixa foi no TOA (155h). */
-  fonte: 'APP' | 'RASTRO'
+  fonte: 'CASA' | 'APP' | 'RASTRO'
   /** Quantos minutos separam esse ponto da hora da baixa. Só no RASTRO.
    *  No RASTRO, `registros` é quantos pontos houve na execução. */
   minutos_do_ponto: number | null

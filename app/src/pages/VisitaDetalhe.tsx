@@ -132,6 +132,27 @@ function metros(aLat: number, aLng: number, bLat: number, bLng: number): number 
   return Math.round(2 * R * Math.asin(Math.sqrt(x)))
 }
 
+/**
+ * A etiqueta da miniatura (Emanuel, 03/11: "era pra dizer que o envio foi fora
+ * da localização do cliente"). Da galeria vale o ENVIO (135) — a coordenada do
+ * arquivo quase nunca vem; da câmera, a captura. Raio = `raio_baixa_m` (D-170).
+ * A mesma conta mora em `campo/src/telas/Visita.tsx` (localDaEvidencia).
+ */
+function localDaEvidencia(
+  a: Evidencia, cliLat: number | null, cliLng: number | null,
+): { texto: string; tom: 'ok' | 'longe' | 'neutro' } {
+  const lat = a.da_galeria ? a.envio_lat : (a.lat ?? a.envio_lat)
+  const lng = a.da_galeria ? a.envio_lng : (a.lng ?? a.envio_lng)
+  if (lat == null || lng == null) return { texto: 'sem GPS', tom: 'longe' }
+  if (cliLat == null || cliLng == null) return { texto: 'cliente sem coordenada', tom: 'neutro' }
+  const d = metros(Number(lat), Number(lng), Number(cliLat), Number(cliLng))
+  if (d <= 200) return { texto: 'no local', tom: 'ok' }
+  return {
+    texto: `fora · ${d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : d + ' m'}`,
+    tom: 'longe',
+  }
+}
+
 function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: boolean }) {
   return (
     <div>
@@ -282,6 +303,18 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
     })
   }, [id])
 
+  // 192: os telefones que o cliente deu em atendimentos anteriores do mesmo
+  // contrato (o histórico do ngestor, D-282, e o melhor contato) — "os
+  // contratos antigos não estão espelhando nos contratos de hoje (...) o
+  // número de telefone" (Emanuel, 03/11). O banco tira o que já está aqui.
+  const [telAnteriores, setTelAnteriores] = useState<{ telefone: string; origem: string; visto_em: string }[]>([])
+  useEffect(() => {
+    if (!id) return
+    supabase.rpc('telefones_do_cliente', { p_visita: id }).then(({ data }) => {
+      setTelAnteriores((data ?? []) as typeof telAnteriores)
+    })
+  }, [id])
+
   /*
    * ┌─ 155 · o que a janela do contrato precisava para funcionar ──────┐
    * │ A janela menor saiu (Emanuel, 29/10) e os comandos dela vieram   │
@@ -413,14 +446,19 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
               {url && ehVideo && <span className="text-2xl text-graf-400">▶</span>}
               {!url && <span className="text-[11px] text-graf-600">carregando…</span>}
 
-              {/* Foto sem coordenada é prova fraca, e a tela
-                  diz isso em vez de sumir com a informação. */}
-              {!a.lat && (
-                <span className="absolute right-1.5 top-1.5 rounded bg-amber-500/90
-                                 px-1.5 py-0.5 text-[10px] font-bold text-graf-950">
-                  sem GPS
-                </span>
-              )}
+              {/* Foto sem coordenada é prova fraca, e a tela diz isso em vez
+                  de sumir com a informação. Da galeria, conta o envio (135). */}
+              {(() => {
+                const l = localDaEvidencia(a, v.lat, v.lng)
+                return (
+                  <span className={`absolute right-1.5 top-1.5 rounded px-1.5 py-0.5
+                                    text-[10px] font-bold text-graf-950 ${
+                    l.tom === 'longe' ? 'bg-amber-500/90'
+                      : l.tom === 'ok' ? 'bg-emerald-400/90' : 'bg-graf-300/90'}`}>
+                    {l.texto}
+                  </span>
+                )
+              })()}
               {/* 132: da galeria, não da câmera do app — hora e GPS
                   são os do arquivo. Quem audita tem de saber. */}
               {a.da_galeria && (
@@ -575,8 +613,11 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                       </div>
                     </> : null} />
                 </div>
-                <Campo r="Telefones" v={v.telefones?.length
-                  ? v.telefones.join(' · ') : null} />
+                <Campo r="Telefones" v={v.telefones?.length || telAnteriores.length ? <>
+                  {!!v.telefones?.length && <div>{v.telefones.join(' · ')}</div>}
+                  {/* sem anotação de origem: "retire esse aviso, não precisa" (03/11) */}
+                  {telAnteriores.map(t => <div key={t.telefone}>{t.telefone}</div>)}
+                </> : null} />
                 <Campo r="Coordenadas (TOA)" v={v.lat && v.lng
                   ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`}
                        target="_blank" rel="noopener noreferrer"

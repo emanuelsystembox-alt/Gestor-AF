@@ -89,6 +89,12 @@ export function ProvaDoContrato({ prova, local, geoToa, raio = 200, compacto }: 
             sem leitura — nenhum registro do campo e nenhum ponto do rastro durante a execução
           </span>
         )}
+        {local?.fonte === 'CASA' && (
+          <span className="text-[11px] text-graf-400">onde o técnico marcou a casa do cliente</span>
+        )}
+        {local?.fonte === 'APP' && (
+          <span className="text-[11px] text-graf-400">GPS da baixa pelo aplicativo</span>
+        )}
         {local?.fonte === 'RASTRO' && (
           <span className="text-[11px] text-graf-400">
             ponto do rastro mais perto do cliente durante a execução

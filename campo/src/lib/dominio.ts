@@ -67,6 +67,10 @@ export const TIPOS_EVIDENCIA = [
   { chave: 'NR35',           rotulo: 'NR-35 (altura)' },
   { chave: 'CLIENTE_AUSENTE',rotulo: 'Cliente ausente' },
   { chave: 'URA',            rotulo: 'URA / protocolo' },
+  // Emanuel, 03/11. O banco aceita qualquer tipo; a web mostra a chave.
+  { chave: 'MINI_ISOLADOR',  rotulo: 'Mini isolador' },
+  { chave: 'TESTE_VELOCIDADE', rotulo: 'Teste de velocidade' },
+  { chave: 'CONSULTIVO',     rotulo: 'Consultivo' },
   { chave: 'LIVRE',          rotulo: 'Outra' },
 ] as const
 
@@ -91,6 +95,8 @@ export const ROTULO_EVENTO: Record<string, string> = {
   DIA_DE_ATUACAO: 'Dia de atuação alterado',
   // 096: a resposta do técnico à pergunta do melhor contato.
   CONTATO: 'Melhor contato do cliente',
+  // 185: a observação escrita depois da baixa.
+  OBSERVACAO_BAIXA: 'Observação da baixa',
 }
 
 export const rotuloEvento = (t: string) => ROTULO_EVENTO[t] ?? t

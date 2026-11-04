@@ -490,6 +490,11 @@ export default function Servicos() {
     // filtrar de novo pelo texto apagaria a WO (que aqui tem "00696|") e
     // a lista colada inteira, que não cabe em campo nenhum.
     const t = contratosBuscados.length ? '' : busca.trim().toLowerCase()
+    // D-283: número pesquisado em "todas as vezes que veio na agenda" é o
+    // HISTÓRICO do contrato — o filtro da lista (bucket, área, equipe…) não
+    // corta visita. O histórico do ngestor (D-282) não tem bucket, e o
+    // filtro de bucket escondia 2 de 3 visitas do 226670442 (Emanuel, 03/11).
+    if (contratosBuscados.length && !contratoNoPeriodo) return base
     return base.filter(v => {
       // Grupo, origem, resultado, responsável, bucket, segmento: a regra é a
       // mesma de Equipes, e mora em um lugar só (lib/filtroContratos).
@@ -509,7 +514,7 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, filtroSemSituacao, busca, contratosBuscados, area, supervisor, equipe, tecnologia])
+  }, [base, filtroSemSituacao, busca, contratosBuscados, contratoNoPeriodo, area, supervisor, equipe, tecnologia])
 
   const visiveis = useMemo(() => (situacao === 'TODAS'
     ? semSituacao
@@ -900,7 +905,8 @@ export default function Servicos() {
               : <> — mostrando <strong>todas as vezes que veio na agenda</strong>:{' '}
                   <span className="tabular">{linhas.length}</span> visita{linhas.length === 1 ? '' : 's'}
                   {' '}em <span className="tabular">{new Set(linhas.map(l => l.data_agendada)).size}</span>{' '}
-                  dia{new Set(linhas.map(l => l.data_agendada)).size === 1 ? '' : 's'}, fora do período.</>}
+                  dia{new Set(linhas.map(l => l.data_agendada)).size === 1 ? '' : 's'}, fora do período
+                  e sem os filtros da lista.</>}
             {' '}
             <button onClick={() => setContratoNoPeriodo(p => !p)}
               className="underline underline-offset-2 hover:text-af-400">

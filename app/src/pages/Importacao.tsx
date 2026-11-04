@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { lerPlanilhaTOA, validarPlanilha, contarOS, type ResultadoLeitura } from '../lib/toa'
+import { lerPlanilhaTOA, validarPlanilha, contarOS, semIdDaAtividade, type ResultadoLeitura } from '../lib/toa'
 import {
   ETAPAS, importarLinhasToa, reconciliarImportacao, type Resumo, type Desatribuicao,
   type FilaImportacao,
@@ -359,6 +359,15 @@ export default function Importacao() {
                   </div>
                 )
               })()}
+
+              {/* 187: exportação do TOA sem o ID — o banco acha o contrato do
+                  dia pela WO; o que não existe ainda não tem como entrar. */}
+              {semIdDaAtividade(leitura) && (
+                <p className="mt-3 rounded-lg border border-amber-700/50 bg-amber-950/30 px-3 py-2.5 text-xs text-amber-300">
+                  Sem a coluna <strong>ID da Atividade</strong>: o contrato é achado pela WO.
+                  Contrato novo e jornada ficam de fora.
+                </p>
+              )}
 
               {/* D-013 visível para quem opera */}
               {leitura.duplicados.length > 0 && (
