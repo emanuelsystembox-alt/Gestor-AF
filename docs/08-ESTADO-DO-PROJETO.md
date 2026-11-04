@@ -470,6 +470,10 @@ falta o olho de quem usa.
 - **Marcador OUVIDORIA** (200, 201): manual no site e automático pela coluna "Caso crítico
   (ouvidoria)" da planilha; preto no site e no app — ninguém viu o selo no celular.
 - **Rota do dia** sem jornada repetida (D-293).
+- **14 apontamentos de jornada fantasma** em 03/11 (12 da planilha de 31/10 importada como 03/11 e 2
+  que o TOA recriou) — apagar com a confirmação do Emanuel (D-294).
+- **Perguntar:** jornada que some da planilha deve sair sozinha (hoje a reconciliação ignora jornada,
+  D-191)? A importação deve RECUSAR arquivo de outro dia (hoje só avisa na prévia, D-166)?
 - Os dois itens do app só chegam a quem tem o **APK 0.6.0**.
 
 ### Melhorias técnicas conhecidas

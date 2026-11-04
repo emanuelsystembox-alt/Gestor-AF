@@ -12285,3 +12285,21 @@ encaixada "depois da parada anterior e antes desta" pelo horário de início —
 saía de novo antes dele e outra vez no fim da faixa. Agora cada jornada é colocada UMA vez, antes
 do primeiro contrato que começou depois dela; nenhum → no fim (inclusive quem só tem jornada).
 Conferido na tela: 11 faixas, 30 apontamentos, nenhum repetido.
+
+### D-294 · A outra jornada repetida: planilha de 31/10 importada como 03/11, e jornada que o TOA recria
+
+*"ainda tem coisa se repetindo, na base e refeição"* (Emanuel, 03/11, depois da D-293) — com horários
+um pouco diferentes (Na Base 07:55–08:12 e 07:58–08:05). Não era a tela: eram **dois registros**.
+
+- **Importação errada:** às 07:33 de 03/11 entrou `Atividades-SLS-AFLINE_02_VT_31_10_26.xlsx` (a
+  planilha de **31/10**) com dia de atuação **03/11** (renan@afline.com.br). Os contratos dela já
+  tinham sido apagados em massa (D-277), mas Serviços esconde jornada — os **12 apontamentos de
+  jornada** dela ficaram em 03/11, ao lado dos verdadeiros.
+- **O TOA recria a jornada:** em Manaus (Z611794) a jornada planejada (08:00 / 12:00, nunca
+  iniciada) veio em 5 importações e foi trocada por outra, com outro número; a antiga ficou —
+  `desatribuir_ausentes` não olha jornada (D-191: "Jornada não conta"). **2 apontamentos.**
+
+Os 14 ficam para apagar com a confirmação do Emanuel (exclusão definitiva, registrada). **Em aberto:**
+jornada que some da planilha do bucket deve sair sozinha (a D-191 deixou jornada de fora de
+propósito)? E a importação deveria recusar arquivo cujo nome diz outro dia que o dia de atuação
+(hoje a prévia só avisa, D-166)?
