@@ -268,6 +268,18 @@ export function corBaixaAfline(natureza: string | null | undefined): string {
  * Sem coordenada do endereço, diz isso — não pinta de verde o que não
  * sabe (regra 6). Clicar abre o mapa com os dois pontos.
  */
+/** D-304: "FABIO SATO" → "FS"; empresa sem o sufixo ("MOKA COMERCIO DE
+ *  ARTIGOS DE VIAGEM LTDA" → "MV"). Primeira e última palavra que contam. */
+const SEM_PESO = new Set(['DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'LTDA', 'ME', 'EPP', 'EIRELI', 'SA', 'S/A', 'S.A.', 'MEI',
+  'FILHO', 'JUNIOR', 'JR', 'NETO', 'SOBRINHO'])
+export function iniciaisCliente(nome: string | null | undefined): string | null {
+  const ps = (nome ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+    .split(/\s+/).filter(w => w && !SEM_PESO.has(w) && /[A-Z]/.test(w))
+  if (!ps.length) return null
+  const l = (w: string) => w.match(/[A-Z]/)![0]
+  return ps.length === 1 ? l(ps[0]) : l(ps[0]) + l(ps[ps.length - 1])
+}
+
 export function SeloLocal({ local, compacto = false, aoAbrir }: {
   local: LocalBaixa; compacto?: boolean
   /** D-295: com ele, o clique abre a janela do mapa em vez do Google Maps numa aba. */
@@ -600,6 +612,14 @@ export function TabelaContratos({
                   // 123: a ouvidoria sobe junto do número — é o que tem de ser visto primeiro
                   <div className="flex items-center gap-1.5 font-medium text-graf-200">
                     {v.contrato ?? '—'}
+                    {/* D-304: as iniciais do cliente, como o concorrente mostra o
+                        nome — só as iniciais na linha; o nome no mouse. */}
+                    {iniciaisCliente(v.cliente_nome) && (
+                      <span title={`Cliente: ${v.cliente_nome}`}
+                        className="rounded bg-graf-800 px-1 text-[10px] font-semibold tracking-wide text-graf-300">
+                        {iniciaisCliente(v.cliente_nome)}
+                      </span>
+                    )}
                     <SinaisContrato s={sinais.get(v.id)} />
                     <SeloOuvidoria ouvidoria={v.ouvidoria} />
                   </div>

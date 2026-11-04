@@ -12,6 +12,7 @@ import { aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle,
          temChaveDoMapa } from '../lib/mapaGoogle'
 import { SinaisContrato, useSinaisDasVisitas, type SinalContrato } from '../components/SinaisContrato'
 import { OrdemSugerida } from '../components/OrdemSugerida'
+import { estadoJornada, IntervaloJornada, type AlvoJornada } from '../components/IntervaloJornada'
 
 /**
  * Rota do Dia — a mesa de despacho (D-111, redesenhada).
@@ -250,6 +251,8 @@ export default function Rota() {
   const [paradasDoDia, setParadas] = useState<Parada[]>([])
   /** Refeicao, Na Base: o que explica o buraco na sequencia do dia. */
   const [jornadas, setJornadas] = useState<Parada[]>([])
+  /** D-303: o intervalo de jornada aberto na janela. */
+  const [jornadaAberta, setJornadaAberta] = useState<AlvoJornada | null>(null)
   // 174 (D-261): prédio, casa e o vai-e-volta no cartão, como o TOA
   const sinais = useSinaisDasVisitas(paradasDoDia.map(p => p.visita_id))
   const [bairros, setBairros] = useState<BairroLinha[]>([])
@@ -401,6 +404,16 @@ export default function Rota() {
     return jornadas.filter(j => logins.has(j.login)).length
   }, [jornadas, paradas])
 
+  /** D-303: quem está almoçando AGORA (Refeição "iniciado" no TOA) e quem
+   *  já almoçou — por técnico, só os logins que estão na tela (o filtro). */
+  const almoco = useMemo(() => {
+    const logins = new Set(paradas.map(p => p.login))
+    const ref = jornadas.filter(j => logins.has(j.login) && ehRefeicao(j.tipo_atividade))
+    const agora = new Set(ref.filter(j => estadoJornada(j.status_toa) === 'EM_CURSO').map(j => j.login))
+    const ja = new Set(ref.filter(j => estadoJornada(j.status_toa) === 'TERMINOU' && !agora.has(j.login)).map(j => j.login))
+    return { agora: agora.size, ja: ja.size }
+  }, [jornadas, paradas])
+
   /** Uma faixa por LOGIN do TOA, na ordem de quem mais rodou. */
   const faixas = useMemo(() => {
     const m = new Map<string, Parada[]>()
@@ -488,7 +501,9 @@ export default function Rota() {
     setOcupado(false); setMover(null); setMotivo('')
   }
 
-  return (
+  return (<>
+    {/* D-303: o intervalo da jornada (fora do Shell: é janela por portal) */}
+    {jornadaAberta && <IntervaloJornada alvo={jornadaAberta} onFechar={() => setJornadaAberta(null)} />}
     <Shell acoes={
       <div className="flex items-center gap-2">
         <input type="date" value={data} onChange={e => setData(e.target.value)}
@@ -579,11 +594,14 @@ export default function Rota() {
 
         {/* ====== resumo ====== */}
         {resumo && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
               ['Visitas', String(vis.visitas),
                 nJornada > 0 ? `${nJornada} de jornada fora da conta` : null],
               ['Técnicos', String(vis.tecnicos), 'com parada produtiva'],
+              // D-303: Refeição "iniciado" no TOA, agora
+              ['Almoçando', String(almoco.agora),
+                almoco.ja ? `${almoco.ja} já almoçou(aram)` : 'Refeição iniciada no TOA'],
               ['Bairros', String(vis.bairros), null],
               ['Km no dia', num(vis.km_total, 0), 'em linha reta'],
               ['Retornos', String(vis.retornos),
@@ -593,7 +611,8 @@ export default function Rota() {
             ].map(([rot, val, nota], i) => (
               <div key={rot as string} className="card-controle p-3">
                 <div className={`tabular text-2xl font-semibold leading-none ${
-                  i >= 4 && Number(val) > 0 ? 'text-af-400' : ''}`}>{val}</div>
+                  i >= 5 && Number(val) > 0 ? 'text-af-400'
+                  : i === 2 && Number(val) > 0 ? 'text-emerald-400' : ''}`}>{val}</div>
                 <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
                   {rot}
                 </div>
@@ -782,7 +801,7 @@ export default function Rota() {
                         const antes = lugar.get(i) ?? []
                         return (
                           <Fragment key={p.visita_id}>
-                            {antes.map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                            {antes.map(j => <ChipJornada key={j.visita_id} j={j} tecnico={t.nome} onAbrir={setJornadaAberta} />)}
                             <Trecho
                               parada={p} anterior={i > 0 ? t.paradas[i - 1] : null}
                               sinal={sinais.get(p.visita_id)}
@@ -798,7 +817,7 @@ export default function Rota() {
                       })}
                       {/* o que ficou depois do último contrato que começou —
                           e, para quem só tem jornada no dia, tudo */}
-                      {fim.map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                      {fim.map(j => <ChipJornada key={j.visita_id} j={j} tecnico={t.nome} onAbrir={setJornadaAberta} />)}
                         </>)
                       })()}
                     </ol>
@@ -902,7 +921,7 @@ export default function Rota() {
         )}
       </div>
     </Shell>
-  )
+  </>)
 }
 
 /* ================================================================== */
@@ -927,30 +946,62 @@ export default function Rota() {
  * │ para o olho não confundir as duas coisas. Ver D-149.              │
  * └───────────────────────────────────────────────────────────────────┘
  */
-function ChipJornada({ j }: { j: Parada }) {
-  const min = j.inicio && j.fim
-    ? Math.round((new Date(j.fim).getTime() - new Date(j.inicio).getTime()) / 60000)
-    : null
+function ehRefeicao(tipo: string | null | undefined) {
+  return (tipo ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().startsWith('REFEI')
+}
+
+function ChipJornada({ j, tecnico, onAbrir }: {
+  j: Parada; tecnico: string | null; onAbrir: (a: AlvoJornada) => void
+}) {
   const rotulo = j.tipo_atividade ?? 'jornada'
+  // D-303: o status do TOA diz se começou e se terminou. Em "iniciado" o
+  // `fim` é o previsto (início + duração), não o fim (D-103).
+  const estado = estadoJornada(j.status_toa)
+  const refeicao = ehRefeicao(j.tipo_atividade)
+  const fimMostrado = estado === 'EM_CURSO' ? null : j.fim
+  const min = estado === 'EM_CURSO' && j.inicio
+    ? Math.round((Date.now() - new Date(j.inicio).getTime()) / 60000)
+    : j.inicio && j.fim
+      ? Math.round((new Date(j.fim).getTime() - new Date(j.inicio).getTime()) / 60000)
+      : null
+  // Verde almoçando, azul terminou — só a Refeição (Emanuel, 04/11). Cor
+  // CHEIA com texto branco: o tom translúcido da 1ª versão sumia no tema
+  // claro ("a cor azul ta muito apagado"). Hex FIXO, e não `emerald-700`:
+  // no tema claro a rampa 700 inverte para tinta clara (styles.css) e o
+  // branco some. #047857 e #0369a1 passam AA com branco (5,5:1 e 5,9:1).
+  const cor = refeicao && estado === 'EM_CURSO'
+    ? 'border-solid border-[#065f46] bg-[#047857] text-white'
+    : refeicao && estado === 'TERMINOU'
+      ? 'border-solid border-[#075985] bg-[#0369a1] text-white'
+      : 'border-dashed border-graf-600 bg-graf-900/60'
+  const texto = refeicao && estado !== 'PLANEJADA' ? '' : 'text-graf-300'
   return (
     <li className="flex items-center" aria-label={`Fora de contrato: ${rotulo}`}>
-      <div className="mx-1 flex items-center gap-1.5 rounded-sm border border-dashed
-                      border-graf-600 bg-graf-900/60 px-2 py-1 text-[10px]"
+      <button type="button"
+        onClick={e => { e.stopPropagation(); onAbrir({
+          visita_id: j.visita_id, login: j.login, tecnico, rotulo, status_toa: j.status_toa,
+          janela_inicio: j.janela_inicio, janela_fim: j.janela_fim, inicio: j.inicio, fim: j.fim }) }}
+        className={`mx-1 flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[10px] hover:brightness-125 ${cor}`}
         title={[
           `${rotulo} — fora de contrato`,
-          j.inicio ? `das ${hhmm(j.inicio)}` : null,
-          j.fim ? `às ${hhmm(j.fim)}` : null,
-          'Não conta como contrato nem em produtividade.',
-        ].filter(Boolean).join(' ')}>
-        <span aria-hidden className="text-graf-500">⏸</span>
-        <span className="font-medium text-graf-300">{rotulo}</span>
-        <span className="tabular text-graf-500">
-          {hhmm(j.inicio) ?? '?'}–{hhmm(j.fim) ?? '?'}
+          estado === 'EM_CURSO' ? `em curso desde ${hhmm(j.inicio)}`
+            : estado === 'TERMINOU' ? `das ${hhmm(j.inicio)} às ${hhmm(j.fim)}`
+            : `planejado ${j.janela_inicio?.slice(0, 5) ?? '?'}–${j.janela_fim?.slice(0, 5) ?? '?'}`,
+          'Clique para ver o intervalo e onde ficou parado.',
+        ].join(' · ')}>
+        <span aria-hidden className={refeicao && estado !== 'PLANEJADA' ? '' : 'text-graf-500'}>
+          {estado === 'EM_CURSO' ? '●' : '⏸'}
+        </span>
+        <span className={`font-medium ${texto}`}>{rotulo}</span>
+        <span className={`tabular ${texto ? 'text-graf-500' : ''}`}>
+          {hhmm(j.inicio) ?? '?'}–{estado === 'EM_CURSO' ? 'agora' : (hhmm(fimMostrado) ?? '?')}
         </span>
         {min != null && min >= 0 && (
-          <span className="tabular font-semibold text-graf-400">{duracao(min)}</span>
+          <span className={`tabular font-semibold ${texto ? 'text-graf-400' : ''}`}>
+            {estado === 'EM_CURSO' ? `há ${duracao(min)}` : duracao(min)}
+          </span>
         )}
-      </div>
+      </button>
     </li>
   )
 }
@@ -1309,6 +1360,8 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
   const div = useRef<HTMLDivElement | null>(null)
   const mapa = useRef<google.maps.Map | null>(null)
   const marcas = useRef<google.maps.Marker[]>([])
+  /** D-305: a linha do trajeto do técnico em foco. */
+  const linha = useRef<google.maps.Polyline | null>(null)
   /** Com que tema o mapa que está na tela foi construído. */
   const temaDoMapa = useRef<string | null>(null)
   /** Sobe a cada mapa novo, para os pinos serem redesenhados nele. */
@@ -1370,10 +1423,65 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
     if (!m) return
     for (const x of marcas.current) x.setMap(null)
     marcas.current = []
+    linha.current?.setMap(null); linha.current = null
     if (pontos.length === 0) return
 
     const limites = new google.maps.LatLngBounds()
     const info = new google.maps.InfoWindow()
+
+    /*
+     * ┌─ D-305 · com UM técnico, o mapa é a rota DELE ─────────────────────┐
+     * │ > "melhore essa visão dos contratos, não ta legal, ta meio apagado │
+     * │ >  quando eu clico em cima de um nome" — Emanuel, 04/11            │
+     * │                                                                     │
+     * │ A pintura da cidade (cor da equipe, encerrado a 15%) servia para   │
+     * │ comparar equipes; com uma pessoa só, deixava três bolinhas         │
+     * │ apagadas e nenhuma ordem. Em foco: pino CHEIO com o número da      │
+     * │ parada, na cor da SITUAÇÃO (a legenda da faixa), e a linha do      │
+     * │ trajeto na ordem do dia, com setas. Linha reta entre paradas — o   │
+     * │ mesmo km da faixa, não o caminho de rua.                            │
+     * └─────────────────────────────────────────────────────────────────────┘
+     */
+    if (foco) {
+      const emOrdem = [...pontos].sort((a, b) => a.ordem - b.ordem)
+      if (emOrdem.length > 1) {
+        linha.current = new google.maps.Polyline({
+          map: m, path: emOrdem.map(p => ({ lat: p.lat as number, lng: p.lng as number })),
+          strokeColor: corEquipe(emOrdem[0].equipe), strokeOpacity: 0.85, strokeWeight: 3, zIndex: 1,
+          icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 2.5,
+                            strokeColor: corEquipe(emOrdem[0].equipe), fillOpacity: 1 },
+                    offset: '50%', repeat: '140px' }],
+        })
+      }
+      for (const p of emOrdem) {
+        const pos = { lat: p.lat as number, lng: p.lng as number }
+        limites.extend(pos)
+        const cs = SITUACAO_INFO[p.situacao]?.cor ?? '#64748b'
+        const marca = new google.maps.Marker({
+          position: pos, map: m, zIndex: 10 + p.ordem,
+          title: `${p.ordem}ª parada · ${p.contrato ?? 'sem contrato'} · ${p.bairro ?? 'sem bairro'}`
+               + ` · ${SITUACAO_INFO[p.situacao]?.label ?? p.situacao}`,
+          label: { text: String(p.ordem), color: '#ffffff', fontSize: '11px', fontWeight: '800' },
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: cs, fillOpacity: 1,
+                  strokeColor: '#ffffff', strokeWeight: 2 },
+        })
+        marca.addListener('click', () => {
+          const janela = p.janela_inicio
+            ? `${p.janela_inicio.slice(0, 5)}–${(p.janela_fim ?? '').slice(0, 5) || '?'}` : 'sem janela'
+          info.setContent(
+            `<div style="color:#111;font:500 12px/1.5 system-ui;min-width:11rem">
+               <strong style="font-size:13px">${p.ordem}ª · ${p.contrato ?? 'sem contrato'}</strong><br>
+               ${p.bairro ?? 'sem bairro'} · ${p.tipo_servico ?? 'sem grupo'}<br>
+               janela ${janela} · ${SITUACAO_INFO[p.situacao]?.label ?? p.situacao}
+             </div>`)
+          info.open({ map: m, anchor: marca })
+        })
+        marcas.current.push(marca)
+      }
+      if (emOrdem.length === 1) { m.setCenter(limites.getCenter()); m.setZoom(15) }
+      else m.fitBounds(limites, 56)
+      return () => info.close()
+    }
 
     // Encerrados primeiro: o pendente fica por cima e continua clicável.
     const ordenados = [...pontos].sort(
@@ -1398,7 +1506,8 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: feito ? 6 : 8.5,
           fillColor: c,
-          fillOpacity: feito ? 0.15 : 0.9,
+          // D-305: 0,15 sumia no mapa claro; 0,45 ainda separa do pendente
+          fillOpacity: feito ? 0.45 : 0.9,
           strokeColor: c,
           strokeWeight: feito ? 1.2 : 2.2,
         },
@@ -1423,7 +1532,7 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
     else m.fitBounds(limites, 48)
 
     return () => info.close()
-  }, [pontos, corEquipe, pronto, versao])
+  }, [pontos, corEquipe, pronto, versao, foco])
 
   if (!temChaveDoMapa || erro) {
     return (
@@ -1482,9 +1591,18 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
     )
   }
 
+  // D-305: com foco, quantas paradas dele ficaram fora do mapa (sem coordenada)
+  const doFoco = foco ? paradas.filter(p => p.login === foco).length : 0
   return (
     <div className="relative min-h-[26rem]">
       <div ref={div} className="absolute inset-0" />
+      {foco && pronto && (
+        <div className="pointer-events-none absolute bottom-7 left-2 rounded bg-white/90 px-2 py-1
+                        text-[11px] font-medium text-[#1f2937] shadow">
+          {pontos.length} de {doFoco} parada(s) no mapa
+          {doFoco > pontos.length ? ` · ${doFoco - pontos.length} sem coordenada do TOA` : ''}
+        </div>
+      )}
       {!pronto && (
         <div role="status"
           className="absolute inset-0 flex items-center justify-center text-xs

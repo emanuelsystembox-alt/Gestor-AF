@@ -98,6 +98,8 @@ export const ROTULO_EVENTO: Record<string, string> = {
   // 185: a observação escrita depois da baixa.
   OBSERVACAO_BAIXA: 'Observação da baixa',
   SUB_FALHA: 'Sub-falha',
+  // 207 (D-302): a resposta do COP no contrato, sem mudar o status
+  RESPOSTA_COP: 'Resposta do COP',
 }
 
 export const rotuloEvento = (t: string) => ROTULO_EVENTO[t] ?? t

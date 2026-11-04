@@ -431,7 +431,7 @@ falta o olho de quem usa.
 
 ---
 
-## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 206, D-295 a D-301)
+## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 207, D-295 a D-304)
 
 ### Ação na operação (não precisa de código)
 
@@ -460,6 +460,7 @@ falta o olho de quem usa.
 
 ### Verificação que ninguém fez ainda
 
+- **Publicar o app (EAS Update)** com o rótulo "Resposta do COP" no histórico do contrato (D-302).
 - **Marcadores CLIENTE ATIVADO e FP2 num contrato real** (202, D-297): marcar um pelo site e ver o
   selo na linha e no app do técnico. A atualização do app (EAS Update, canal preview, runtime 0.6.0)
   foi publicada em 04/11; o técnico recebe ao fechar e abrir o app.
@@ -469,6 +470,7 @@ falta o olho de quem usa.
 
 ### Melhorias técnicas conhecidas
 
+- **Refeição "iniciado" que nunca fecha** (D-303): quem esquece de encerrar no TOA aparece almoçando até a próxima importação — às 13h de 04/11 havia "há 1h13". Um alerta de almoço longo não foi pedido.
 - **O app não percebe a localização aproximada.** O expo-location diz `accuracy: 'coarse'`; o app
   poderia pedir a precisa, em vez de a central descobrir pelo mapa (D-295).
 - **Técnico sem equipe é invisível para a gestão** (`tecnico_leitura` exige a equipe legível): a

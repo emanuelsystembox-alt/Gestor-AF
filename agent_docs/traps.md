@@ -350,6 +350,13 @@ relógio, ociosidade ou "há quanto tempo" medido nele sem essa guarda mostra o 
 número para a planilha inteira — e o defeito é **invisível em contrato único**, que é
 como ele passou. Ver D-224.
 
+**No tema claro, `emerald-700`, `sky-700` (e as 200–400/700–900 de af, amber, violet) INVERTEM.**
+`styles.css` redefine essas faixas em `[data-tema="claro"] .sup-controle` para tinta clara e texto
+escuro — só as 500/600 ficam fixas. Um chip `bg-sky-700 text-white` sai `rgb(125,211,252)` com
+branco por cima: "a cor azul ta muito apagado" (Emanuel, 04/11, a Refeição da Rota). Cor CHEIA que
+tem de ser a mesma nos dois temas vai em hex fixo (`bg-[#0369a1]`); e meça com `getComputedStyle`,
+não pelo nome da classe. Ver D-303.
+
 **Meça contraste sobre o fundo REAL do elemento, não sobre o fundo da tela.** O
 `traps.md` dizia que `graf-400` dá 5,88 — e dá, **sobre o cartão** (`graf-900`). Sobre
 um chip `graf-800`, que é mais claro, o mesmo texto cai para **4,35:1** e reprova no

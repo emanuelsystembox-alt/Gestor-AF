@@ -36,6 +36,8 @@ export const EVENTO_ROTULO: Record<string, string> = {
   OBSERVACAO_BAIXA: 'Observação da baixa',
   // 199: a sub-falha posta depois da baixa automática do TOA
   SUB_FALHA: 'Sub-falha',
+  // 207 (D-302): a resposta do COP no contrato, no mesmo status
+  RESPOSTA_COP: 'Resposta do COP',
 }
 
 export const rotuloEvento = (tipo: string) =>
@@ -59,6 +61,8 @@ export function transicaoEvento(e: {
     return partes.length ? partes.join(' · ') : null
   }
   const a = rot(e.de), b = rot(e.para)
+  // 207: a resposta no mesmo status não é transição
+  if (a && b && a === b) return `no status ${b}`
   if (a && b) return `${a} → ${b}`
   return b ?? a
 }

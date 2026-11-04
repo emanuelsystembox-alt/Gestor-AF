@@ -12438,3 +12438,70 @@ na 105, a rota do Z709503 saiu. Baterias 29/29 e 33/33; 0 DEFINER aberta ao anon
 **Não coberto:** reimportar a planilha de um dia ANTERIOR depois da troca liga o contrato ao
 registro novo (a importação acha o técnico pela matrícula) — não reimporte dia passado de um login
 que mudou de dono.
+
+### D-302 · Responder no contrato: manter o status, voltar ao anterior ou mudar (207)
+
+*"tem que da a opção para o cop responder no mesmo status (...) o campo resposta ao contrato e não
+resposta ao técnico (...) eles não estavam usando por que o cop não conseguia enviar para o mesmo
+status ai ele acaba indo para o chat abaixo, porém o chat seria para outro assunto que não fosse o
+contrato"* · *"a ideia é deixar o controlador escolher o status (...) se é para deslocamento ou para
+o prior status"* (Emanuel, 04/11).
+
+A resposta só existia como observação de uma MUDANÇA (`registrar_etapa`); o select tirava o status
+atual e o gatilho de avisos ignora SITUACAO com de = para. Agora o bloco se chama **Responder no
+contrato** e o campo **Resposta ao contrato**; o status abre com **Manter: <atual>**, **Voltar ao
+anterior: <o de antes da última mudança>** (lido do histórico) e os demais em "Mudar para". Quem
+escolhe é o controlador — não há padrão marcado.
+
+Manter = `responder_no_contrato` (207): evento **RESPOSTA_COP** (de/para = o status de agora; o
+histórico escreve "no status X"), sem tocar em `visita` — o relógio do serviço e o `bloqueado_em` não
+mudam —, e aviso OBSERVACAO "Resposta do COP no contrato" no celular. Resposta vazia é recusada; o
+técnico não usa. O botão do chat diz "outros assuntos". Testado como `authenticated` em transação
+desfeita; baterias 29/29 e 33/33.
+
+**App:** o aviso já chega sem atualizar o app; o rótulo "Resposta do COP" no histórico do contrato
+do celular precisa do próximo EAS Update (até lá aparece o código RESPOSTA_COP).
+
+### D-303 · Rota do dia: quem está almoçando, e onde ficou parado
+
+*"quando o técnico der status em almoço o sistema deve mostrar nos cards quantos estão almoçando e
+mudar a cor do almoço para verde se for o caso, depois azul claro quando ele finalizar (...) quando
+eu clicar em cima do almoço da equipe é interessante ele mostrar o intervalo do técnico de almoço
+onde ele almoçou de fato onde ele ficou parado esse tempo"* (Emanuel, 04/11).
+
+O "Status da Atividade" do TOA na Refeição diz tudo: **iniciado** = almoçando (o `inicio` é o real;
+o `fim` é início + duração prevista, não fim — D-103), **concluído** = terminou (início e fim reais),
+**pendente** = não começou. Medido às 13h de 04/11: 41 iniciado, 17 concluído, 16 pendente.
+
+- Card **Almoçando** na Rota: técnicos com Refeição iniciada agora, dentro do filtro da tela; a nota
+  diz quantos já almoçaram.
+- O chip da Refeição: **verde** em curso ("12:37–agora há 1h06"), **azul** terminado, cinza
+  tracejado planejado. Só a Refeição muda de cor; Na Base continua como era. Cor cheia em hex fixo
+  (#047857 e #0369a1, texto branco, AA nos dois temas): a 1ª versão usava a rampa translúcida, que no
+  tema claro inverte e ficou "muito apagado" (Emanuel, 04/11; traps.md).
+- Na janela, o **horário de cada ponto**: rótulo no mapa (sem repetir em pontos a menos de 30 m um
+  do outro) e a lista ao lado — hora, precisão e distância até a parada; clicar centraliza.
+- Clicar abre a janela do intervalo: planejado × de fato, duração, e o mapa do rastro do intervalo
+  (verde) com 15 min antes e depois (cinza). **Onde ficou** = o maior grupo de pontos com GPS até
+  100 m que ficaram a até 100 m um do outro — "parado de 12:41 a 13:17, num raio de 25 m"; o resto
+  é deslocamento no intervalo. A primeira versão usava o raio de TODOS os pontos e dizia "1,3 km"
+  para quem iniciou a Refeição ainda chegando ao lugar. Sem ponto, diz por quê.
+
+### D-304 · As iniciais do cliente ao lado do contrato
+
+*"ao lado do contrato mostre as iniciais do nome do cliente igual da concorrência"* (Emanuel, 04/11).
+Em Serviços e Equipes (`TabelaContratos`), ao lado do número: primeira e última palavra que contam
+("FABIO SATO" → FS; sem DE/DA/DOS/E, LTDA/ME/EIRELI/SA, FILHO/JUNIOR/NETO/SOBRINHO). O nome inteiro
+fica no mouse — a linha mostra só as iniciais, que é o que identifica sem expor (LGPD).
+
+### D-305 · Rota do dia: com um técnico em foco, o mapa é a rota dele
+
+*"melhore essa visão dos contratos, não ta legal, ta meio apagado — quando eu clico em cima de um
+nome"* (Emanuel, 04/11).
+
+Clicar no nome da faixa já filtrava o mapa, mas com a pintura da cidade: cor da equipe e encerrado a
+15% de opacidade — três bolinhas apagadas e nenhuma ordem. Em foco agora: pino **cheio com o número
+da parada**, na **cor da situação** (a legenda da faixa), e a **linha do trajeto na ordem do dia**,
+com setas (linha reta, o mesmo km da faixa). Um selo no mapa diz quantas paradas dele estão ali e
+quantas ficaram de fora por falta de coordenada do TOA. Na visão da cidade, o encerrado passou de 15%
+para 45% (sumia no mapa claro).

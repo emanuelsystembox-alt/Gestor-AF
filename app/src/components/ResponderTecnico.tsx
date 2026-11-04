@@ -117,6 +117,7 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
     }
     abrirChat(tecnicoId)
   }
+  /** '' = não escolheu; MANTER = responder no mesmo status (207); o resto é situação. */
   const [novaSituacao, setNovaSituacao] = useState('')
   const [resposta, setResposta] = useState('')
   const [respondendo, setRespondendo] = useState(false)
@@ -129,8 +130,42 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
     return ev && ev.origem === 'MOBILE' && visita.situacao === 'COM_IMPEDIMENTO' ? ev : null
   }, [eventos, visita.situacao])
 
+  /*
+   * ┌─ D-302 · o controlador escolhe: manter, voltar ou outro ───────────┐
+   * │ > "tem que da a opção para o cop responder no mesmo status (...)   │
+   * │ >  a ideia é deixar o controlador escolher o status (...) se é     │
+   * │ >  para deslocamento ou para o prior status" — Emanuel, 04/11      │
+   * │                                                                     │
+   * │ Antes o select tirava o status atual, e responder um ticket sem    │
+   * │ tirá-lo do ticket não existia — o COP ia para o chat, fora do      │
+   * │ histórico do contrato. Agora: MANTER (responder_no_contrato, 207), │
+   * │ VOLTAR ao status de antes da última mudança (lido do histórico),   │
+   * │ ou qualquer outro. A escolha é dele; a tela não escolhe sozinha.   │
+   * └─────────────────────────────────────────────────────────────────────┘
+   */
+  const anterior = useMemo(() => {
+    const ev = eventos.find(e => e.tipo === 'SITUACAO'
+      && (e.para as { situacao?: string } | null)?.situacao === visita.situacao)
+    const de = (ev?.de as { situacao?: string } | null)?.situacao as Situacao | undefined
+    return de && de !== visita.situacao && SITUACAO_INFO[de] ? de : null
+  }, [eventos, visita.situacao])
+  const manter = novaSituacao === 'MANTER'
+
   async function responder() {
     if (!novaSituacao) return
+    if (manter) {
+      if (!resposta.trim()) { setErro('Para responder no mesmo status, escreva a resposta.'); return }
+      setRespondendo(true); setErro(null); setOk(null)
+      const { error } = await supabase.rpc('responder_no_contrato',
+        { p_visita: visita.id, p_texto: resposta.trim() })
+      setRespondendo(false)
+      if (error) { setErro(error.message); return }
+      setOk('Resposta enviada — o técnico recebe como aviso no celular; o status não mudou.')
+      setNovaSituacao(''); setResposta('')
+      await aoMudar()
+      recarregarCentral()
+      return
+    }
     // Encerrado = fora de EM_ABERTO: a lista que a web já tem, sem cópia nova.
     const encerrado = !EM_ABERTO.includes(visita.situacao)
     if (encerrado && !resposta.trim()) {
@@ -158,12 +193,15 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
   const corpo = (
     <>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold">Responder ao técnico</h2>
+        <h2 className="text-sm font-semibold">Responder no contrato</h2>
+        {/* D-302: o chat é para o que NÃO é deste contrato — o que é dele
+            fica aqui, no histórico. */}
         {visita.tecnico_responsavel_id && (
           <button onClick={() => abrirConversa(visita.tecnico_responsavel_id!)}
+            title="Para assunto que não é deste contrato — o que é dele, responda aqui e fica no histórico"
             className="ml-auto rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
                        hover:border-af-600 hover:text-af-400">
-            Abrir conversa com {visita.tecnico?.nome?.split(' ')[0] ?? 'o técnico'}
+            Conversa com {visita.tecnico?.nome?.split(' ')[0] ?? 'o técnico'} · outros assuntos
           </button>
         )}
       </div>
@@ -189,28 +227,30 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
           conversa" (Emanuel, 30/10). Em 133 a ordem era a inversa ("ler,
           depois responder"); quem usa todo dia preferiu a resposta à mão.
           O pedido de ajuda continua no topo: é o que está sendo respondido. */}
-      <p className="mb-3 text-xs text-graf-400">
-        Escolha o status que faz sentido e escreva a resposta: ela chega no celular do
-        técnico como aviso, junto com a mudança. Encerrar exige todas as O.S. baixadas;
-        contrato já encerrado só volta com motivo.
-      </p>
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-44">
-          <label htmlFor={`nova-situacao-${visita.id}`} className="mb-1 block text-[11px] text-graf-400">
-            Novo status
+          <label htmlFor={`nova-situacao-${visita.id}`} className="mb-1 block text-[11px] text-graf-400"
+            title="Encerrar exige todas as O.S. baixadas; contrato encerrado só volta com motivo">
+            Status
           </label>
           <select id={`nova-situacao-${visita.id}`} value={novaSituacao}
             onChange={e => setNovaSituacao(e.target.value)}
             className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm">
             <option value="">Selecione…</option>
-            {SITUACOES.filter(s => s !== visita.situacao).map(s => (
-              <option key={s} value={s}>{SITUACAO_INFO[s].label}</option>
-            ))}
+            <option value="MANTER">Manter: {SITUACAO_INFO[visita.situacao]?.label ?? visita.situacao}</option>
+            {anterior && (
+              <option value={anterior}>Voltar ao anterior: {SITUACAO_INFO[anterior].label}</option>
+            )}
+            <optgroup label="Mudar para">
+              {SITUACOES.filter(s => s !== visita.situacao && s !== anterior).map(s => (
+                <option key={s} value={s}>{SITUACAO_INFO[s].label}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
         <div className="min-w-56 flex-1">
           <label htmlFor={`resposta-tecnico-${visita.id}`} className="mb-1 block text-[11px] text-graf-400">
-            Resposta ao técnico
+            Resposta ao contrato
           </label>
           <input id={`resposta-tecnico-${visita.id}`} value={resposta}
             onChange={e => setResposta(e.target.value)} maxLength={500}
@@ -218,10 +258,10 @@ export function ResponderTecnico({ visita, eventos, aoMudar, semMoldura }: {
             placeholder="Ex.: pode seguir, liguei para o cliente e ele está em casa"
             className="w-full rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-sm" />
         </div>
-        <button onClick={responder} disabled={!novaSituacao || respondendo}
+        <button onClick={responder} disabled={!novaSituacao || respondendo || (manter && !resposta.trim())}
           className="rounded-md bg-af-600 px-4 py-1.5 text-sm font-medium text-white
                      hover:bg-af-500 disabled:opacity-40">
-          {respondendo ? 'Enviando…' : 'Responder e mudar status'}
+          {respondendo ? 'Enviando…' : manter ? 'Responder' : 'Responder e mudar status'}
         </button>
       </div>
 
