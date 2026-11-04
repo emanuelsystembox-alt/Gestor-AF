@@ -12241,3 +12241,47 @@ Na regra comum dos filtros (`lib/filtroContratos.ts`, usada pelas duas telas): *
 `visita_marcador`). Cada opção mostra quantos contratos do dia tem; entram no "limpar filtros".
 Conferido na tela, 03/11: LOG 0 305, LOG 1 21, LOG 2+ 12, sem LOG 1; Só REV D-10 = 10 contratos
 em Serviços e 6 equipes (4+2+1+1+1+1 = 10) em Equipes; LOG 2+ deixou 12 linhas, todas LOG 2/3.
+
+### D-291 · Sub-falha depois da baixa automática do TOA (199)
+
+*"depois de baixado o técnico deve conseguir colocar as subfalhas com base no código toa baixado
+depois de concluído automático, é possível fazer sem gerar uma nova apk?"* (Emanuel, 03/11).
+
+A sub-falha só entrava pela baixa da AFLINE (`baixar_os`); no fechamento automático pelo código do
+TOA o técnico não baixa, e a O.S. ficava sem. `definir_sub_falha(p_os, p_sub_falha)` grava a
+sub-falha **do código do TOA** daquela O.S. (conjunto vigente, ativa), com as travas da observação
+depois da baixa (185, `pode_anexar_na_visita(…, false)`: escopo e, para o campo, só o contrato do
+dia). Só em O.S. com código do TOA e **sem** baixa da AFLINE — com baixa nossa, vale a sub-falha da
+baixa. Nulo apaga. Histórico: evento `SUB_FALHA` (o aviso ao técnico ignora). No app, no cartão da
+O.S.: "Escolher / Trocar sub-falha", a lista do código e "Apagar".
+
+Sem APK: função no banco + tela pelo ar (OTA preview 0.6.0, grupo 3644dada) — **só para quem está no
+APK 0.6.0**. Testado como técnico, desfeito: código 522 gravou "ETHERNET QUEIMADA (RAIO)"; sub-falha de
+outro código recusada; apagar funcionou; os dois eventos no histórico. Baterias 33/33 e 29/29.
+
+### D-292 · Marcador OUVIDORIA, automático pela planilha, em preto no site e no app (200, 201)
+
+*"ouvidoria, sobe o marcador também no app do técnico"* — perguntado, **"Criar marcador
+OUVIDORIA"**; *"ouvidoria sobe na cor preta"*; *"esse marcador você sobe automático porque lê a
+planilha"* (Emanuel, 03/11).
+
+- **200:** marcador OUVIDORIA na lista de Marcadores (ordem 9, meta 100, peso 1 — como os outros);
+  o COP pode marcar à mão.
+- **201:** entra sozinho pela coluna "Caso crítico (ouvidoria)" da planilha (`visita.ouvidoria`,
+  coluna gerada): gatilho depois de cada importação põe o marcador quando o valor passa a SIM e tira
+  só o automático quando deixa de ser. Só reage quando o valor muda — tirado à mão não volta a cada
+  importação. Testado, desfeito: ligou → 1; reimportou igual → 1; desligou → 0. Hoje: 1 contrato.
+- **Preto** na coluna do contrato do site (com aro claro: preto some no cartão escuro, traps.md) e,
+  no app, o mesmo selo "● OUVIDORIA" do caso crítico do TOA (Agenda e visita). OTA preview 0.6.0,
+  grupo 7ac4e586 — só para o APK 0.6.0.
+
+### D-293 · Rota do dia: Refeição e Na Base aparecem uma vez só
+
+*"corrija essa tela, refeição e na base aparece duas vezes em algumas linhas"* (Emanuel, 03/11).
+
+No banco não havia duplicata (Z499948: um Na Base, uma Refeição). Era a tela: cada jornada era
+encaixada "depois da parada anterior e antes desta" pelo horário de início — e contrato SEM início
+(em curso, cancelado pela central, desatribuído) fazia a conta valer para todos: a mesma jornada
+saía de novo antes dele e outra vez no fim da faixa. Agora cada jornada é colocada UMA vez, antes
+do primeiro contrato que começou depois dela; nenhum → no fim (inclusive quem só tem jornada).
+Conferido na tela: 11 faixas, 30 apontamentos, nenhum repetido.

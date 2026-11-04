@@ -22,6 +22,9 @@
 >   (195). Supervisor e coordenador conversam com a cidade (196). No app, o cancelado diz se
 >   foi Auditar ou cancelado pela central (197). Planilha do TOA sem "ID da Atividade" entra
 >   pela WO (187).
+> - Ainda em 03/11: o técnico põe a **sub-falha** depois da baixa automática (199); marcador
+>   **OUVIDORIA** automático pela planilha, preto no site e no app (200, 201); a Rota do dia não
+>   repete mais Refeição/Na Base (D-293).
 > - **O APK 0.5.0 não recebe atualização:** quem estiver nele (o Nicacio estava) não vê nada
 >   disso no app. Instalar o 0.6.0.
 

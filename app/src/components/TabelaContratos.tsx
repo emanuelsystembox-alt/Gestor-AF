@@ -614,6 +614,10 @@ export function TabelaContratos({
                           className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase
                                       tracking-wide ring-1 ${ind!.nome === 'REV D-10'
                                         ? 'bg-af-900/40 text-af-200 ring-af-700/50'
+                                        // 200: OUVIDORIA em preto ("sobe na cor preta", 03/11);
+                                        // o aro claro é estrutural — preto some no cartão escuro
+                                        : ind!.nome === 'OUVIDORIA'
+                                        ? 'bg-black text-white ring-graf-400'
                                         : 'bg-sky-900/40 text-sky-300 ring-sky-700/40'}`}>
                           {ind!.nome}
                         </span>

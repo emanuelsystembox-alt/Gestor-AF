@@ -762,14 +762,24 @@ export default function Rota() {
                         │ arrasta. É um separador que fala. Ver D-149.    │
                         └─────────────────────────────────────────────────┘ */}
                     <ol className="trilho flex flex-wrap items-stretch gap-y-1.5">
+                      {(() => {
+                        // Cada jornada entra UMA vez: antes do primeiro contrato que
+                        // começou depois dela; nenhum → no fim. Contrato sem início
+                        // (em curso, cancelado, desatribuído) não conta — com ele a
+                        // conta "depois do anterior e antes deste" valia para todos,
+                        // e Refeição/Na Base apareciam duas vezes (Emanuel, 03/11).
+                        const lugar = new Map<number, Parada[]>()
+                        const fim: Parada[] = []
+                        for (const j of t.jornada) {
+                          const i = j.inicio
+                            ? t.paradas.findIndex(p => !!p.inicio && p.inicio >= j.inicio!)
+                            : -1
+                          if (i < 0) fim.push(j)
+                          else lugar.set(i, [...(lugar.get(i) ?? []), j])
+                        }
+                        return (<>
                       {t.paradas.map((p, i) => {
-                        // A jornada que começou DEPOIS da parada anterior e
-                        // ANTES desta: é o buraco que ela explica.
-                        const antes = t.jornada.filter(j => {
-                          if (!j.inicio) return false
-                          const ant = i > 0 ? t.paradas[i - 1].inicio : null
-                          return (!ant || j.inicio > ant) && (!p.inicio || j.inicio <= p.inicio)
-                        })
+                        const antes = lugar.get(i) ?? []
                         return (
                           <Fragment key={p.visita_id}>
                             {antes.map(j => <ChipJornada key={j.visita_id} j={j} />)}
@@ -786,15 +796,11 @@ export default function Rota() {
                           </Fragment>
                         )
                       })}
-                      {/* o que ficou depois do último contrato do dia */}
-                      {t.jornada
-                        .filter(j => j.inicio && t.paradas.length > 0
-                          && j.inicio > (t.paradas[t.paradas.length - 1].inicio ?? ''))
-                        .map(j => <ChipJornada key={j.visita_id} j={j} />)}
-                      {/* técnico que só tem jornada no dia: a faixa existe
-                          e precisa dizer o que ele fez */}
-                      {t.paradas.length === 0 &&
-                        t.jornada.map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                      {/* o que ficou depois do último contrato que começou —
+                          e, para quem só tem jornada no dia, tudo */}
+                      {fim.map(j => <ChipJornada key={j.visita_id} j={j} />)}
+                        </>)
+                      })()}
                     </ol>
                   </div>
                 )

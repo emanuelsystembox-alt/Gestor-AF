@@ -345,6 +345,28 @@ export default function Visita({ route, navigation }: Props) {
     q.order('ordem').then(({ data }) => setSubFalhas((data ?? []) as SubFalha[]))
   }, [codEscolhido, conjunto])
 
+  // 199: a sub-falha da O.S. que o TOA fechou sozinho — "depois de baixado o
+  // técnico deve conseguir colocar as subfalhas com base no código toa"
+  // (Emanuel, 03/11). As opções são as do código do TOA, no conjunto vigente.
+  const [subOs, setSubOs] = useState<string | null>(null)
+  const [subOpcoes, setSubOpcoes] = useState<SubFalha[] | null>(null)
+  const [subSalvando, setSubSalvando] = useState(false)
+  async function abrirSubFalha(osId: string, codigo: number) {
+    setSubOs(osId); setSubOpcoes(null)
+    let q = supabase.from('sub_falha').select('id, nome').eq('codigo', codigo).eq('ativo', true)
+    if (conjunto) q = q.eq('conjunto', conjunto)
+    const { data } = await q.order('ordem')
+    setSubOpcoes((data ?? []) as SubFalha[])
+  }
+  async function salvarSubFalha(osId: string, subId: string | null) {
+    setSubSalvando(true)
+    const { error } = await supabase.rpc('definir_sub_falha', { p_os: osId, p_sub_falha: subId })
+    setSubSalvando(false)
+    if (error) { Alert.alert('Sub-falha', error.message); return }
+    setSubOs(null)
+    await recarregar()
+  }
+
   /*
    * ┌─ 156e · a CASA DO CLIENTE ───────────────────────────────────────┐
    * │ > "na hora que o técnico baixar no aplicativo, o sistema deve    │
@@ -377,13 +399,20 @@ export default function Visita({ route, navigation }: Props) {
   // 193: o marcador REV D-10 do contrato (texto da observação do automático,
   // ou vazio se alguém marcou à mão); nulo = não é revisita
   const [revD10, setRevD10] = useState<string | null>(null)
+  // 200: o marcador OUVIDORIA do site — o mesmo selo preto do caso crítico do TOA
+  const [ouvMarc, setOuvMarc] = useState(false)
   useEffect(() => {
     let vivo = true
     supabase.from('visita_marcador')
       .select('observacao, indicador_qualidade!inner(nome)')
-      .eq('visita_id', id).eq('indicador_qualidade.nome', 'REV D-10')
-      .maybeSingle()
-      .then(({ data }) => { if (vivo) setRevD10(data ? (data.observacao ?? '') : null) })
+      .eq('visita_id', id).in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA'])
+      .then(({ data }) => {
+        if (!vivo) return
+        const ms = (data ?? []) as unknown as { observacao: string | null; indicador_qualidade: { nome: string } }[]
+        const rev = ms.find(m => m.indicador_qualidade?.nome === 'REV D-10')
+        setRevD10(rev ? (rev.observacao ?? '') : null)
+        setOuvMarc(ms.some(m => m.indicador_qualidade?.nome === 'OUVIDORIA'))
+      })
     return () => { vivo = false }
   }, [id])
 
@@ -827,9 +856,9 @@ export default function Visita({ route, navigation }: Props) {
         )}
 
         {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). */}
-        {(!!v.ouvidoria || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null) && (
+        {(!!v.ouvidoria || ouvMarc || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null) && (
           <View style={e.marcas}>
-            <SeloOuvidoria ouvidoria={v.ouvidoria} />
+            <SeloOuvidoria ouvidoria={v.ouvidoria || ouvMarc} />
             <SeloSegmento segmento={v.segmentacao?.nome} />
             <SeloRevD10 ativo={revD10 != null} />
             <SeloTec1 tec1={v.tec1} />
@@ -1040,6 +1069,46 @@ export default function Visita({ route, navigation }: Props) {
               />
             ) : (
               <Text style={e.semAcao}>Sem baixa.</Text>
+            )}
+
+            {/* 199: fechada pelo TOA, sem baixa nossa — o técnico diz a sub-falha */}
+            {!os.baixa_afline && !!os.codigo_baixa && podeAnexar && (
+              <View style={{ marginTop: 8, gap: 6 }}>
+                <Text style={e.baixaMiudo}>
+                  Sub-falha: {os.sub_falha?.nome ?? 'não informada'}
+                </Text>
+                {subOs === os.id ? (
+                  <>
+                    {subOpcoes === null && <Text style={e.baixaMiudo}>Carregando…</Text>}
+                    {subOpcoes !== null && subOpcoes.length === 0 && (
+                      <Text style={e.baixaMiudo}>O código {os.codigo_baixa.codigo} não tem sub-falha.</Text>
+                    )}
+                    {(subOpcoes ?? []).map(sf => (
+                      <Pressable key={sf.id} disabled={subSalvando}
+                        onPress={() => salvarSubFalha(os.id, sf.id)}
+                        style={[e.opcao, os.sub_falha?.nome === sf.nome && e.opcaoAtiva]}>
+                        <Text style={[e.opcaoTexto, os.sub_falha?.nome === sf.nome && e.opcaoTextoAtivo]}>
+                          {sf.nome}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                      {!!os.sub_falha && (
+                        <Pressable hitSlop={8} disabled={subSalvando} onPress={() => salvarSubFalha(os.id, null)}>
+                          <Text style={e.trocar}>Apagar</Text>
+                        </Pressable>
+                      )}
+                      <Pressable hitSlop={8} onPress={() => setSubOs(null)}>
+                        <Text style={e.trocar}>Cancelar</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : (
+                  <Pressable hitSlop={8} onPress={() => abrirSubFalha(os.id, os.codigo_baixa!.codigo)}>
+                    <Text style={e.trocar}>{os.sub_falha ? 'Trocar sub-falha' : 'Escolher sub-falha'}</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
           </Cartao>
         ))}

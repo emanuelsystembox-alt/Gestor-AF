@@ -140,6 +140,7 @@ export default function Agenda({ navigation }: Props) {
   const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
   const [sinais, setSinais] = useState<Map<string, Sinal>>(new Map())
   const [revD10, setRevD10] = useState<Set<string>>(new Set())
+  const [ouvMarc, setOuvMarc] = useState<Set<string>>(new Set())
   const [origemCanc, setOrigemCanc] = useState<Map<string, OrigemCanc>>(new Map())
 
   const carregar = useCallback(async (dia: string) => {
@@ -155,12 +156,14 @@ export default function Agenda({ navigation }: Props) {
       const m = new Map<string, Sinal>()
       for (const x of (s ?? []) as Sinal[]) m.set(x.visita_id, x)
       setSinais(m)
-      // 193: quais têm o marcador REV D-10 (automático ou manual)
+      // 193/200: os marcadores que o técnico vê — REV D-10 e OUVIDORIA
       const { data: mk } = await supabase.from('visita_marcador')
         .select('visita_id, indicador_qualidade!inner(nome)')
         .in('visita_id', ls.map(l => l.visita_id))
-        .eq('indicador_qualidade.nome', 'REV D-10')
-      setRevD10(new Set(((mk ?? []) as { visita_id: string }[]).map(x => x.visita_id)))
+        .in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA'])
+      const marcas = (mk ?? []) as unknown as { visita_id: string; indicador_qualidade: { nome: string } }[]
+      setRevD10(new Set(marcas.filter(x => x.indicador_qualidade?.nome === 'REV D-10').map(x => x.visita_id)))
+      setOuvMarc(new Set(marcas.filter(x => x.indicador_qualidade?.nome === 'OUVIDORIA').map(x => x.visita_id)))
       // 197: para onde foi o cancelado — Auditar ou cancelado pela central
       const canc = ls.filter(l => l.situacao === 'CANCELADA').map(l => l.visita_id)
       if (canc.length) {
@@ -168,7 +171,7 @@ export default function Agenda({ navigation }: Props) {
         setOrigemCanc(new Map(((oc ?? []) as { visita_id: string; origem: OrigemCanc | null }[])
           .filter(x => x.origem).map(x => [x.visita_id, x.origem!])))
       } else setOrigemCanc(new Map())
-    } else { setSinais(new Map()); setRevD10(new Set()); setOrigemCanc(new Map()) }
+    } else { setSinais(new Map()); setRevD10(new Set()); setOuvMarc(new Set()); setOrigemCanc(new Map()) }
   }, [])
 
   useEffect(() => {
@@ -622,12 +625,13 @@ export default function Agenda({ navigation }: Props) {
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
                 muda como ele trata o cliente. */}
             {(!!l.ouvidoria || !!l.segmento || !!l.tec1 || !!sinais.get(l.visita_id)?.edificacao
-              || !!sinais.get(l.visita_id)?.revisita || revD10.has(l.visita_id)) && (
+              || !!sinais.get(l.visita_id)?.revisita || revD10.has(l.visita_id) || ouvMarc.has(l.visita_id)) && (
               <View style={e.marcas}>
                 <SeloRevisita revisita={sinais.get(l.visita_id)?.revisita}
                   motivo={sinais.get(l.visita_id)?.revisita_motivo} />
                 <SeloEdificacao edificacao={sinais.get(l.visita_id)?.edificacao} />
-                <SeloOuvidoria ouvidoria={l.ouvidoria} />
+                {/* 200: o caso crítico do TOA OU o marcador OUVIDORIA do site — o mesmo selo preto */}
+                <SeloOuvidoria ouvidoria={l.ouvidoria || ouvMarc.has(l.visita_id)} />
                 <SeloSegmento segmento={l.segmento} />
                 <SeloRevD10 ativo={revD10.has(l.visita_id)} />
                 <SeloTec1 tec1={l.tec1} />

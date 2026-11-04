@@ -463,9 +463,19 @@ falta o olho de quem usa.
 - A carga do ngestor nos relatórios de meses passados (pontos pelas regras de hoje, TEC1 do
   "Tec Um"; 873 contratos sem área e 742 O.S. sem tipo).
 
+### Depois da 198, no mesmo dia (199 a 201, D-291 a D-293)
+
+- **Sub-falha depois da baixa automática do TOA** (199): o técnico escolhe no app, pelo código do TOA
+  da O.S. — ninguém testou na tela do celular (só a função, como técnico).
+- **Marcador OUVIDORIA** (200, 201): manual no site e automático pela coluna "Caso crítico
+  (ouvidoria)" da planilha; preto no site e no app — ninguém viu o selo no celular.
+- **Rota do dia** sem jornada repetida (D-293).
+- Os dois itens do app só chegam a quem tem o **APK 0.6.0**.
+
 ### Melhorias técnicas conhecidas
 
 - Cenário em `testar_campo()` para `observar_baixa` (185).
+- Cenário em `testar_campo()` para `definir_sub_falha` (199).
 - **A EAS reescreve o `campo/app.json` a cada `eas update`** (permissões duplicadas e um segundo
   `runtimeVersion`) — em 03/11 aconteceu em todas as publicações e o arquivo foi restaurado de
   cópia. Ver em `traps.md`; vale achar a configuração que impede.

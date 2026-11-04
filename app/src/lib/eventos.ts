@@ -34,6 +34,8 @@ export const EVENTO_ROTULO: Record<string, string> = {
   CONTATO:         'Melhor contato do cliente',
   // 185: a observação escrita depois da baixa (o texto anterior vai no `de`).
   OBSERVACAO_BAIXA: 'Observação da baixa',
+  // 199: a sub-falha posta depois da baixa automática do TOA
+  SUB_FALHA: 'Sub-falha',
 }
 
 export const rotuloEvento = (tipo: string) =>
