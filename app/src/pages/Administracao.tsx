@@ -737,6 +737,25 @@ export default function Administracao() {
    * │ palpite da tela.                                                  │
    * └───────────────────────────────────────────────────────────────────┘
    */
+  /** D-300: liga/desliga o supervisor em campo (migrations 204 e 205). */
+  async function alternarEmCampo(u: Usuario, ligar: boolean) {
+    if (!ligar && !confirm(`Tirar ${u.nome} de campo?
+
+O login TOA dele deixa de rotear para a equipe própria `
+        + '(o que já foi para lá fica), e ele perde as travas e as permissões de técnico. Continua supervisor.')) return
+    setChaveOcupada(`campo:${u.id}`); setErro(null); setOk(null)
+    const { data, error } = await supabase.rpc('supervisor_em_campo', { p_usuario: u.id, p_ligar: ligar })
+    if (error) setErro(traduzir(error.message))
+    else {
+      const r = data as { em_campo: boolean; equipe?: string; login: string }
+      setOk(r.em_campo
+        ? `${u.nome} em campo: login ${r.login} roteando para ${r.equipe}. No app, sair e entrar de novo para valer.`
+        : `${u.nome} fora de campo. Continua supervisor.`)
+    }
+    await recarregar()
+    setChaveOcupada(null)
+  }
+
   async function alternarRoteamento(u: Usuario) {
     const login = u.tecnico?.matricula?.trim().toUpperCase()
     if (!login) return
@@ -1394,6 +1413,35 @@ export default function Administracao() {
                                       <strong className="tabular text-graf-300">
                                         {sv.tecnicos}</strong> técnico(s) abaixo
                                     </span>
+                                    {/* D-300: a chave "em campo" — a equipe própria, o login
+                                        TOA roteando para ela, o papel e as travas do técnico */}
+                                    {(papeisPorUsuario.get(u.id) ?? []).includes('SUPERVISOR') && (() => {
+                                      const emCampo = (papeisPorUsuario.get(u.id) ?? []).includes('TECNICO')
+                                      const ocupada = chaveOcupada === `campo:${u.id}`
+                                      return (
+                                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                                          <button role="switch" aria-checked={emCampo}
+                                            disabled={!souAdmin || ocupada || !u.tecnico_id}
+                                            onClick={() => alternarEmCampo(u, !emCampo)}
+                                            title={!u.tecnico_id
+                                              ? 'Sem login TOA — cadastre em Editar primeiro'
+                                              : emCampo
+                                                ? 'Desligar: sai da rota, perde as travas e as permissões do técnico'
+                                                : 'Ligar: a rota do login TOA dele cai na equipe própria, com as travas do técnico'}
+                                            className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full
+                                                        transition disabled:opacity-40 ${emCampo ? 'bg-emerald-600' : 'bg-graf-700'}`}>
+                                            <span className={`ml-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                                              emCampo ? 'translate-x-4' : 'translate-x-0'}`} />
+                                          </button>
+                                          <span className="text-[11px] leading-tight">
+                                            {ocupada ? <span className="text-graf-400">aplicando…</span>
+                                              : emCampo
+                                                ? <><span className="text-emerald-400">em campo</span> · rota e app como técnico</>
+                                                : <span className="text-graf-400">em campo: desligado</span>}
+                                          </span>
+                                        </div>
+                                      )
+                                    })()}
                                   </div>
                                 )
                               })()}

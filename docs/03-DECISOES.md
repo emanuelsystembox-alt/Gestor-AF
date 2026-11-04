@@ -12304,3 +12304,137 @@ duplicado"*), pela exclusão definitiva registrada (12 em São Luís, 2 em Manau
 jornada que some da planilha do bucket deve sair sozinha (a D-191 deixou jornada de fora de
 propósito)? E a importação deveria recusar arquivo cujo nome diz outro dia que o dia de atuação
 (hoje a prévia só avisa, D-166)?
+
+### D-295 · O mapa da baixa numa janela, em Serviços e Equipes
+
+*"um botão onde é a casa do cliente, e onde o técnico bateu, o sistema mostrar em um pop up de um
+mapa, qual a distancia que ele bateu da casa do cliente, onde ele estava, e é bom ter o botão onde
+o técnico ta dizendo que de fato é a casa do cliente"* (Emanuel, 04/11).
+
+Toda linha (fora jornada) de `TabelaContratos` tem o botão **⌖ mapa**; onde já há selo de distância,
+o próprio selo abre a janela (antes abria o Google Maps numa aba). No mapa: **C** a casa do TOA com o
+raio da baixa; **M** a casa marcada pelo técnico nesta visita (ou, sem ela, a última do mesmo
+contrato no mesmo endereço, dita "visita anterior"); **B** cada baixa/encerramento do app com GPS;
+**R** o ponto do rastro que `local_da_baixa` escolheu na baixa do TOA; em cinza, os pontos do rastro
+da execução. Cada um com a SUA distância até a casa do TOA — a referência continua a da D-281. A
+janela não tem regra própria de "no raio": o selo da linha continua sendo `local_da_baixa`.
+
+**Sem posição, a janela diz por quê** (regra 6). Caso real de 04/11: o Kainan (Z538227, Manaus)
+aparecia "com sinal" e nenhum contrato tinha selo. Os 26 pontos do dia vieram com **±2.000 m** e
+coordenada em grade de ~2 km — o Android com a "localização precisa" desligada para o app; o rastro
+descarta acima de 100 m (`rastro_precisao_max_m`). Era o único técnico assim no dia (23 com rastro).
+A janela agora escreve "só pontos aproximados" e o caminho no Android. **Contrato em aberto** (mesmo dia, *"esse fora do [raio] era bom mostrar onde pegou a localização da
+equipe"*): o selo "fora do raio · 5,1 km" da aproximação (190) também abre a janela, que mostra **T** (o
+último ponto, o mesmo do selo), **P** (o ponto do rastro com GPS bom mais perto da casa) e a trilha em
+linha, até agora. No caso que motivou (222308897): esteve a 16 m às 10:20 e saiu — o selo só dizia
+onde ele está, não se esteve lá. **Em aberto:** o app do
+campo detectar a permissão aproximada (`accuracy: 'coarse'` do expo-location) e pedir a precisa.
+
+### D-296 · Evidência e taxa de conclusão: só contrato encerrado
+
+*"vamos fazer isso com os contratos encerrados apenas, os que estão aberto não entra no calculo
+desses 2 card"* (Emanuel, 04/11). Muda a 155, que deixava o aberto no denominador e só o separava
+no apoio. Encerrado = `situacoes_terminais()` (Concluída, Cancelada, Reagendamento); cancelado pela
+central e desatribuído já estavam fora (D-152). Os em aberto aparecem no apoio como "fora da
+conta". Medido em Manaus, 04/11 de manhã: conclusão de 17,8% (57 de 321) para 77,0% (57 de 74);
+evidência 12,2% (9 de 74). A lista "ver quem não registrou" passa a ter só encerrados.
+
+### D-297 · Marcadores CLIENTE ATIVADO (azul claro) e FP2 (laranja claro) (202)
+
+*"Adicione os dois marcadores também, Cliente ativado vai ser um azul claro, e fp2 um laranja claro
+ok quando for inserido, técnico deve visualizar também igual o rev - 10 dias"* (Emanuel, 04/11).
+
+Manuais, como o OUVIDORIA (200): entram no catálogo `indicador_qualidade` (ordem 10 e 11) e o COP
+marca pelo site. A cor mora na tela, como a dos outros (a tabela não tem cor): na web, selo cheio
+(`bg-sky-200` / `bg-orange-200`) para não confundir com o azul escuro translúcido dos demais
+marcadores; no app, as mesmas cores, na Agenda e no contrato, ao lado do REV D-10. "Igual o REV" =
+o técnico vê o selo; nenhum marcador manda aviso no sino, e este também não.
+
+### D-298 · Nova O.S.: o número do contrato já traz o cadastro
+
+*"quando eu colocasse o contrato do cliente a ideia era puxar os dados automatico e o usuario
+cadastrar apenas as o.s ou o que tivesse pendente, mais não obrigatorio"* (Emanuel, 04/11).
+
+Digitou o contrato (5+ caracteres), 500 ms depois a tela procura o atendimento mais recente com
+aquele número EXATO e preenche nome, pessoa, residência, telefones, endereço, CEP, node e área.
+Só preenche o que está vazio (ou com o padrão MANAUS/AM, ou o que ela mesma pôs antes — trocar o
+número troca o cadastro); o que a pessoa digitou fica. Nada passou a ser obrigatório: continua
+contrato + uma O.S. A linha abaixo do campo diz de que dia veio a cópia, ou que o contrato não tem
+atendimento anterior. A busca por nome/contrato do topo continua.
+
+### D-299 · A agenda do app é a da equipe do técnico, mesmo quando o login é da gestão (203)
+
+*"o supervisor precisou ir para campo o supervisor pedro de Manaus (...) quero passar rota pra ele,
+ele vai usar o app igual ao técnico, mais ele ainda continua sendo supervisor"* (Emanuel, 04/11).
+
+A equipe própria do supervisor já existia (067, D-133): **SUP-PEDRO**, que a tela mostra como
+"PEDRO CAMPOS". Faltava o app: `agenda_do_campo` lia `equipes_visiveis()`, que para o supervisor
+são todas as equipes dele — como o Pedro, em 04/11, **47 contratos de 8 equipes**. Agora o login
+ligado a um técnico que tem equipe vê só os contratos dessa equipe (testado: 1 contrato passado
+para SUP-PEDRO → 1 na agenda). Para o técnico comum a conta é a mesma (Kainan: 8 = 8). No site o
+supervisor continua supervisor. Medido: só 2 logins de gestão têm técnico ligado (Pedro e Adarlan),
+os dois sem equipe — ninguém mais mudou. Baterias: 29/29 e 33/33.
+
+**Lembrete do que já vale:** o supervisor não é "campo" (não tem só o papel do campo), então as
+travas de GPS da baixa (055) não valem para ele, e a pesquisa de humor não aparece. E transferir
+não fixa a rota (D-257): para segurar o contrato com ele, desligar "Roteamento do TOA".
+
+### D-300 · A chave "em campo" do supervisor: rota, app e travas do técnico (204, 205)
+
+*"quando precisamos dele em campo deve ter um chaveamento pra ele, pra puxar os contratos na linha
+dele, até por que vamos da um login pra ele"* · *"As travas de GPS da baixa não valem para ele (...)
+habilita por favor"* (Emanuel, 04/11, sobre o Pedro Campos).
+
+Em Administração, na linha do supervisor, a chave **"em campo"** (só ADMIN — ela dá papel). Ligada,
+numa transação (`supervisor_em_campo`): a equipe própria (067/D-133, criada se faltar); o técnico do
+login nela; a matrícula (login TOA) **roteando** para ela pelo mesmo `cadastrar_login_da_equipe`
+(autor = quem ligou; os contratos já importados desse login vão para lá); o papel TECNICO; e as
+permissões `servicos.baixar` e `servicos.anexar`, que o perfil Supervisor não tem. Desligada,
+desfaz tudo (o que já foi para a equipe dele fica lá). Ele continua supervisor o tempo todo.
+
+**As travas.** A 204 achou que o papel bastava — o arquivo da 055 diz "campo = TECNICO e não
+gestor". O banco dizia outra coisa: as 8 funções das travas tiram também CONTROLADOR e SUPERVISOR.
+Pego no teste (v_campo continuava falso) — de novo o arquivo atrasado em relação ao banco. A 205
+regera as 8 do banco trocando só a expressão: o supervisor sai da exceção quando
+`supervisor_esta_em_campo()` (papel TECNICO + técnico na equipe própria). Controlador e coordenador
+continuam fora das travas. Medido: ninguém tinha TECNICO junto com SUPERVISOR/CONTROLADOR/COORDENADOR.
+Testado como `authenticated`, em transação desfeita: sem GPS → "Ligue a localizacao do celular";
+com GPS → baixa; desligada → volta ao que era; não-admin → recusado. Baterias 29/29 e 33/33; 0
+DEFINER aberta ao anon.
+
+**Recusado / dito:** com a chave ligada as travas valem também no site (o banco não sabe de que
+tela veio). A agenda do app é a da equipe dele (203, D-299).
+
+### D-301 · Trocar ou tirar o login TOA de um acesso — e o passado tem dono (206)
+
+*"eu quero da o pedro outro login pra ele usar como técnico porém sistema não ta deixando editar (...)
+eu salvo outro login ele acaba puxando o antigo, a mesma coisa também eu tiro de um técnico pra ele
+ficar sem e não apaga"* · *"lembrando que o espelhamento da rota é so pra hoje, não é para mudar os
+donos das baixas de dias anteriores"* (Emanuel, 04/11).
+
+**Os defeitos.** (1) TROCAR: o Editar fazia o upsert do técnico (`cadastrar_tecnico_avulso`) antes
+do vínculo; com o login de outra pessoa, regravou o NOME e a EQUIPE dela (15:45: Z476988, do Thiago
+Menezes de Souza, virou "pedro campos de oliveira" em SUP-PEDRO) e o vínculo era recusado — o Pedro
+ficava no login antigo. Nenhum contrato mudou de equipe. Restaurado na 206 (nome e equipe 105 — 12
+dos 18 contratos dele, o roteamento até 03/11 e o supervisor da lista apontam para ela). (2) TIRAR:
+com o campo vazio a tela não chamava nada.
+
+**A porta nova:** `definir_login_toa_do_usuario` confere o dono ANTES de gravar (recusa dizendo de
+quem é e o que fazer), troca ou solta, e religa a chave "em campo" (D-300) em volta da troca.
+
+**O passado tem dono.** O `tecnico` é o login do TOA; passar o login a outra pessoa no mesmo
+registro poria o nome novo nas baixas antigas. Se o registro tem contrato de dia anterior com OUTRO
+nome, ele é aposentado com o histórico (matrícula `Z476988-ATE-031126`, DESLIGADO) e quem recebe
+ganha registro novo; só os contratos de HOJE em diante passam. E as duas portas do roteamento
+passam a valer de hoje: `cadastrar_login_da_equipe` (antes: desde a primeira visita do login,
+levando o histórico para a equipe — **muda a regra da 042, que dizia "senão o histórico fica
+órfão"**) e `cadastrar_tecnico_avulso` (religava contrato de qualquer dia).
+
+Testado em transação desfeita, o fluxo inteiro: dar Z476988 ao Pedro antes de tirar do Thiago →
+recusado com o recado; tirar do Thiago → solto; dar ao Pedro → registro antigo com as 12 baixas do
+Thiago, registro novo com os 6 de hoje, rota Z476988 → SUP-PEDRO desde 04/11, os de 01/11 ficaram
+na 105, a rota do Z709503 saiu. Baterias 29/29 e 33/33; 0 DEFINER aberta ao anon.
+
+**Não coberto:** reimportar a planilha de um dia ANTERIOR depois da troca liga o contrato ao
+registro novo (a importação acha o técnico pela matrícula) — não reimporte dia passado de um login
+que mudou de dono.

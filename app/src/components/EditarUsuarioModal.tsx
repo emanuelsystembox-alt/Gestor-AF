@@ -411,33 +411,45 @@ export function EditarUsuarioModal({
     }
 
     // ---- 3. o técnico: operação, equipe, skill, login ----
+    // D-301 (206): TROCAR ou TIRAR o login é uma porta só no banco, que
+    // confere o dono ANTES de gravar. Antes a tela fazia o upsert do técnico
+    // primeiro — com o login de outra pessoa, renomeava o técnico dela — e,
+    // com o campo vazio, não fazia nada. O passado tem dono: só os contratos
+    // de hoje em diante mudam para quem recebe o login.
     const login = f.login_toa.trim()
-    if (login) {
+    const loginAntes = (usuario.tecnico?.matricula ?? '').trim()
+    if (login.toUpperCase() !== loginAntes.toUpperCase()) {
+      const { data, error: el } = await supabase.rpc('definir_login_toa_do_usuario', {
+        p_usuario: usuario.id, p_login: login,
+        p_equipe_id: f.equipe_id || null, p_base_id: f.base_id || null,
+      })
+      if (el) recados.push(`login TOA não alterado: ${traduzir(el.message)}`)
+      else {
+        const r = data as { acao: string; login?: string; login_anterior?: string | null
+                            aposentado?: boolean; contratos_de_hoje?: number; em_campo?: boolean }
+        if (r.acao === 'tirado') recados.push(`login TOA ${r.login_anterior ?? ''} tirado deste acesso`)
+        else if (r.acao === 'trocado') {
+          recados.push(`login TOA agora é ${r.login}`
+            + (r.contratos_de_hoje ? ` (${r.contratos_de_hoje} contrato(s) de hoje vieram junto)` : '')
+            + (r.aposentado ? '; o histórico dos dias anteriores ficou com quem tinha o login' : '')
+            + (r.em_campo ? '; em campo, roteando para a equipe própria' : ''))
+        }
+      }
+    } else if (login) {
+      // mesmo login: só operação e equipe do técnico
       const { error: ec } = await supabase.rpc('cadastrar_tecnico_avulso', {
         p_matricula: login,
         p_nome: f.nome.trim(),
         p_equipe_id: f.equipe_id || null,
         p_base_id: f.base_id || null,
       })
-      if (ec) {
-        recados.push(`o técnico não foi atualizado: ${traduzir(ec.message)}`)
-      } else {
-        recados.push('técnico atualizado')
-        // Vincular só quando o login MUDOU: a função recusa técnico que
-        // já é de outro acesso, e repetir o vínculo existente só
-        // gastaria uma viagem.
-        if (login.toUpperCase() !== (usuario.tecnico?.matricula ?? '').toUpperCase()) {
-          const { error: ev } = await supabase.rpc('vincular_tecnico_ao_usuario',
-            { p_usuario: usuario.id, p_login_toa: login })
-          if (ev) recados.push(`vínculo não feito: ${traduzir(ev.message)}`)
-          else recados.push(`vinculado ao login ${login.toUpperCase()}`)
-        }
-        if (f.skill) {
-          const { error: es } = await supabase.rpc('definir_skill_tecnico',
-            { p_login_toa: login, p_skill: f.skill })
-          if (es) recados.push(`skill não gravada: ${traduzir(es.message)}`)
-        }
-      }
+      if (ec) recados.push(`o técnico não foi atualizado: ${traduzir(ec.message)}`)
+      else recados.push('técnico atualizado')
+    }
+    if (login && f.skill) {
+      const { error: es } = await supabase.rpc('definir_skill_tecnico',
+        { p_login_toa: login, p_skill: f.skill })
+      if (es) recados.push(`skill não gravada: ${traduzir(es.message)}`)
     }
 
     // ---- 3b. permissões do login (157a) ----

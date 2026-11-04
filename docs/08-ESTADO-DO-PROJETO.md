@@ -431,6 +431,52 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 206, D-295 a D-301)
+
+### Ação na operação (não precisa de código)
+
+- **Kainan (Z538227, Manaus): ligar a "localização precisa"** no Android (Configurações › Apps › o
+  aplicativo › Permissões › Localização › "Usar localização precisa"). Os 26 pontos de 04/11 vieram
+  com ±2.000 m; o rastro descarta acima de 100 m e nenhum contrato dele teve local da baixa (D-295).
+- **Pedro Campos em campo:** em Administração, ligar a chave **"em campo"** na linha dele (só ADMIN).
+  Depois ele sai e entra de novo no app. Para passar rota à mão: Serviços › transferir para
+  **PEDRO CAMPOS** e desligar "Roteamento do TOA" do contrato (D-257) — o que vier do TOA no login
+  dele já cai lá sozinho (D-300).
+- **Login do Pedro → Z476988 (o do Thiago)** (D-301): primeiro Editar **THIAGO** › apagar o Login TOA
+  › Salvar; depois Editar **PEDRO** › Login TOA = Z476988 › Salvar. As 12 baixas antigas ficam com o
+  Thiago; os contratos de hoje do login vão para o Pedro. A chave "em campo" acompanha a troca.
+  Não reimportar planilha de dia anterior desse login depois da troca.
+- **Se o login TOA do Pedro NÃO for Z709503** (a matrícula que está no técnico dele hoje): trocar em
+  Editar ANTES de ligar a chave — ela roteia a matrícula que estiver no cadastro.
+
+### Depende do Emanuel
+
+- **Renan (coordenador, São Luís) sem "Nova área / Nova garagem":** banco e tela liberam (testado
+  como ele: `eh_gestao` verdadeiro, a função aceita, a tela não esconde). Falta o print da tela de
+  Monitoramento DELE — suspeita: o mapa do Google não carregou para ele (os botões ficam apagados
+  com o aviso amarelo) ou ele não rolou até o quadro.
+- **Adarlan (supervisor):** tem técnico ligado, sem equipe — a mesma chave serve para ele, se for
+  a campo.
+
+### Verificação que ninguém fez ainda
+
+- **Marcadores CLIENTE ATIVADO e FP2 num contrato real** (202, D-297): marcar um pelo site e ver o
+  selo na linha e no app do técnico. A atualização do app (EAS Update, canal preview, runtime 0.6.0)
+  foi publicada em 04/11; o técnico recebe ao fechar e abrir o app.
+- **O mapa da baixa logado como supervisor/coordenador** (D-295): só foi testado como ADMIN.
+- **A chave "em campo" ligada de verdade** (204/205): testada em transação desfeita (rota, papel,
+  permissões, trava de GPS recusando sem GPS e aceitando com GPS). Ligar pela tela não foi feito.
+
+### Melhorias técnicas conhecidas
+
+- **O app não percebe a localização aproximada.** O expo-location diz `accuracy: 'coarse'`; o app
+  poderia pedir a precisa, em vez de a central descobrir pelo mapa (D-295).
+- **Técnico sem equipe é invisível para a gestão** (`tecnico_leitura` exige a equipe legível): a
+  linha do usuário em Administração mostra "outra cidade" no Segmento, o que é falso — é "sem
+  equipe". Corrigir é mexer em RLS (baterias). Ver D-232.
+- **Com a chave "em campo" ligada, as travas valem também no SITE** (o banco não sabe de que tela
+  veio): baixa pela web sem GPS é recusada. Para agir como supervisor sem travas, desligar a chave.
+
 ## Pendente depois da 198 — 03/11/2026 (D-272 a D-290)
 
 ### Ação na operação (não precisa de código)

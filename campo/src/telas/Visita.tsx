@@ -18,7 +18,7 @@ import {
 import { escolherDaGaleria } from '../lib/galeria'
 import { VisorEvidencia } from '../ui/VisorEvidencia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
-import { SeloOuvidoria, SeloRevD10, SeloSegmento, SeloTec1 } from '../ui/MarcasCliente'
+import { NOMES_MARCADORES_COR, SeloOuvidoria, SeloRevD10, SeloSegmento, SeloTec1, SelosMarcadores } from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
@@ -401,17 +401,20 @@ export default function Visita({ route, navigation }: Props) {
   const [revD10, setRevD10] = useState<string | null>(null)
   // 200: o marcador OUVIDORIA do site — o mesmo selo preto do caso crítico do TOA
   const [ouvMarc, setOuvMarc] = useState(false)
+  // D-297: CLIENTE ATIVADO e FP2
+  const [outrasMarc, setOutrasMarc] = useState<string[]>([])
   useEffect(() => {
     let vivo = true
     supabase.from('visita_marcador')
       .select('observacao, indicador_qualidade!inner(nome)')
-      .eq('visita_id', id).in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA'])
+      .eq('visita_id', id).in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA', ...NOMES_MARCADORES_COR])
       .then(({ data }) => {
         if (!vivo) return
         const ms = (data ?? []) as unknown as { observacao: string | null; indicador_qualidade: { nome: string } }[]
         const rev = ms.find(m => m.indicador_qualidade?.nome === 'REV D-10')
         setRevD10(rev ? (rev.observacao ?? '') : null)
         setOuvMarc(ms.some(m => m.indicador_qualidade?.nome === 'OUVIDORIA'))
+        setOutrasMarc(ms.map(m => m.indicador_qualidade?.nome).filter(n => NOMES_MARCADORES_COR.includes(n)))
       })
     return () => { vivo = false }
   }, [id])
@@ -856,11 +859,12 @@ export default function Visita({ route, navigation }: Props) {
         )}
 
         {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). */}
-        {(!!v.ouvidoria || ouvMarc || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null) && (
+        {(!!v.ouvidoria || ouvMarc || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null || outrasMarc.length > 0) && (
           <View style={e.marcas}>
             <SeloOuvidoria ouvidoria={v.ouvidoria || ouvMarc} />
             <SeloSegmento segmento={v.segmentacao?.nome} />
             <SeloRevD10 ativo={revD10 != null} />
+            <SelosMarcadores nomes={outrasMarc} />
             <SeloTec1 tec1={v.tec1} />
           </View>
         )}

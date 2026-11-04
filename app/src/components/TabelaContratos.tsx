@@ -11,6 +11,7 @@ import { SeloLog } from './SeloLog'
 import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 import { idadeMin, tendencia, useAproximacao, type Aproximacao } from '../lib/aproximacao'
+import { BotaoMapa, MapaDaBaixa, type AlvoMapa } from './MapaDaBaixa'
 
 /**
  * A linha de contrato — uma só, para as duas telas.
@@ -267,7 +268,11 @@ export function corBaixaAfline(natureza: string | null | undefined): string {
  * Sem coordenada do endereço, diz isso — não pinta de verde o que não
  * sabe (regra 6). Clicar abre o mapa com os dois pontos.
  */
-export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; compacto?: boolean }) {
+export function SeloLocal({ local, compacto = false, aoAbrir }: {
+  local: LocalBaixa; compacto?: boolean
+  /** D-295: com ele, o clique abre a janela do mapa em vez do Google Maps numa aba. */
+  aoAbrir?: () => void
+}) {
   const fora = local.fora_do_raio === true
   const semEndereco = local.distancia_m == null
   const prec = local.precisao_m != null ? ` ±${Math.round(Number(local.precisao_m))} m` : ''
@@ -297,7 +302,10 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
       : 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/50'
   return (
     <a href={linkMapaDaBaixa(local)} target="_blank" rel="noreferrer"
-      onClick={e => e.stopPropagation()} title={titulo}
+      onClick={e => {
+        e.stopPropagation()
+        if (aoAbrir) { e.preventDefault(); aoAbrir() }
+      }} title={titulo}
       className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold
                   ring-1 hover:brightness-125 ${cor}`}>
       <span aria-hidden>⌖</span>
@@ -315,7 +323,15 @@ export function SeloLocal({ local, compacto = false }: { local: LocalBaixa; comp
  * No deslocamento, se a distância está diminuindo; na execução, se está no
  * raio. Ponto com mais de 10 min diz a idade — app fechado não é "parado".
  */
-export function SeloAproximacao({ a, compacto = false }: { a: Aproximacao; compacto?: boolean }) {
+export function SeloAproximacao({ a, compacto = false, aoAbrir }: {
+  a: Aproximacao; compacto?: boolean
+  /** D-295: com ele, o clique abre a janela do mapa (onde ele está, a trilha e a casa). */
+  aoAbrir?: () => void
+}) {
+  const clique = (e: MouseEvent) => {
+    e.stopPropagation()
+    if (aoAbrir) { e.preventDefault(); aoAbrir() }
+  }
   const idade = idadeMin(a)
   const velho = idade > 10
   const prec = a.precisao_m != null ? ` (GPS ±${Math.round(Number(a.precisao_m))} m)` : ''
@@ -327,7 +343,7 @@ export function SeloAproximacao({ a, compacto = false }: { a: Aproximacao; compa
 
   if (a.distancia_m == null) {
     return (
-      <a href={mapa} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+      <a href={mapa} target="_blank" rel="noreferrer" onClick={clique}
         title={`Último ponto do técnico ${quando}${prec}, mas o endereço veio do TOA sem coordenada — não dá para medir.`}
         className="inline-flex items-center gap-1 rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-semibold text-graf-300 ring-1 ring-graf-600/50 hover:brightness-125">
         <span aria-hidden>◎</span>sem coord. do endereço
@@ -368,7 +384,7 @@ export function SeloAproximacao({ a, compacto = false }: { a: Aproximacao; compa
     + `Raio: ${a.raio_m} m. Clique para ver no mapa.`
 
   return (
-    <a href={mapa} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title={titulo}
+    <a href={mapa} target="_blank" rel="noreferrer" onClick={clique} title={titulo}
       className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 hover:brightness-125 ${cor}`}>
       <span aria-hidden>◎</span>
       {!compacto && <span className="uppercase tracking-wide">{rotulo} ·</span>}
@@ -414,6 +430,8 @@ export function TabelaContratos({
   const aproximacao = useAproximacao(linhas
     .filter(l => l.situacao === 'EM_DESLOCAMENTO' || l.situacao === 'EM_EXECUCAO')
     .map(l => l.id))
+  // D-295: o contrato cujo mapa da baixa está aberto
+  const [mapaDe, setMapaDe] = useState<AlvoMapa | null>(null)
   const temSelecao = !!(selecionados && aoSelecionar)
   const todosMarcados = temSelecao && linhas.length > 0
     && linhas.every(l => selecionados!.has(l.id))
@@ -448,7 +466,10 @@ export function TabelaContratos({
     }, 250)
   }
 
-  return (
+  return (<>
+    {/* Fora da tabela: o portal herda os eventos do pai no React, e dentro
+        da linha o clique no mapa abriria o contrato. */}
+    {mapaDe && <MapaDaBaixa alvo={mapaDe} onFechar={() => setMapaDe(null)} />}
     <table className="w-full text-sm">
       <thead className="border-b border-graf-700 bg-graf-900 text-left
                         text-[11px] uppercase tracking-wide text-graf-400">
@@ -618,6 +639,13 @@ export function TabelaContratos({
                                         // o aro claro é estrutural — preto some no cartão escuro
                                         : ind!.nome === 'OUVIDORIA'
                                         ? 'bg-black text-white ring-graf-400'
+                                        // D-297: CLIENTE ATIVADO azul claro, FP2 laranja claro
+                                        // (Emanuel, 04/11) — cheios, para não confundir com o
+                                        // azul escuro translúcido dos outros marcadores
+                                        : ind!.nome === 'CLIENTE ATIVADO'
+                                        ? 'bg-sky-200 text-sky-900 ring-sky-400'
+                                        : ind!.nome === 'FP2'
+                                        ? 'bg-orange-200 text-orange-900 ring-orange-400'
                                         : 'bg-sky-900/40 text-sky-300 ring-sky-700/40'}`}>
                           {ind!.nome}
                         </span>
@@ -728,15 +756,23 @@ export function TabelaContratos({
                 })()}
                 {/* Onde baixou (096). Ao lado da situação porque é a
                     pergunta que vem junto dela: "concluiu — e estava lá?" */}
-                {locais?.get(v.id) && (
+                {/* D-295: o selo (ou, sem ele, o botão) abre a janela do mapa —
+                    casa do TOA, casa marcada pelo técnico e onde baixou. */}
+                {locais?.get(v.id) ? (
                   <div className="mt-1">
-                    <SeloLocal local={locais.get(v.id)!} compacto={!detalhada} />
+                    <SeloLocal local={locais.get(v.id)!} compacto={!detalhada}
+                      aoAbrir={() => setMapaDe({ id: v.id, contrato: v.contrato })} />
+                  </div>
+                ) : !jornada && (
+                  <div className="mt-1">
+                    <BotaoMapa aoAbrir={() => setMapaDe({ id: v.id, contrato: v.contrato })} />
                   </div>
                 )}
                 {/* 190: a caminho ou executando — a que distância está agora */}
                 {aproximacao.get(v.id) && (
                   <div className="mt-1">
-                    <SeloAproximacao a={aproximacao.get(v.id)!} compacto={!detalhada} />
+                    <SeloAproximacao a={aproximacao.get(v.id)!} compacto={!detalhada}
+                      aoAbrir={() => setMapaDe({ id: v.id, contrato: v.contrato })} />
                   </div>
                 )}
                 {/* ┌─ a palavra do TOA, ao lado da nossa ────────────────┐
@@ -1009,5 +1045,5 @@ export function TabelaContratos({
         })}
       </tbody>
     </table>
-  )
+  </>)
 }

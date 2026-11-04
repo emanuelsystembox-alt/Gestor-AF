@@ -347,16 +347,31 @@ export function calcular(visitas: Visita[]) {
    * │ fechamento são coisas diferentes.                                │
    * └───────────────────────────────────────────────────────────────────┘
    */
-  const comEvidencia = produtivas.filter(v => quantasEvidencias(v) > 0)
-  const semEvidencia = produtivas.filter(v => quantasEvidencias(v) === 0)
-  const evidenciasTotal = produtivas.reduce((t, v) => t + quantasEvidencias(v), 0)
-  const semEvidenciaAberto = semEvidencia.filter(v =>
-    !['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'].includes(v.situacao)).length
-  const pctEvidencia = produtivas.length
-    ? (comEvidencia.length * 100) / produtivas.length : 0
+  /*
+   * ┌─ D-296 · evidência e conclusão: só o que ENCERROU ────────────────┐
+   * │ > "vamos fazer isso com os contratos encerrados apenas, os que    │
+   * │ >  estão aberto não entra no calculo desses 2 card" — Emanuel,    │
+   * │ >  04/11                                                          │
+   * │                                                                    │
+   * │ Mudou a 155 acima (que deixava o aberto dentro e só o separava    │
+   * │ no apoio): às 10h, 60 dos 64 "sem evidência" e 51 dos 73 "abaixo  │
+   * │ da meta" eram contratos que ainda nem tinham acabado — o card     │
+   * │ media a hora do dia, não o técnico. Encerrado = as situações de   │
+   * │ `situacoes_terminais()` (035): Concluída, Cancelada, Reagendamento.│
+   * │ Os em aberto aparecem no apoio, fora da conta.                    │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const TERMINAIS = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO']
+  const encerradas = produtivas.filter(v => TERMINAIS.includes(v.situacao))
+  const abertasFora = produtivas.length - encerradas.length
+  const comEvidencia = encerradas.filter(v => quantasEvidencias(v) > 0)
+  const semEvidencia = encerradas.filter(v => quantasEvidencias(v) === 0)
+  const evidenciasTotal = encerradas.reduce((t, v) => t + quantasEvidencias(v), 0)
+  const pctEvidencia = encerradas.length
+    ? (comEvidencia.length * 100) / encerradas.length : 0
 
-  const taxaConclusao = produtivas.length
-    ? (concluidas.length / produtivas.length) * 100 : 0
+  const taxaConclusao = encerradas.length
+    ? (concluidas.length / encerradas.length) * 100 : 0
 
   // "Janela em risco" (menos de 60 min para o fim) foi retirada a pedido
   // em 23/09 — ver D-153. A conta saiu junto com o aviso: metrica que
@@ -695,7 +710,7 @@ export function calcular(visitas: Visita[]) {
     // O.S. faria o número encolher calado, que é o defeito da D-225.
     contratosQuebrados, contratosComBaixa,
     comEvidencia: comEvidencia.length, semEvidencia: semEvidencia.length,
-    semEvidenciaAberto, evidenciasTotal, pctEvidencia,
+    encerradas: encerradas.length, abertasFora, evidenciasTotal, pctEvidencia,
     listaSemEvidencia: semEvidencia,
     nossas,
     // 152: aparecem na matriz, não entram em conta nenhuma.

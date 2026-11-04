@@ -131,7 +131,9 @@ botão não falhar sem explicar.
 4. **Quem carimba o autor é o servidor.** Nenhuma tela manda
    `usuario_id` (D-061).
 
-"Campo" é quem **só** tem o papel do campo. Um controlador que também
+"Campo" é quem **só** tem o papel do campo — **exceto o supervisor "em campo"** (204/205, D-300):
+com a chave ligada em Administração ele tem o papel TECNICO, a rota da equipe própria e as travas
+do técnico, e continua supervisor. `supervisor_esta_em_campo()` é a regra; não escreva outra. Um controlador que também
 está cadastrado como técnico não perde os poderes de controlador por
 abrir o aplicativo — a mesma conta é feita no banco e nas duas telas.
 
@@ -175,6 +177,13 @@ técnico. Quem transfere e quer segurar, desliga a chave.
 **A data de contratação é da pessoa** (`perfil.data_contratacao`, 101),
 opcional, e só o ADMIN altera. O tempo de casa é calculado na leitura,
 nunca guardado; vazio é "não informada", não "0 dias" (D-178).
+
+**O login TOA muda de dono, o passado não** (206, D-301). Trocar ou tirar o login de um acesso é
+`definir_login_toa_do_usuario` (confere o dono antes de gravar). Login com histórico de outra pessoa
+é aposentado com ele (`<LOGIN>-ATE-DDMMAA`) e quem recebe ganha registro novo; só os contratos de
+HOJE em diante mudam. O roteamento (`cadastrar_login_da_equipe`) também vale de hoje — *"o
+espelhamento da rota é so pra hoje, não é para mudar os donos das baixas de dias anteriores"*
+(Emanuel, 04/11).
 
 **Técnico se desliga, não se apaga.** DELETE em `tecnico`/`equipe` é só
 para ADMIN (policy), e trigger recusa quem tem histórico — inclusive

@@ -767,7 +767,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
   const [verTec1, setVerTec1] = useState(false)
   const [verLog, setVerLog] = useState(false)
   const [verEvid, setVerEvid] = useState(false)
-  const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.produtivas) - m.concluidas)
+  const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.encerradas) - m.concluidas)
   const naMeta = m.taxaConclusao >= META
 
   // Só as situações que existem no período, na ordem do domínio — com
@@ -835,10 +835,10 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
             <span className="tabular">{num(m.comEvidencia)}</span> com ·{' '}
             <span className="tabular">{num(m.semEvidencia)}</span> sem ·{' '}
             <span className="tabular">{num(m.evidenciasTotal)}</span> arquivo(s)
-            {m.semEvidenciaAberto > 0 && (
-              <span className="block" title="Contrato que ainda não encerrou: a foto ainda pode vir">
-                <span className="tabular">{num(m.semEvidenciaAberto)}</span> dos sem
-                {' '}ainda estão em aberto
+            {/* D-296: o aberto sai da conta — a foto ainda pode vir */}
+            {m.abertasFora > 0 && (
+              <span className="block" title="Contrato que ainda não encerrou fica fora da porcentagem: a foto ainda pode vir">
+                <span className="tabular">{num(m.abertasFora)}</span> em aberto fora da conta
               </span>
             )}
             {m.comEvidencia === 0 && (
@@ -855,10 +855,16 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
           cor={naMeta ? 'var(--st-concluida)' : undefined}
           apoio={<>
             <span className="tabular">{num(m.concluidas)}</span> de{' '}
-            <span className="tabular">{num(m.produtivas)}</span> ·{' '}
+            <span className="tabular">{num(m.encerradas)}</span> encerrados ·{' '}
             {naMeta
               ? <span className="text-emerald-400">meta de {META}% atingida</span>
               : <><span className="tabular">{num(faltamParaMeta)}</span> abaixo da meta de {META}%</>}
+            {/* D-296: só o encerrado entra na taxa */}
+            {m.abertasFora > 0 && (
+              <span className="block" title="Contrato que ainda não encerrou não entra na taxa de conclusão">
+                <span className="tabular">{num(m.abertasFora)}</span> em aberto fora da conta
+              </span>
+            )}
           </>}
         />
 

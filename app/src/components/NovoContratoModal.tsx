@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Alerta } from './ui'
-import { equipeRotulo, isoLocal } from '../lib/formato'
+import { dataBR, equipeRotulo, isoLocal } from '../lib/formato'
 
 /**
  * Cadastro manual de contrato — a "Nova Ordem de Serviço" do sistema atual.
@@ -145,6 +145,59 @@ export function NovoContratoModal({
     setBusca('')
   }
 
+  /*
+   * ┌─ D-298 · o número do contrato já traz o cadastro ──────────────────┐
+   * │ > "quando eu colocasse o contrato do cliente a ideia era puxar os  │
+   * │ >  dados automatico e o usuario cadastrar apenas as o.s ou o que   │
+   * │ >  tivesse pendente, mais não obrigatorio" — Emanuel, 04/11        │
+   * │                                                                    │
+   * │ Digitou o contrato (5+ caracteres), espera 500 ms e procura o      │
+   * │ atendimento MAIS RECENTE com esse número exato. Achou: preenche o  │
+   * │ que está VAZIO — ou o que ele mesmo tinha preenchido antes e       │
+   * │ ninguém mexeu (trocar o número troca o cadastro). O que a pessoa   │
+   * │ digitou não é sobrescrito. Nada vira obrigatório: continua sendo   │
+   * │ contrato + uma O.S., e tudo se edita antes de confirmar.           │
+   * └────────────────────────────────────────────────────────────────────┘
+   */
+  const autoAnterior = useRef<Record<string, string>>({})
+  const [autoInfo, setAutoInfo] = useState<string | null>(null)
+  useEffect(() => {
+    const t = f.contrato.trim()
+    if (t.length < 5) { setAutoInfo(null); return }
+    let vivo = true
+    const timer = window.setTimeout(async () => {
+      const { data } = await supabase.from('visita')
+        .select(`contrato, cliente_nome, tipo_pessoa, tipo_residencia, telefones,
+                 logradouro, complemento, bairro, cidade, uf, cep, node, lat, lng, area_id, data_agendada`)
+        .eq('contrato', t).is('excluido_em', null)
+        .order('data_agendada', { ascending: false }).limit(1)
+      if (!vivo) return
+      const a = ((data ?? []) as (Achado & { data_agendada: string | null })[])[0]
+      if (!a) { setAutoInfo('Contrato sem atendimento anterior — preencha à mão, se quiser.'); return }
+      const novos: Record<string, string> = {
+        cliente_nome: a.cliente_nome ?? '', tipo_pessoa: a.tipo_pessoa ?? '',
+        tipo_residencia: a.tipo_residencia ?? '', telefones: (a.telefones ?? []).join(', '),
+        logradouro: a.logradouro ?? '', complemento: a.complemento ?? '', bairro: a.bairro ?? '',
+        cidade: a.cidade ?? '', uf: a.uf ?? '', cep: a.cep ?? '', node: a.node ?? '',
+        area_id: a.area_id ?? '',
+      }
+      setF(x => {
+        const y = { ...x }
+        for (const [k, v] of Object.entries(novos)) {
+          if (!v) continue
+          const atual = (x[k] ?? '').trim()
+          // vazio, o padrão da tela (MANAUS/AM) ou o que o automático pôs antes
+          const padrao = (k === 'cidade' && atual === 'MANAUS') || (k === 'uf' && atual === 'AM')
+          if (!atual || padrao || atual === autoAnterior.current[k]) y[k] = v
+        }
+        return y
+      })
+      autoAnterior.current = novos
+      setAutoInfo(`Dados copiados do atendimento de ${a.data_agendada ? dataBR(a.data_agendada) : 'antes'} — confira e acrescente as O.S.`)
+    }, 500)
+    return () => { vivo = false; window.clearTimeout(timer) }
+  }, [f.contrato])
+
   function inserirOS() {
     if (!novaTipo && !novaDescricao.trim()) return
     if (ordens.length >= 10) {
@@ -252,6 +305,7 @@ export function NovoContratoModal({
                 <span className="mb-1 block">Contrato *</span>
                 <input value={f.contrato} onChange={e => set('contrato', e.target.value)}
                   className={`${campo} w-full`} />
+                {autoInfo && <span className="mt-1 block text-[10px] text-graf-400">{autoInfo}</span>}
               </label>
               <label className="text-[11px] text-graf-400 sm:col-span-2">
                 <span className="mb-1 block">Nome do cliente</span>

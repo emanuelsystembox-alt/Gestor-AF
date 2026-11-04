@@ -111,6 +111,30 @@ export function SeloRevD10({ ativo }: { ativo?: boolean }) {
   )
 }
 
+/** D-297: CLIENTE ATIVADO (azul claro) e FP2 (laranja claro), marcados pelo
+ *  site — "quando for inserido, técnico deve visualizar também igual o rev"
+ *  (Emanuel, 04/11). As cores são as mesmas da web (TabelaContratos). */
+export const MARCADORES_COR: Record<string, { fundo: string; borda: string; texto: string }> = {
+  'CLIENTE ATIVADO': { fundo: '#bae6fd', borda: '#38bdf8', texto: '#075985' },
+  FP2: { fundo: '#fed7aa', borda: '#fb923c', texto: '#9a3412' },
+}
+export const NOMES_MARCADORES_COR = Object.keys(MARCADORES_COR)
+
+export function SelosMarcadores({ nomes }: { nomes?: string[] }) {
+  if (!nomes?.length) return null
+  return (
+    <>
+      {nomes.filter(n => MARCADORES_COR[n]).map(n => (
+        <View key={n} style={[e.selo, { backgroundColor: MARCADORES_COR[n].fundo, borderWidth: 1,
+                                        borderColor: MARCADORES_COR[n].borda }]}
+          accessibilityLabel={`Marcador ${n}`}>
+          <Text style={[e.seloTexto, { color: MARCADORES_COR[n].texto }]}>{n}</Text>
+        </View>
+      ))}
+    </>
+  )
+}
+
 const e = StyleSheet.create({
   selo: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
