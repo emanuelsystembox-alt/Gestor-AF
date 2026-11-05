@@ -21,6 +21,13 @@ export interface CodigoDeBaixa {
 /** As três situações que encerram — as únicas com código de baixa (098).
  *  A lista canônica é `situacoes_terminais()` no banco; esta é a cara dela. */
 const TERMINAIS = ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'] as const
+/** D-306: o Auditar é a Cancelada com o 800 (Desatribuído) em toda O.S. (D-191). */
+const AUDITAR = 'AUDITAR'
+/** D-306 (208): Cancelado pela central marcado pela baixa — o -1 em toda O.S. e a marca. */
+const CENTRAL = 'CENTRAL'
+/** D-306: os status que o painel de baixa oferece SEM código — o mesmo
+ *  `registrar_etapa` / `reverter_situacao` do "Mudar status". */
+const SO_STATUS: Situacao[] = ['ENTRADA', 'ATRIBUIDA', 'EM_DESLOCAMENTO', 'EM_EXECUCAO', 'COM_IMPEDIMENTO']
 
 /**
  * O contrato aberto em janela, não em linha expandida (D-056).
@@ -460,15 +467,41 @@ export function ContratoModal({
             const faltam = ordenadas.length - preenchidas
             // 098: o código serve a UMA situação final (o destino dele, D-097).
             // 409 não cancela; código de cancelamento não conclui.
-            const doDestino = codigos.filter(c => c.situacao_destino === situacaoFinal)
+            // D-306: Auditar = Cancelada com o 800; "só o status" = sem código
+            const auditar = situacaoFinal === AUDITAR
+            const central = situacaoFinal === CENTRAL
+            const soStatus = (SO_STATUS as string[]).includes(situacaoFinal)
+            const destinoReal = auditar || central ? 'CANCELADA' : situacaoFinal
+            const doDestino = auditar
+              ? codigos.filter(c => c.codigo === 800)
+              : codigos.filter(c => c.situacao_destino === destinoReal)
             const destinoDe = new Map(codigos.map(c => [String(c.codigo), c.situacao_destino]))
-            const rotuloFinal = SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal
+            const rotuloFinal = auditar ? 'Auditar' : central ? 'Cancelado pela central'
+              : SITUACAO_INFO[situacaoFinal as Situacao]?.label ?? situacaoFinal
+            const encerrado = !EM_ABERTO.includes(v.situacao)
             const trocarFinal = (s: string) => {
               setSituacaoFinal(s)
+              if (s === AUDITAR) {
+                // o 800 em todas as O.S. — é isso que faz o contrato "Auditar"
+                setBaixas(Object.fromEntries(ordenadas.map(o => [o.id,
+                  { codigo: '800', sub: '', obs: baixas[o.id]?.obs ?? '' }])))
+                return
+              }
               // O código que não serve à situação nova sai — deixá-lo lá seria
               // oferecer um botão que o banco recusa.
               setBaixas(a => Object.fromEntries(Object.entries(a).map(([k, b]) =>
-                [k, destinoDe.get(b.codigo) === s ? b : { ...b, codigo: '', sub: '' }])))
+                [k, destinoDe.get(b.codigo) === s && b.codigo !== '800' ? b : { ...b, codigo: '', sub: '' }])))
+            }
+            const chip = (s: string, rot: string, cor: string) => {
+              const ativo = situacaoFinal === s
+              return (
+                <button key={s} onClick={() => trocarFinal(s)} aria-pressed={ativo}
+                  style={ativo ? { borderColor: cor, color: cor } : undefined}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${ativo
+                    ? 'bg-graf-850' : 'border-graf-700 text-graf-400 hover:text-graf-200'}`}>
+                  {rot}
+                </button>
+              )
             }
 
             return (
@@ -479,36 +512,71 @@ export function ContratoModal({
                   esta é a baixa da AFLINE — a da operadora vem do TOA e não se edita
                 </span>
               </p>
-              <p className="mb-2.5 text-[11px] text-graf-400">
-                Código de baixa só entra para <strong>concluir</strong>, <strong>cancelar</strong> ou
-                {' '}<strong>reagendar</strong> — e cada código serve a uma delas. Outro status,
-                sem código, é pelo{' '}
-                <button onClick={() => setAcao('status')}
-                  className="text-af-400 underline underline-offset-2">Mudar status</button>.
-              </p>
-
-              {/* ---- 1. como o contrato termina ---- */}
+              {/* ---- 1. o status: com código (encerra) ou sem código ----
+                  D-306: "o correto é ter outros status de escolher, em vez de
+                  ficar concluído, cancelado, reagendado" (Emanuel, 04/11). */}
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 w-28 text-[11px] text-graf-400"
+                  title="Cada código de baixa serve a uma destas situações">Encerrar (com código)</span>
+                {TERMINAIS.map(s => chip(s, SITUACAO_INFO[s]?.label ?? s, SITUACAO_INFO[s]?.cor ?? '#64748b'))}
+                {chip(CENTRAL, 'Cancelado pela central', '#b65a55')}
+                {chip(AUDITAR, 'Auditar', '#b08640')}
+              </div>
               <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-[11px] text-graf-400">Situação final</span>
-                {TERMINAIS.map(s => {
-                  const ativo = situacaoFinal === s
-                  const cor = SITUACAO_INFO[s]?.cor ?? '#64748b'
-                  return (
-                    <button key={s} onClick={() => trocarFinal(s)} aria-pressed={ativo}
-                      style={ativo ? { borderColor: cor, color: cor } : undefined}
-                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${ativo
-                        ? 'bg-graf-850' : 'border-graf-700 text-graf-400 hover:text-graf-200'}`}>
-                      {SITUACAO_INFO[s]?.label ?? s}
-                    </button>
-                  )
-                })}
+                <span className="mr-1 w-28 text-[11px] text-graf-400"
+                  title="Muda o status sem código de baixa">Só o status</span>
+                {SO_STATUS.filter(s => s !== v.situacao).map(s =>
+                  chip(s, SITUACAO_INFO[s]?.label ?? s, SITUACAO_INFO[s]?.cor ?? '#64748b'))}
               </div>
 
               {!situacaoFinal ? (
                 <p className="rounded-md border border-dashed border-graf-700 px-3 py-4 text-center
                               text-xs text-graf-400">
-                  Escolha a situação final — a lista de códigos depende dela.
+                  Escolha o status — para encerrar, a lista de códigos depende dele.
                 </p>
+              ) : central ? (
+                // 208: o -1 "Cancelado no Sistema NETSMS" em todas as O.S. e a marca
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                    <span className="mb-1 block">Observação (opcional — vai em cada O.S.)</span>
+                    <input value={motivoV} onChange={e => setMotivoV(e.target.value)}
+                      placeholder="Ex.: central cancelou por telefone"
+                      className={`${campo} w-full`} />
+                  </label>
+                  <button disabled={ocupado}
+                    title={`Baixa as ${ordenadas.length} O.S. com -1 · Cancelado no Sistema NETSMS`}
+                    onClick={() => comAviso(() => supabase.rpc('cancelar_pela_central', {
+                      p_visita: id, p_observacao: motivoV.trim() || null,
+                    }), 'Contrato cancelado pela central.')}
+                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                               hover:bg-af-500 disabled:opacity-50">
+                    Cancelar pela central ({ordenadas.length} O.S.)
+                  </button>
+                </div>
+              ) : soStatus ? (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="min-w-64 flex-1 text-[11px] text-graf-400">
+                    <span className="mb-1 block">
+                      {encerrado ? 'Motivo (obrigatório — o contrato está encerrado)' : 'Observação para o técnico (opcional)'}
+                    </span>
+                    <input value={motivoV} onChange={e => setMotivoV(e.target.value)}
+                      placeholder={encerrado ? 'Baixa indevida, reabertura…' : 'Vai como aviso no celular do técnico'}
+                      className={`${campo} w-full`} />
+                  </label>
+                  <button disabled={ocupado || (encerrado && !motivoV.trim())}
+                    onClick={() => comAviso(() => encerrado
+                      ? supabase.rpc('reverter_situacao', {
+                          p_visita: id, p_situacao: situacaoFinal, p_motivo: motivoV.trim(),
+                        })
+                      : supabase.rpc('registrar_etapa', {
+                          p_visita: id, p_situacao: situacaoFinal,
+                          p_observacao: motivoV.trim() || null, p_lat: null, p_lng: null,
+                        }), `Status mudado para ${rotuloFinal}.`)}
+                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                               hover:bg-af-500 disabled:opacity-50">
+                    Mudar para {rotuloFinal.toLowerCase()}
+                  </button>
+                </div>
               ) : (<>
               <p className="mb-2 text-[11px] text-graf-400">
                 {rotuloFinal} exige o código de <strong>todas</strong> as {ordenadas.length} O.S.
@@ -589,7 +657,7 @@ export function ContratoModal({
                       sub_falha_id: baixas[o.id].sub || null,
                       observacao: baixas[o.id].obs || null,
                     })),
-                    p_situacao: situacaoFinal,
+                    p_situacao: destinoReal,
                   }), `Baixa registrada: ${preenchidas} O.S., contrato ${rotuloFinal.toLowerCase()}.`)}
                   className="ml-auto rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium
                              text-white hover:bg-af-500 disabled:opacity-50">

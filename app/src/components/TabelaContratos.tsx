@@ -87,6 +87,7 @@ export const SELECT_CONTRATO = `
   segmentacao:segmentacao_id ( nome ),
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
+  cancelado_central_em,
   contador_log:dados_origem->>"Contador de log",
   observacao_cop, observacao_cop_em,
   tipo_atividade:tipo_atividade_id ( nome, natureza ),

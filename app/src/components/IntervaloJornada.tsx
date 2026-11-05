@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useTema } from '../lib/tema'
 import {
-  aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle, temChaveDoMapa,
+  aoFalharAutenticacao, autenticacaoFalhou, camada, carregarMapaGoogle, mapaReaproveitado, temChaveDoMapa,
 } from '../lib/mapaGoogle'
 import { metrosEntre, textoDistancia } from '../lib/localBaixa'
 
@@ -253,27 +253,28 @@ function MapaIntervalo({ pontos, parada, foco }: {
 
   useEffect(() => {
     if (!pronto || !div.current) return
-    div.current.innerHTML = ''
-    const m = new google.maps.Map(div.current, {
+    // D-308: o mesmo mapa em toda abertura (lib/mapaGoogle)
+    const m = mapaReaproveitado(div.current, tema, {
       center: parada ?? (pontos[0] ? { lat: pontos[0].lat, lng: pontos[0].lng } : { lat: -3.1, lng: -60.0 }),
-      zoom: 16, colorScheme: tema === 'claro' ? 'LIGHT' : 'DARK',
+      zoom: 16,
       mapTypeControl: true, streetViewControl: true, fullscreenControl: true, clickableIcons: false,
     })
     mapa.current = m
+    const c = camada()
     const limites = new google.maps.LatLngBounds()
     // O horário em cima de cada ponto. Pontos a menos de 30 m de um já
     // rotulado não repetem o rótulo (na parada eles se empilham); o horário
     // deles está na lista ao lado e no mouse.
     const rotulados: Ponto[] = []
-    if (pontos.length > 1) new google.maps.Polyline({
+    if (pontos.length > 1) c.guarda(new google.maps.Polyline({
       map: m, path: pontos.map(p => ({ lat: p.lat, lng: p.lng })),
       strokeColor: '#6b7280', strokeOpacity: 0.6, strokeWeight: 2,
-    })
+    }))
     for (const p of pontos) {
       limites.extend(p)
       const rotula = !rotulados.some(r => metrosEntre(r.lat, r.lng, p.lat, p.lng) < 30)
       if (rotula) rotulados.push(p)
-      new google.maps.Marker({
+      c.guarda(new google.maps.Marker({
         map: m, position: p, zIndex: p.dentro ? 20 : 10,
         title: `${hhmm(p.em)}${p.precisao_m != null ? ` · GPS ±${Math.round(Number(p.precisao_m))} m` : ''}`
              + (p.motivo === 'SAIU' ? ' · app fechado' : ''),
@@ -286,25 +287,26 @@ function MapaIntervalo({ pontos, parada, foco }: {
                 strokeColor: '#ffffff', strokeWeight: 1,
                 // o rótulo acima do ponto, não em cima dele
                 labelOrigin: new google.maps.Point(0, -2.6) },
-      })
+      }))
     }
     if (parada) {
       limites.extend(parada)
-      new google.maps.Circle({
+      c.guarda(new google.maps.Circle({
         map: m, center: parada, radius: Math.max(parada.raio, 15), clickable: false,
         strokeColor: '#047857', strokeOpacity: 0.9, strokeWeight: 2, fillColor: '#047857', fillOpacity: 0.12,
-      })
-      new google.maps.Marker({
+      }))
+      c.guarda(new google.maps.Marker({
         map: m, position: parada, zIndex: 40, title: `Parado de ${hhmm(parada.de)} a ${hhmm(parada.ate)}`,
         label: { text: 'P', color: '#ffffff', fontSize: '11px', fontWeight: '800' },
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: '#047857', fillOpacity: 1,
                 strokeColor: '#ffffff', strokeWeight: 2 },
-      })
+      }))
     }
     if (!limites.isEmpty()) {
       if (pontos.length > 1) m.fitBounds(limites, 48)
       else m.setCenter(limites.getCenter())
     }
+    return () => c.limpa()
   }, [pronto, pontos, parada, tema])
 
   useEffect(() => {

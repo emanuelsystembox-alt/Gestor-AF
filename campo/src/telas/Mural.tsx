@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text,
+  ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text,
   useWindowDimensions, View,
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native'
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { supabase } from '../lib/supabase'
 import { Aviso, Carregando } from '../ui/componentes'
+import { ImagemAmpliavel } from '../ui/ImagemAmpliavel'
 import { cor, raio, sombraCard } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -189,6 +190,8 @@ function Carrossel({ posts, urls }: { posts: PostMural[]; urls: Record<string, s
   const [i, setI] = useState(0)
   const [arrastando, setArrastando] = useState(false)
   const [falhas, setFalhas] = useState<Record<string, true>>({})
+  /** D-309: a imagem aberta em tela cheia, com zoom. */
+  const [ampliada, setAmpliada] = useState<PostMural | null>(null)
   const n = posts.length
   const atual = posts[Math.min(i, n - 1)]
 
@@ -201,10 +204,10 @@ function Carrossel({ posts, urls }: { posts: PostMural[]; urls: Record<string, s
   useEffect(() => { if (i >= n) ir(0, false) }, [i, n, ir])
 
   useEffect(() => {
-    if (arrastando || n < 2) return
+    if (arrastando || ampliada || n < 2) return
     const t = setTimeout(() => ir((i + 1) % n), INTERVALO_MS)
     return () => clearTimeout(t)
-  }, [i, arrastando, n, ir])
+  }, [i, arrastando, ampliada, n, ir])
 
   function parou(ev: NativeSyntheticEvent<NativeScrollEvent>) {
     const k = Math.round(ev.nativeEvent.contentOffset.x / W)
@@ -232,9 +235,16 @@ function Carrossel({ posts, urls }: { posts: PostMural[]; urls: Record<string, s
           return (
             <View style={[e.slide, { width: W, height: altura }]}>
               {url && !falhas[p.id] ? (
-                <Image source={{ uri: url }} style={{ width: W, height: altura }}
-                  resizeMode="contain" accessibilityLabel={p.titulo}
-                  onError={() => setFalhas(f => ({ ...f, [p.id]: true }))} />
+                // D-309: tocar abre em tela cheia, com zoom
+                <Pressable onPress={() => setAmpliada(p)} accessibilityRole="imagebutton"
+                  accessibilityLabel={`${p.titulo} — toque para ampliar`}>
+                  <Image source={{ uri: url }} style={{ width: W, height: altura }}
+                    resizeMode="contain"
+                    onError={() => setFalhas(f => ({ ...f, [p.id]: true }))} />
+                  <View style={e.lupa} pointerEvents="none">
+                    <Text style={e.lupaTexto}>Toque para ampliar</Text>
+                  </View>
+                </Pressable>
               ) : urls === null ? (
                 <ActivityIndicator color={cor.branco} />
               ) : (
@@ -259,6 +269,24 @@ function Carrossel({ posts, urls }: { posts: PostMural[]; urls: Record<string, s
           ))}
         </View>
       )}
+
+      {/* D-309: a campanha em tela cheia — pinça ou toque duplo para ampliar */}
+      <Modal visible={!!ampliada} animationType="fade" statusBarTranslucent
+        onRequestClose={() => setAmpliada(null)}>
+        <SafeAreaView style={e.cheia} edges={['top', 'bottom']}>
+          <View style={e.cheiaTopo}>
+            <Text style={e.cheiaTitulo} numberOfLines={1}>{ampliada?.titulo}</Text>
+            <Pressable onPress={() => setAmpliada(null)} hitSlop={12}
+              accessibilityRole="button" accessibilityLabel="Fechar">
+              <Text style={e.cheiaFechar}>Fechar</Text>
+            </Pressable>
+          </View>
+          {!!ampliada && !!urls?.[ampliada.imagem_path] && (
+            <ImagemAmpliavel uri={urls[ampliada.imagem_path]} rotulo={ampliada.titulo} />
+          )}
+          <Text style={e.cheiaDica}>Dois dedos ou toque duplo para ampliar</Text>
+        </SafeAreaView>
+      </Modal>
 
       {/* Os dizeres do item atual, embaixo da imagem — como no site. */}
       {!!atual && (
@@ -294,6 +322,16 @@ const e = StyleSheet.create({
   // faixa nas bordas, e faixa preta some; faixa cinza parece defeito.
   slide: { backgroundColor: cor.tinta, alignItems: 'center', justifyContent: 'center' },
   semImagem: { color: cor.graf200, fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
+  lupa: {
+    position: 'absolute', right: 8, bottom: 8, borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  lupaTexto: { color: cor.branco, fontSize: 12, fontWeight: '700' },
+  cheia: { flex: 1, backgroundColor: '#000' },
+  cheiaTopo: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  cheiaTitulo: { flex: 1, color: cor.branco, fontSize: 16, fontWeight: '800' },
+  cheiaFechar: { color: cor.branco, fontSize: 15, fontWeight: '700' },
+  cheiaDica: { color: cor.graf200, fontSize: 12, textAlign: 'center', paddingVertical: 10 },
 
   bolinhas: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',

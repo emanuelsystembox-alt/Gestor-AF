@@ -12505,3 +12505,122 @@ da parada**, na **cor da situação** (a legenda da faixa), e a **linha do traje
 com setas (linha reta, o mesmo km da faixa). Um selo no mapa diz quantas paradas dele estão ali e
 quantas ficaram de fora por falta de coordenada do TOA. Na visão da cidade, o encerrado passou de 15%
 para 45% (sumia no mapa claro).
+
+### D-306 · Baixar serviço com mais status: Auditar, Cancelado pela central e "só o status" (208)
+
+*"nessa tela o correto é ter outros status de escolher, em vez de ficar concluído, cancelado,
+reagendado (...) se for analisar só tem 3 status vamos adicionar mais"* · *"eu quero adicionar
+cancelado central e auditar também"* (Emanuel, 04/11).
+
+O painel **Baixar serviço** tinha só os três destinos dos códigos (Concluída, Cancelada,
+Reagendamento — os únicos `situacao_destino` do cadastro). Agora tem duas linhas:
+
+- **Encerrar (com código):** Concluída · Cancelada · Reagendamento · **Cancelado pela central** ·
+  **Auditar**. Auditar = o 800 (Desatribuído) já posto em toda O.S. — é o que faz o contrato cair em
+  Auditar (D-191). Cancelado pela central = `cancelar_pela_central` (208): o -1 ("Cancelado no
+  Sistema NETSMS") em toda O.S. pela mesma `baixar_visita`, e a marca `visita.cancelado_central_em`
+  / `_por` — quem afirmou e quando. A marca só se grava por essa porta (gatilho) e cai quando o
+  contrato sai de CANCELADA.
+- **Só o status (sem código):** Na entrada · Atribuída · Em deslocamento · Em execução · Ticket de
+  suporte, com observação — o mesmo `registrar_etapa` / `reverter_situacao` do "Mudar status"
+  (encerrado volta só com motivo, D-030).
+
+**A regra do cancelado pela central muda nos dois lados juntos** (D-289): `origemCancelada()` na web
+e, no banco, as 9 funções que tiravam o cancelado pela central das contas (volume, painel de equipes,
+ritmo, em rota, risco de quebra, impacto, qualidade, revisita do técnico, REV D-10, origem para o
+app) passam a ler **o status do TOA OU a marca**. Regeradas do banco, trocando só a condição.
+Conferido: no mesmo instante, versão nova e antiga dão o mesmo resultado em 7 delas (ninguém tem a
+marca ainda). O "Status da Atividade" do TOA não é tocado (D-042). **Fica de fora:** o TEC1 (só conta
+o que o TOA encerrou) e o selo "canc. central" do cartão da Rota (lê o status do TOA) — o contrato
+marcado pelo site aparece ali como Cancelada. Baterias 29/29 e 33/33.
+
+### D-307 · O mapa do Google sai do projeto preso em 100/dia para um projeto com faturamento próprio
+
+*"esta página não carregou o Google Maps corretamente (...) é limitação da API?"* (Emanuel, 04/11).
+
+Era. A chave do site e a do app estavam no projeto `amazing-coast-h9v0l`, ligado a uma conta de
+faturamento "Cloud Run SaaS Tenant" (criada pelo Google para um app do AI Studio), que não pode ser
+trocada ("você não tem permissão"). Sem faturamento próprio, a Maps JavaScript API dá **100
+carregamentos por dia** ("Ajustável: Não") — às 15h de 04/11 estavam 104/100, e o mapa caiu no modo
+"For development purposes only". O app (Maps SDK for Android) tinha o mesmo teto (43/100).
+
+Feito, com autorização do Emanuel ("você tem autorização (...) para não gastar mais do que os 50"):
+projeto **`pulsoline-mapas`** na conta de faturamento dele (em teste: o cartão não é cobrado até
+"Fazer upgrade"); Maps JavaScript API e Maps SDK for Android ativas; chave do site restrita a 1 API e
+aos 4 endereços; chave do app restrita à Maps SDK for Android; orçamento de R$ 50 com avisos em
+50/90/100%, **sem descontar crédito** (senão, no teste, o alerta nunca dispararia). Site republicado
+com a chave nova e conferido: o mapa desenha sem aviso.
+
+**O que o Google não deixa:** teto diário de "Map loads" ("Editar cota" desativado) nem limite de gasto
+com pausa para o Maps (só Cloud Run, Functions, Gemini e Vertex). O R$ 50 **avisa, não trava**. O que
+segura: o teste (90 dias), os 10.000 carregamentos grátis por mês do site (o do app é grátis) e menos
+carregamentos no código (pendente: mapa só quando aparece; um mapa só para as janelas).
+
+**Pendente:** o APK do técnico só usa a chave nova depois de `eas env:update` + build novo — até lá, o app
+segue no teto de 100/dia. Também: os dados de pagamento do "Noah Moreira Maia" e uma assinatura Google
+AI Pro estão na conta `geminiturbo1` — conta que guarda o mapa da AFLINE (D-307, conversa de 04/11).
+
+### D-308 · Menos "map loads": o mapa da Rota só quando chega perto, e um mapa só para as janelas
+
+*"pode ser, só não quero perder performance"* (Emanuel, 04/11, depois da D-307).
+
+O Google cobra (e, sem faturamento, limitava a 100/dia) por **mapa criado** (`new google.maps.Map`).
+- **Rota do dia:** o mapa "O dia no espaço" fica embaixo das faixas e nascia ao abrir a tela, mesmo
+  para quem nunca rola até ele. Agora nasce quando chega a 600 px da tela (IntersectionObserver) —
+  começa a carregar antes de aparecer.
+- **As janelas** (onde baixou, D-295; intervalo da jornada, D-303): criavam um mapa por abertura.
+  Agora há um mapa por tema e por sessão (`mapaReaproveitado` em `lib/mapaGoogle.ts`), que a janela
+  pendura no seu espaço; os desenhos de cada abertura ficam numa `camada()` e saem ao fechar.
+- O Monitoramento ficou como estava: lá o mapa é a tela, aparece de cara.
+
+Medido no navegador, com um contador em `google.maps.Map`: Rota no topo = 0 mapas; rolando = 1;
+três aberturas da janela de jornada = +1 (antes, +3). A janela seguinte abre limpa (sem os pontos da
+anterior). Reabrir ficou mais rápido — o mapa já está pronto.
+
+### D-309 · App 0.7.0: várias fotos da galeria por tipo, dois tipos novos e zoom no mural
+
+*"quando o técnico for enviar a foto pela galeria, ele vai escolher que foto é correto, se é fachada,
+ou URA e entre outros e desse grupo ele vai poder selecionar mais de uma imagem (...) EVIDENCIAS
+REFAZER, NIVEIS DE SINAIS (...) a campanha da afline que ela envia no mural, é bom ele conseguir
+ampliar a imagem"* (Emanuel, 04/11).
+
+- **Galeria:** o técnico escolhe o tipo (como já era) e marca **até 10 fotos** daquele grupo
+  (`escolherVariasDaGaleria`). Sobem uma depois da outra ("Enviando 2 de 5…") — em paralelo, no 4G
+  fraco, falhariam todas; sem sinal, a que falhou e as que faltam vão para a fila. Cada uma continua
+  com a hora e o GPS do PRÓPRIO arquivo e a marca `da_galeria` (D-213).
+- **Tipos novos:** EVIDENCIAS_REFAZER ("Evidências refazer") e NIVEIS_SINAIS ("Níveis de sinais"), no
+  app (`dominio.ts`) e no site (`AnexarEvidencia`) — `evidencia.tipo` é texto, sem migration.
+- **Zoom:** a imagem do mural abre em tela cheia ao tocar; pinça (1× a 5×), toque duplo (2,5×) e
+  arrastar. O visor de evidência ganhou o mesmo. Feito com `PanResponder` + `Animated` do próprio RN
+  (`ui/ImagemAmpliavel`) — no Android a ScrollView não tem zoom, e não se instala biblioteca de UI.
+- **Versão 0.7.0** — runtime nova (política `appVersion`): o APK 0.7.0 só recebe atualização pelo ar
+  publicada para 0.7.0. Vai junto a chave do mapa do projeto novo (D-307).
+
+### D-310 · Copiar o telefone no app (expo-clipboard)
+
+*"equipes estão reclamando que eles não conseguem copiar o número de telefone, do outro app
+concorrente eles conseguiam"* (Emanuel, 04/11).
+
+- Ao lado de cada "Ligar para …" (telefones do TOA e dos atendimentos anteriores), um **Copiar**.
+- Observação do COP (no contrato e na Agenda) e o histórico: texto **selecionável** (segurar = copiar)
+  e telefone no meio do texto vira **link**: tocar oferece Ligar ou Copiar (`ui/TextoComTelefone`).
+  Só vira link o que é telefone: DDD que existe, 9 depois do DDD (celular) ou 2–5 (fixo) — sem isso o
+  número da O.S. (2614958081) virava telefone. O nome do cliente também ficou selecionável.
+- `expo-clipboard` (módulo da Expo, não é biblioteca de interface) é nativo: só funciona no APK 0.7.0.
+
+### D-311 · Depois da baixa do TOA: observação da baixa no app, só no dia (209) — app 0.7.1
+
+*"so conseguimos adicionar a subfalha depois de baixado, tem que dar direito de o técnico editar o
+equipamento e miscelania se for necessário, e da direito de depois de baixado, ele colocar a
+observação da baixa, isso ja tem porém não nos contratos encerrados"* (Emanuel, 05/11, pela sessão
+AFLINE 360). Perguntado antes de mexer: **só os contratos de hoje** (fica a regra da 136); **a
+miscelânea não muda** ("não vamos editar a miscelânea"); a observação **na O.S.**, como a do app.
+
+O que estava: no contrato que o TOA encerrou sozinho (baixa automática, 128), a O.S. tem só o código
+da operadora, e o app oferecia apenas a sub-falha (199); `observar_baixa` (185) exigia a baixa da
+AFLINE e recusava. Equipamento já estava liberado no dia, encerrado ou não (UI e banco) — testado.
+
+Agora `observar_baixa` aceita qualquer das duas baixas (209, regerada do banco), e o app mostra
+"Escrever/Editar observação" também na O.S. fechada pelo TOA. Testado como técnico, em transação
+desfeita: O.S. de hoje encerrada pelo TOA grava; equipamento no mesmo contrato aceito; contrato de
+ontem recusado ("o campo só anexa no dia"). Baterias 29/29 e 33/33. Vai no APK **0.7.1**.

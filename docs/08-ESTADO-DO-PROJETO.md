@@ -431,10 +431,16 @@ falta o olho de quem usa.
 
 ---
 
-## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 207, D-295 a D-304)
+## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 208, D-295 a D-310)
 
 ### Ação na operação (não precisa de código)
 
+- **APK 0.7.0** (D-307, D-309, D-310): chave nova do mapa, várias fotos da galeria, zoom, copiar telefone. Mesmos comandos abaixo; instalar nos celulares.
+- **APK do técnico com a chave nova do mapa** (D-307): `cd campo` e depois
+  `npx eas-cli@latest env:update --environment preview --variable-name GOOGLE_MAPS_ANDROID_KEY --value <chave em campo/.env>`
+  e `npx eas-cli@latest build --platform android --profile preview`. Até instalar o APK novo, o app segue preso em 100 mapas/dia.
+- **Conta Google `geminiturbo1@gmail.com`** (dona do projeto do mapa): proteger (recuperação, dispositivos, senha, 2 etapas) e decidir sobre o perfil de pagamento do "Noah Moreira Maia" e a assinatura Google AI Pro (D-307).
+- **Fim do teste do Google Cloud** (90 dias a partir de 04/11): sem "Fazer upgrade", o mapa para de novo. Decidir antes de ~02/02/2027.
 - **Kainan (Z538227, Manaus): ligar a "localização precisa"** no Android (Configurações › Apps › o
   aplicativo › Permissões › Localização › "Usar localização precisa"). Os 26 pontos de 04/11 vieram
   com ±2.000 m; o rastro descarta acima de 100 m e nenhum contrato dele teve local da baixa (D-295).
@@ -470,6 +476,7 @@ falta o olho de quem usa.
 
 ### Melhorias técnicas conhecidas
 
+- **Cancelado pela central marcado no site** (208, D-306): o cartão da Rota e o TEC1 ainda leem só o status do TOA.
 - **Refeição "iniciado" que nunca fecha** (D-303): quem esquece de encerrar no TOA aparece almoçando até a próxima importação — às 13h de 04/11 havia "há 1h13". Um alerta de almoço longo não foi pedido.
 - **O app não percebe a localização aproximada.** O expo-location diz `accuracy: 'coarse'`; o app
   poderia pedir a precisa, em vez de a central descobrir pelo mapa (D-295).

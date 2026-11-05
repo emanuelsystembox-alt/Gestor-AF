@@ -5,6 +5,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 import { urlAssinada } from '../lib/midia'
 import { carimbo } from '../lib/formato'
 import { rotuloEvidencia } from '../lib/dominio'
+import { ImagemAmpliavel } from './ImagemAmpliavel'
 import { cor } from './tema'
 
 /**
@@ -57,8 +58,8 @@ export function VisorEvidencia({ ev, aoFechar }: { ev: EvidenciaVista | null; ao
           ) : ev?.midia === 'VIDEO' ? (
             <Video url={url} />
           ) : (
-            <Image source={{ uri: url }} style={e.midia} resizeMode="contain"
-              onError={() => setErro(true)} accessibilityLabel="Foto enviada" />
+            // D-309: a foto amplia com os dedos, como a do mural
+            <ImagemAmpliavel uri={url} rotulo="Foto enviada" onErro={() => setErro(true)} />
           )}
         </View>
 

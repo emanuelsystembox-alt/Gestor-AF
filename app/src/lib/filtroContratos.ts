@@ -54,6 +54,8 @@ export const ORIGEM_CANCELADA_INFO: Record<OrigemCancelada, { label: string; cor
 type ParaOrigem = Pick<ContratoLinha, 'situacao' | 'status_toa'> & {
   ordem_servico: { baixa_afline?: { codigo: number } | null }[]
   motivo_fechamento_toa?: string | null
+  /** 208 (D-306): o COP afirmou pela baixa que a central cancelou. */
+  cancelado_central_em?: string | null
 }
 
 const semAcento = (s: string | null | undefined) =>
@@ -65,6 +67,9 @@ const semAcento = (s: string | null | undefined) =>
 export function origemCancelada(v: ParaOrigem): OrigemCancelada | null {
   if (v.situacao !== 'CANCELADA') return null
   if (v.ordem_servico.some(o => o.baixa_afline?.codigo === 800)) return 'DESATRIBUIDO'
+  // 208 (D-306): a marca do site vale como o TOA — no banco, a mesma
+  // troca foi feita nas funções que separam o cancelado pela central.
+  if (v.cancelado_central_em) return 'CANCELADO_CENTRAL'
   if (semAcento(v.status_toa) === 'CANCELADO'
       || semAcento(v.motivo_fechamento_toa).includes('CANCELADO NO SISTEMA')) {
     return 'CANCELADO_CENTRAL'

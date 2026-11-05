@@ -1392,8 +1392,27 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
   // │ grafite — e o defeito só aparecia DEPOIS de alternar, que é    │
   // │ por que ele passou na primeira conferência.                    │
   // └────────────────────────────────────────────────────────────────┘
+  // ┌─ D-308 · o mapa só nasce quando chega perto da tela ─────────────┐
+  // │ Cada `new google.maps.Map` é um "map load" cobrado (e, sem        │
+  // │ faturamento, contado no teto de 100/dia). O mapa da Rota fica      │
+  // │ embaixo das faixas, e quem abre a tela para despachar muitas vezes │
+  // │ nunca rola até ele. Com 600 px de folga ele começa a carregar      │
+  // │ ANTES de aparecer — quem rola não vê espera.                       │
+  // └────────────────────────────────────────────────────────────────────┘
+  const [perto, setPerto] = useState(false)
+  const temDiv = pontos.length > 0
   useEffect(() => {
-    if (!pronto || !div.current) return
+    if (perto || !div.current) return
+    if (typeof IntersectionObserver === 'undefined') { setPerto(true); return }
+    const ob = new IntersectionObserver(es => {
+      if (es.some(e => e.isIntersecting)) { setPerto(true); ob.disconnect() }
+    }, { rootMargin: '600px 0px' })
+    ob.observe(div.current)
+    return () => ob.disconnect()
+  }, [perto, temDiv, pronto])
+
+  useEffect(() => {
+    if (!pronto || !perto || !div.current) return
     if (mapa.current && temaDoMapa.current === tema) return
     if (mapa.current) {
       for (const x of marcas.current) x.setMap(null)
@@ -1416,7 +1435,7 @@ function MapaDoDia({ paradas, bairros, corEquipe, corBairro, foco }: {
       gestureHandling: 'cooperative',
     })
     setVersao(v => v + 1)
-  }, [pronto, tema])
+  }, [pronto, tema, perto])
 
   useEffect(() => {
     const m = mapa.current

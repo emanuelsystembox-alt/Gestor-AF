@@ -93,7 +93,8 @@ execução ("Vale o do técnico").
 **"Cancelado no Sistema NETSMS"** (vem como "não concluído") é cancelado pela central, e
 **movimento** é o TOA ter mostrado em rota/iniciado numa importação ou alguém ter mexido — não a
 conversão de "não concluído" em Em execução (198, D-289). `cancelado_pela_central()` no banco e
-`origemCancelada()` na web mudam juntas.
+`origemCancelada()` na web mudam juntas. **E o COP pode marcar pela baixa** (208, D-306): o -1 em toda O.S. + `visita.cancelado_central_em`; a
+regra é "status do TOA OU a marca", nos dois lados.
 
 **Mais de um contrato em andamento vindo do TOA é AVISADO, não corrigido**
 (129, D-206): aviso no sino do técnico e sinal na central. Nada muda sozinho.

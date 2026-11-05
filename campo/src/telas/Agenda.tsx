@@ -18,6 +18,7 @@ import {
 } from '../lib/avisos'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
+import { TextoComTelefone } from '../ui/TextoComTelefone'
 import { NOMES_MARCADORES_COR, SeloEdificacao, SeloOuvidoria, SeloRevD10, SeloRevisita, SeloSegmento, SeloTec1, SelosMarcadores } from '../ui/MarcasCliente'
 import { BarraInferior } from '../ui/BarraInferior'
 import { capaDoMural } from './Mural'
@@ -625,7 +626,8 @@ export default function Agenda({ navigation }: Props) {
                 pena ir agora ("cliente só às 14h"). Inteira, sem cortar. */}
             {!!l.observacao_cop && (
               <View style={e.obsCop}>
-                <Text style={e.obsCopTexto}>💬 {l.observacao_cop}</Text>
+                {/* D-310: o número no meio da observação liga ou copia */}
+                <TextoComTelefone texto={`💬 ${l.observacao_cop}`} style={e.obsCopTexto} />
               </View>
             )}
 

@@ -53,6 +53,45 @@ function grau(v: unknown, ref: unknown): number | null {
   return r === 'S' || r === 'W' ? -Math.abs(n) : n
 }
 
+/** Quantas fotos de uma vez (D-309). Dez cobre "fachada + URA + medição"
+ *  de um contrato sem virar um envio de vinte minutos no 4G fraco. */
+export const MAX_DA_GALERIA = 10
+
+/**
+ * D-309: várias fotos de uma vez, do MESMO tipo (o técnico escolhe o tipo
+ * antes — fachada, URA… — e marca as fotos daquele grupo). Vazio = cancelou.
+ * > "desse grupo ele vai poder selecionar mais de uma imagem" — Emanuel, 04/11
+ */
+export async function escolherVariasDaGaleria(): Promise<DaGaleria[]> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+  if (!perm.granted) {
+    throw new Error('Autorize o acesso às fotos nos ajustes do celular para enviar da galeria.')
+  }
+  const r = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    exif: true,
+    quality: 1,
+    allowsEditing: false,
+    allowsMultipleSelection: true,
+    selectionLimit: MAX_DA_GALERIA,
+    orderedSelection: true,
+  })
+  if (r.canceled || !r.assets?.length) return []
+  return r.assets.slice(0, MAX_DA_GALERIA)
+    .filter(a => a.type !== 'video')
+    .map(a => {
+      const exif = (a.exif ?? {}) as Record<string, unknown>
+      const lat = grau(exif.GPSLatitude, exif.GPSLatitudeRef)
+      const lng = grau(exif.GPSLongitude, exif.GPSLongitudeRef)
+      return {
+        captura: { uri: a.uri, midia: 'FOTO' as const },
+        capturadaEm: dataExif(exif.DateTimeOriginal) ?? dataExif(exif.DateTime),
+        lat: lat && lng ? lat : null,
+        lng: lat && lng ? lng : null,
+      }
+    })
+}
+
 /** Abre a galeria. Nulo = cancelou. Lança com recado quando falta permissão. */
 export async function escolherDaGaleria(): Promise<DaGaleria | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()

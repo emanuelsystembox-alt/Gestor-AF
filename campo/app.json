@@ -2,7 +2,7 @@
   "expo": {
     "name": "PulsoLine",
     "slug": "afline-manager",
-    "version": "0.6.0",
+    "version": "0.7.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "gestoraf",

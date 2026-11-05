@@ -51,6 +51,15 @@ Conferir: `claude mcp list` (mostra estado de cada um, sem mostrar segredo).
 | GitHub CLI (`gh`) | **não logado** | `gh auth status` | só para PR/issue — se precisar, o Emanuel roda `gh auth login` |
 | `app/.env` | na pasta, fora do Git | o script confere as chaves | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (publishable — quem protege é o RLS), `VITE_GOOGLE_MAPS_API_KEY` (restrita por referenciador) |
 | `campo/.env` | na pasta, fora do Git | o script confere as chaves | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `GOOGLE_MAPS_ANDROID_KEY` |
+
+**Google Maps — desde 04/11/2026 no projeto `pulsoline-mapas`** (conta Google `geminiturbo1@gmail.com`,
+"Minha conta de faturamento", hoje em período de teste: R$ 1.830 de crédito, 90 dias). Duas chaves:
+**PulsoLine site (mapa)** — só Maps JavaScript API, só os sites `pulsoline.grupoafline.com.br`,
+`gestor-af.pages.dev`, `*.gestor-af.pages.dev` e `localhost:5173`; **PulsoLine app do tecnico (Android)**
+— só Maps SDK for Android. Orçamento "Alerta PulsoLine R$ 50" (avisa em 25/45/50, sem descontar crédito).
+O Google NÃO deixa travar "Map loads per day" nem pôr limite de gasto no Maps: o alerta só avisa. Ver D-307.
+A chave antiga (projeto `amazing-coast-h9v0l`, faturamento de um tenant do Cloud Run que ninguém
+daqui controla) ficava presa em **100 carregamentos por dia** — foi o "For development purposes only".
 | Variáveis da EAS (`--environment preview`) | na conta da Expo | `npx eas-cli@latest env:list --environment preview` | o `eas update` lê daqui, não do `.env` (ver `traps.md`) |
 | **Token da Hostinger** | `~/.claude.json` (env do `hostinger-api`) | `claude mcp list` | o MCP da VPS |
 | **Acesso do Claude Code ao modelo** | `~/.claude/settings.json` → `env` (`ANTHROPIC_BASE_URL` = gateway `apiclaude.pulsecoding.com.br`, `ANTHROPIC_AUTH_TOKEN`) | a sessão abrir já prova | é por onde esta IA fala com o modelo; outra sessão do mesmo usuário usa o mesmo |

@@ -15,9 +15,10 @@ import { distanciaM, ondeEstou, type EstadoGps } from '../lib/gps'
 import {
   apagarEvidencia, enfileirar, enviarEvidencia, pendentesDaVisita, urlAssinada,
 } from '../lib/midia'
-import { escolherDaGaleria } from '../lib/galeria'
+import { escolherVariasDaGaleria } from '../lib/galeria'
 import { VisorEvidencia } from '../ui/VisorEvidencia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
+import { copiarTelefone, TextoComTelefone } from '../ui/TextoComTelefone'
 import { NOMES_MARCADORES_COR, SeloOuvidoria, SeloRevD10, SeloSegmento, SeloTec1, SelosMarcadores } from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
@@ -242,6 +243,8 @@ export default function Visita({ route, navigation }: Props) {
   // 132: ver o que subiu, e mandar da galeria.
   const [vendo, setVendo] = useState<Evid | null>(null)
   const [enviandoGaleria, setEnviandoGaleria] = useState(false)
+  /** D-309: "2 de 5" enquanto sobem as fotos da galeria. */
+  const [progressoGaleria, setProgressoGaleria] = useState<string | null>(null)
   const [equipAberto, setEquipAberto] = useState(false)
   const [equipOper, setEquipOper] = useState<'INSTALADO' | 'RETIRADO'>('INSTALADO')
   const [equipSerial, setEquipSerial] = useState('')
@@ -596,30 +599,43 @@ export default function Visita({ route, navigation }: Props) {
    * sinal, vai para a mesma fila da câmera. A hora e o GPS são os do
    * arquivo (EXIF); sem eles, sobe sem — nunca com os de agora.
    */
+  // D-309: várias fotos do mesmo tipo de uma vez, uma depois da outra (não
+  // em paralelo: no 4G fraco, cinco envios juntos falham os cinco). Sem
+  // sinal, a que falhou e as que faltam vão para a fila e sobem sozinhas.
   async function enviarDaGaleria(tipo: string) {
     if (!v) return
     setErro(null)
-    let g: Awaited<ReturnType<typeof escolherDaGaleria>>
-    try { g = await escolherDaGaleria() } catch (err) {
+    let fotos: Awaited<ReturnType<typeof escolherVariasDaGaleria>>
+    try { fotos = await escolherVariasDaGaleria() } catch (err) {
       setErro(err instanceof Error ? err.message : String(err)); return
     }
-    if (!g) return
+    if (!fotos.length) return
     setEnviandoGaleria(true)
-    const dados = {
-      visitaId: v.id,
-      osId: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
-      tipo, lat: g.lat, lng: g.lng, precisao: null,
-      capturadaEm: g.capturadaEm, galeria: true,
+    let naFila = 0
+    const recusadas: string[] = []
+    for (let k = 0; k < fotos.length; k++) {
+      const g = fotos[k]
+      setProgressoGaleria(fotos.length > 1 ? `${k + 1} de ${fotos.length}` : null)
+      const dados = {
+        visitaId: v.id,
+        osId: v.ordem_servico.length === 1 ? v.ordem_servico[0].id : null,
+        tipo, lat: g.lat, lng: g.lng, precisao: null,
+        capturadaEm: g.capturadaEm, galeria: true,
+      }
+      if (naFila > 0) { await enfileirar(g.captura, dados); naFila++; continue }
+      try {
+        await enviarEvidencia(g.captura, dados)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        // Arquivo grande demais não adianta guardar na fila.
+        if (/limite/i.test(msg)) recusadas.push(msg)
+        else { await enfileirar(g.captura, dados); naFila++ }
+      }
     }
-    try {
-      await enviarEvidencia(g.captura, dados)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      // Arquivo grande demais não adianta guardar na fila.
-      if (/limite/i.test(msg)) setErro(msg)
-      else { await enfileirar(g.captura, dados); setErro('Sem sinal: a evidência ficou na fila e sobe sozinha.') }
-    }
+    setProgressoGaleria(null)
     setEnviandoGaleria(false)
+    if (recusadas.length) setErro(recusadas[0])
+    else if (naFila) setErro(`Sem sinal: ${naFila} foto(s) ficaram na fila e sobem sozinhas.`)
     await recarregar()
   }
 
@@ -830,7 +846,8 @@ export default function Visita({ route, navigation }: Props) {
               💬 Observação do COP{v.observacao_cop_em
                 ? ` · ${carimbo(v.observacao_cop_em)}` : ''}
             </Text>
-            <Text style={e.obsCopTexto}>{v.observacao_cop}</Text>
+            {/* D-310: o número no meio da observação liga ou copia */}
+            <TextoComTelefone texto={v.observacao_cop} style={e.obsCopTexto} />
           </View>
         )}
 
@@ -889,7 +906,7 @@ export default function Visita({ route, navigation }: Props) {
 
         {/* ---------- endereço ---------- */}
         <Cartao style={{ padding: 16 }}>
-          {!!v.cliente_nome && <Text style={e.clienteNome}>{v.cliente_nome}</Text>}
+          {!!v.cliente_nome && <Text style={e.clienteNome} selectable>{v.cliente_nome}</Text>}
           <Text style={e.endereco}>{v.logradouro ?? 'Sem endereço'}</Text>
           {!!v.complemento && <Text style={e.enderecoMiudo}>{v.complemento}</Text>}
           <Text style={e.enderecoMiudo}>
@@ -925,22 +942,26 @@ export default function Visita({ route, navigation }: Props) {
             )}
             {/* Ligar antes de sair evita a improdutiva mais comum:
                 cliente ausente. O número já está aqui — usar. */}
+            {/* D-310: "Copiar" ao lado do "Ligar" — o técnico manda o número
+                no WhatsApp ou disca de outro chip */}
             {(v.telefones ?? []).slice(0, 2).map(t => (
-              <Botao
-                key={t}
-                titulo={`Ligar para ${t}`}
-                tom="discreto"
-                aoTocar={() => Linking.openURL(`tel:${t.replace(/\D/g, '')}`)}
-              />
+              <View key={t} style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Botao titulo={`Ligar para ${t}`} tom="discreto"
+                    aoTocar={() => Linking.openURL(`tel:${t.replace(/\D/g, '')}`)} />
+                </View>
+                <Botao titulo="Copiar" tom="contorno" aoTocar={() => copiarTelefone(t)} />
+              </View>
             ))}
             {/* todos os números do histórico, sem rótulo de origem (Emanuel, 03/11) */}
             {telAnteriores.map(t => (
-              <Botao
-                key={t.telefone}
-                titulo={`Ligar para ${t.telefone}`}
-                tom="discreto"
-                aoTocar={() => Linking.openURL(`tel:${t.telefone.replace(/\D/g, '')}`)}
-              />
+              <View key={t.telefone} style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Botao titulo={`Ligar para ${t.telefone}`} tom="discreto"
+                    aoTocar={() => Linking.openURL(`tel:${t.telefone.replace(/\D/g, '')}`)} />
+                </View>
+                <Botao titulo="Copiar" tom="contorno" aoTocar={() => copiarTelefone(t.telefone)} />
+              </View>
             ))}
           </View>
 
@@ -1112,6 +1133,37 @@ export default function Visita({ route, navigation }: Props) {
                     <Text style={e.trocar}>{os.sub_falha ? 'Trocar sub-falha' : 'Escolher sub-falha'}</Text>
                   </Pressable>
                 )}
+
+                {/* D-311 (209): a observação da baixa também na O.S. que o TOA
+                    encerrou — "isso já tem porém não nos contratos encerrados"
+                    (Emanuel, 05/11). Só no dia, a regra do anexo. */}
+                {!!os.baixa_observacao && obsOs !== os.id && (
+                  <TextoComTelefone texto={os.baixa_observacao} style={e.baixaMiudo} />
+                )}
+                {obsOs === os.id ? (
+                  <View style={{ gap: 8, marginTop: 6 }}>
+                    <TextInput
+                      value={obsOsTexto} onChangeText={setObsOsTexto}
+                      placeholder="Observação da baixa"
+                      placeholderTextColor={cor.graf300}
+                      multiline maxLength={500} autoFocus
+                      style={e.campo}
+                    />
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Botao titulo="Cancelar" tom="contorno" style={{ flex: 1 }}
+                        aoTocar={() => setObsOs(null)} />
+                      <Botao titulo="Salvar" style={{ flex: 1 }} carregando={obsOsSalvando}
+                        aoTocar={() => salvarObsBaixa(os.id)} />
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable hitSlop={8}
+                    onPress={() => { setObsOs(os.id); setObsOsTexto(os.baixa_observacao ?? '') }}>
+                    <Text style={e.trocar}>
+                      {os.baixa_observacao ? 'Editar observação' : 'Escrever observação'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </Cartao>
@@ -1222,7 +1274,8 @@ export default function Visita({ route, navigation }: Props) {
         {/* 132: da galeria do celular — sobe marcada, com hora e GPS do arquivo.
             D-256: só foto; vídeo só pela câmera do app. */}
         {podeAnexar && (
-          <Botao titulo={enviandoGaleria ? 'Enviando da galeria…' : 'Foto da galeria'}
+          <Botao titulo={enviandoGaleria
+              ? `Enviando da galeria${progressoGaleria ? ` ${progressoGaleria}` : ''}…` : 'Fotos da galeria'}
             tom="contorno" carregando={enviandoGaleria}
             aoTocar={() => setEscolhendoTipo('GALERIA')} />
         )}
@@ -1406,7 +1459,7 @@ export default function Visita({ route, navigation }: Props) {
                       {ev.login ? <Text style={e.eventoLogin}> · {ev.login}</Text> : null}
                     </Text>
                     {!!ev.observacao && (
-                      <Text style={e.eventoObs}>{ev.observacao}</Text>
+                      <TextoComTelefone texto={ev.observacao} style={e.eventoObs} />
                     )}
                   </View>
                 </View>
@@ -1648,6 +1701,11 @@ export default function Visita({ route, navigation }: Props) {
             {escolhendoTipo === 'VIDEO' ? 'Gravar vídeo de quê?'
               : escolhendoTipo === 'GALERIA' ? 'Da galeria: é de quê?' : 'Foto de quê?'}
           </Text>
+          {escolhendoTipo === 'GALERIA' && (
+            <Text style={e.folhaMiudo}>
+              Depois, marque as fotos desse grupo — até 10 de uma vez.
+            </Text>
+          )}
           <Text style={e.folhaMiudo}>
             O tipo é o que faz a evidência ser encontrada depois. Nenhum
             deles é obrigatório para baixar.

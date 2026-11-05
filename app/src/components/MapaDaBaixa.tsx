@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useTema } from '../lib/tema'
 import {
-  aoFalharAutenticacao, autenticacaoFalhou, carregarMapaGoogle, temChaveDoMapa,
+  aoFalharAutenticacao, autenticacaoFalhou, camada, carregarMapaGoogle, mapaReaproveitado, temChaveDoMapa,
 } from '../lib/mapaGoogle'
 import { metrosEntre, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 import { idadeMin, type Aproximacao } from '../lib/aproximacao'
@@ -392,83 +392,84 @@ function MapaPontos({ dados, foco }: { dados: Dados; foco: string | null }) {
   // construção (traps.md) — trocar o tema com ela aberta refaz o mapa.
   useEffect(() => {
     if (!pronto || !div.current) return
-    div.current.innerHTML = ''
-    const m = new google.maps.Map(div.current, {
+    // D-308: o mesmo mapa em toda abertura (lib/mapaGoogle)
+    const m = mapaReaproveitado(div.current, tema, {
       center: dados.toa ?? { lat: -3.1, lng: -60.0 }, zoom: 17,
-      colorScheme: tema === 'claro' ? 'LIGHT' : 'DARK',
       mapTypeControl: true,
       mapTypeControlOptions: { mapTypeIds: ['roadmap', 'satellite', 'hybrid'] },
       streetViewControl: true, fullscreenControl: true, rotateControl: false,
       clickableIcons: false,
     })
     mapa.current = m
+    const c = camada()
     const limites = new google.maps.LatLngBounds()
     let n = 0
 
     // O caminho da execução, em ordem: a linha e os pontos, em cinza — o
     // trajeto, não a afirmação.
-    if (dados.rastro.length > 1) new google.maps.Polyline({
+    if (dados.rastro.length > 1) c.guarda(new google.maps.Polyline({
       map: m, path: dados.rastro, strokeColor: '#6b7280', strokeOpacity: 0.7, strokeWeight: 3, zIndex: 5,
       icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2, strokeColor: '#4b5563' },
                 offset: '50%', repeat: '120px' }],
-    })
+    }))
     for (const p of dados.rastro) {
       // O círculo de precisão só quando é pequeno: doze círculos de 2 km
       // um em cima do outro escurecem o mapa e não dizem nada a mais.
-      if (p.precisao_m != null && Number(p.precisao_m) <= 300) new google.maps.Circle({
+      if (p.precisao_m != null && Number(p.precisao_m) <= 300) c.guarda(new google.maps.Circle({
         map: m, center: p, radius: Number(p.precisao_m), clickable: false,
         strokeColor: '#9ca3af', strokeOpacity: 0.35, strokeWeight: 1, fillColor: '#9ca3af', fillOpacity: 0.06,
-      })
-      new google.maps.Marker({
+      }))
+      c.guarda(new google.maps.Marker({
         map: m, position: p, zIndex: 10,
         title: `Rastro ${hhmm(p.em)}${p.precisao_m != null ? ` · GPS ±${Math.round(Number(p.precisao_m))} m` : ''}`,
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 4, fillColor: '#6b7280', fillOpacity: 0.95,
                 strokeColor: '#ffffff', strokeWeight: 1 },
-      })
+      }))
     }
 
     if (dados.toa) {
       limites.extend(dados.toa); n++
-      new google.maps.Circle({
+      c.guarda(new google.maps.Circle({
         map: m, center: dados.toa, radius: dados.raio, clickable: false,
         strokeColor: COR.TOA, strokeOpacity: 0.8, strokeWeight: 1.5, fillColor: COR.TOA, fillOpacity: 0.06,
-      })
-      new google.maps.Marker({
+      }))
+      c.guarda(new google.maps.Marker({
         map: m, position: dados.toa, zIndex: 60, title: `${NOME.TOA} · raio ${dados.raio} m`,
         label: { text: 'C', color: '#ffffff', fontSize: '11px', fontWeight: '800' },
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: COR.TOA, fillOpacity: 1,
                 strokeColor: '#ffffff', strokeWeight: 2 },
-      })
+      }))
     }
 
     for (const p of dados.pontos) {
       const pos = { lat: p.lat, lng: p.lng }
       limites.extend(pos); n++
       if (dados.toa) {
-        new google.maps.Polyline({
+        c.guarda(new google.maps.Polyline({
           map: m, path: [pos, dados.toa], strokeColor: COR[p.tipo], strokeOpacity: 0.85, strokeWeight: 2,
           icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '8px' }],
-        })
+        }))
       }
       if (p.precisao_m != null && Number(p.precisao_m) > 0) {
-        new google.maps.Circle({
+        c.guarda(new google.maps.Circle({
           map: m, center: pos, radius: Math.min(Number(p.precisao_m), 2000), clickable: false,
           strokeColor: COR[p.tipo], strokeOpacity: 0.4, strokeWeight: 1, fillColor: COR[p.tipo], fillOpacity: 0.08,
-        })
+        }))
       }
-      new google.maps.Marker({
+      c.guarda(new google.maps.Marker({
         map: m, position: pos, zIndex: p.tipo === 'AGORA' ? 58 : p.tipo === 'APP' ? 50 : 55,
         title: `${p.rotulo} · ${diaHora(p.em)}${p.dist != null ? ` · ${textoDistancia(p.dist)} da casa do TOA` : ''}`
              + `${p.precisao_m != null ? ` · GPS ±${Math.round(Number(p.precisao_m))} m` : ''}`,
         label: { text: LETRA[p.tipo], color: '#ffffff', fontSize: '10px', fontWeight: '800' },
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: COR[p.tipo], fillOpacity: 1,
                 strokeColor: '#ffffff', strokeWeight: 2 },
-      })
+      }))
     }
     // A trilha entra no enquadramento: é ela que diz por onde ele andou.
     for (const p of dados.rastro) { limites.extend(p); n++ }
     if (n > 1) m.fitBounds(limites, 48)
     else if (n === 1) { m.setCenter(limites.getCenter()); m.setZoom(17) }
+    return () => c.limpa()
   }, [pronto, dados, tema])
 
   // O item clicado na lista centraliza o mapa nele.

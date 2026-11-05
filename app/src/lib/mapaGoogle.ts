@@ -105,3 +105,45 @@ export function carregarMapaGoogle(): Promise<void> {
 
   return promessa
 }
+
+/*
+ * ┌─ D-308 · um mapa só para as janelas ──────────────────────────────────┐
+ * │ O Google cobra (e, sem faturamento, limita a 100/dia) por MAPA CRIADO │
+ * │ — `new google.maps.Map`. As janelas (onde baixou, intervalo da        │
+ * │ jornada) criavam um a cada abertura: dez cliques, dez "map loads".    │
+ * │ Aqui o mapa nasce uma vez por tema e por sessão, num <div> próprio,   │
+ * │ e cada janela que abre só o PENDURA no seu espaço e redesenha os      │
+ * │ pontos. Reabrir fica mais rápido, não mais lento: o mapa já está      │
+ * │ pronto. Um por tema porque `colorScheme` só vale na construção        │
+ * │ (traps.md). Quem usa limpa os próprios desenhos ao fechar.            │
+ * └────────────────────────────────────────────────────────────────────────┘
+ */
+const reaproveitados = new Map<string, { el: HTMLDivElement; mapa: google.maps.Map }>()
+
+export function mapaReaproveitado(destino: HTMLElement, tema: string,
+                                  opcoes: google.maps.MapOptions): google.maps.Map {
+  let x = reaproveitados.get(tema)
+  if (!x) {
+    const el = document.createElement('div')
+    el.style.width = '100%'
+    el.style.height = '100%'
+    const mapa = new google.maps.Map(el, { ...opcoes, colorScheme: tema === 'claro' ? 'LIGHT' : 'DARK' })
+    x = { el, mapa }
+    reaproveitados.set(tema, x)
+  } else {
+    x.mapa.setOptions(opcoes)
+    if (opcoes.center) x.mapa.setCenter(opcoes.center)
+    if (opcoes.zoom != null) x.mapa.setZoom(opcoes.zoom)
+  }
+  if (x.el.parentElement !== destino) destino.appendChild(x.el)
+  return x.mapa
+}
+
+/** Guarda o que foi desenhado num mapa reaproveitado, para tirar ao fechar. */
+export function camada() {
+  const itens: { setMap: (m: google.maps.Map | null) => void }[] = []
+  return {
+    guarda: <T extends { setMap: (m: google.maps.Map | null) => void }>(o: T): T => { itens.push(o); return o },
+    limpa: () => { for (const o of itens) o.setMap(null); itens.length = 0 },
+  }
+}

@@ -39,6 +39,7 @@ const SELECT = `
   origem, criado_em, inicio, fim, tempo_deslocamento, toa_bucket,
   status_toa:dados_origem->>"Status da Atividade",
   motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
+  cancelado_central_em,
   contador_log:dados_origem->>"Contador de log",
   tipo_atividade:tipo_atividade_id ( nome, natureza ),
   tipo_servico:tipo_servico_id ( nome, prioridade ),

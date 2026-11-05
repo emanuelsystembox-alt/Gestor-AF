@@ -71,6 +71,9 @@ export const TIPOS_EVIDENCIA = [
   { chave: 'MINI_ISOLADOR',  rotulo: 'Mini isolador' },
   { chave: 'TESTE_VELOCIDADE', rotulo: 'Teste de velocidade' },
   { chave: 'CONSULTIVO',     rotulo: 'Consultivo' },
+  // D-309 (Emanuel, 04/11)
+  { chave: 'EVIDENCIAS_REFAZER', rotulo: 'Evidências refazer' },
+  { chave: 'NIVEIS_SINAIS',  rotulo: 'Níveis de sinais' },
   { chave: 'LIVRE',          rotulo: 'Outra' },
 ] as const
 
