@@ -96,10 +96,12 @@ export async function lerPlanilhaTOA(arquivo: File): Promise<ResultadoLeitura> {
       const texto = celulaParaTexto(bruta[c])
       if (texto !== '') obj[chaves[c]] = texto
     }
-    // Sem ID da Atividade não há chave de deduplicação (D-004): a linha
-    // não pode entrar, senão a reimportação duplicaria. 187: há exportação
-    // do TOA SEM a coluna do ID — a linha com WO sobe, e o banco completa o
-    // ID pela WO do contrato do dia (só o que já existe).
+    // Sem ID da Atividade nem WO não há chave de deduplicação (D-004): a
+    // linha não pode entrar, senão a reimportação duplicaria. 187: há
+    // exportação do TOA SEM a coluna do ID — a linha com WO sobe, e o banco
+    // completa o ID pela WO do contrato do dia. 215: WO sem contrato no dia
+    // entra com chave provisória ('SEMID-WO-<wo>'), que a planilha com o ID
+    // troca pelo ID real. Jornada (sem WO) continua de fora.
     if (obj['ID da Atividade'] || obj['Número da WO']) linhas.push(obj)
     else descartadas++
   }
@@ -117,8 +119,9 @@ export function validarPlanilha(r: ResultadoLeitura): string[] {
       problemas.push(`Coluna obrigatória ausente: "${col}"`)
     }
   }
-  // 187: o ID pode faltar se houver a WO (o banco acha o contrato do dia
-  // por ela). Sem os dois, nenhuma linha tem chave.
+  // 187/215: o ID pode faltar se houver a WO (o banco acha o contrato do
+  // dia por ela, ou cria com chave provisória). Sem os dois, nenhuma linha
+  // tem chave.
   if (!r.cabecalhos.includes('ID da Atividade') && !r.cabecalhos.includes('Número da WO')) {
     problemas.push('Coluna obrigatória ausente: "ID da Atividade" (ou, na falta dela, "Número da WO")')
   }

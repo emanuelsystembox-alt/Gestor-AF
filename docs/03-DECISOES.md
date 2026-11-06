@@ -12624,3 +12624,159 @@ Agora `observar_baixa` aceita qualquer das duas baixas (209, regerada do banco),
 "Escrever/Editar observação" também na O.S. fechada pelo TOA. Testado como técnico, em transação
 desfeita: O.S. de hoje encerrada pelo TOA grava; equipamento no mesmo contrato aceito; contrato de
 ontem recusado ("o campo só anexa no dia"). Baterias 29/29 e 33/33. Vai no APK **0.7.1**.
+
+### D-312 · Agendamento não cumprido: pendente no TOA depois das 21:20 vira Reagendado 100 (210)
+
+*"após 21:20 de Manaus toda noite, se o contrato quando houver uma importação depois desse horário
+ainda tiver contrato em entrada ou deslocamento no site e que não tenha cod de baixa em nosso site
+para esse contrato TOA, e o Toa quando importado Informar status pendente no contrato, o contrato
+deve ser puxado imediatamente para Reagendado - Cód 100 - Agendamento não cumprido"* (Emanuel, 05/11).
+
+Mora em `desatribuir_ausentes`, a última chamada de toda importação (site e extensão): site e
+extensão não precisam de versão nova. Vale quando a importação é do dia de **hoje**, feita às 21:20
+de Manaus ou depois (parâmetro `nao_cumprido_hora`), e o contrato veio **nesta** planilha como
+"pendente", está Na entrada / Atribuída / Em deslocamento, não tem código em nenhuma O.S. (nem nosso
+nem do TOA), não é jornada e tem O.S. O 100 vai na **baixa da AFLINE** (D-042); o técnico recebe o
+aviso pelo evento; encerrado não reabre (D-272). O horário é o de Manaus para todas as cidades,
+como foi pedido.
+
+**Recusado (perguntado):** baixar também no TOA. O sistema não grava no TOA (D-250); o Emanuel
+escolheu "só no site e no app" — a baixa lá continua com o COP. Ensaiado numa transação desfeita
+com a planilha MAN-AFLINE_01_VT de 05/11: os 2 contratos "pendente" iriam para Reagendamento, com
+aviso.
+
+### D-313 · Revisita é uma regra só: o vai-e-volta e o REV D-10 seguem `revisita_dos_contratos` (211)
+
+*"Revisita 30 dias, e Revisita 10 dias, ambas devem olhar Retorno do Retorno, Visita da Visita, e
+grupo instalação para Retorno, ou para visita (...) só pode aparecer esse critério, e para subir o
+marcador de REV D-10 tem que entrar na regra e ser 10 dias"* (Emanuel, 05/11). Perguntado se
+Retorno→VT e Serviço→VT deixavam de contar: *"pode manter esses também como revisita"*.
+
+- O **vai-e-volta** (`sinais_das_visitas`, 174) deixa a regra própria (VT da VT em qualquer
+  situação; a mesma O.S. de instalação não concluída) e passa a ser a revisita da D-245: anterior
+  **concluída**, até 30 dias, qualquer → VT, Retorno ← Retorno ou instalação. Motivo novo
+  `DE_OUTRO_GRUPO` (ex.: Adesão → VT). Muda a D-261, que dizia "não troque uma pela outra": as duas
+  divergiam na tela e o Emanuel quer uma só.
+- O **REV D-10** (`aplicar_rev_d10`, 193) passa a ser a mesma revisita com a anterior **até 10
+  dias** (era 30, e só VT←VT). Aplicado em 05/11: 4 postos, 10 tirados (os de 11 a 30 dias).
+- O card Revisita do técnico (`revisita_do_tecnico`, D-246) não mudou.
+
+### D-314 · Marcadores LOG 1 a LOG 6, manuais (211)
+
+*"Os marcadores devemos subir marcador de: LOG 1, LOG 2, LOG 3, LOG 4, LOG 5, LOG 6, caso queiram
+subir ok."* (Emanuel, 05/11). Seis marcadores novos em `indicador_qualidade`, marcados à mão pelo
+COP, como OUVIDORIA e FP2. Não são o "Contador de log" do TOA (que continua vindo da planilha).
+
+### D-315 · Contrato manual com equipe nasce Na entrada; Atribuída só sem dono (211)
+
+*"esse status atribuído não sei para que serve, era pra ser somente quando fosse criado manual e o
+contrato estivesse sem dono, fora isso, se um contrato Manual fosse criado e passado para uma
+equipe (...) tem que estar em entrada mesmo."* (Emanuel, 05/11). `criar_visita_manual` fazia o
+contrário (com equipe → Atribuída, sem equipe → Na entrada). Feito ao pé da letra; os 2 manuais de
+hoje que estavam Atribuída com equipe foram para Na entrada, com evento.
+
+### D-316 · Serviços e Equipes: filtros de lista com mais de uma opção, LOG até 7, Ctrl+clique nas situações
+
+*"ambos o filtro tem que dar liberdade de selecionar mais de uma opção do filtro, ou marcador"*,
+*"o log deve ir até o 7"*, *"filtrar mais de uma situação de status, segurando control"* (Emanuel,
+05/11). Todo filtro de lista virou um conjunto (lista vazia = todos, como os buckets, D-119); o
+contrato passa se casar com qualquer valor marcado. O significado de cada valor não mudou
+(Cancelado pela central e Auditar continuam por `origemCancelada()`). Um componente só,
+`SelecaoMultipla` (botão com caixinhas — recusado o `<select multiple>`, cujo Ctrl+clique ninguém
+descobre). Entraram **Janela** e **Marcador** em Serviços, **Equipe** e **Marcador** em Equipes (o
+marcador olha só se existe no contrato: `cumprido` está nulo nas 103 marcações). LOG: 0 a 6 um por
+um, "7 ou mais" e "Sem LOG". Pílulas: clique escolhe uma; Ctrl/Cmd soma ou tira; a barra de
+composição acende todas as fatias marcadas. A URL antiga (`?situacao=X`, `?grupo=X`) continua valendo.
+
+### D-317 · Dashboard: filtros com mais de uma opção, grupo de serviço e card "Não compareceu" (cód. 100)
+
+*"posso selecionar mais de uma opção no grupo de serviços"* e *"deve ter um Card de Não compareceu
+para nos identificarmos os contratos de baixa 100"* (Emanuel, 05/11). Origem, **grupo de serviço**
+(novo), tipo de atividade e equipe aceitam várias opções; todos os números saem da mesma lista
+filtrada. O card conta CONTRATOS com alguma O.S. no 100, na baixa do TOA ou na da AFLINE; o % é
+sobre os encerrados (D-296), o 100 em aberto fica fora da conta, e sem encerrado o card diz "—". A
+lista abre no próprio Dashboard (Serviços não filtra por código) e diz de onde veio o 100: TOA,
+Sistema 21:20 (a 210, reconhecida pela observação que ela grava — `OBS_NAO_CUMPRIDO_SISTEMA` em
+`lib/metricas.ts` muda junto se a observação mudar) ou AFLINE (à mão ou carga histórica: 668
+contratos sem observação, medido em 05/11).
+
+### D-318 · Qualidade: o estágio "Aguardando cliente" entre o pendente e o desfecho (213)
+
+*"deve ter um estágio inicial de status em cada contrato, por exemplo, Aguardando Retorno do
+Cliente, ao lado do Ligação, WhatsApp (...) só para a gente saber que estão aguardando retorno do
+cliente"* (Emanuel, 05/11). Pendente → **Aguardando cliente** → Desfecho. O aguardando não é
+desfecho: mora em `qualidade_aguardando` (canal, telefone, autor por `auth.uid()`, hora; um aberto
+por contrato), e por isso nenhum indicador o conta como avaliado. Desmarcar ou registrar qualquer
+desfecho FECHA a linha (não apaga). Só se marca em contrato sem desfecho ou cujo desfecho não falou
+com ninguém (`qualidade_contatado` falso). Recusado: um décimo desfecho (contaria como avaliado) e
+coluna em `pesquisa_qualidade` (`desfecho` é NOT NULL e seis contas leem `count(desfecho)`).
+**A confirmar com o Emanuel:** qualquer analista com `qualidade.registrar` pode desmarcar.
+
+### D-319 · Monitoramento: card "Fora da área" (214)
+
+*"no Card de monitoramento deve aparecer a quantidade de técnico que saiu da sua área de atuação,
+e quando clicar em cima deve mostrar eles"* (Emanuel, 05/11). Conta quem está, na última posição de
+HOJE, fora de **todas** as áreas (cerca AREA não arquivada) que valem para a equipe dele — a área de
+atuação é a soma delas. Medido em 05/11 às 22h30: 5 fora (2 em Manaus, 3 em São Luís); cerca a cerca
+seriam 13. `monitor_fora_da_area()` só lê o `cerca_estado` que o rastro já mantém (D-171). Sem área
+para a equipe = "sem cerca", fora da conta; com área e sem leitura de hoje = "sem ponto hoje". O selo
+"fora de: X" da lista passou à mesma regra; o aviso do sino continua cerca a cerca (097). Das 6
+cercas, 2 são de Manaus (MA1, MA05) e 4 de São Luís. **A confirmar:** "todas as áreas" ou cerca a cerca.
+
+### D-320 · App do técnico: o LOG e todos os marcadores do contrato
+
+*"APP do técnico deve mostrar os LOG do contrato (...) e deve mostrar os marcadores que o sistema
+sobe no contrato (...) ele mostra poucas coisas, tem que melhorar"* (Emanuel, 05/11). O selo LOG na
+Agenda e no contrato (`campo/src/lib/log.ts`, cópia declarada da web: nulo é "log ?", 3 ou mais preto
+com aro âmbar); na Agenda a leitura traz SÓ `dados_origem->>'Contador de log'` (LGPD). Os marcadores
+deixaram de ser lista fechada: sai todo marcador ativo, na ordem do cadastro, com as cores da web,
+LOG 1–6 como o selo de LOG, o resto cinza; no contrato, com a observação de quem marcou. Entraram no
+contrato prédio/casa, o vai-e-volta com o porquê por extenso, Node e WO. Sem RPC nova: `vm_leitura` e o
+RLS de `visita` bastam (medido como técnico real).
+
+### D-321 · Dashboard Visita Técnica e base de clientes por área (212)
+
+*"Vamos criar um Dashboard Visita Técnica abaixo do principal (...) gráficos intuitivos e
+direcionados para o resultado"* (Emanuel, 05/11). Embaixo do Dashboard (segue o dia do Dashboard
+quando o período é de um dia; senão tem seletor próprio). Uma RPC, `dashboard_visita_tecnica(p_dia)`,
+INVOKER (o RLS de `visita` é o escopo, cidade ativa), grupo VISITA TECNICA, sem jornada:
+- **TEC1**: `tec1_da_os`, por O.S., meta 94%, sobre a VT fora Auditar e Cancelado pela central.
+- **LOG** = LOG 3 ou mais ÷ VT do dia sem Auditar (perguntado: o corte é 3). **AT5** = LOG 0 ÷ a
+  mesma base. LOG vazio na planilha não é 0: fica fora do denominador e é contado à parte.
+- **AT1** = VT do dia (fora Auditar e Cancelado pela central) ÷ base de clientes das áreas;
+  **projetada** = VT do dia × dias do mês ÷ base (perguntado: "só o dia"). Área sem base é "sem
+  base", nunca zero, e a VT dela fica fora da conta, avisada.
+- Ofensores: executadas por equipe (código de sucesso sem improdutivo, como a 161c); revisita
+  (`revisita_dos_contratos`, para o técnico do serviço ANTERIOR); Node; código de baixa do TOA, ou o
+  da AFLINE quando o TOA não tem, com a sub-falha de cada código.
+A base mora em `base_clientes_area`, com **vigência** (trocar o número não reescreve o passado, como
+a meta da skill, D-167), cadastrada em Configurações › Base de clientes por quem tem
+`pode_configurar`, na cidade ativa; o servidor carimba empresa, cidade e autor. Nasceu vazia.
+Recusado: guardar o AT1 calculado e escrever a regra da revisita outra vez.
+**Perguntas abertas ao Emanuel:** volume do AT1 inclui VT em aberto?; LOG vazio fora do denominador
+ou "total cru"?; a base cadastrada hoje vale desde o dia 1 do mês?; metas de LOG, AT5 e AT1 (só o
+TEC1 tem cor de meta); revisita cujo serviço anterior não tem técnico (6 hoje, equipe 120).
+
+### D-322 · Planilha do TOA sem "ID da Atividade": contrato novo entra com chave provisória, e a planilha com o ID a troca (215)
+
+*"o outro arquivo que você informa que não tem ID quando é importado, tem que dar um jeito de usar
+ele (...) talvez o sistema criar a ID para o novo contrato que não tivesse (...) e depois quando eu
+importar com o padrão de sempre ele não duplicar e saber que o contrato existe"* (Emanuel, 05/11).
+Muda a D-276. Em 05/11, entre 07:10 e 08:09, onze importações manuais sem ID terminaram com
+"Criadas 0 · Ignoradas N": era a primeira do dia e a 187 só completava o ID de contrato que já
+existia. Agora a WO sem contrato no dia vira a chave `SEMID-WO-<wo>` em `visita.toa_atividade_id`
+(não colide: os IDs do TOA são números; estável: uma atividade por WO, dia e cidade). Quando chega a
+planilha com o ID, a linha da mesma WO passa o ID real ao provisório ANTES do laço (evento
+EDICAO_CADASTRO, sem aviso) e o contrato é atualizado, não duplicado. **Suspensa não conta:** em 867
+importações, 1.149 vezes uma WO veio com dois IDs no mesmo arquivo, e em todas só um não estava
+suspenso. Fica de fora, com o motivo na linha, o que não dá para chavear sem adivinhar: WO repetida
+entre linhas sem ID, WO com ID em outra linha, WO que já tem contrato no dia, linha sem WO (jornada).
+A varredura da extensão ignora a chave provisória. Recusado: coluna nova (o prefixo basta) e mexer
+em `desatribuir_ausentes` (o provisório é achado pela `visita_id` da linha). Medido como
+authenticated: dia inteiro de Manaus, 248 criadas sem ID em 4,1–4,4 s e trocadas pela planilha com ID
+em 4,7–5,6 s, 0 WO duplicada — folga de ~2,5 s para os 8 s.
+**Perguntas abertas:** jornada (Na Base, Refeição) não tem WO e fica de fora da planilha sem ID;
+"Ausencia por motivo medico" e "Retorno a Base" estão como PRODUTIVA e são desatribuídas/acusadas pela
+planilha sem ID — deveriam ser JORNADA?; selo "provisória" na tela do contrato.
+**Fora do escopo, a olhar:** na tarde de 05/11 (14h–17h) ~40 importações estouraram o tempo, com e
+sem ID; às 17:40 voltaram a 1–2,5 s. Causa não achada (o log do Postgres não registra).

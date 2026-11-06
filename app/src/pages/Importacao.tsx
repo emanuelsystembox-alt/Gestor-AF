@@ -360,12 +360,13 @@ export default function Importacao() {
                 )
               })()}
 
-              {/* 187: exportação do TOA sem o ID — o banco acha o contrato do
-                  dia pela WO; o que não existe ainda não tem como entrar. */}
+              {/* 187/215: exportação do TOA sem o ID — o banco acha o contrato
+                  do dia pela WO; o que ainda não existe entra com chave
+                  provisória, trocada pelo ID quando vier a planilha com ele. */}
               {semIdDaAtividade(leitura) && (
                 <p className="mt-3 rounded-lg border border-amber-700/50 bg-amber-950/30 px-3 py-2.5 text-xs text-amber-300">
-                  Sem a coluna <strong>ID da Atividade</strong>: o contrato é achado pela WO.
-                  Contrato novo e jornada ficam de fora.
+                  Sem a coluna <strong>ID da Atividade</strong>: o contrato é achado pela WO; o novo
+                  entra com chave provisória até vir a planilha com o ID. Jornada fica de fora.
                 </p>
               )}
 
@@ -621,6 +622,25 @@ export default function Importacao() {
                 </div>
               ))}
             </div>
+
+            {/* 215: a planilha sem ID — o que entrou com chave provisória e o
+                que a planilha com o ID reconheceu (sem duplicar). */}
+            {(!!resumo.provisorias || !!resumo.id_trocado) && (
+              <Alerta tipo="info">
+                {!!resumo.provisorias && (
+                  <p>
+                    <strong>{resumo.provisorias}</strong> contrato(s) sem ID da Atividade entraram com
+                    chave provisória (pela WO). A planilha com o ID troca a chave, sem duplicar.
+                  </p>
+                )}
+                {!!resumo.id_trocado && (
+                  <p>
+                    <strong>{resumo.id_trocado}</strong> contrato(s) com chave provisória receberam o ID
+                    da Atividade do TOA.
+                  </p>
+                )}
+              </Alerta>
+            )}
 
             {/* 116 (D-191): o que saiu do TOA e o que voltou. Nulo = a
                 conferência não rodou — não é "nenhum". */}

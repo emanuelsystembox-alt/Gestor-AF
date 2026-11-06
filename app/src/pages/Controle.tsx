@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { supabase, SITUACAO_INFO } from '../lib/supabase'
 import { calcular, csvPorTipo, type Visita } from '../lib/metricas'
@@ -14,6 +15,7 @@ import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { SEM_BUCKET } from '../lib/filtroContratos'
 import { QuebraPorAgrupamento, tabelaQuebra } from '../components/QuebraPorAgrupamento'
 import { LinkContrato } from '../components/LinkContrato'
+import DashboardVT from '../components/DashboardVT'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -52,7 +54,7 @@ const SELECT = `
     codigo_baixa:codigo_baixa_id ( codigo, descricao, natureza, responsabilidade,
                                    responsavel_quebra, agrupamento_quebra, agrupamento_quebra_vt, quebra_pct,
                                    situacao_destino ),
-    baixa_afline:codigo_baixa_afline_id ( codigo, descricao )
+    baixa_afline:codigo_baixa_afline_id ( codigo, descricao ), baixa_observacao
   ),
   evidencia ( count )
 `
@@ -89,6 +91,137 @@ const dataBR = (iso: string) => new Date(iso + 'T12:00').toLocaleDateString('pt-
 
 const sel = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs'
 
+/** Contrato sem grupo de serviço: opção própria, para não sumir do filtro. */
+const SEM_GRUPO = '__SEM_GRUPO__'
+const grupoDe = (v: Visita) => v.tipo_servico?.nome ?? SEM_GRUPO
+const ROTULO_ORIGEM: Record<string, string> = { TOA: 'TOA', MANUAL: 'Manual' }
+
+interface Opcao { valor: string; rotulo: string; qtd: number }
+
+/** Conta as opções de um filtro sobre as visitas; chave nula fica de fora. */
+function contar(vs: Visita[], chave: (v: Visita) => string | null,
+  rotulo: (valor: string, v: Visita) => string): Opcao[] {
+  const m = new Map<string, Opcao>()
+  for (const v of vs) {
+    const k = chave(v)
+    if (k == null) continue
+    const o = m.get(k)
+    if (o) o.qtd++
+    else m.set(k, { valor: k, rotulo: rotulo(k, v), qtd: 1 })
+  }
+  return [...m.values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))
+}
+
+/**
+ * Filtro com MAIS DE UM marcado, o mesmo desenho do `SeletorBuckets` (119):
+ * botão que abre caixinhas, nada marcado = todos. A lista abre por portal na
+ * `.sup-controle` com `fixed` — o cartão dos filtros tem `transform` e
+ * prenderia o `absolute` dentro dele (D-169, D-173).
+ *
+ * Mora aqui, e não em components/, porque Serviços está ganhando o seu
+ * componente de seleção múltipla ao mesmo tempo (05/11). Juntar os dois
+ * fica para quando as duas telas estiverem prontas.
+ */
+function SeletorMultiplo({ rotulo, todos, varios, opcoes, valor, onChange, className }: {
+  rotulo: string
+  todos: string
+  varios: (n: number) => string
+  opcoes: Opcao[]
+  valor: string[]
+  onChange: (v: string[]) => void
+  className: string
+}) {
+  const [aberto, setAberto] = useState(false)
+  const caixa = useRef<HTMLDivElement>(null)
+  const lista = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ x: number; dir: number; y: number } | null>(null)
+
+  function abrirOuFechar() {
+    if (aberto) { setAberto(false); return }
+    const r = caixa.current?.getBoundingClientRect()
+    if (r) setPos({ x: r.left, dir: r.right, y: r.bottom + 4 })
+    setAberto(true)
+  }
+
+  useEffect(() => {
+    if (!aberto) return
+    const fora = (e: MouseEvent) => {
+      const alvo = e.target as Node
+      if (caixa.current?.contains(alvo) || lista.current?.contains(alvo)) return
+      setAberto(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    // fixed não acompanha a rolagem: rolou, fecha
+    const rolou = (e: Event) => {
+      if (lista.current?.contains(e.target as Node)) return
+      setAberto(false)
+    }
+    document.addEventListener('mousedown', fora)
+    document.addEventListener('keydown', esc)
+    window.addEventListener('scroll', rolou, true)
+    window.addEventListener('resize', rolou)
+    return () => {
+      document.removeEventListener('mousedown', fora)
+      document.removeEventListener('keydown', esc)
+      window.removeEventListener('scroll', rolou, true)
+      window.removeEventListener('resize', rolou)
+    }
+  }, [aberto])
+
+  // O marcado que o período novo não tem continua na lista (com 0): senão
+  // ele filtraria tudo para fora e não haveria onde desmarcar.
+  const todas: Opcao[] = [...opcoes, ...valor
+    .filter(x => !opcoes.some(o => o.valor === x))
+    .map(x => ({ valor: x, rotulo: x === SEM_GRUPO ? 'Sem grupo de serviço' : x, qtd: 0 }))]
+  const nome = (x: string) => todas.find(o => o.valor === x)?.rotulo ?? x
+  const alterna = (x: string) =>
+    onChange(valor.includes(x) ? valor.filter(y => y !== x) : [...valor, x])
+  const texto = valor.length === 0 ? todos
+    : valor.length === 1 ? nome(valor[0]) : varios(valor.length)
+
+  return (
+    <div ref={caixa} className="relative">
+      <button type="button" onClick={abrirOuFechar}
+        title={valor.length > 1 ? valor.map(nome).join('\n') : undefined}
+        aria-haspopup="true" aria-expanded={aberto} aria-label={rotulo}
+        className={`${className} inline-flex items-center gap-1.5 ${
+          valor.length ? 'border-af-500 text-graf-100' : ''}`}>
+        <span className="truncate">{texto}</span>
+        <span aria-hidden className="text-[9px] opacity-60">▼</span>
+      </button>
+      {aberto && pos && createPortal(
+        <div ref={lista} role="group" aria-label={rotulo}
+          style={pos.x + 260 > window.innerWidth
+            ? { position: 'fixed', left: pos.dir, top: pos.y, transform: 'translateX(-100%)' }
+            : { position: 'fixed', left: pos.x, top: pos.y }}
+          className="z-50 max-h-80 min-w-60 overflow-y-auto rounded-md border
+                     border-graf-700 bg-graf-900 p-1.5 shadow-lg">
+          {todas.length === 0 ? (
+            <p className="px-2 py-1.5 text-xs text-graf-400">Nada no período.</p>
+          ) : todas.map(o => (
+            <label key={o.valor}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs
+                         hover:bg-graf-800">
+              <input type="checkbox" checked={valor.includes(o.valor)}
+                onChange={() => alterna(o.valor)} className="accent-af-600" />
+              <span className="flex-1">{o.rotulo}</span>
+              <span className="tabular text-graf-400">{o.qtd}</span>
+            </label>
+          ))}
+          {valor.length > 0 && (
+            <button type="button" onClick={() => onChange([])}
+              className="mt-1 w-full border-t border-graf-800 px-2 pt-1.5 text-left text-xs
+                         text-af-400 hover:underline">
+              {todos}
+            </button>
+          )}
+        </div>,
+        document.querySelector('.sup-controle') ?? document.body,
+      )}
+    </div>
+  )
+}
+
 export default function Controle() {
   const [periodo, setPeriodo] = useState<Periodo>('HOJE')
   /** 141: o motivo aberto no detalhe (contrato, serviço, técnico). */
@@ -105,9 +238,14 @@ export default function Controle() {
   }, [textoMeta])
   const [de, setDe] = useState(isoLocal(new Date()))
   const [ate, setAte] = useState(isoLocal(new Date()))
-  const [origem, setOrigem] = useState('TODAS')
-  const [equipe, setEquipe] = useState('TODAS')
-  const [tipo, setTipo] = useState('TODOS')
+  // 05/11: "todos os filtros (...) dessem liberdade de selecionar mais de
+  // um" (Emanuel). Vazio = todos, como o bucket (119).
+  const [origens, setOrigens] = useState<string[]>([])
+  const [equipes, setEquipes] = useState<string[]>([])
+  const [tipos, setTipos] = useState<string[]>([])
+  /** O grupo de serviço (tipo_servico): "quero saber só migração, ou só
+   *  visita técnica" (Emanuel, 05/11). */
+  const [grupos, setGrupos] = useState<string[]>([])
   const [semEquipe, setSemEquipe] = useState(false)
   // 119 (D-195): mais de um bucket marcado; vazio = todos.
   const [buckets, setBuckets] = useState<string[]>([])
@@ -166,13 +304,14 @@ export default function Controle() {
   }, [dtInicio, dtFim, versao])
 
   const filtradas = useMemo(() => linhas.filter(v => {
-    if (origem !== 'TODAS' && v.origem !== origem) return false
-    if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
-    if (tipo !== 'TODOS' && v.tipo_atividade?.nome !== tipo) return false
+    if (origens.length && !origens.includes(v.origem)) return false
+    if (equipes.length && !equipes.includes(v.equipe?.codigo ?? '')) return false
+    if (tipos.length && !tipos.includes(v.tipo_atividade?.nome ?? '')) return false
+    if (grupos.length && !grupos.includes(grupoDe(v))) return false
     if (semEquipe && v.equipe) return false
     if (buckets.length && !buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
     return true
-  }), [linhas, origem, equipe, tipo, semEquipe, buckets])
+  }), [linhas, origens, equipes, tipos, grupos, semEquipe, buckets])
 
   // Contadas sobre as PRODUTIVAS, o mesmo universo do número grande.
   const opBuckets = useMemo(() => opcoesDeBucket(
@@ -180,24 +319,31 @@ export default function Controle() {
 
   const m = useMemo(() => calcular(filtradas), [filtradas])
 
-  /** Código → rótulo com três dígitos e nome, como no resto do sistema.
-   *  O select trazia "074" e "SEM-LOGIN" crus; em Equipes a mesma coisa
-   *  se lê "074 - EQUIPE" e "Sem login definido". */
-  const equipesDisp = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const v of linhas) {
-      if (v.equipe?.codigo) m.set(v.equipe.codigo, equipeRotulo(v.equipe.codigo, v.equipe.nome))
+  // As opções saem do período carregado, com a contagem — como o bucket.
+  // Contadas sobre as PRODUTIVAS, menos o tipo de atividade: é nele que a
+  // jornada (Na Base, Refeição) aparece, e ali ela conta o que é.
+  const opcoes = useMemo(() => {
+    const prod = linhas.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+    return {
+      origens: contar(prod, v => v.origem, o => ROTULO_ORIGEM[o] ?? o),
+      tipos: contar(linhas, v => v.tipo_atividade?.nome ?? null, t => t),
+      grupos: contar(prod, grupoDe, g => g === SEM_GRUPO ? 'Sem grupo de serviço' : g),
+      /** Código → rótulo com três dígitos e nome, como no resto do sistema
+       *  ("074 - EQUIPE", "Sem login definido"), não o código cru. */
+      equipes: contar(prod, v => v.equipe?.codigo ?? null,
+        (c, v) => equipeRotulo(c, v.equipe?.nome ?? null)),
     }
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
   }, [linhas])
 
-  const tiposDisp = useMemo(() => [...new Set(
-    linhas.map(v => v.tipo_atividade?.nome).filter(Boolean) as string[])].sort(), [linhas])
-
-  const temFiltro = origem !== 'TODAS' || equipe !== 'TODAS' || tipo !== 'TODOS' || semEquipe
-    || buckets.length > 0
+  const temFiltro = origens.length > 0 || equipes.length > 0 || tipos.length > 0
+    || grupos.length > 0 || semEquipe || buckets.length > 0
   function limparFiltros() {
-    setOrigem('TODAS'); setEquipe('TODAS'); setTipo('TODOS'); setSemEquipe(false); setBuckets([])
+    setOrigens([]); setEquipes([]); setTipos([]); setGrupos([]); setSemEquipe(false); setBuckets([])
+  }
+  /** O recorte em texto: até três nomes, o resto em "+n". */
+  const resumo = (vals: string[], ops: Opcao[]) => {
+    const nomes = vals.map(x => ops.find(o => o.valor === x)?.rotulo ?? x)
+    return nomes.length <= 3 ? nomes.join(', ') : `${nomes.slice(0, 3).join(', ')} +${nomes.length - 3}`
   }
 
   function baixarCSV() {
@@ -255,24 +401,18 @@ export default function Controle() {
             <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
               valor={buckets} onChange={setBuckets} className={sel} />
 
-            <select value={origem} onChange={e => setOrigem(e.target.value)}
-              aria-label="Origem" className={sel}>
-              <option value="TODAS">Todas as origens</option>
-              <option value="TOA">TOA</option>
-              <option value="MANUAL">Manual</option>
-            </select>
+            <SeletorMultiplo rotulo="Origem" todos="Todas as origens" varios={n => `${n} origens`}
+              opcoes={opcoes.origens} valor={origens} onChange={setOrigens} className={sel} />
 
-            <select value={tipo} onChange={e => setTipo(e.target.value)}
-              aria-label="Tipo de atividade" className={`max-w-48 ${sel}`}>
-              <option value="TODOS">Todos os tipos</option>
-              {tiposDisp.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <SeletorMultiplo rotulo="Grupo de serviço" todos="Todo grupo de serviço"
+              varios={n => `${n} grupos de serviço`}
+              opcoes={opcoes.grupos} valor={grupos} onChange={setGrupos} className={`max-w-52 ${sel}`} />
 
-            <select value={equipe} onChange={e => setEquipe(e.target.value)}
-              aria-label="Equipe" className={`max-w-52 ${sel}`}>
-              <option value="TODAS">Todas as equipes</option>
-              {equipesDisp.map(([cod, rot]) => <option key={cod} value={cod}>{rot}</option>)}
-            </select>
+            <SeletorMultiplo rotulo="Tipo de atividade" todos="Todos os tipos" varios={n => `${n} tipos`}
+              opcoes={opcoes.tipos} valor={tipos} onChange={setTipos} className={`max-w-48 ${sel}`} />
+
+            <SeletorMultiplo rotulo="Equipe" todos="Todas as equipes" varios={n => `${n} equipes`}
+              opcoes={opcoes.equipes} valor={equipes} onChange={setEquipes} className={`max-w-52 ${sel}`} />
 
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
               <input type="checkbox" checked={semEquipe}
@@ -289,9 +429,10 @@ export default function Controle() {
             <span className="ml-auto text-[11px] text-graf-500">
               {dtInicio === dtFim ? dataBR(dtInicio) : `${dataBR(dtInicio)} a ${dataBR(dtFim)}`}
               {temFiltro && <>
-                {origem !== 'TODAS' && ` · ${origem}`}
-                {tipo !== 'TODOS' && ` · ${tipo}`}
-                {equipe !== 'TODAS' && ` · ${equipesDisp.find(([c]) => c === equipe)?.[1] ?? equipe}`}
+                {origens.length > 0 && ` · ${resumo(origens, opcoes.origens)}`}
+                {grupos.length > 0 && ` · ${resumo(grupos, opcoes.grupos)}`}
+                {tipos.length > 0 && ` · ${resumo(tipos, opcoes.tipos)}`}
+                {equipes.length > 0 && ` · ${resumo(equipes, opcoes.equipes)}`}
                 {semEquipe && ' · sem equipe'}
                 {buckets.length > 0 && ` · ${buckets.map(b => b === SEM_BUCKET ? 'sem bucket' : b).join(', ')}`}
                 <button onClick={limparFiltros}
@@ -567,6 +708,10 @@ export default function Controle() {
             </div>
           </>
         )}
+
+        {/* D-321: o painel de Visita Técnica, abaixo do principal. É de UM dia:
+            com período de um dia ele segue o Dashboard; senão abre o seletor próprio. */}
+        <DashboardVT dia={dtInicio === dtFim ? dtInicio : undefined} />
       </div>
     </Shell>
   )

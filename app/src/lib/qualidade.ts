@@ -60,11 +60,51 @@ export const DESFECHO_POR_CHAVE: Record<string, Desfecho> =
 export const ehProblema = (v: string | null) =>
   !!v && (DESFECHO_POR_CHAVE[v]?.conclusivo ?? false) && v !== 'NORMALIZADO'
 
+/**
+ * O estágio do contato (213): Pendente → Aguardando cliente → Desfecho.
+ *
+ * > "um estagio inicial de status em cada contrato, por exemplo,
+ * >  Aguardando Retorno do Cliente (...) so para a gente saber que estao
+ * >  aguardando retorno do cliente" — Emanuel, 05/11
+ *
+ * O aguardando NÃO é desfecho: mora em `qualidade_aguardando`, fora de
+ * `pesquisa_qualidade`, e nenhum indicador o conta como avaliado. Quando
+ * existe, ele É o estágio — mesmo sobre um "Não atendeu" anterior, que é
+ * justamente o caso de mandar WhatsApp e esperar.
+ */
+export type Estagio = 'PENDENTE' | 'AGUARDANDO' | 'DESFECHO'
+
+export const COR_AGUARDANDO = '#0ea5e9'
+
+export function estagioDe(desfecho: string | null, aguardandoEm: string | null): Estagio {
+  if (aguardandoEm) return 'AGUARDANDO'
+  return desfecho ? 'DESFECHO' : 'PENDENTE'
+}
+
+/** Marcar aguardando só vale para quem ainda não falou com o assinante —
+ *  a mesma conta de `qualidade_contatado` no banco, que é quem recusa. */
+export const podeAguardar = (desfecho: string | null) =>
+  !desfecho || !(DESFECHO_POR_CHAVE[desfecho]?.contatado ?? false)
+
+export const CANAL: Record<string, string> = { LIGACAO: 'Ligação', WHATSAPP: 'WhatsApp' }
+
+/** "agora", "há 25 min", "há 2 h", "há 3 d" — o relógio é quem chama. */
+export function haQuanto(iso: string, agora: number): string {
+  const min = Math.max(0, Math.floor((agora - new Date(iso).getTime()) / 60000))
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h} h`
+  return `há ${Math.floor(h / 24)} d`
+}
+
 /** Os grupos da barra de triagem no topo da fila. */
-export type Triagem = 'PENDENTE' | 'NORMALIZADO' | 'PROBLEMA' | 'REDE_EXTERNA' | 'SEM_APURACAO' | 'TODOS'
+export type Triagem = 'PENDENTE' | 'AGUARDANDO' | 'NORMALIZADO' | 'PROBLEMA' | 'REDE_EXTERNA'
+  | 'SEM_APURACAO' | 'TODOS'
 
 export const TRIAGEM: { v: Triagem; r: string; cor: string }[] = [
   { v: 'PENDENTE',     r: 'Pendentes',    cor: 'var(--color-graf-500)' },
+  { v: 'AGUARDANDO',   r: 'Aguardando',   cor: COR_AGUARDANDO },
   { v: 'NORMALIZADO',  r: 'Normalizados', cor: 'var(--st-concluida)' },
   { v: 'PROBLEMA',     r: 'Problemas',    cor: '#dc2626' },
   { v: 'REDE_EXTERNA', r: 'Rede externa', cor: 'var(--st-reagendamento)' },
@@ -72,16 +112,23 @@ export const TRIAGEM: { v: Triagem; r: string; cor: string }[] = [
   { v: 'TODOS',        r: 'Todos',        cor: 'var(--color-graf-400)' },
 ]
 
-export function naTriagem(desfecho: string | null, t: Triagem): boolean {
+/** Cada contrato cai em UM grupo (fora o Todos): o aguardando sai de
+ *  Pendentes e de Sem apuração, para a barra contar o estágio. */
+export function naTriagem(
+  l: { desfecho: string | null; aguardando_em: string | null }, t: Triagem,
+): boolean {
+  const { desfecho } = l
+  const aguardando = !!l.aguardando_em
   switch (t) {
     case 'TODOS': return true
-    case 'PENDENTE': return desfecho == null
+    case 'AGUARDANDO': return aguardando
+    case 'PENDENTE': return desfecho == null && !aguardando
     case 'NORMALIZADO': return desfecho === 'NORMALIZADO'
     case 'PROBLEMA': return ehProblema(desfecho)
     case 'REDE_EXTERNA': return desfecho === 'REDE_EXTERNA'
     case 'SEM_APURACAO':
-      return !!desfecho && !DESFECHO_POR_CHAVE[desfecho]?.contatado
-        || desfecho === 'NAO_QUIS_RESPONDER'
+      return !aguardando && (!!desfecho && !DESFECHO_POR_CHAVE[desfecho]?.contatado
+        || desfecho === 'NAO_QUIS_RESPONDER')
   }
 }
 

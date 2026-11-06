@@ -94,26 +94,49 @@ export function infoSituacaoDeTela(s: SituacaoDeTela): { label: string; cor: str
 export const ehSituacaoDeTela = (s: string | null): s is SituacaoDeTela =>
   !!s && (SITUACOES_DE_TELA as string[]).includes(s)
 
+/** O que a pílula de situação marca: uma situação de tela ou "Em aberto". */
+export type SituacaoDoFiltro = SituacaoDeTela | 'ABERTAS'
+
+/**
+ * ┌─ cada filtro é um CONJUNTO de valores (05/11) ───────────────────┐
+ * │ > "ambos o filtro tem que dar liberdade de selecionar mais de uma │
+ * │ >  opção do filtro" · "o time pudesse filtrar mais de uma        │
+ * │ >  situação de status, segurando control" — Emanuel, 05/11       │
+ * │                                                                   │
+ * │ Até aqui cada campo guardava UM valor e um "TODOS" de sentinela.  │
+ * │ Agora é lista: vazia = todos (o mesmo dos buckets, 119), e o     │
+ * │ contrato passa se casar com QUALQUER valor marcado. O significado │
+ * │ de cada valor não mudou — "Cancelado pela central" e "Auditar"    │
+ * │ continuam saindo de `origemCancelada()`, "Com improdutiva" da     │
+ * │ natureza do código. Só "um" virou "um destes".                    │
+ * └───────────────────────────────────────────────────────────────────┘
+ */
 export interface FiltroContrato {
-  situacao: SituacaoDeTela | 'TODAS' | 'ABERTAS'
-  grupo: string                 // 'TODOS' ou o nome do grupo de serviço
-  origem: string                // 'TODAS' | 'TOA' | 'MANUAL'
-  resultado: 'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'
-  culpa: string                 // 'TODAS' ou a responsabilidade da improdutiva
-  /** 'TODAS', uma chave de `janelaDe`, ou SEM_JANELA. */
-  janela: string
-  /** 'TODOS', o "Status da Atividade" como veio do TOA, ou SEM_STATUS. */
-  statusToa: string
-  /** Os buckets do TOA marcados (119). Vazio = todos; SEM_BUCKET = manual. */
+  /** Pílulas de situação. Vazio = Todas; 'ABERTAS' = Em aberto. */
+  situacoes: SituacaoDoFiltro[]
+  /** Nomes do grupo de serviço. */
+  grupos: string[]
+  /** 'TOA' | 'MANUAL'. */
+  origens: string[]
+  resultados: ('SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA')[]
+  /** A responsabilidade da improdutiva (TECNICO, CLIENTE…). */
+  culpas: string[]
+  /** Chaves de `janelaDe`, ou SEM_JANELA. */
+  janelas: string[]
+  /** O "Status da Atividade" como veio do TOA, ou SEM_STATUS. */
+  statusToa: string[]
+  /** Os buckets do TOA marcados (119). SEM_BUCKET = manual. */
   buckets: string[]
-  /** Segmentação do cliente: 'TODOS', o nome, ou SEM_SEGMENTO (o TOA não disse). */
-  segmento: string
+  /** Segmentação do cliente: o nome, ou SEM_SEGMENTO (o TOA não disse). */
+  segmentos: string[]
   /** Só os casos críticos de ouvidoria (123). */
   soOuvidoria: boolean
-  /** D-290: o "Contador de log" do TOA — 'TODOS', '0', '1', '2+' ou SEM_LOG. */
-  log: string
+  /** D-290: o "Contador de log" do TOA, pela faixa de `faixaDeLog`. */
+  logs: string[]
   /** D-290: só os contratos com o marcador REV D-10 (automático ou manual). */
   soRevD10: boolean
+  /** Os marcadores (`indicador_id`) — o contrato tem ao menos um deles —, ou SEM_MARCADOR. */
+  marcadores: string[]
 }
 
 export const SEM_JANELA = '__sem_janela__'
@@ -121,11 +144,12 @@ export const SEM_STATUS = '__sem_status__'
 export const SEM_BUCKET = '__sem_bucket__'
 export const SEM_SEGMENTO = '__sem_segmento__'
 export const SEM_LOG = '__sem_log__'
+export const SEM_MARCADOR = '__sem_marcador__'
 
 export const FILTRO_VAZIO: FiltroContrato = {
-  situacao: 'TODAS', grupo: 'TODOS', origem: 'TODAS', resultado: 'TODOS',
-  culpa: 'TODAS', janela: 'TODAS', statusToa: 'TODOS', buckets: [],
-  segmento: 'TODOS', soOuvidoria: false, log: 'TODOS', soRevD10: false,
+  situacoes: [], grupos: [], origens: [], resultados: [], culpas: [], janelas: [],
+  statusToa: [], buckets: [], segmentos: [], soOuvidoria: false, logs: [],
+  soRevD10: false, marcadores: [],
 }
 
 /** O LOG do contrato como número; nulo quando o TOA não mandou ("log ?"). */
@@ -133,6 +157,23 @@ export function logDe(v: Pick<ContratoLinha, 'contador_log'>): number | null {
   const n = Number.parseInt(String(v.contador_log ?? '').trim(), 10)
   return Number.isFinite(n) ? n : null
 }
+
+/**
+ * As faixas do filtro de LOG: 0 a 6 um a um, "7 ou mais" e "Sem LOG".
+ * > "o log deve ir até o 7 quando houver o filtro, e deve dar opção de
+ * >  selecionar mais de um" — Emanuel, 05/11
+ * Antes parava em "2 ou mais". Medido nos 30 dias até 05/11: LOG 3 em 12
+ * visitas e LOG 4 em 3 — iam todas para o mesmo balaio do LOG 2.
+ */
+export const LOG_TETO = 7
+export const FAIXAS_LOG: string[] = [
+  ...Array.from({ length: LOG_TETO }, (_, i) => String(i)), `${LOG_TETO}+`, SEM_LOG,
+]
+export function faixaDeLog(n: number | null): string {
+  return n === null ? SEM_LOG : n >= LOG_TETO ? `${LOG_TETO}+` : String(n)
+}
+export const rotuloFaixaLog = (f: string) =>
+  f === SEM_LOG ? 'Sem LOG' : f.endsWith('+') ? `LOG ${f.slice(0, -1)} ou mais` : `LOG ${f}`
 
 /** Tem o marcador REV D-10 (193) — o nome vem no embed de `visita_marcador`. */
 export const temRevD10 = (v: Pick<ContratoLinha, 'visita_marcador'>) =>
@@ -152,46 +193,112 @@ export function quantosLigados(f: FiltroContrato): number {
     .filter(k => Array.isArray(f[k]) ? (f[k] as string[]).length > 0 : f[k] !== FILTRO_VAZIO[k]).length
 }
 
+/**
+ * O clique na pílula de situação. Simples: só ela (como sempre foi).
+ * Com Ctrl (Cmd no Mac): soma ou tira da seleção. "Todas" limpa.
+ */
+export function clicarSituacao(
+  atual: SituacaoDoFiltro[], s: SituacaoDoFiltro | 'TODAS', somar: boolean,
+): SituacaoDoFiltro[] {
+  if (s === 'TODAS') return []
+  if (!somar) return [s]
+  return atual.includes(s) ? atual.filter(x => x !== s) : [...atual, s]
+}
+
+/** Lê `?situacao=` da URL: um valor só (como os links antigos mandam) ou
+ *  vários separados por vírgula. O que não for situação é ignorado. */
+export function situacoesDaUrl(bruto: string | null): SituacaoDoFiltro[] {
+  return (bruto ?? '').split(',').map(s => s.trim())
+    .filter((s): s is SituacaoDoFiltro => s === 'ABERTAS' || ehSituacaoDeTela(s))
+}
+
+/** A situação passa nas pílulas marcadas? Vazio = todas. */
+export function passaNaSituacao(v: ContratoLinha, situacoes: SituacaoDoFiltro[]): boolean {
+  if (!situacoes.length) return true
+  const tela = situacaoDeTela(v)
+  return situacoes.some(s => s === 'ABERTAS' ? EM_ABERTO.includes(v.situacao) : s === tela)
+}
+
 export function passaNoFiltro(v: ContratoLinha, f: FiltroContrato): boolean {
-  if (f.situacao === 'ABERTAS' && !EM_ABERTO.includes(v.situacao)) return false
-  if (f.situacao !== 'TODAS' && f.situacao !== 'ABERTAS' && situacaoDeTela(v) !== f.situacao) return false
-  if (f.grupo !== 'TODOS' && v.tipo_servico?.nome !== f.grupo) return false
-  if (f.origem !== 'TODAS' && v.origem !== f.origem) return false
+  if (!passaNaSituacao(v, f.situacoes)) return false
+  if (f.grupos.length && !f.grupos.includes(v.tipo_servico?.nome ?? '')) return false
+  if (f.origens.length && !f.origens.includes(v.origem ?? '')) return false
   if (f.buckets.length && !f.buckets.includes(v.toa_bucket ?? SEM_BUCKET)) return false
   if (f.soOuvidoria && !v.ouvidoria) return false
   if (f.soRevD10 && !temRevD10(v)) return false
-  if (f.log !== 'TODOS') {
-    const n = logDe(v)
-    if (f.log === SEM_LOG ? n !== null
-        : f.log === '2+' ? (n === null || n < 2)
-        : n !== Number(f.log)) return false
-  }
-  if (f.segmento !== 'TODOS') {
-    const s = v.segmentacao?.nome ?? null
-    if (f.segmento === SEM_SEGMENTO ? s !== null : s !== f.segmento) return false
-  }
-
-  if (f.janela !== 'TODAS') {
-    const j = janelaDe(v)
-    if (f.janela === SEM_JANELA ? j !== null : j !== f.janela) return false
+  if (f.logs.length && !f.logs.includes(faixaDeLog(logDe(v)))) return false
+  if (f.segmentos.length && !f.segmentos.includes(v.segmentacao?.nome ?? SEM_SEGMENTO)) return false
+  if (f.janelas.length && !f.janelas.includes(janelaDe(v) ?? SEM_JANELA)) return false
+  if (f.marcadores.length) {
+    const ms = (v.visita_marcador ?? []).map(m => m.indicador_id)
+    const casa = f.marcadores.some(k => k === SEM_MARCADOR ? ms.length === 0 : ms.includes(k))
+    if (!casa) return false
   }
   // O status do TOA é comparado como VEIO — é a palavra da operadora, e
   // a opção do filtro sai do próprio dado carregado.
-  if (f.statusToa !== 'TODOS') {
-    const s = v.status_toa?.trim() || null
-    if (f.statusToa === SEM_STATUS ? s !== null : s !== f.statusToa) return false
-  }
+  if (f.statusToa.length && !f.statusToa.includes(v.status_toa?.trim() || SEM_STATUS)) return false
 
-  if (f.resultado !== 'TODOS') {
-    const comBaixa = v.ordem_servico.filter(o => o.codigo_baixa)
-    if (f.resultado === 'SEM_BAIXA' && comBaixa.length > 0) return false
-    if (f.resultado === 'SUCESSO'
-      && !v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'SUCESSO')) return false
-    if (f.resultado === 'IMPRODUTIVA'
-      && !v.ordem_servico.some(o => o.codigo_baixa?.natureza === 'IMPRODUTIVA')) return false
+  if (f.resultados.length) {
+    const casa = f.resultados.some(r =>
+      r === 'SEM_BAIXA' ? !v.ordem_servico.some(o => o.codigo_baixa)
+      : v.ordem_servico.some(o => o.codigo_baixa?.natureza === r))
+    if (!casa) return false
   }
-  if (f.culpa !== 'TODAS'
-    && !v.ordem_servico.some(o => o.codigo_baixa?.responsabilidade === f.culpa)) return false
+  if (f.culpas.length
+    && !v.ordem_servico.some(o => f.culpas.includes(o.codigo_baixa?.responsabilidade ?? ''))) return false
 
   return true
 }
+
+/** As opções de LOG com a contagem de cada faixa. "Sem LOG" só conta
+ *  contrato (a jornada não tem LOG, e não é por falta do TOA). */
+export function opcoesDeLog(cs: ContratoLinha[]): { valor: string; rotulo: string; qtd: number }[] {
+  const m = new Map<string, number>()
+  for (const v of cs) {
+    const f = faixaDeLog(logDe(v))
+    if (f === SEM_LOG && v.tipo_atividade?.natureza === 'JORNADA') continue
+    m.set(f, (m.get(f) ?? 0) + 1)
+  }
+  return FAIXAS_LOG
+    .filter(f => f !== SEM_LOG || (m.get(f) ?? 0) > 0)
+    .map(f => ({ valor: f, rotulo: rotuloFaixaLog(f), qtd: m.get(f) ?? 0 }))
+}
+
+/** As opções de marcador: os que aparecem nos contratos, com a contagem,
+ *  e "Sem marcador" quando algum contrato não tem nenhum. */
+export function opcoesDeMarcador(cs: ContratoLinha[]): { valor: string; rotulo: string; qtd: number }[] {
+  const m = new Map<string, { nome: string; qtd: number }>()
+  let sem = 0
+  for (const v of cs) {
+    const ms = v.visita_marcador ?? []
+    if (!ms.length) { sem++; continue }
+    for (const id of new Set(ms.map(x => x.indicador_id))) {
+      const nome = ms.find(x => x.indicador_id === id)?.indicador?.nome ?? 'Marcador sem nome'
+      const a = m.get(id) ?? { nome, qtd: 0 }
+      a.qtd++; m.set(id, a)
+    }
+  }
+  return [
+    ...[...m.entries()].map(([valor, x]) => ({ valor, rotulo: x.nome, qtd: x.qtd }))
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR')),
+    ...(sem > 0 ? [{ valor: SEM_MARCADOR, rotulo: 'Sem marcador', qtd: sem }] : []),
+  ]
+}
+
+/** Os rótulos fixos dos filtros que não saem do dado. */
+export const OPCOES_RESULTADO: { valor: FiltroContrato['resultados'][number]; rotulo: string }[] = [
+  { valor: 'SUCESSO', rotulo: 'Com O.S. executada' },
+  { valor: 'IMPRODUTIVA', rotulo: 'Com improdutiva' },
+  { valor: 'SEM_BAIXA', rotulo: 'Sem baixa ainda' },
+]
+export const OPCOES_CULPA = [
+  { valor: 'TECNICO', rotulo: 'Improdutiva nossa' },
+  { valor: 'CLIENTE', rotulo: 'Improdutiva do cliente' },
+  { valor: 'REDE', rotulo: 'Improdutiva de rede' },
+  { valor: 'OPERADORA', rotulo: 'Improdutiva da operadora' },
+  { valor: 'TERCEIRO', rotulo: 'Improdutiva de terceiro' },
+]
+export const OPCOES_ORIGEM = [
+  { valor: 'TOA', rotulo: 'TOA' },
+  { valor: 'MANUAL', rotulo: 'Manual' },
+]

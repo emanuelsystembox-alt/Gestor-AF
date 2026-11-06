@@ -82,7 +82,9 @@ interface TecMonitor {
   aparelho_modificado: boolean
   /** Quando deu ciência do aviso de rastro (097). Nulo = ainda não deu. */
   ciencia_em: string | null
-  /** Áreas (com aviso ao sair) de onde ele está FORA agora. */
+  /** Áreas (com aviso ao sair) de onde ele está FORA agora, cerca a cerca.
+   *  Desde a 214 a tela não usa: o selo vem de `monitor_fora_da_area`, que
+   *  só chama de fora quem saiu de TODAS as áreas dele. */
   fora_de_area: string | null
   /** Garagens onde ele está DENTRO agora. */
   na_garagem: string | null
@@ -124,6 +126,50 @@ interface ContratoMapa {
 
 type Estado = 'VIVO' | 'SEM_SINAL' | 'APP_FECHADO' | 'ENCERROU' | 'NUNCA' | 'DIA_PASSADO'
   | 'GPS_SIMULADO' | 'GPS_DESLIGADO'
+
+/*
+ * ┌─ 214 · fora da área de atuação ───────────────────────────────────┐
+ * │ > "no Card de monitoramento deve aparecer a quantidade de técnico  │
+ * │ >  que saiu da sua área de atuação, e quando clicar em cima deve   │
+ * │ >  mostrar eles." — Emanuel, 05/11                                 │
+ * │                                                                    │
+ * │ Quem decide dentro/fora é o BANCO (`cerca_estado`, 097: 2 pontos   │
+ * │ seguidos, precisão até 100 m); a tela só lê `monitor_fora_da_area`. │
+ * │ FORA = fora de TODAS as áreas que valem para a equipe dele — quem  │
+ * │ está dentro da área 2 não saiu da atuação por estar fora da 4.     │
+ * │ Sem área para a equipe = "sem cerca", fora da conta. Só hoje: o    │
+ * │ estado é o presente, não guarda o dia.                             │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+interface AreaTec {
+  tecnico_id: string
+  situacao: 'FORA' | 'DENTRO' | 'SEM_LEITURA'
+  areas: number
+  cercas: string
+  cerca_ids: string[]
+  desde: string | null
+  ultimo_em: string | null
+}
+type Filtro = Estado | 'TODOS' | 'FORA_AREA'
+const COR_FORA_AREA = '#6366f1'
+
+/** Metros do ponto até a borda do polígono ([lat, lng]); nulo se o ponto
+ *  está dentro (aí "a quanto da borda" não diz nada). Projeção local plana:
+ *  sobra precisão para escrever "a 1,2 km". */
+function metrosAteABorda(lat: number, lng: number, poli: [number, number][]): number | null {
+  if (poli.length < 3) return null
+  const kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110540
+  const p = poli.map(([a, b]) => [(b - lng) * kx, (a - lat) * ky] as const)
+  let dentro = false, min = Infinity
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const [xi, yi] = p[i], [xj, yj] = p[j]
+    if ((yi > 0) !== (yj > 0) && 0 < (xj - xi) * (0 - yi) / (yj - yi) + xi) dentro = !dentro
+    const dx = xj - xi, dy = yj - yi, l2 = dx * dx + dy * dy
+    const t = l2 ? Math.max(0, Math.min(1, -(xi * dx + yi * dy) / l2)) : 0
+    min = Math.min(min, Math.hypot(xi + t * dx, yi + t * dy))
+  }
+  return dentro ? null : min
+}
 
 // ---------------------------------------------------------------------------
 // o que a tela deduz — e diz que deduz
@@ -248,7 +294,10 @@ export default function Monitor() {
   const [versao, setVersao] = useState(0)
   const [agora, setAgora] = useState(Date.now())
   const [busca, setBusca] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState<Estado | 'TODOS'>('TODOS')
+  const [filtroEstado, setFiltroEstado] = useState<Filtro>('TODOS')
+  /** 214: área de atuação de cada técnico, hoje. Nulo = não consegui ler
+   *  (o card escreve "—", não 0). */
+  const [areaDe, setAreaDe] = useState<Map<string, AreaTec> | null>(new Map())
   /*
    * ┌─ 160 · o recorte: equipe, bucket, supervisor, área ───────────────┐
    * │ > "é importante também a gente colocar alguns filtros, como        │
@@ -323,6 +372,13 @@ export default function Monitor() {
       }
       setDonoDaEquipe(m)
     })
+    // 214: fora da área — só hoje (o estado da cerca é o presente).
+    if (data === isoLocal()) {
+      supabase.rpc('monitor_fora_da_area').then(({ data: fa, error: efa }) => {
+        if (meu !== pedido.current) return
+        setAreaDe(efa ? null : new Map(((fa ?? []) as AreaTec[]).map(x => [x.tecnico_id, x])))
+      })
+    } else setAreaDe(new Map())
     supabase.rpc('painel_equipes', { p_data: data }).then(({ data: p }) => {
       if (meu !== pedido.current) return
       setOciosas(new Set(((p ?? []) as { equipe_id: string; ocioso: boolean | null }[])
@@ -360,7 +416,11 @@ export default function Monitor() {
   // diz de quando é o mapa.
 
   // Trocar de dia limpa a seleção: a trilha é de um dia só.
-  useEffect(() => { setSel(null); setContratosDia(null); setRefContrato('') }, [data])
+  // O card "fora da área" só existe hoje: em outro dia o filtro dele esvaziaria a lista sem card.
+  useEffect(() => {
+    setSel(null); setContratosDia(null); setRefContrato('')
+    setFiltroEstado(f => f === 'FORA_AREA' ? 'TODOS' : f)
+  }, [data])
 
   // O sino (GPS, cerca) abre o técnico já selecionado.
   const pedidoUrl = params.get('tecnico')
@@ -490,7 +550,8 @@ export default function Monitor() {
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return comEstado
-      .filter(x => filtroEstado === 'TODOS' || x.e === filtroEstado)
+      .filter(x => filtroEstado === 'TODOS'
+        || (filtroEstado === 'FORA_AREA' ? areaDe?.get(x.t.tecnico_id)?.situacao === 'FORA' : x.e === filtroEstado))
       .filter(x => !q || [x.t.nome, x.t.matricula, x.t.equipe_codigo, x.t.placa, x.t.contrato_ativo]
         .some(v => v?.toLowerCase().includes(q)))
       // Os que pedem atenção primeiro: sem sinal, app fechado, baixa fora.
@@ -499,10 +560,10 @@ export default function Monitor() {
           (x.t.baixas_fora > 0 ? 0 : 10)
           + ({ GPS_SIMULADO: -2, GPS_DESLIGADO: -1, SEM_SINAL: 0, APP_FECHADO: 1, NUNCA: 2, VIVO: 3,
                ENCERROU: 4, DIA_PASSADO: 3 }[x.e])
-          + (x.t.fora_de_area ? -1 : 0)
+          + (areaDe?.get(x.t.tecnico_id)?.situacao === 'FORA' ? -1 : 0)
         return peso(a) - peso(b) || a.t.nome.localeCompare(b.t.nome)
       })
-  }, [comEstado, filtroEstado, busca])
+  }, [comEstado, filtroEstado, busca, areaDe])
 
   const leitura = useMemo(() => lerTrilha(trilha, contratosDele), [trilha, contratosDele])
 
@@ -583,6 +644,28 @@ export default function Monitor() {
   const kmTotal = comEstado.reduce((s, x) => s + Number(x.t.km), 0)
   const foraTotal = comEstado.reduce((s, x) => s + x.t.baixas_fora, 0)
   const baixasTotal = comEstado.reduce((s, x) => s + x.t.baixas_campo, 0)
+  // 214: do RECORTE também. "com área" = tem pelo menos uma área que vale
+  // para a equipe; o resto é "sem cerca" e não entra na conta.
+  const foraArea = areaDe && comEstado.filter(x => areaDe.get(x.t.tecnico_id)?.situacao === 'FORA').length
+  const comArea = areaDe ? comEstado.filter(x => areaDe.has(x.t.tecnico_id)).length : 0
+  const semLeitura = areaDe ? comEstado.filter(x => areaDe.get(x.t.tecnico_id)?.situacao === 'SEM_LEITURA').length : 0
+  /** Fora da área: de quais saiu, desde quando e a quanto da borda mais perto. */
+  function textoFora(t: TecMonitor): { cercas: string; desde: string; dist: string | null } | null {
+    const a = areaDe?.get(t.tecnico_id)
+    if (!a || a.situacao !== 'FORA') return null
+    let m: number | null = null
+    if (t.ultimo_lat != null && t.ultimo_lng != null) {
+      for (const c of cercas) {
+        if (!a.cerca_ids.includes(c.id)) continue
+        const d = metrosAteABorda(Number(t.ultimo_lat), Number(t.ultimo_lng), c.poligono)
+        if (d != null && (m == null || d < m)) m = d
+      }
+    }
+    const desde = !a.desde ? '—'
+      : isoLocal(new Date(a.desde)) === data ? hhmm(a.desde)
+      : new Date(a.desde).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return { cercas: a.cercas, desde, dist: m != null ? textoDistancia(m) : null }
+  }
 
   return (
     <Shell acoes={
@@ -598,7 +681,7 @@ export default function Monitor() {
 
         {/* ====== o dia em números ====== */}
         <section className="card-controle sobe grid grid-cols-2 gap-px overflow-hidden
-                            sm:grid-cols-4 xl:grid-cols-8">
+                            sm:grid-cols-3 xl:grid-cols-9">
           {([
             ['VIVO', 'com sinal agora', `ponto nos últimos ${SEM_SINAL_MIN} min`],
             ['SEM_SINAL', 'sem sinal', `mais de ${SEM_SINAL_MIN} min sem ponto`],
@@ -618,6 +701,26 @@ export default function Monitor() {
               <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">{r}</div>
             </button>
           ))}
+          {ehHoje && (
+            <button onClick={() => setFiltroEstado(filtroEstado === 'FORA_AREA' ? 'TODOS' : 'FORA_AREA')}
+              aria-pressed={filtroEstado === 'FORA_AREA'}
+              title={areaDe
+                ? `Última posição fora de todas as áreas que valem para a equipe dele, de ${comArea} técnicos com área.`
+                  + (comEstado.length - comArea ? ` ${comEstado.length - comArea} sem cerca, fora da conta.` : '')
+                  + (semLeitura ? ` ${semLeitura} sem ponto hoje para saber.` : '')
+                : 'Não consegui ler as áreas'}
+              className={`bg-graf-900/40 p-3 text-left transition hover:bg-graf-800/60 ${
+                filtroEstado === 'FORA_AREA' ? 'ring-2 ring-inset ring-af-500' : ''}`}>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ background: COR_FORA_AREA }} />
+                <span className="tabular text-2xl font-semibold text-graf-100">
+                  {foraArea ?? '—'}
+                  {areaDe && <span className="text-sm font-normal text-graf-400"> / {comArea}</span>}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">fora da área</div>
+            </button>
+          )}
           <div className="bg-graf-900/40 p-3" title="Soma dos trechos medidos pelo GPS. Estimativa: linha reta entre pontos, só trechos com precisão até 100 m.">
             <div className="tabular text-2xl font-semibold text-graf-100">{kmTotal.toFixed(1).replace('.', ',')}</div>
             <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">km estimados</div>
@@ -690,11 +793,13 @@ export default function Monitor() {
                   <Vazio titulo="Ninguém aqui"
                     descricao={tecnicos.length === 0
                       ? 'Nenhum técnico com contrato, sinal ou baixa neste dia. O rastro começa quando o técnico abre o aplicativo logado.'
+                      : filtroEstado === 'FORA_AREA' ? 'Ninguém fora da área de atuação agora.'
                       : 'Nenhum técnico passa no filtro.'} />
                 </li>
               )}
               {visiveis.map(({ t, e }) => {
                 const ativo = sel === t.tecnico_id
+                const fora = textoFora(t)
                 return (
                   <li key={t.tecnico_id}>
                     <button onClick={() => setSel(ativo ? null : t.tecnico_id)} aria-pressed={ativo}
@@ -755,9 +860,11 @@ export default function Monitor() {
                         </div>
                         {/* 097: cerca, garagem, GPS e ciência */}
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
-                          {t.fora_de_area && (
-                            <span className="rounded bg-indigo-900/60 px-1 font-semibold uppercase text-indigo-200"
-                              title="Está fora de uma área com aviso ao sair">fora de: {t.fora_de_area}</span>
+                          {fora && (
+                            <span className="rounded bg-indigo-900/60 px-1 font-semibold text-indigo-200"
+                              title="Fora de todas as áreas que valem para a equipe dele (a distância é do último ponto até a borda mais perto)">
+                              FORA DA ÁREA: {fora.cercas} · desde {fora.desde}{fora.dist && ` · a ${fora.dist}`}
+                            </span>
                           )}
                           {t.na_garagem && (
                             <span className="rounded bg-graf-800 px-1 text-graf-300">na garagem: {t.na_garagem}</span>

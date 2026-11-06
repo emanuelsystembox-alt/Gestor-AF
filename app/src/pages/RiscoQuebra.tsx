@@ -49,7 +49,7 @@ const FAIXA: Record<Faixa, { rotulo: string; classe: string }> = {
   SEM_HISTORICO: { rotulo: 'Sem histórico', classe: 'bg-graf-800 text-graf-300' },
 }
 
-const VAI_E_VOLTA: Record<string, string> = { VT_DA_VT: 'VT da VT', RETORNO_DO_RETORNO: 'Retorno do retorno' }
+const VAI_E_VOLTA: Record<string, string> = { VT_DA_VT: 'VT da VT', RETORNO_DO_RETORNO: 'Retorno do retorno', DE_OUTRO_GRUPO: 'Voltou depois de outro serviço' }
 
 /** O nome do fator como a operação fala. */
 function rotuloFator(familia: string, valor: string): string {

@@ -20,10 +20,12 @@ import { fotosDosTecnicos } from '../lib/foto'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { BarraComposicao } from '../components/telemetria'
 import {
-  FILTRO_VAZIO, SEM_JANELA, SEM_LOG, SEM_SEGMENTO, SEM_STATUS, janelaDe, logDe, passaNoFiltro, quantosLigados, temRevD10,
+  FILTRO_VAZIO, OPCOES_CULPA, OPCOES_ORIGEM, OPCOES_RESULTADO, SEM_JANELA, SEM_SEGMENTO, SEM_STATUS,
+  clicarSituacao, janelaDe, opcoesDeLog, opcoesDeMarcador, passaNoFiltro, quantosLigados, temRevD10,
   SITUACOES_DE_TELA, infoSituacaoDeTela, origemCancelada, situacaoDeTela,
-  type FiltroContrato,
+  type FiltroContrato, type OrigemCancelada,
 } from '../lib/filtroContratos'
+import { SelecaoMultipla, opcoesContadas, type OpcaoMultipla } from '../components/SelecaoMultipla'
 import { LinkContrato, useAbrirContrato } from '../components/LinkContrato'
 
 /**
@@ -357,8 +359,11 @@ export default function Equipes() {
 
   // filtros
   const [busca, setBusca] = useState('')
-  const [area, setArea] = useState('TODAS')
-  const [supervisor, setSupervisor] = useState('TODOS')
+  // 05/11: conjuntos (vazio = todos) — "liberdade de selecionar mais de um" (Emanuel)
+  const [areasSel, setAreasSel] = useState<string[]>([])
+  const [supervisoresSel, setSupervisoresSel] = useState<string[]>([])
+  /** As equipes marcadas, pelo `equipe_id` — o código se repete (SEM-LOGIN por base). */
+  const [equipesSel, setEquipesSel] = useState<string[]>([])
   // Ligado por padrao: 89 equipes na tela, 7 com servico no dia. Quem
   // nao tem contrato nao tem o que ser olhado -- e as 82 linhas vazias
   // empurravam as 7 que importam para fora da primeira tela.
@@ -626,10 +631,14 @@ export default function Equipes() {
    *  respondendo pelo que executou. Por isso a única ação aqui é mudar a
    *  situação; apagar nem aparece, e o banco recusa quem tem histórico. */
 
-  const areas = useMemo(() =>
-    [...new Set(painel.map(e => e.area).filter(Boolean) as string[])].sort(), [painel])
-  const supervisores = useMemo(() =>
-    [...new Set(painel.map(e => e.supervisor).filter(Boolean) as string[])].sort(), [painel])
+  // Opções de EQUIPE: a contagem é de equipes (não de contratos), e por
+  // isso não aparece — o número ao lado leria como contratos.
+  const semQtd = (os: OpcaoMultipla[]) => os.map(({ valor, rotulo }) => ({ valor, rotulo }))
+  const areas = useMemo(() => semQtd(opcoesContadas(painel, e => e.area)), [painel])
+  const supervisores = useMemo(() => semQtd(opcoesContadas(painel, e => e.supervisor)), [painel])
+  const opEquipes = useMemo<OpcaoMultipla[]>(() => painel
+    .map(e => ({ valor: e.equipe_id, rotulo: equipeRotulo(e.codigo, e.nome) }))
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR')), [painel])
 
   const filtrando = quantosLigados(filtro)
 
@@ -705,25 +714,23 @@ export default function Equipes() {
   // opção, e o status do TOA sai escrito como veio.
   const opContrato = useMemo(() => {
     const cs = (contratosDia ?? []).filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
-    const uniq = (xs: (string | null | undefined)[]) =>
-      [...new Set(xs.filter((x): x is string => !!x && x.trim() !== ''))]
-        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    // "sem X" vira opção própria, com a contagem, só quando existe
+    const com = (os: OpcaoMultipla[], sem: string, rotulo: string, qtd: number) =>
+      qtd > 0 ? [...os, { valor: sem, rotulo, qtd }] : os
     return {
-      janelas: uniq(cs.map(janelaDe)),
-      semJanela: cs.some(v => !janelaDe(v)),
-      status: uniq(cs.map(v => v.status_toa?.trim())),
-      semStatus: cs.some(v => !v.status_toa?.trim()),
-      grupos: uniq(cs.map(v => v.tipo_servico?.nome)),
+      janelas: com(opcoesContadas(cs, janelaDe), SEM_JANELA, 'Sem janela',
+        cs.filter(v => !janelaDe(v)).length),
+      status: com(opcoesContadas(cs, v => v.status_toa?.trim(), s => `TOA · ${s}`),
+        SEM_STATUS, 'Sem status do TOA', cs.filter(v => !v.status_toa?.trim()).length),
+      grupos: opcoesContadas(cs, v => v.tipo_servico?.nome),
       ...opcoesDeBucket(cs),
-      segmentos: uniq(cs.map(v => v.segmentacao?.nome)),
-      semSegmento: cs.some(v => !v.segmentacao?.nome),
+      segmentos: com(opcoesContadas(cs, v => v.segmentacao?.nome), SEM_SEGMENTO,
+        'Segmento não informado', cs.filter(v => !v.segmentacao?.nome).length),
       ouvidorias: cs.filter(v => v.ouvidoria).length,
-      // D-290: LOG do TOA e REV D-10
+      // D-290: LOG do TOA e REV D-10; 05/11: LOG 0 a "7 ou mais", e o Marcador
       revD10: cs.filter(temRevD10).length,
-      log0: cs.filter(v => logDe(v) === 0).length,
-      log1: cs.filter(v => logDe(v) === 1).length,
-      log2: cs.filter(v => (logDe(v) ?? -1) >= 2).length,
-      semLog: cs.filter(v => logDe(v) === null).length,
+      logs: opcoesDeLog(cs),
+      marcadores: opcoesDeMarcador(cs),
       // Desatribuído e Cancelado pela central à parte (origem — filtroContratos.ts).
       situacoes: SITUACOES_DE_TELA.filter(s => cs.some(v => situacaoDeTela(v) === s)),
       /* 155f: a contagem de cada situação, para a barra de pílulas.
@@ -764,8 +771,9 @@ export default function Equipes() {
   const eqFiltradas = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return painelVisto.filter(e => {
-      if (area !== 'TODAS' && e.area !== area) return false
-      if (supervisor !== 'TODOS' && e.supervisor !== supervisor) return false
+      if (areasSel.length && !areasSel.includes(e.area ?? '')) return false
+      if (supervisoresSel.length && !supervisoresSel.includes(e.supervisor ?? '')) return false
+      if (equipesSel.length && !equipesSel.includes(e.equipe_id)) return false
       // D-288: a equipe que só tem Auditar/Cancelado pela central não some
       if (soAtivas && e.visitas === 0 && !foraPorEquipe.has(e.equipe_id)) return false
       // Enquanto o dia carrega, ninguém some: esconder equipe por falta
@@ -775,7 +783,8 @@ export default function Equipes() {
       return [e.codigo, e.nome, e.supervisor, e.area, e.login_toa]
         .some(x => x?.toLowerCase().includes(t))
     })
-  }, [painelVisto, busca, area, supervisor, soAtivas, filtrando, contratosDia, passamPorEquipe, foraPorEquipe])
+  }, [painelVisto, busca, areasSel, supervisoresSel, equipesSel, soAtivas, filtrando, contratosDia,
+      passamPorEquipe, foraPorEquipe])
 
   const grupos = useMemo(() => {
     const ordenadas = [...eqFiltradas].sort((a, b) =>
@@ -793,13 +802,13 @@ export default function Equipes() {
   const tecFiltrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return tecnicos.filter(x => {
-      if (area !== 'TODAS' && x.equipe?.area?.apelido !== area) return false
+      if (areasSel.length && !areasSel.includes(x.equipe?.area?.apelido ?? '')) return false
       if (!t) return true
       return [x.matricula, x.nome, x.base?.nome, x.equipe?.codigo,
               x.supervisor?.nome, x.equipe?.supervisor_nome]
         .some(y => y?.toLowerCase().includes(t))
     })
-  }, [tecnicos, busca, area])
+  }, [tecnicos, busca, areasSel])
 
   const semTecnico = painel.filter(e => e.tecnicos === 0).length
   // com filtro: as equipes com contrato QUE PASSOU no filtro (131)
@@ -961,18 +970,16 @@ export default function Equipes() {
             className="min-w-56 flex-1 rounded-md border border-graf-700 bg-graf-900 px-3 py-1.5
                        text-sm outline-none placeholder-graf-500 focus:border-af-500" />
 
-          <select value={area} onChange={e => setArea(e.target.value)} className={sel}>
-            <option value="TODAS">Todas as áreas</option>
-            {areas.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <SelecaoMultipla rotulo="Área" todos="Todas as áreas" plural="áreas"
+            opcoes={areas} valor={areasSel} onChange={setAreasSel} className={sel} />
 
           {aba === 'equipes' && (
             <>
-              <select value={supervisor} onChange={e => setSupervisor(e.target.value)}
-                className={`max-w-52 ${sel}`}>
-                <option value="TODOS">Todos os supervisores</option>
-                {supervisores.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <SelecaoMultipla rotulo="Supervisor" todos="Todos os supervisores" plural="supervisores"
+                opcoes={supervisores} valor={supervisoresSel} onChange={setSupervisoresSel}
+                className={sel} />
+              <SelecaoMultipla rotulo="Equipe" todos="Toda equipe" plural="equipes"
+                opcoes={opEquipes} valor={equipesSel} onChange={setEquipesSel} className={sel} />
               <select value={agrupar} onChange={e => setAgrupar(e.target.value as typeof agrupar)}
                 className={sel}>
                 <option value="nenhum">Sem agrupamento</option>
@@ -993,71 +1000,45 @@ export default function Equipes() {
                 </span>
                 <SeletorBuckets opcoes={opContrato.buckets} semBucket={opContrato.semBucket}
                   valor={filtro.buckets} onChange={b => mudaFiltro('buckets', b)} className={sel} />
-                <select value={filtro.janela} aria-label="Janela"
-                  onChange={e => mudaFiltro('janela', e.target.value)} className={sel}>
-                  <option value="TODAS">Toda janela</option>
-                  {opContrato.janelas.map(j => <option key={j} value={j}>{j}</option>)}
-                  {opContrato.semJanela && <option value={SEM_JANELA}>Sem janela</option>}
-                </select>
-                <select value={filtro.statusToa} aria-label="Status da Atividade no TOA"
-                  onChange={e => mudaFiltro('statusToa', e.target.value)} className={sel}>
-                  <option value="TODOS">Todo status do TOA</option>
-                  {opContrato.status.map(s => <option key={s} value={s}>TOA · {s}</option>)}
-                  {opContrato.semStatus && <option value={SEM_STATUS}>Sem status do TOA</option>}
-                </select>
-                <select value={filtro.grupo} aria-label="Grupo de serviço"
-                  onChange={e => mudaFiltro('grupo', e.target.value)} className={sel}>
-                  <option value="TODOS">Todo grupo de serviço</option>
-                  {opContrato.grupos.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-                <select value={filtro.resultado} aria-label="Resultado"
-                  onChange={e => mudaFiltro('resultado', e.target.value as FiltroContrato['resultado'])}
-                  className={sel}>
-                  <option value="TODOS">Qualquer resultado</option>
-                  <option value="SUCESSO">Com O.S. executada</option>
-                  <option value="IMPRODUTIVA">Com improdutiva</option>
-                  <option value="SEM_BAIXA">Sem baixa ainda</option>
-                </select>
-                <select value={filtro.culpa} aria-label="Responsável pela improdutiva"
-                  onChange={e => mudaFiltro('culpa', e.target.value)} className={sel}>
-                  <option value="TODAS">Qualquer responsável</option>
-                  <option value="TECNICO">Improdutiva nossa</option>
-                  <option value="CLIENTE">Improdutiva do cliente</option>
-                  <option value="REDE">Improdutiva de rede</option>
-                  <option value="OPERADORA">Improdutiva da operadora</option>
-                  <option value="TERCEIRO">Improdutiva de terceiro</option>
-                </select>
-                <select value={filtro.segmento} aria-label="Segmentação do cliente"
-                  onChange={e => mudaFiltro('segmento', e.target.value)} className={sel}>
-                  <option value="TODOS">Todo segmento</option>
-                  {opContrato.segmentos.map(s => <option key={s} value={s}>{s}</option>)}
-                  {opContrato.semSegmento && <option value={SEM_SEGMENTO}>Segmento não informado</option>}
-                </select>
+                <SelecaoMultipla rotulo="Janela" todos="Toda janela" plural="janelas"
+                  opcoes={opContrato.janelas} valor={filtro.janelas}
+                  onChange={v => mudaFiltro('janelas', v)} className={sel} />
+                <SelecaoMultipla rotulo="Marcador" todos="Todo marcador" plural="marcadores"
+                  opcoes={opContrato.marcadores} valor={filtro.marcadores}
+                  onChange={v => mudaFiltro('marcadores', v)} className={sel} />
+                <SelecaoMultipla rotulo="Status da Atividade no TOA" todos="Todo status do TOA"
+                  plural="status do TOA" opcoes={opContrato.status} valor={filtro.statusToa}
+                  onChange={v => mudaFiltro('statusToa', v)} className={sel} />
+                <SelecaoMultipla rotulo="Grupo de serviço" todos="Todo grupo de serviço" plural="grupos"
+                  opcoes={opContrato.grupos} valor={filtro.grupos}
+                  onChange={v => mudaFiltro('grupos', v)} className={sel} />
+                <SelecaoMultipla rotulo="Resultado" todos="Qualquer resultado" plural="resultados"
+                  opcoes={OPCOES_RESULTADO} valor={filtro.resultados}
+                  onChange={v => mudaFiltro('resultados', v as FiltroContrato['resultados'])}
+                  className={sel} />
+                <SelecaoMultipla rotulo="Responsável pela improdutiva" todos="Qualquer responsável"
+                  plural="responsáveis" opcoes={OPCOES_CULPA} valor={filtro.culpas}
+                  onChange={v => mudaFiltro('culpas', v)} className={sel} />
+                <SelecaoMultipla rotulo="Segmentação do cliente" todos="Todo segmento" plural="segmentos"
+                  opcoes={opContrato.segmentos} valor={filtro.segmentos}
+                  onChange={v => mudaFiltro('segmentos', v)} className={sel} />
                 <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
                   <input type="checkbox" checked={filtro.soOuvidoria} className="accent-af-600"
                     onChange={e => mudaFiltro('soOuvidoria', e.target.checked)} />
                   Só ouvidoria <span className="tabular text-graf-400">({opContrato.ouvidorias})</span>
                 </label>
-                {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10 */}
-                <select value={filtro.log} aria-label="LOG do TOA"
-                  onChange={e => mudaFiltro('log', e.target.value)} className={sel}>
-                  <option value="TODOS">Todo LOG</option>
-                  <option value="0">LOG 0 ({opContrato.log0})</option>
-                  <option value="1">LOG 1 ({opContrato.log1})</option>
-                  <option value="2+">LOG 2 ou mais ({opContrato.log2})</option>
-                  {opContrato.semLog > 0 && <option value={SEM_LOG}>Sem LOG ({opContrato.semLog})</option>}
-                </select>
+                {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10; 05/11: até "7 ou mais" */}
+                <SelecaoMultipla rotulo="LOG do TOA" todos="Todo LOG" plural="LOGs"
+                  opcoes={opContrato.logs} valor={filtro.logs}
+                  onChange={v => mudaFiltro('logs', v)} className={sel} />
                 <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
                   <input type="checkbox" checked={filtro.soRevD10} className="accent-af-600"
                     onChange={e => mudaFiltro('soRevD10', e.target.checked)} />
                   Só REV D-10 <span className="tabular text-graf-400">({opContrato.revD10})</span>
                 </label>
-                <select value={filtro.origem} aria-label="Origem"
-                  onChange={e => mudaFiltro('origem', e.target.value)} className={sel}>
-                  <option value="TODAS">Toda origem</option>
-                  <option value="TOA">TOA</option>
-                  <option value="MANUAL">Manual</option>
-                </select>
+                <SelecaoMultipla rotulo="Origem" todos="Toda origem" plural="origens"
+                  opcoes={OPCOES_ORIGEM} valor={filtro.origens}
+                  onChange={v => mudaFiltro('origens', v)} className={sel} />
                 {filtrando > 0 && (
                   <button onClick={() => setFiltro(FILTRO_VAZIO)}
                     className="text-xs text-af-400 underline underline-offset-2">
@@ -1085,23 +1066,26 @@ export default function Equipes() {
                       chave: st, rotulo: infoSituacaoDeTela(st).label,
                       qtd: opContrato.contagem[st] ?? 0, cor: infoSituacaoDeTela(st).cor,
                     }))}
-                    ativa={filtro.situacao !== 'TODAS' && filtro.situacao !== 'ABERTAS'
-                      ? filtro.situacao : null} />
+                    // várias pílulas (Ctrl+clique) acendem várias fatias; Em aberto não é fatia
+                    ativa={filtro.situacoes.includes('ABERTAS') ? null : filtro.situacoes} />
 
                   <div className="flex flex-wrap gap-1.5">
                     {(['TODAS', 'ABERTAS', ...opContrato.situacoes] as const).map(st => {
                       const n = st === 'TODAS' ? opContrato.total
                         : st === 'ABERTAS' ? opContrato.abertas
                         : opContrato.contagem[st] ?? 0
-                      if (n === 0 && st !== 'TODAS') return null
-                      const ativo = filtro.situacao === st
+                      // a marcada não some zerada: é por ela que se desmarca
+                      if (n === 0 && st !== 'TODAS' && !filtro.situacoes.includes(st)) return null
+                      const ativo = st === 'TODAS'
+                        ? filtro.situacoes.length === 0 : filtro.situacoes.includes(st)
                       const cor = st === 'TODAS' ? 'var(--color-graf-400)'
                         : st === 'ABERTAS' ? 'var(--st-execucao)'
                         : infoSituacaoDeTela(st).cor
                       return (
                         <button key={st} aria-pressed={ativo}
-                          onClick={() => mudaFiltro('situacao',
-                            st as FiltroContrato['situacao'])}
+                          title={st === 'TODAS' ? undefined : 'Ctrl+clique soma'}
+                          onClick={e => mudaFiltro('situacoes',
+                            clicarSituacao(filtro.situacoes, st, e.ctrlKey || e.metaKey))}
                           style={{ ['--pill-cor' as string]: cor }}
                           className={`pill pill-filtro ${ativo ? 'pill-ativo' : 'pill-apagada'}`}>
                           {st === 'TODAS' ? 'Todas' : st === 'ABERTAS' ? 'Em aberto'
@@ -1125,15 +1109,22 @@ export default function Equipes() {
                        │ A pílula fica: ela é o número, e o número é útil.   │
                        │ O que faltava era a frase.                           │
                        └──────────────────────────────────────────────────────┘ */}
-                  {(filtro.situacao === 'CANCELADO_CENTRAL'
-                    || filtro.situacao === 'DESATRIBUIDO') && (
-                    <p className="text-[11px] text-graf-400">
-                      <strong className="text-graf-300">
-                        {infoSituacaoDeTela(filtro.situacao).label}
-                      </strong>{' '}
-                      aparece na equipe, mas não entra nos números dela — ninguém foi ao endereço.
-                    </p>
-                  )}
+                  {(() => {
+                    // com Ctrl+clique podem ser as duas ao mesmo tempo
+                    const fora = (['CANCELADO_CENTRAL', 'DESATRIBUIDO'] as OrigemCancelada[])
+                      .filter(s => filtro.situacoes.includes(s))
+                    if (!fora.length) return null
+                    return (
+                      <p className="text-[11px] text-graf-400">
+                        <strong className="text-graf-300">
+                          {fora.map(s => infoSituacaoDeTela(s).label).join(' e ')}
+                        </strong>{' '}
+                        {fora.length === 1 ? 'aparece' : 'aparecem'} na equipe, mas não{' '}
+                        {fora.length === 1 ? 'entra' : 'entram'} nos números dela — ninguém foi ao
+                        endereço.
+                      </p>
+                    )
+                  })()}
                 </div>
               )}
               {filtrando > 0 && (

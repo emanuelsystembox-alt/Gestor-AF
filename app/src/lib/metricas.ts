@@ -33,8 +33,11 @@ export interface OS {
      *  o serviço saiu (570, 582, 583). */
     situacao_destino: string | null
   } | null
-  /** A baixa da AFLINE (D-042) — só a lista do TEC1 perdido usa. */
+  /** A baixa da AFLINE (D-042) — a lista do TEC1 perdido e o Não compareceu usam. */
   baixa_afline?: { codigo: number; descricao: string } | null
+  /** A observação da baixa da AFLINE: é por ela que se sabe que o 100 foi
+   *  o sistema que pôs (210, D-312). Telas que não pedem vêm sem. */
+  baixa_observacao?: string | null
 }
 
 export interface Visita {
@@ -96,6 +99,40 @@ export interface Visita {
 
 /** Quantas evidencias o contrato tem. O embed pode vir vazio. */
 export const quantasEvidencias = (v: Visita): number => v.evidencia?.[0]?.count ?? 0
+
+/*
+ * ┌─ Não compareceu: o código 100 (Agendamento Não Cumprido) ─────────┐
+ * │ > "no dashboard deve ter um Card de Não compareceu para nos       │
+ * │ >  identificarmos os contratos de baixa 100" — Emanuel, 05/11     │
+ * │                                                                    │
+ * │ O 100 chega por três portas, e a lista diz qual:                  │
+ * │  · TOA     — a baixa da operadora (`codigo_baixa_id`);            │
+ * │  · SISTEMA — a importação de depois das 21:20 pôs na baixa da     │
+ * │    AFLINE (210, D-312). Ela grava sempre a mesma observação, e é  │
+ * │    o único rastro: `baixa_por` é quem importou, não "o sistema";  │
+ * │  · AFLINE  — qualquer outro 100 na nossa baixa (alguém baixou, ou │
+ * │    a carga histórica do ngestor, que veio sem observação).        │
+ * │ Conta por CONTRATO: o caso comum é 2 O.S. com o mesmo 100.        │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+export const COD_NAO_CUMPRIDO = 100
+/** O começo da observação que a 210 grava — tem de mudar junto com ela. */
+const OBS_NAO_CUMPRIDO_SISTEMA = 'agendamento não cumprido: pendente no toa'
+
+export type OrigemNaoCumprido = 'TOA' | 'SISTEMA' | 'AFLINE'
+
+/** De onde veio o 100 deste contrato; vazio = não tem 100. */
+export function origensNaoCumprido(v: Visita): OrigemNaoCumprido[] {
+  const s = new Set<OrigemNaoCumprido>()
+  for (const o of v.ordem_servico) {
+    if (o.codigo_baixa?.codigo === COD_NAO_CUMPRIDO) s.add('TOA')
+    if (o.baixa_afline?.codigo === COD_NAO_CUMPRIDO) {
+      s.add((o.baixa_observacao ?? '').normalize('NFC').trim().toLowerCase().startsWith(OBS_NAO_CUMPRIDO_SISTEMA)
+        ? 'SISTEMA' : 'AFLINE')
+    }
+  }
+  return (['TOA', 'SISTEMA', 'AFLINE'] as OrigemNaoCumprido[]).filter(x => s.has(x))
+}
 
 /**
  * ┌─ o vocabulário é o da CLARO, não o nosso (141) ───────────────────┐
@@ -372,6 +409,13 @@ export function calcular(visitas: Visita[]) {
 
   const taxaConclusao = encerradas.length
     ? (concluidas.length / encerradas.length) * 100 : 0
+
+  // Não compareceu (cód. 100): o % é sobre os encerrados, como a conclusão
+  // (D-296); o 100 em contrato ainda aberto fica no apoio, fora da conta.
+  const comNaoCumprido = produtivas.filter(v => origensNaoCumprido(v).length > 0)
+  const naoCumpridos = comNaoCumprido.filter(v => TERMINAIS.includes(v.situacao)).length
+  const naoCumpridoAbertos = comNaoCumprido.length - naoCumpridos
+  const pctNaoCumprido = encerradas.length ? (naoCumpridos * 100) / encerradas.length : 0
 
   // "Janela em risco" (menos de 60 min para o fim) foi retirada a pedido
   // em 23/09 — ver D-153. A conta saiu junto com o aviso: metrica que
@@ -712,6 +756,8 @@ export function calcular(visitas: Visita[]) {
     comEvidencia: comEvidencia.length, semEvidencia: semEvidencia.length,
     encerradas: encerradas.length, abertasFora, evidenciasTotal, pctEvidencia,
     listaSemEvidencia: semEvidencia,
+    naoCumpridos, naoCumpridoAbertos, pctNaoCumprido,
+    listaNaoCumprido: comNaoCumprido,
     nossas,
     // 152: aparecem na matriz, não entram em conta nenhuma.
     foraDaConta: foraDaConta.length, canceladoCentral, desatribuido,

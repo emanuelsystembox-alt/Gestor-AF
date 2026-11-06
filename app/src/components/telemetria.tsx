@@ -411,9 +411,11 @@ export interface Fatia { chave: string; rotulo: string; cor: string; qtd: number
  */
 export function BarraComposicao({ fatias, ativa }: {
   fatias: Fatia[]
-  /** Situação filtrada agora: as outras fatias apagam. */
-  ativa?: string | null
+  /** Situação(ões) filtrada(s) agora: as outras fatias apagam. Lista
+   *  vazia ou nula = nenhuma apagada (Ctrl+clique soma pílulas, D-316). */
+  ativa?: readonly string[] | string | null
 }) {
+  const acesas: readonly string[] = ativa == null ? [] : typeof ativa === 'string' ? [ativa] : ativa
   const total = fatias.reduce((s, f) => s + f.qtd, 0)
   if (total === 0) return null
   return (
@@ -423,7 +425,7 @@ export function BarraComposicao({ fatias, ativa }: {
         .join('\n')}>
       {fatias.filter(f => f.qtd > 0).map(f => (
         <span key={f.chave}
-          data-apagada={ativa && ativa !== f.chave ? '1' : '0'}
+          data-apagada={acesas.length > 0 && !acesas.includes(f.chave) ? '1' : '0'}
           style={{ flex: `${f.qtd} 0 0`, ['--fatia-cor' as string]: f.cor }} />
       ))}
     </div>

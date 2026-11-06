@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { supabase, SITUACAO_INFO } from '../lib/supabase'
-import type { Metricas, Visita } from '../lib/metricas'
+import { origensNaoCumprido, type Metricas, type OrigemNaoCumprido, type Visita } from '../lib/metricas'
 import {
   SITUACOES_DE_TELA, infoSituacaoDeTela, situacaoDeTela, type SituacaoDeTela,
 } from '../lib/filtroContratos'
@@ -754,6 +754,153 @@ function SemEvidencia({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => 
   )
 }
 
+// ================================================================== //
+//  NÃO COMPARECEU -- clicar no card abre os contratos com o 100
+// ================================================================== //
+
+const ORIGEM_100: Record<OrigemNaoCumprido, { rotulo: string; dica: string }> = {
+  TOA: { rotulo: 'TOA', dica: 'O 100 veio na baixa da operadora (TOA)' },
+  SISTEMA: { rotulo: 'Sistema 21:20', dica: 'O sistema pôs o 100 na baixa da AFLINE: pendente no TOA depois das 21:20 (D-312)' },
+  AFLINE: { rotulo: 'AFLINE', dica: 'O 100 está na baixa da AFLINE, lançado por alguém (ou pela carga histórica)' },
+}
+
+/**
+ * Os contratos com O.S. no código 100 — "Agendamento Não Cumprido".
+ *
+ * Sai do mesmo conjunto que o card conta (as produtivas filtradas). O card
+ * conta só os encerrados; o 100 em contrato ainda aberto aparece aqui,
+ * marcado, porque é justamente o que vale conferir.
+ */
+function NaoCompareceu({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
+  const [soOrigem, setSoOrigem] = useState<OrigemNaoCumprido | null>(null)
+  const fechado = (v: Visita) => ['CONCLUIDA', 'CANCELADA', 'REAGENDAMENTO'].includes(v.situacao)
+
+  const todos = useMemo(() => linhas
+    .map(v => ({ v, origens: origensNaoCumprido(v) }))
+    .sort((a, b) => Number(fechado(b.v)) - Number(fechado(a.v))
+      || b.v.data_agendada.localeCompare(a.v.data_agendada)
+      || (a.v.tecnico?.nome ?? '').localeCompare(b.v.tecnico?.nome ?? '', 'pt-BR')),
+  [linhas])
+
+  const porOrigem = useMemo(() => (['TOA', 'SISTEMA', 'AFLINE'] as OrigemNaoCumprido[])
+    .map(o => ({ o, qtd: todos.filter(x => x.origens.includes(o)).length }))
+    .filter(x => x.qtd > 0), [todos])
+
+  const lista = soOrigem ? todos.filter(x => x.origens.includes(soOrigem)) : todos
+  const variosDias = new Set(linhas.map(v => v.data_agendada)).size > 1
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aoFechar() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [aoFechar])
+
+  // Portal pelo mesmo motivo do TEC1 e do LOG (D-169/D-173).
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4"
+      role="dialog" aria-modal="true" aria-label="Contratos com código 100" onClick={aoFechar}>
+      <div className="card-controle mt-10 w-full max-w-6xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-graf-800 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">
+              Não compareceu · {lista.length} contrato(s)
+              {soOrigem && <span className="ml-1 font-normal text-graf-400">de {todos.length}</span>}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-graf-400">
+              Código 100 — Agendamento não cumprido, na baixa do TOA ou na da AFLINE.
+            </p>
+          </div>
+          <button onClick={aoFechar} className="rounded-md border border-graf-700 px-3 py-1 text-xs text-graf-300 hover:border-af-600">
+            Fechar
+          </button>
+        </div>
+
+        {todos.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-graf-400">Nenhum contrato com o código 100 no período e nos filtros.</p>
+        ) : (<>
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-4 py-2.5">
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-graf-400">De onde veio</span>
+            <button onClick={() => setSoOrigem(null)}
+              className={`rounded px-2 py-0.5 text-xs ${soOrigem == null
+                ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+              Todos
+            </button>
+            {porOrigem.map(({ o, qtd }) => (
+              <button key={o} onClick={() => setSoOrigem(soOrigem === o ? null : o)}
+                aria-pressed={soOrigem === o} title={ORIGEM_100[o].dica}
+                className={`rounded px-2 py-0.5 text-xs ${soOrigem === o
+                  ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                {ORIGEM_100[o].rotulo} <strong className="tabular">{qtd}</strong>
+              </button>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-graf-800 bg-graf-900 text-left text-[11px] uppercase tracking-wide text-graf-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Situação</th>
+                  <th className="px-3 py-2 font-medium">Contrato</th>
+                  <th className="px-3 py-2 font-medium">Grupo de serviço</th>
+                  <th className="px-3 py-2 font-medium">Equipe</th>
+                  <th className="px-3 py-2 font-medium">Técnico</th>
+                  <th className="px-3 py-2 font-medium">Janela</th>
+                  <th className="px-3 py-2 font-medium">De onde veio o 100</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lista.map(({ v, origens }) => (
+                  <tr key={v.id} className="border-b border-graf-800/60 hover:bg-graf-900/60">
+                    <td className="px-3 py-2">
+                      <span style={{ color: SITUACAO_INFO[v.situacao]?.cor }}>
+                        {SITUACAO_INFO[v.situacao]?.label ?? v.situacao}
+                      </span>
+                      {!fechado(v) && (
+                        <span className="ml-1.5 text-[10px] text-graf-400"
+                          title="Ainda não encerrou: fica fora da conta do card">em aberto</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <LinkContrato to={`/controle/visita/${v.id}`}
+                        className="tabular text-af-400 underline underline-offset-2">
+                        {v.contrato ?? v.wo_numero ?? '—'}
+                      </LinkContrato>
+                      {variosDias && (
+                        <div className="tabular text-[11px] text-graf-400">
+                          {new Date(v.data_agendada + 'T12:00').toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-graf-300">{v.tipo_servico?.nome ?? '—'}</td>
+                    <td className="px-3 py-2 text-graf-300">{v.equipe?.codigo ?? <span className="text-graf-400">sem equipe</span>}</td>
+                    <td className="px-3 py-2 text-graf-300">
+                      {v.tecnico?.nome ?? <span className="text-graf-400">sem técnico</span>}
+                    </td>
+                    <td className="tabular whitespace-nowrap px-3 py-2 text-graf-300">
+                      {v.janela_inicio ? `${v.janela_inicio.slice(0, 5)}–${v.janela_fim?.slice(0, 5) ?? '?'}` : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {origens.map(o => (
+                          <span key={o} title={ORIGEM_100[o].dica}
+                            className="rounded bg-graf-800 px-1.5 py-0.5 text-[11px] text-graf-200">
+                            {ORIGEM_100[o].rotulo}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+      </div>
+    </div>,
+    document.querySelector('.sup-controle') ?? document.body,
+  )
+}
+
 export function ReguaDoDia({ m, de, ate, linhas }: {
   m: Metricas
   /** As visitas FILTRADAS, as mesmas de onde `m` saiu — a lista do TEC1
@@ -767,6 +914,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
   const [verTec1, setVerTec1] = useState(false)
   const [verLog, setVerLog] = useState(false)
   const [verEvid, setVerEvid] = useState(false)
+  const [ver100, setVer100] = useState(false)
   const faltamParaMeta = Math.max(0, Math.ceil((META / 100) * m.encerradas) - m.concluidas)
   const naMeta = m.taxaConclusao >= META
 
@@ -911,6 +1059,35 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
             : 'nenhuma O.S. improdutiva no período'}
         />
 
+        {/* "Card de Não compareceu (...) os contratos de baixa 100" (Emanuel,
+            05/11). Contrato, não O.S.; % sobre os encerrados (D-296).
+            Nada encerrado ainda é "—", não 0. */}
+        <Celula
+          valor={m.encerradas ? num(m.naoCumpridos) : '—'}
+          rotulo="Não compareceu"
+          aoClicar={m.listaNaoCumprido.length > 0 ? () => setVer100(true) : undefined}
+          dica={m.listaNaoCumprido.length > 0
+            ? `Ver os ${m.listaNaoCumprido.length} contratos com código 100 (Agendamento não cumprido)`
+            : 'Código 100 — Agendamento não cumprido, na baixa do TOA ou da AFLINE'}
+          chamada="ver quais"
+          cor={!m.encerradas ? 'var(--color-graf-500)'
+            : m.naoCumpridos > 0 ? 'var(--st-reagendamento)' : 'var(--st-concluida)'}
+          alerta={m.naoCumpridos > 0}
+          apoio={m.encerradas
+            ? <>
+                cód. 100 · <span className="tabular">{m.pctNaoCumprido.toFixed(1).replace('.', ',')}%</span> de{' '}
+                <span className="tabular">{num(m.encerradas)}</span> encerrados
+                {m.naoCumpridoAbertos > 0 && (
+                  <span className="block" title="Tem o 100 mas o contrato ainda não encerrou: fica fora da conta">
+                    <span className="tabular">{num(m.naoCumpridoAbertos)}</span> em aberto fora da conta
+                  </span>
+                )}
+              </>
+            : m.naoCumpridoAbertos > 0
+              ? <><span className="tabular">{num(m.naoCumpridoAbertos)}</span> com cód. 100 em aberto — nada encerrado ainda</>
+              : 'nada encerrado para medir ainda'}
+        />
+
         {/* LOG (144) — "ao lado de improdutivas, coloque a tag log"
             (Emanuel, 26/10). O número é de CONTRATO: o LOG conta idas à
             agenda, e uma ida é uma visita, não uma O.S. */}
@@ -979,6 +1156,7 @@ export function ReguaDoDia({ m, de, ate, linhas }: {
       {verTec1 && <Tec1Perdido linhas={linhas} aoFechar={() => setVerTec1(false)} />}
       {verLog && <LogRetornos linhas={linhas} aoFechar={() => setVerLog(false)} />}
       {verEvid && <SemEvidencia linhas={m.listaSemEvidencia} aoFechar={() => setVerEvid(false)} />}
+      {ver100 && <NaoCompareceu linhas={m.listaNaoCumprido} aoFechar={() => setVer100(false)} />}
     </section>
   )
 }

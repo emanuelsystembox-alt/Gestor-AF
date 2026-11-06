@@ -41,6 +41,13 @@ export interface Resumo {
    *  abortada nao e trabalho, e some da tela -- mas nao daqui. */
   suspensas?: number
   erros: number; conflitos: number; ordens_servico: number
+  /** 187: linhas sem ID cujo ID veio do contrato do dia, pela WO. */
+  id_pela_wo?: number
+  /** 215: linhas sem ID, de WO sem contrato no dia, que entraram com a
+   *  chave provisória 'SEMID-WO-<wo>'. */
+  provisorias?: number
+  /** 215: contratos de chave provisória que receberam o ID real nesta importação. */
+  id_trocado?: number
   /** O dia em que as visitas entraram (090). */
   dia?: string
 }

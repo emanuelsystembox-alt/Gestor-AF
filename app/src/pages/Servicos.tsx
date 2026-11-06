@@ -12,11 +12,14 @@ import { BotaoAtualizar } from '../components/BotaoAtualizar'
 import { NovoContratoModal } from '../components/NovoContratoModal'
 import { BarraComposicao } from '../components/telemetria'
 import {
-  FILTRO_VAZIO, SEM_LOG, SEM_SEGMENTO, SITUACOES_DE_TELA, ehSituacaoDeTela, infoSituacaoDeTela,
-  logDe, passaNoFiltro, situacaoDeTela, temRevD10, type FiltroContrato, type SituacaoDeTela,
+  FILTRO_VAZIO, OPCOES_CULPA, OPCOES_ORIGEM, OPCOES_RESULTADO, SEM_JANELA, SEM_SEGMENTO,
+  SITUACOES_DE_TELA, clicarSituacao, infoSituacaoDeTela, janelaDe, opcoesDeLog,
+  opcoesDeMarcador, passaNoFiltro, situacaoDeTela, situacoesDaUrl, temRevD10,
+  type FiltroContrato, type SituacaoDeTela, type SituacaoDoFiltro,
 } from '../lib/filtroContratos'
 import { tecnologiaTxt } from '../lib/relatorio'
 import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
+import { SelecaoMultipla, opcoesContadas } from '../components/SelecaoMultipla'
 // A linha do contrato e o SELECT que a alimenta moram no componente —
 // Serviços e Equipes mostram o mesmo objeto do mesmo jeito (D-095).
 import {
@@ -168,29 +171,33 @@ export default function Servicos() {
    *  mostra, para o controlador saber quão velho é o que está vendo. */
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null)
 
-  // filtros
-  const [situacao, setSituacao] = useState<SituacaoDeTela | 'TODAS' | 'ABERTAS'>(() => {
-    if (params.get('filtro') === 'abertas') return 'ABERTAS'
-    const s = params.get('situacao')
-    return ehSituacaoDeTela(s) ? s : 'TODAS'
-  })
+  // filtros — cada um é um CONJUNTO (vazio = todos), ver lib/filtroContratos (05/11)
+  // A URL antiga (um valor só, vinda do Dashboard) continua valendo.
+  const [situacoes, setSituacoes] = useState<SituacaoDoFiltro[]>(() =>
+    params.get('filtro') === 'abertas' ? ['ABERTAS'] : situacoesDaUrl(params.get('situacao')))
   const [busca, setBusca] = useState('')
-  const [area, setArea] = useState('TODAS')
-  const [supervisor, setSupervisor] = useState('TODOS')
-  const [equipe, setEquipe] = useState('TODAS')
-  const [grupo, setGrupo] = useState(params.get('grupo') ?? 'TODOS')
+  const [areas, setAreas] = useState<string[]>([])
+  const [supervisores, setSupervisores] = useState<string[]>([])
+  const [equipes, setEquipes] = useState<string[]>([])
+  const [grupos, setGrupos] = useState<string[]>(() => {
+    const g = params.get('grupo')
+    return g && g !== 'TODOS' ? [g] : []
+  })
   /** 109: separar GPON (Emanuel, 19/10). SEM = sem GPON identificado. */
-  const [tecnologia, setTecnologia] = useState<'TODAS' | 'GPON' | 'SEM'>('TODAS')
-  const [origem, setOrigem] = useState('TODAS')
+  const [tecnologias, setTecnologias] = useState<string[]>([])
+  const [origens, setOrigens] = useState<string[]>([])
   const [buckets, setBuckets] = useState<string[]>([])
   // 123: segmento do cliente e caso crítico (ouvidoria)
-  const [segmento, setSegmento] = useState('TODOS')
+  const [segmentos, setSegmentos] = useState<string[]>([])
   const [soOuvidoria, setSoOuvidoria] = useState(false)
   // D-290: LOG do TOA e REV D-10 (Emanuel, 03/11)
-  const [log, setLog] = useState('TODOS')
+  const [logs, setLogs] = useState<string[]>([])
   const [soRevD10, setSoRevD10] = useState(false)
-  const [resultado, setResultado] = useState<'TODOS' | 'SUCESSO' | 'IMPRODUTIVA' | 'SEM_BAIXA'>('TODOS')
-  const [culpa, setCulpa] = useState('TODAS')
+  const [resultados, setResultados] = useState<FiltroContrato['resultados']>([])
+  const [culpas, setCulpas] = useState<string[]>([])
+  // 05/11: Janela e Marcador também em Serviços (já existiam em Equipes / na linha)
+  const [janelas, setJanelas] = useState<string[]>([])
+  const [marcadores, setMarcadores] = useState<string[]>([])
   const [soProdutivas, setSoProdutivas] = useState(true)
   // Quanto a linha mostra. "Detalhada" traz a O.S. e o código de baixa
   // para a própria linha — sem isso o COP precisava abrir uma por uma
@@ -463,21 +470,31 @@ export default function Servicos() {
 
   // As opções saem do que a lista carregada TEM, com a contagem.
   const opBuckets = useMemo(() => opcoesDeBucket(base), [base])
-  const opCliente = useMemo(() => ({
-    segmentos: [...new Set(base.map(v => v.segmentacao?.nome).filter((x): x is string => !!x))].sort(),
-    semSegmento: base.some(v => v.tipo_atividade?.natureza !== 'JORNADA' && !v.segmentacao?.nome),
-    ouvidorias: base.filter(v => v.ouvidoria).length,
-    revD10: base.filter(temRevD10).length,
-    log0: base.filter(v => logDe(v) === 0).length,
-    log1: base.filter(v => logDe(v) === 1).length,
-    log2: base.filter(v => (logDe(v) ?? -1) >= 2).length,
-    semLog: base.filter(v => v.tipo_atividade?.natureza !== 'JORNADA' && logDe(v) === null).length,
-  }), [base])
+  const opCliente = useMemo(() => {
+    const contratos = base.filter(v => v.tipo_atividade?.natureza !== 'JORNADA')
+    const semSegmento = contratos.filter(v => !v.segmentacao?.nome).length
+    const semJanela = base.filter(v => !janelaDe(v)).length
+    return {
+      segmentos: [
+        ...opcoesContadas(base, v => v.segmentacao?.nome),
+        ...(semSegmento ? [{ valor: SEM_SEGMENTO, rotulo: 'Segmento não informado', qtd: semSegmento }] : []),
+      ],
+      janelas: [
+        ...opcoesContadas(base, janelaDe),
+        ...(semJanela ? [{ valor: SEM_JANELA, rotulo: 'Sem janela', qtd: semJanela }] : []),
+      ],
+      ouvidorias: base.filter(v => v.ouvidoria).length,
+      revD10: base.filter(temRevD10).length,
+      logs: opcoesDeLog(base),
+      marcadores: opcoesDeMarcador(contratos),
+    }
+  }, [base])
 
   const filtro = useMemo<FiltroContrato>(() => ({
-    ...FILTRO_VAZIO, situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria,
-    log, soRevD10,
-  }), [situacao, grupo, origem, resultado, culpa, buckets, segmento, soOuvidoria, log, soRevD10])
+    ...FILTRO_VAZIO, situacoes, grupos, origens, resultados, culpas, buckets, segmentos, soOuvidoria,
+    logs, soRevD10, janelas, marcadores,
+  }), [situacoes, grupos, origens, resultados, culpas, buckets, segmentos, soOuvidoria, logs,
+       soRevD10, janelas, marcadores])
 
   /**
    * ┌─ as etiquetas contam o que o FILTRO deixa (24/10) ─────────────────┐
@@ -492,7 +509,7 @@ export default function Servicos() {
    * └────────────────────────────────────────────────────────────────────┘
    */
   const filtroSemSituacao = useMemo<FiltroContrato>(
-    () => ({ ...filtro, situacao: 'TODAS' }), [filtro])
+    () => ({ ...filtro, situacoes: [] }), [filtro])
 
   const semSituacao = useMemo(() => {
     // Número(s) digitado(s) em cima já foram resolvidos no servidor (162):
@@ -508,11 +525,12 @@ export default function Servicos() {
       // Grupo, origem, resultado, responsável, bucket, segmento: a regra é a
       // mesma de Equipes, e mora em um lugar só (lib/filtroContratos).
       if (!passaNoFiltro(v, filtroSemSituacao)) return false
-      if (area !== 'TODAS' && v.area?.apelido !== area && v.area?.codigo !== area) return false
-      if (supervisor !== 'TODOS' && supervisorDo(v) !== supervisor) return false
-      if (equipe !== 'TODAS' && v.equipe?.codigo !== equipe) return false
-      if (tecnologia === 'GPON' && v.tecnologia !== 'GPON') return false
-      if (tecnologia === 'SEM' && v.tecnologia === 'GPON') return false
+      if (areas.length
+        && !areas.some(a => v.area?.apelido === a || v.area?.codigo === a)) return false
+      if (supervisores.length && !supervisores.includes(supervisorDo(v) ?? '')) return false
+      if (equipes.length && !equipes.includes(v.equipe?.codigo ?? '')) return false
+      if (tecnologias.length
+        && !tecnologias.includes(v.tecnologia === 'GPON' ? 'GPON' : 'SEM')) return false
 
       if (!t) return true
       return [
@@ -523,11 +541,12 @@ export default function Servicos() {
           ? `${o.codigo_baixa.codigo} ${o.codigo_baixa.descricao}` : ''),
       ].some(x => x?.toLowerCase().includes(t))
     })
-  }, [base, filtroSemSituacao, busca, contratosBuscados, contratoNoPeriodo, area, supervisor, equipe, tecnologia])
+  }, [base, filtroSemSituacao, busca, contratosBuscados, contratoNoPeriodo, areas, supervisores,
+      equipes, tecnologias])
 
-  const visiveis = useMemo(() => (situacao === 'TODAS'
+  const visiveis = useMemo(() => (situacoes.length === 0
     ? semSituacao
-    : semSituacao.filter(v => passaNoFiltro(v, filtro))), [semSituacao, filtro, situacao])
+    : semSituacao.filter(v => passaNoFiltro(v, filtro))), [semSituacao, filtro, situacoes])
 
   // ---- paginação ----
   const [pagina, setPagina] = useState(1)
@@ -535,8 +554,9 @@ export default function Servicos() {
   // Filtro que muda joga de volta para a primeira: continuar na página 7
   // de um filtro que agora tem 2 páginas é cair num vazio sem explicação.
   useEffect(() => { setPagina(1) },
-    [situacao, busca, area, supervisor, equipe, grupo, origem, resultado,
-     culpa, soProdutivas, de, ate, tecnologia, buckets, segmento, soOuvidoria, log, soRevD10])
+    [situacoes, busca, areas, supervisores, equipes, grupos, origens, resultados,
+     culpas, soProdutivas, de, ate, tecnologias, buckets, segmentos, soOuvidoria, logs, soRevD10,
+     janelas, marcadores])
   // A lista pode encolher por baixo (chegou baixa ao vivo, filtro do
   // Realtime): a página nunca passa do fim.
   const paginaAtual = Math.min(pagina, paginas)
@@ -555,11 +575,17 @@ export default function Servicos() {
     [visiveis, pontos])
 
   // opções derivadas do que está carregado
+  // (com a contagem, como os buckets — quantos o período tem de cada)
   const op = useMemo(() => ({
-    areas: [...new Set(base.map(v => v.area?.apelido).filter(Boolean) as string[])].sort(),
-    supers: [...new Set(base.map(supervisorDo).filter(Boolean) as string[])].sort(),
-    equipes: [...new Set(base.map(v => v.equipe?.codigo).filter(Boolean) as string[])].sort(),
-    grupos: [...new Set(base.map(v => v.tipo_servico?.nome).filter(Boolean) as string[])].sort(),
+    areas: opcoesContadas(base, v => v.area?.apelido),
+    supers: opcoesContadas(base, supervisorDo),
+    equipes: opcoesContadas(base, v => v.equipe?.codigo, equipeRotulo),
+    grupos: opcoesContadas(base, v => v.tipo_servico?.nome),
+    tecnologias: [
+      { valor: 'GPON', rotulo: 'Só GPON', qtd: base.filter(v => v.tecnologia === 'GPON').length },
+      { valor: 'SEM', rotulo: 'Sem GPON identificado',
+        qtd: base.filter(v => v.tecnologia !== 'GPON').length },
+    ],
   }), [base])
 
   // Desatribuído e Cancelado pela central contam à parte de Cancelada
@@ -581,17 +607,16 @@ export default function Servicos() {
   })), [contagem])
 
   const abertas = semSituacao.filter(v => EM_ABERTO.includes(v.situacao)).length
-  const filtrando = [situacao !== 'TODAS', area !== 'TODAS', supervisor !== 'TODOS',
-    equipe !== 'TODAS', grupo !== 'TODOS', origem !== 'TODAS', resultado !== 'TODOS',
-    culpa !== 'TODAS', tecnologia !== 'TODAS', buckets.length > 0,
-    segmento !== 'TODOS', soOuvidoria, log !== 'TODOS', soRevD10,
-    busca.trim() !== ''].filter(Boolean).length
+  const filtrando = [situacoes, areas, supervisores, equipes, grupos, origens, resultados,
+    culpas, tecnologias, buckets, segmentos, logs, janelas, marcadores]
+    .filter(l => l.length > 0).length
+    + [soOuvidoria, soRevD10, busca.trim() !== ''].filter(Boolean).length
 
   function limpar() {
-    setSituacao('TODAS'); setArea('TODAS'); setSupervisor('TODOS'); setEquipe('TODAS')
-    setGrupo('TODOS'); setOrigem('TODAS'); setResultado('TODOS'); setCulpa('TODAS'); setBusca('')
-    setTecnologia('TODAS'); setBuckets([]); setSegmento('TODOS'); setSoOuvidoria(false)
-    setLog('TODOS'); setSoRevD10(false)
+    setSituacoes([]); setAreas([]); setSupervisores([]); setEquipes([])
+    setGrupos([]); setOrigens([]); setResultados([]); setCulpas([]); setBusca('')
+    setTecnologias([]); setBuckets([]); setSegmentos([]); setSoOuvidoria(false)
+    setLogs([]); setSoRevD10(false); setJanelas([]); setMarcadores([])
   }
 
   function exportar() {
@@ -745,77 +770,46 @@ export default function Servicos() {
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <select value={grupo} onChange={e => setGrupo(e.target.value)} className={sel}>
-              <option value="TODOS">Todo grupo de serviço</option>
-              {op.grupos.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-            <select value={tecnologia} onChange={e => setTecnologia(e.target.value as 'TODAS' | 'GPON' | 'SEM')}
-              className={sel} aria-label="Tecnologia">
-              <option value="TODAS">Toda tecnologia</option>
-              <option value="GPON">Só GPON</option>
-              <option value="SEM">Sem GPON identificado</option>
-            </select>
-            <select value={area} onChange={e => setArea(e.target.value)} className={sel}>
-              <option value="TODAS">Toda área</option>
-              {op.areas.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-            <select value={supervisor} onChange={e => setSupervisor(e.target.value)}
-              className={`${sel} max-w-52`}>
-              <option value="TODOS">Todo supervisor</option>
-              {op.supers.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={equipe} onChange={e => setEquipe(e.target.value)} className={sel}>
-              <option value="TODAS">Toda equipe</option>
-              {op.equipes.map(e => (
-                <option key={e} value={e}>{equipeRotulo(e)}</option>))}
-            </select>
-            <select value={resultado} onChange={e => setResultado(e.target.value as typeof resultado)}
-              className={sel}>
-              <option value="TODOS">Qualquer resultado</option>
-              <option value="SUCESSO">Com O.S. executada</option>
-              <option value="IMPRODUTIVA">Com improdutiva</option>
-              <option value="SEM_BAIXA">Sem baixa ainda</option>
-            </select>
-            <select value={culpa} onChange={e => setCulpa(e.target.value)} className={sel}>
-              <option value="TODAS">Qualquer responsável</option>
-              <option value="TECNICO">Improdutiva nossa</option>
-              <option value="CLIENTE">Improdutiva do cliente</option>
-              <option value="REDE">Improdutiva de rede</option>
-              <option value="OPERADORA">Improdutiva da operadora</option>
-              <option value="TERCEIRO">Improdutiva de terceiro</option>
-            </select>
+            {/* 05/11: todo filtro de lista aceita mais de uma opção (SelecaoMultipla) */}
+            <SelecaoMultipla rotulo="Grupo de serviço" todos="Todo grupo de serviço" plural="grupos"
+              opcoes={op.grupos} valor={grupos} onChange={setGrupos} className={sel} />
+            <SelecaoMultipla rotulo="Tecnologia" todos="Toda tecnologia" plural="tecnologias"
+              opcoes={op.tecnologias} valor={tecnologias} onChange={setTecnologias} className={sel} />
+            <SelecaoMultipla rotulo="Área" todos="Toda área" plural="áreas"
+              opcoes={op.areas} valor={areas} onChange={setAreas} className={sel} />
+            <SelecaoMultipla rotulo="Supervisor" todos="Todo supervisor" plural="supervisores"
+              opcoes={op.supers} valor={supervisores} onChange={setSupervisores} className={sel} />
+            <SelecaoMultipla rotulo="Equipe" todos="Toda equipe" plural="equipes"
+              opcoes={op.equipes} valor={equipes} onChange={setEquipes} className={sel} />
+            <SelecaoMultipla rotulo="Janela" todos="Toda janela" plural="janelas"
+              opcoes={opCliente.janelas} valor={janelas} onChange={setJanelas} className={sel} />
+            <SelecaoMultipla rotulo="Marcador" todos="Todo marcador" plural="marcadores"
+              opcoes={opCliente.marcadores} valor={marcadores} onChange={setMarcadores} className={sel} />
+            <SelecaoMultipla rotulo="Resultado" todos="Qualquer resultado" plural="resultados"
+              opcoes={OPCOES_RESULTADO} valor={resultados}
+              onChange={v => setResultados(v as FiltroContrato['resultados'])} className={sel} />
+            <SelecaoMultipla rotulo="Responsável pela improdutiva" todos="Qualquer responsável"
+              plural="responsáveis" opcoes={OPCOES_CULPA} valor={culpas} onChange={setCulpas}
+              className={sel} />
             <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
               valor={buckets} onChange={setBuckets} className={sel} />
-            <select value={segmento} onChange={e => setSegmento(e.target.value)} className={sel}
-              aria-label="Segmentação do cliente">
-              <option value="TODOS">Todo segmento</option>
-              {opCliente.segmentos.map(s => <option key={s} value={s}>{s}</option>)}
-              {opCliente.semSegmento && <option value={SEM_SEGMENTO}>Segmento não informado</option>}
-            </select>
+            <SelecaoMultipla rotulo="Segmentação do cliente" todos="Todo segmento" plural="segmentos"
+              opcoes={opCliente.segmentos} valor={segmentos} onChange={setSegmentos} className={sel} />
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
               <input type="checkbox" checked={soOuvidoria} className="accent-af-600"
                 onChange={e => setSoOuvidoria(e.target.checked)} />
               Só ouvidoria <span className="tabular text-graf-400">({opCliente.ouvidorias})</span>
             </label>
-            {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10 */}
-            <select value={log} onChange={e => setLog(e.target.value)} className={sel}
-              aria-label="LOG do TOA">
-              <option value="TODOS">Todo LOG</option>
-              <option value="0">LOG 0 ({opCliente.log0})</option>
-              <option value="1">LOG 1 ({opCliente.log1})</option>
-              <option value="2+">LOG 2 ou mais ({opCliente.log2})</option>
-              {opCliente.semLog > 0 && <option value={SEM_LOG}>Sem LOG ({opCliente.semLog})</option>}
-            </select>
+            {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10; 05/11: até "7 ou mais" */}
+            <SelecaoMultipla rotulo="LOG do TOA" todos="Todo LOG" plural="LOGs"
+              opcoes={opCliente.logs} valor={logs} onChange={setLogs} className={sel} />
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
               <input type="checkbox" checked={soRevD10} className="accent-af-600"
                 onChange={e => setSoRevD10(e.target.checked)} />
               Só REV D-10 <span className="tabular text-graf-400">({opCliente.revD10})</span>
             </label>
-            <select value={origem} onChange={e => setOrigem(e.target.value)} className={sel}>
-              <option value="TODAS">Toda origem</option>
-              <option value="TOA">TOA</option>
-              <option value="MANUAL">Manual</option>
-            </select>
+            <SelecaoMultipla rotulo="Origem" todos="Toda origem" plural="origens"
+              opcoes={OPCOES_ORIGEM} valor={origens} onChange={setOrigens} className={sel} />
             <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
               <input type="checkbox" checked={soProdutivas}
                 onChange={e => setSoProdutivas(e.target.checked)} className="accent-af-600" />
@@ -852,22 +846,27 @@ export default function Servicos() {
               `aria-pressed`. Fatia de 5% e alvo de clique ruim para
               qualquer pessoa. */}
           <div className="space-y-2 border-t border-graf-800 pt-2.5">
+            {/* Com várias pílulas (Ctrl+clique) a barra acende todas elas;
+                Em aberto não é fatia, e com ela a barra fica inteira. */}
             <BarraComposicao fatias={fatias}
-              ativa={situacao !== 'TODAS' && situacao !== 'ABERTAS' ? situacao : null} />
+              ativa={situacoes.includes('ABERTAS') ? null : situacoes} />
 
             <div className="flex flex-wrap gap-1.5">
               {(['TODAS', 'ABERTAS', ...SITUACOES_DE_TELA] as const).map(s => {
                 const n = s === 'TODAS' ? semSituacao.length
                   : s === 'ABERTAS' ? abertas : contagem[s as SituacaoDeTela] ?? 0
-                if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS') return null
-                const ativo = situacao === s
+                // A pílula marcada não some mesmo zerada: é por ela que se desmarca.
+                if (n === 0 && s !== 'TODAS' && s !== 'ABERTAS' && !situacoes.includes(s)) return null
+                const ativo = s === 'TODAS' ? situacoes.length === 0 : situacoes.includes(s)
                 // A cor do botao e a cor da SITUACAO, nao a da marca:
                 // "Concluida" ligada nao pode acender em vermelho.
                 const cor = s === 'TODAS' ? 'var(--color-graf-400)'
                   : s === 'ABERTAS' ? 'var(--st-execucao)'
                   : infoSituacaoDeTela(s as SituacaoDeTela).cor
                 return (
-                  <button key={s} onClick={() => setSituacao(s)} aria-pressed={ativo}
+                  <button key={s} aria-pressed={ativo}
+                    onClick={e => setSituacoes(atual => clicarSituacao(atual, s, e.ctrlKey || e.metaKey))}
+                    title={s === 'TODAS' ? undefined : 'Ctrl+clique soma'}
                     style={{ ['--pill-cor' as string]: cor }}
                     className={`pill pill-filtro ${ativo ? 'pill-ativo' : 'pill-apagada'}`}>
                     {s === 'TODAS' ? 'Todas' : s === 'ABERTAS' ? 'Em aberto'

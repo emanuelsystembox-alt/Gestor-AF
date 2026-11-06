@@ -667,6 +667,12 @@ export function TabelaContratos({
                                         ? 'bg-sky-200 text-sky-900 ring-sky-400'
                                         : ind!.nome === 'FP2'
                                         ? 'bg-orange-200 text-orange-900 ring-orange-400'
+                                        // D-314: LOG 1–6 marcados à mão seguem o selo de LOG —
+                                        // de 3 para cima preto com aro âmbar (igual ao app)
+                                        : /^LOG [3-9]$/.test(ind!.nome)
+                                        ? 'bg-black text-white ring-amber-500'
+                                        : /^LOG \d$/.test(ind!.nome)
+                                        ? 'bg-graf-800 text-graf-200 ring-graf-600'
                                         : 'bg-sky-900/40 text-sky-300 ring-sky-700/40'}`}>
                           {ind!.nome}
                         </span>

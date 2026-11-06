@@ -7,7 +7,8 @@ import { useAuth } from '../lib/auth'
 import {
   DESFECHOS, DESFECHO_POR_CHAVE, TRIAGEM, naTriagem, ehProblema,
   SITUACAO_CONTRATO, linkWhatsApp, formataTel, pct, num1, num2,
-  type Triagem,
+  COR_AGUARDANDO, CANAL, estagioDe, podeAguardar, haQuanto,
+  type Triagem, type Estagio,
 } from '../lib/qualidade'
 import { LinkContrato } from '../components/LinkContrato'
 
@@ -54,6 +55,8 @@ interface Linha {
   desfecho: string | null; canal: string | null; telefone: string | null
   nota_tecnico: number | null; tratou_bem: boolean | null; observacao: string | null
   tentativas: number; registrado_em: string | null; analista: string | null
+  /** 213: o "aguardando cliente" ABERTO — nulo quando não há. */
+  aguardando_em: string | null; aguardando_canal: string | null; aguardando_por: string | null
 }
 
 interface Indicadores {
@@ -172,6 +175,13 @@ function AbaFila({ de, ate, podeRegistrar }: {
 
   useEffect(() => recarregar(), [recarregar])
 
+  // O "há 2 h" do aguardando anda sozinho; um tique por minuto basta.
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
   /** As opções saem do PERÍODO inteiro, não do que sobrou: lista que
    *  encolhe conforme se filtra deixa a pessoa sem caminho de volta. */
   const opcoes = useMemo(() => ({
@@ -185,7 +195,7 @@ function AbaFila({ de, ate, podeRegistrar }: {
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return linhas.filter(l => {
-      if (!naTriagem(l.desfecho, triagem)) return false
+      if (!naTriagem(l, triagem)) return false
       if (fGrupo !== 'TODOS' && l.grupo !== fGrupo) return false
       if (fSituacao !== 'TODAS' && l.situacao_contrato !== fSituacao) return false
       if (fBaixa !== 'TODOS' && String(l.baixa_codigo ?? '') !== fBaixa) return false
@@ -205,7 +215,7 @@ function AbaFila({ de, ate, podeRegistrar }: {
   }, [linhas, triagem, busca, fGrupo, fSituacao, fBaixa, fJanela, fLog])
 
   const contagem = useMemo(() => Object.fromEntries(
-    TRIAGEM.map(t => [t.v, linhas.filter(l => naTriagem(l.desfecho, t.v)).length]),
+    TRIAGEM.map(t => [t.v, linhas.filter(l => naTriagem(l, t.v)).length]),
   ) as Record<Triagem, number>, [linhas])
 
   const avaliados = linhas.filter(l => l.desfecho != null).length
@@ -228,6 +238,11 @@ function AbaFila({ de, ate, podeRegistrar }: {
           {linhas.length > 0 && (
             <span className="ml-1 text-graf-400">
               · {Math.round((avaliados / linhas.length) * 100)}%
+            </span>
+          )}
+          {contagem.AGUARDANDO > 0 && (
+            <span className="ml-1 text-sky-300">
+              · <strong className="tabular">{contagem.AGUARDANDO}</strong> aguardando cliente
             </span>
           )}
         </p>
@@ -309,9 +324,12 @@ function AbaFila({ de, ate, podeRegistrar }: {
       <p className="py-16 text-center text-graf-400" role="status">Carregando a fila…</p>
     ) : filtradas.length === 0 ? (
       <Vazio titulo={triagem === 'PENDENTE' && contagem.TODOS > 0 && !temFiltro
-        ? 'Período concluído' : 'Nenhum contrato nesta seleção'}
+        ? (contagem.AGUARDANDO > 0 ? 'Nenhum pendente' : 'Período concluído')
+        : 'Nenhum contrato nesta seleção'}
         descricao={triagem === 'PENDENTE' && contagem.TODOS > 0 && !temFiltro
-          ? `Todos os ${contagem.TODOS} contratos do período já foram avaliados.`
+          ? (contagem.AGUARDANDO > 0
+            ? `${contagem.AGUARDANDO} aguardando retorno do cliente.`
+            : `Todos os ${contagem.TODOS} contratos do período já foram avaliados.`)
           : 'Ajuste a triagem ou os filtros acima.'}
         acao={temFiltro ? (
           <button onClick={limpar}
@@ -333,11 +351,12 @@ function AbaFila({ de, ate, podeRegistrar }: {
           </thead>
           <tbody>
             {filtradas.map(l => (
-              <LinhaFila key={l.visita_id} l={l}
+              <LinhaFila key={l.visita_id} l={l} agora={agora}
                 aberto={aberto === l.visita_id}
                 podeRegistrar={podeRegistrar}
                 aoAbrir={() => setAberto(a => a === l.visita_id ? null : l.visita_id)}
-                aoSalvar={() => { setAberto(null); recarregar() }} />
+                aoSalvar={() => { setAberto(null); recarregar() }}
+                aoMudar={() => { recarregar() }} />
             ))}
           </tbody>
         </table>
@@ -346,9 +365,9 @@ function AbaFila({ de, ate, podeRegistrar }: {
   </>)
 }
 
-function LinhaFila({ l, aberto, podeRegistrar, aoAbrir, aoSalvar }: {
-  l: Linha; aberto: boolean; podeRegistrar: boolean
-  aoAbrir: () => void; aoSalvar: () => void
+function LinhaFila({ l, agora, aberto, podeRegistrar, aoAbrir, aoSalvar, aoMudar }: {
+  l: Linha; agora: number; aberto: boolean; podeRegistrar: boolean
+  aoAbrir: () => void; aoSalvar: () => void; aoMudar: () => void
 }) {
   const d = l.desfecho ? DESFECHO_POR_CHAVE[l.desfecho] : null
   return (<>
@@ -393,10 +412,16 @@ function LinhaFila({ l, aberto, podeRegistrar, aoAbrir, aoSalvar }: {
         </div>
       </td>
       <td className="px-3 py-2.5">
-        <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
-          style={{ background: 'var(--color-graf-800)', color: d?.cor ?? 'var(--color-graf-400)' }}>
-          {d?.r ?? 'Pendente'}
-        </span>
+        {l.aguardando_em ? (<>
+          <SeloAguardando l={l} agora={agora} />
+          {/* o "Não atendeu" de antes não some: é a tentativa que já foi contada */}
+          {d && <div className="text-[10px] text-graf-400">antes: {d.r}</div>}
+        </>) : (
+          <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+            style={{ background: 'var(--color-graf-800)', color: d?.cor ?? 'var(--color-graf-400)' }}>
+            {d?.r ?? 'Pendente'}
+          </span>
+        )}
         {l.nota_tecnico != null && (
           <div className="tabular text-[11px] text-amber-300">{'★'.repeat(l.nota_tecnico)}</div>
         )}
@@ -404,21 +429,67 @@ function LinhaFila({ l, aberto, podeRegistrar, aoAbrir, aoSalvar }: {
     </tr>
     {aberto && (
       <tr><td colSpan={5} className="border-b border-graf-800 bg-graf-900/40 p-0">
-        <Registro l={l} podeRegistrar={podeRegistrar} aoSalvar={aoSalvar} />
+        <Registro l={l} agora={agora} podeRegistrar={podeRegistrar}
+          aoSalvar={aoSalvar} aoMudar={aoMudar} />
       </td></tr>
     )}
   </>)
+}
+
+/** "Aguardando cliente · há 2 h · WhatsApp" — no lugar do "Pendente". */
+function SeloAguardando({ l, agora }: { l: Linha; agora: number }) {
+  if (!l.aguardando_em) return null
+  return (
+    <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-sky-300"
+      title={`Marcado${l.aguardando_por ? ` por ${l.aguardando_por}` : ''} às ${hhmm(l.aguardando_em)}`}
+      style={{ background: 'var(--color-graf-800)' }}>
+      Aguardando cliente · {haQuanto(l.aguardando_em, agora)}
+      {l.aguardando_canal && ` · ${CANAL[l.aguardando_canal] ?? l.aguardando_canal}`}
+    </span>
+  )
+}
+
+/** Pendente → Aguardando cliente → Desfecho, com o estágio atual aceso. */
+function EtapasContato({ estagio, desfecho }: { estagio: Estagio; desfecho: string | null }) {
+  const d = desfecho ? DESFECHO_POR_CHAVE[desfecho] : null
+  const etapas: { v: Estagio; r: string; cor: string }[] = [
+    { v: 'PENDENTE', r: 'Pendente', cor: 'var(--color-graf-400)' },
+    // texto em sky-300: troca de tom com o tema (styles.css) e passa na AA
+    // sobre o graf-800 nos dois; o #0ea5e9 cheio daria ~2,2:1 no claro
+    { v: 'AGUARDANDO', r: 'Aguardando cliente', cor: 'var(--color-sky-300)' },
+    { v: 'DESFECHO', r: estagio === 'DESFECHO' && d ? d.r : 'Desfecho',
+      cor: d?.cor ?? 'var(--color-graf-400)' },
+  ]
+  return (
+    <ol aria-label="Estágio do contato" className="flex flex-wrap items-center gap-1.5 text-[11px]">
+      {etapas.map((e, i) => (
+        <li key={e.v} className="flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden className="text-graf-500">→</span>}
+          <span aria-current={estagio === e.v ? 'step' : undefined}
+            className={`rounded px-1.5 py-0.5 ${estagio === e.v
+              ? 'font-semibold' : 'text-graf-400'}`}
+            style={estagio === e.v
+              ? { background: 'var(--color-graf-800)', color: e.cor } : undefined}>
+            {e.r}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
 }
 
 // ================================================================== //
 //  O REGISTRO DA LIGAÇÃO
 // ================================================================== //
 
-function Registro({ l, podeRegistrar, aoSalvar }: {
-  l: Linha; podeRegistrar: boolean; aoSalvar: () => void
+function Registro({ l, agora, podeRegistrar, aoSalvar, aoMudar }: {
+  l: Linha; agora: number; podeRegistrar: boolean
+  aoSalvar: () => void; aoMudar: () => void
 }) {
   const [tel, setTel] = useState(l.telefone ?? '')
-  const [canal, setCanal] = useState(l.canal ?? 'LIGACAO')
+  // o canal do aguardando é o contato mais recente; senão, o da pesquisa
+  const [canal, setCanal] = useState(l.aguardando_canal ?? l.canal ?? 'LIGACAO')
+  const [marcando, setMarcando] = useState(false)
   const [desfecho, setDesfecho] = useState<string | null>(l.desfecho)
   const [nota, setNota] = useState<number | null>(l.nota_tecnico)
   const [tratouBem, setTratouBem] = useState<boolean | null>(l.tratou_bem)
@@ -450,8 +521,34 @@ function Registro({ l, podeRegistrar, aoSalvar }: {
     aoSalvar()
   }
 
+  // 213: o estágio intermediário. Grava, não encerra — o contrato segue na
+  // fila, marcado. Quem e quando, o servidor carimba (D-061).
+  async function marcarAguardando() {
+    setMarcando(true); setErro(null)
+    const { error } = await supabase.rpc('marcar_qualidade_aguardando', {
+      p_visita_id: l.visita_id, p_canal: canal, p_telefone: tel || null,
+    })
+    setMarcando(false)
+    if (error) { setErro(error.message); return }
+    aoSalvar()
+  }
+
+  async function desmarcarAguardando() {
+    setMarcando(true); setErro(null)
+    const { error } = await supabase.rpc('desmarcar_qualidade_aguardando', {
+      p_visita_id: l.visita_id,
+    })
+    setMarcando(false)
+    if (error) { setErro(error.message); return }
+    aoMudar()
+  }
+
+  const aguardavel = podeAguardar(l.desfecho)
+
   return (
     <div className="space-y-3 px-3 py-3">
+      <EtapasContato estagio={estagioDe(l.desfecho, l.aguardando_em)} desfecho={l.desfecho} />
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-graf-400">
         <span>{l.endereco ?? 'sem endereço'}{l.bairro ? ` · ${l.bairro}` : ''}</span>
         {l.tecnico && <span>Técnico {l.tecnico}</span>}
@@ -484,6 +581,32 @@ function Registro({ l, podeRegistrar, aoSalvar }: {
               {c === 'LIGACAO' ? 'Ligação' : 'WhatsApp'}
             </button>
           ))}
+          {l.aguardando_em ? (
+            <span className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-sky-300"
+              style={{ borderColor: COR_AGUARDANDO }}
+              title={`Marcado${l.aguardando_por ? ` por ${l.aguardando_por}` : ''} às ${hhmm(l.aguardando_em)}`}>
+              <span className="font-semibold">Aguardando cliente</span>
+              · {haQuanto(l.aguardando_em, agora)}
+              {l.aguardando_canal && ` · ${CANAL[l.aguardando_canal] ?? l.aguardando_canal}`}
+              {podeRegistrar && (
+                <button onClick={desmarcarAguardando} disabled={marcando}
+                  className="ml-1 text-[11px] text-graf-400 underline-offset-2 hover:text-af-400
+                             hover:underline disabled:opacity-40">
+                  {marcando ? 'desmarcando…' : 'desmarcar'}
+                </button>
+              )}
+            </span>
+          ) : (
+            <button onClick={marcarAguardando}
+              disabled={!podeRegistrar || !aguardavel || marcando}
+              title={aguardavel
+                ? `O assinante ficou de retornar (${CANAL[canal] ?? canal}). Não encerra o contato.`
+                : 'Já houve conversa com o assinante — registre o desfecho.'}
+              className="rounded-md border border-graf-700 px-2 py-1 text-xs text-graf-200
+                         hover:border-[#0ea5e9] hover:text-sky-300 disabled:opacity-40">
+              {marcando ? 'Marcando…' : 'Aguardando cliente'}
+            </button>
+          )}
         </div>
         {wa && (
           <a href={wa} target="_blank" rel="noopener noreferrer"

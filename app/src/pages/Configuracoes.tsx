@@ -4,6 +4,7 @@ import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { EditorSubFalhas } from '../components/EditorSubFalhas'
 import { BucketsToa } from '../components/BucketsToa'
+import { DashboardVTBaseClientes } from '../components/DashboardVTBaseClientes'
 import { CodigosDeBaixa, type CodigoBaixa } from '../components/CodigosDeBaixa'
 
 /**
@@ -95,9 +96,11 @@ interface TipoAtividade {
 }
 
 export default function Configuracoes() {
+  // 212: `?aba=clientes` — o Dashboard VT leva direto à base de clientes.
   const [aba, setAba] = useState<'status' | 'servico' | 'indicadores' | 'pontuacao'
                                 | 'baixa' | 'atividade' | 'subfalhas' | 'almox'
-                                | 'buckets'>('status')
+                                | 'buckets' | 'clientes'>(() =>
+    new URLSearchParams(window.location.search).get('aba') === 'clientes' ? 'clientes' : 'status')
   const [atividades, setAtividades] = useState<TipoAtividade[]>([])
   const [tiposOS, setTiposOS] = useState<TipoOS[]>([])
   const [grupos, setGrupos] = useState<string[]>([])
@@ -382,7 +385,9 @@ export default function Configuracoes() {
              ['pontuacao', 'Pontuação', totalRegras],
              ['almox', 'Almoxarifado', null],
              // 103: de qual cidade é cada arquivo do TOA (D-180).
-             ['buckets', 'Buckets do TOA', null]] as const).map(
+             ['buckets', 'Buckets do TOA', null],
+             // 212: o denominador do AT1 do Dashboard VT.
+             ['clientes', 'Base de clientes', null]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
                 className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
@@ -394,6 +399,8 @@ export default function Configuracoes() {
 
         {aba === 'subfalhas' ? (
           <EditorSubFalhas />
+        ) : aba === 'clientes' ? (
+          <DashboardVTBaseClientes />
         ) : aba === 'buckets' ? (
           <BucketsToa />
         ) : aba === 'almox' ? (

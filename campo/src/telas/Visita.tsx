@@ -19,7 +19,10 @@ import { escolherVariasDaGaleria } from '../lib/galeria'
 import { VisorEvidencia } from '../ui/VisorEvidencia'
 import { Aviso, Botao, Carregando, Cartao, Etiqueta } from '../ui/componentes'
 import { copiarTelefone, TextoComTelefone } from '../ui/TextoComTelefone'
-import { NOMES_MARCADORES_COR, SeloOuvidoria, SeloRevD10, SeloSegmento, SeloTec1, SelosMarcadores } from '../ui/MarcasCliente'
+import {
+  ListaMarcadores, SELECT_MARCADOR, SeloEdificacao, SeloLog, SeloOuvidoria, SeloRevisita, SeloSegmento,
+  SeloTec1, agruparMarcas, textoRevisita, type LinhaMarcador, type MarcaDoContrato, type SinalContrato,
+} from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
@@ -129,6 +132,12 @@ interface Detalhe {
    *  vieram (D-158). Nulos em contrato que não veio do TOA. */
   status_toa: string | null
   motivo_fechamento_toa: string | null
+  /** O "Contador de log" do TOA (144), como veio. Nulo = a linha não
+   *  trouxe — "log ?", nunca LOG 0. */
+  contador_log: string | null
+  /** Node e WO, como o detalhe do contrato no site mostra. */
+  node: string | null
+  wo_numero: string | null
   /** Os sinais da central (123, 124) — ver `ui/MarcasCliente`. */
   ouvidoria: boolean | null
   tec1: string | null
@@ -172,7 +181,7 @@ function localDaEvidencia(
 }
 
 const SELECT = `
-  id, contrato, cliente_nome, telefones,
+  id, contrato, cliente_nome, telefones, node, wo_numero,
   logradouro, complemento, bairro, cep, lat, lng,
   janela_inicio, janela_fim, situacao, data_agendada, observacao,
   ouvidoria, tec1, segmentacao:segmentacao_id ( nome ), toa_varrido_em, tecnologia,
@@ -193,7 +202,8 @@ const SELECT = `
   ),
   equipamento_movimento ( id, operacao, serial, tipo, modelo, criado_em, login, tecnico_id ),
   status_toa:dados_origem->>"Status da Atividade",
-  motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo"
+  motivo_fechamento_toa:dados_origem->>"Motivo de Fechamento Externo",
+  contador_log:dados_origem->>"Contador de log"
 `
 
 type Props = NativeStackScreenProps<Pilha, 'Visita'>
@@ -399,28 +409,28 @@ export default function Visita({ route, navigation }: Props) {
   // 192: os números que o cliente já deu em atendimentos anteriores do mesmo
   // contrato — "quando esse contrato voltar de novo, já aparecer para o
   // técnico" (Emanuel, 03/11). O banco já tira os que estão nesta visita.
-  // 193: o marcador REV D-10 do contrato (texto da observação do automático,
-  // ou vazio se alguém marcou à mão); nulo = não é revisita
-  const [revD10, setRevD10] = useState<string | null>(null)
-  // 200: o marcador OUVIDORIA do site — o mesmo selo preto do caso crítico do TOA
-  const [ouvMarc, setOuvMarc] = useState(false)
-  // D-297: CLIENTE ATIVADO e FP2
-  const [outrasMarc, setOutrasMarc] = useState<string[]>([])
+  // 05/11: TODOS os marcadores do contrato, com a observação de quem marcou
+  // ("deve mostrar os marcadores que o sistema sobe no contrato", Emanuel).
+  // 193: o REV D-10 continua com o aviso próprio no alto; 200: a OUVIDORIA do
+  // site continua sendo o mesmo selo preto do caso crítico do TOA.
+  const [marcas, setMarcas] = useState<MarcaDoContrato[]>([])
+  // 174 (D-261): prédio/casa e o vai-e-volta — o mesmo da agenda e do site.
+  const [sinal, setSinal] = useState<SinalContrato | null>(null)
   useEffect(() => {
     let vivo = true
-    supabase.from('visita_marcador')
-      .select('observacao, indicador_qualidade!inner(nome)')
-      .eq('visita_id', id).in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA', ...NOMES_MARCADORES_COR])
+    supabase.from('visita_marcador').select(SELECT_MARCADOR).eq('visita_id', id)
+      .eq('indicador_qualidade.ativo', true)
       .then(({ data }) => {
-        if (!vivo) return
-        const ms = (data ?? []) as unknown as { observacao: string | null; indicador_qualidade: { nome: string } }[]
-        const rev = ms.find(m => m.indicador_qualidade?.nome === 'REV D-10')
-        setRevD10(rev ? (rev.observacao ?? '') : null)
-        setOuvMarc(ms.some(m => m.indicador_qualidade?.nome === 'OUVIDORIA'))
-        setOutrasMarc(ms.map(m => m.indicador_qualidade?.nome).filter(n => NOMES_MARCADORES_COR.includes(n)))
+        if (vivo) setMarcas(agruparMarcas((data ?? []) as unknown as LinhaMarcador[]).get(id) ?? [])
       })
+    supabase.rpc('sinais_das_visitas', { p_visitas: [id] }).then(({ data }) => {
+      if (vivo) setSinal(((data ?? []) as SinalContrato[])[0] ?? null)
+    })
     return () => { vivo = false }
   }, [id])
+  const rev = marcas.find(m => m.nome === 'REV D-10')
+  const revD10 = rev ? (rev.observacao ?? '') : null
+  const ouvMarc = marcas.some(m => m.nome === 'OUVIDORIA')
 
   const [telAnteriores, setTelAnteriores] = useState<{ telefone: string; origem: string; visto_em: string }[]>([])
   useEffect(() => {
@@ -869,22 +879,29 @@ export default function Visita({ route, navigation }: Props) {
             também (...) o app dele deve aparecer o informativo" (03/11). */}
         {revD10 != null && (
           // vermelho suave, como o marcador na web (Emanuel, 03/11)
+          // A observação de quem marcou à mão também aparece (antes só a do
+          // automático) — por isso a lista de marcadores não a repete.
           <Aviso tipo="erro">
             {`REV D-10 · revisita${revD10.startsWith('Automático:')
-              ? ` — atendimento anterior: ${revD10.replace('Automático: ', '')}` : ''}.`}
+              ? ` — atendimento anterior: ${revD10.replace('Automático: ', '')}`
+              : revD10.trim() ? ` — ${revD10.trim()}` : ''}.`}
           </Aviso>
         )}
 
-        {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). */}
-        {(!!v.ouvidoria || ouvMarc || !!v.segmentacao?.nome || !!v.tec1 || revD10 != null || outrasMarc.length > 0) && (
-          <View style={e.marcas}>
-            <SeloOuvidoria ouvidoria={v.ouvidoria || ouvMarc} />
-            <SeloSegmento segmento={v.segmentacao?.nome} />
-            <SeloRevD10 ativo={revD10 != null} />
-            <SelosMarcadores nomes={outrasMarc} />
-            <SeloTec1 tec1={v.tec1} />
-          </View>
-        )}
+        {/* Os mesmos sinais da agenda e da central (Emanuel, 21/10). O LOG
+            sai sempre: nulo é "log ?" (a planilha não trouxe), não LOG 0. */}
+        <View style={e.marcas}>
+          <SeloLog valor={v.contador_log} />
+          <SeloRevisita revisita={sinal?.revisita} motivo={sinal?.revisita_motivo} />
+          <SeloEdificacao edificacao={sinal?.edificacao} />
+          <SeloOuvidoria ouvidoria={v.ouvidoria || ouvMarc} />
+          <SeloSegmento segmento={v.segmentacao?.nome} />
+          <SeloTec1 tec1={v.tec1} />
+        </View>
+        {/* No site o porquê do vai-e-volta é a dica do mouse; no celular vai escrito. */}
+        {!!sinal?.revisita && <Text style={e.revisitaTexto}>🔁 {textoRevisita(sinal)}</Text>}
+
+        <ListaMarcadores marcas={marcas} semObs={['REV D-10']} />
 
         {/* ---------- onde estou / onde é ---------- */}
         <View style={e.chipGps}>
@@ -912,6 +929,13 @@ export default function Visita({ route, navigation }: Props) {
           <Text style={e.enderecoMiudo}>
             {v.bairro}{v.cep ? ` · ${v.cep}` : ''}
           </Text>
+          {/* Node e WO, como no contrato do site — a agenda já mostra o node. */}
+          {(!!v.node || !!v.wo_numero) && (
+            <Text style={e.enderecoMiudo} selectable>
+              {[v.node ? `Node ${v.node}` : null, v.wo_numero ? `WO ${v.wo_numero}` : null]
+                .filter(Boolean).join(' · ')}
+            </Text>
+          )}
 
           {/* 156e: a casa que um colega marcou na porta. Vale mais que o
               ponto do TOA, que é aproximado -- e o mapa vai para ela. */}
@@ -1923,6 +1947,7 @@ const e = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden',
   },
   marcas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  revisitaTexto: { fontSize: 14, lineHeight: 20, color: cor.graf600 },
   operadora: { fontSize: 12, color: cor.graf400, marginTop: 8 },
   semAcao: { fontSize: 13, color: cor.graf400, marginTop: 10 },
 

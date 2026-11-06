@@ -1,5 +1,20 @@
 # Passagem de bastão — leia isto primeiro
 
+> **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-322, migrations 210 a 215; site
+> publicado em 05/11 ~23h):
+> - **Reagendado 100 depois das 21:20** (210): importação de hoje, contrato "pendente" no TOA, ainda
+>   em entrada/deslocamento e sem código → Reagendamento com o 100 na baixa da AFLINE. O TOA NÃO é
+>   baixado (D-250 fica). **Revisita numa regra só** (211): o vai-e-volta é `revisita_dos_contratos`;
+>   REV D-10 = a mesma com 10 dias. Marcadores LOG 1–6. Manual com equipe nasce Na entrada.
+> - Site: filtros de seleção múltipla e Ctrl+clique nas situações (Serviços, Equipes, Dashboard);
+>   grupo de serviço e card "Não compareceu" no Dashboard; **Dashboard Visita Técnica** embaixo
+>   (212; base de clientes por área em Configurações — nasceu vazia); "Aguardando cliente" na
+>   Qualidade (213); "Fora da área" no Monitoramento (214); planilha sem ID entra com chave
+>   `SEMID-WO-…` e a planilha com ID a troca (215).
+> - **App:** LOG e todos os marcadores (só código JS) — **o `eas update` NÃO foi rodado** (barrado
+>   pela permissão da sessão). Perguntas abertas no fim de cada decisão (D-318, D-319, D-321, D-322).
+>   Ainda: na tarde de 05/11 ~40 importações estouraram os 8 s, causa não achada.
+
 Última atualização: **03/11/2026**, por Claude (Opus 5.5).
 
 > **03/11/2026 — status do TOA, histórico do ngestor, REV D-10** (D-272 a D-290, migrations

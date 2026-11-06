@@ -8,10 +8,10 @@ import { supabase } from '../lib/supabase'
  * > "precisamos sinalizar nossos contratos igual ao do TOA" — Emanuel, 02/11
  *
  * Quem decide é o banco (`sinais_das_visitas`): a edificação pela regra da
- * D-198 (APTO/LOJA = prédio; CASA/BECO = casa) e o vai-e-volta pela regra
- * que o Emanuel ditou — VT da VT, retorno do retorno, ou a mesma O.S. de
- * instalação que já veio e não foi concluída, nos 30 dias antes. Não é a
- * revisita da D-245 (a do card do técnico): não troque uma pela outra.
+ * D-198 (APTO/LOJA = prédio; CASA/BECO = casa) e o vai-e-volta pela revisita
+ * (`revisita_dos_contratos`, D-245): anterior concluída até 30 dias antes,
+ * qualquer → VT, retorno ← retorno ou instalação. Desde a 211 (D-313) o sinal
+ * e a revisita são a MESMA regra — antes eram duas, e divergiam na tela.
  *
  * Desenhos em SVG, não emoji: emoji muda de cara em cada sistema e some no
  * tema escuro. A cor do vai-e-volta é a laranja do TOA, para quem vem de lá
@@ -22,7 +22,7 @@ export interface SinalContrato {
   visita_id: string
   edificacao: 'PREDIO' | 'CASA' | null
   revisita: boolean
-  revisita_motivo: 'VT_DA_VT' | 'RETORNO_DO_RETORNO' | 'OS_NAO_CONCLUIDA' | null
+  revisita_motivo: 'VT_DA_VT' | 'RETORNO_DO_RETORNO' | 'DE_OUTRO_GRUPO' | 'OS_NAO_CONCLUIDA' | null
   anterior_data: string | null
   anterior_situacao: string | null
   anterior_grupo: string | null
@@ -31,6 +31,7 @@ export interface SinalContrato {
 const MOTIVO: Record<string, string> = {
   VT_DA_VT: 'VT da VT',
   RETORNO_DO_RETORNO: 'retorno do retorno',
+  DE_OUTRO_GRUPO: 'voltou depois de outro serviço',
   OS_NAO_CONCLUIDA: 'a mesma O.S. já veio e não foi concluída',
 }
 const SITUACAO: Record<string, string> = {

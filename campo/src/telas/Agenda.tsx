@@ -19,7 +19,10 @@ import {
 import { Aviso, Botao, Carregando, Cartao, Etiqueta, Marca, Vazio } from '../ui/componentes'
 import { PainelAvisos } from '../ui/PainelAvisos'
 import { TextoComTelefone } from '../ui/TextoComTelefone'
-import { NOMES_MARCADORES_COR, SeloEdificacao, SeloOuvidoria, SeloRevD10, SeloRevisita, SeloSegmento, SeloTec1, SelosMarcadores } from '../ui/MarcasCliente'
+import {
+  SeloEdificacao, SeloLog, SeloOuvidoria, SeloRevisita, SeloSegmento, SeloTec1, SelosMarcadores,
+  SELECT_MARCADOR, agruparMarcas, type LinhaMarcador, type MarcaDoContrato, type SinalContrato,
+} from '../ui/MarcasCliente'
 import { BarraInferior } from '../ui/BarraInferior'
 import { capaDoMural } from './Mural'
 import { cor, raio, sombraCard } from '../ui/tema'
@@ -84,12 +87,7 @@ export interface LinhaAgenda {
 }
 
 /** O que `sinais_das_visitas` devolve (174, D-261). */
-interface Sinal {
-  visita_id: string
-  edificacao: 'PREDIO' | 'CASA' | null
-  revisita: boolean
-  revisita_motivo: string | null
-}
+type Sinal = SinalContrato
 
 interface Producao {
   tecnico_id: string | null
@@ -140,10 +138,12 @@ export default function Agenda({ navigation }: Props) {
    *  ar, ou não deu para ler — nos dois casos o cartão não aparece. */
   const [capa, setCapa] = useState<{ titulo: string; url: string | null } | null>(null)
   const [sinais, setSinais] = useState<Map<string, Sinal>>(new Map())
-  const [revD10, setRevD10] = useState<Set<string>>(new Set())
-  const [ouvMarc, setOuvMarc] = useState<Set<string>>(new Set())
-  // D-297: CLIENTE ATIVADO e FP2, por contrato
-  const [outrasMarc, setOutrasMarc] = useState<Map<string, string[]>>(new Map())
+  // Todos os marcadores de cada contrato (Emanuel, 05/11: "deve mostrar os
+  // marcadores que o sistema sobe no contrato"), na ordem do cadastro.
+  const [marcas, setMarcas] = useState<Map<string, MarcaDoContrato[]>>(new Map())
+  // O "Contador de log" do TOA (144). Contrato FORA do mapa = não deu para
+  // ler (não desenha nada); DENTRO com nulo = a planilha não trouxe ("log ?").
+  const [logs, setLogs] = useState<Map<string, string | null>>(new Map())
   const [origemCanc, setOrigemCanc] = useState<Map<string, OrigemCanc>>(new Map())
 
   const carregar = useCallback(async (dia: string) => {
@@ -159,20 +159,24 @@ export default function Agenda({ navigation }: Props) {
       const m = new Map<string, Sinal>()
       for (const x of (s ?? []) as Sinal[]) m.set(x.visita_id, x)
       setSinais(m)
-      // 193/200/D-297: os marcadores que o técnico vê — REV D-10, OUVIDORIA, CLIENTE ATIVADO e FP2
-      const { data: mk } = await supabase.from('visita_marcador')
-        .select('visita_id, indicador_qualidade!inner(nome)')
-        .in('visita_id', ls.map(l => l.visita_id))
-        .in('indicador_qualidade.nome', ['REV D-10', 'OUVIDORIA', ...NOMES_MARCADORES_COR])
-      const marcas = (mk ?? []) as unknown as { visita_id: string; indicador_qualidade: { nome: string } }[]
-      setRevD10(new Set(marcas.filter(x => x.indicador_qualidade?.nome === 'REV D-10').map(x => x.visita_id)))
-      setOuvMarc(new Set(marcas.filter(x => x.indicador_qualidade?.nome === 'OUVIDORIA').map(x => x.visita_id)))
-      const outras = new Map<string, string[]>()
-      for (const x of marcas) {
-        const n = x.indicador_qualidade?.nome
-        if (n && NOMES_MARCADORES_COR.includes(n)) outras.set(x.visita_id, [...(outras.get(x.visita_id) ?? []), n])
-      }
-      setOutrasMarc(outras)
+      // 193/200/D-297 e 05/11: TODOS os marcadores do contrato — os do
+      // cadastro ativo, como a web (TabelaContratos só desenha os ativos).
+      // A leitura é a policy `vm_leitura`: quem vê a visita vê o marcador.
+      const ids = ls.map(l => l.visita_id)
+      const [{ data: mk }, { data: lg, error: elg }] = await Promise.all([
+        supabase.from('visita_marcador')
+          .select(SELECT_MARCADOR)
+          .in('visita_id', ids)
+          .eq('indicador_qualidade.ativo', true),
+        // Só o contador, e não o `dados_origem` inteiro: a linha crua do TOA
+        // carrega nome, telefone e endereço do assinante (LGPD).
+        supabase.from('visita')
+          .select('id, contador_log:dados_origem->>"Contador de log"')
+          .in('id', ids),
+      ])
+      setMarcas(agruparMarcas((mk ?? []) as unknown as LinhaMarcador[]))
+      setLogs(elg ? new Map() : new Map(((lg ?? []) as unknown as { id: string; contador_log: string | null }[])
+        .map(x => [x.id, x.contador_log])))
       // 197: para onde foi o cancelado — Auditar ou cancelado pela central
       const canc = ls.filter(l => l.situacao === 'CANCELADA').map(l => l.visita_id)
       if (canc.length) {
@@ -180,7 +184,7 @@ export default function Agenda({ navigation }: Props) {
         setOrigemCanc(new Map(((oc ?? []) as { visita_id: string; origem: OrigemCanc | null }[])
           .filter(x => x.origem).map(x => [x.visita_id, x.origem!])))
       } else setOrigemCanc(new Map())
-    } else { setSinais(new Map()); setRevD10(new Set()); setOuvMarc(new Set()); setOutrasMarc(new Map()); setOrigemCanc(new Map()) }
+    } else { setSinais(new Map()); setMarcas(new Map()); setLogs(new Map()); setOrigemCanc(new Map()) }
   }, [])
 
   useEffect(() => {
@@ -634,20 +638,27 @@ export default function Agenda({ navigation }: Props) {
             {/* O que o controlador vê na linha do contrato, o técnico vê
                 aqui (Emanuel, 21/10). A ouvidoria vem primeiro: é rara e
                 muda como ele trata o cliente. */}
-            {(!!l.ouvidoria || !!l.segmento || !!l.tec1 || !!sinais.get(l.visita_id)?.edificacao
-              || !!sinais.get(l.visita_id)?.revisita || revD10.has(l.visita_id) || ouvMarc.has(l.visita_id) || outrasMarc.has(l.visita_id)) && (
-              <View style={e.marcas}>
-                <SeloRevisita revisita={sinais.get(l.visita_id)?.revisita}
-                  motivo={sinais.get(l.visita_id)?.revisita_motivo} />
-                <SeloEdificacao edificacao={sinais.get(l.visita_id)?.edificacao} />
-                {/* 200: o caso crítico do TOA OU o marcador OUVIDORIA do site — o mesmo selo preto */}
-                <SeloOuvidoria ouvidoria={l.ouvidoria || ouvMarc.has(l.visita_id)} />
-                <SeloSegmento segmento={l.segmento} />
-                <SeloRevD10 ativo={revD10.has(l.visita_id)} />
-                <SelosMarcadores nomes={outrasMarc.get(l.visita_id)} />
-                <SeloTec1 tec1={l.tec1} />
-              </View>
-            )}
+            {(() => {
+              const sn = sinais.get(l.visita_id)
+              const mk = marcas.get(l.visita_id) ?? []
+              const ouvMarc = mk.some(m => m.nome === 'OUVIDORIA')
+              const temLog = logs.has(l.visita_id)
+              if (!l.ouvidoria && !ouvMarc && !l.segmento && !l.tec1 && !sn?.edificacao
+                && !sn?.revisita && !mk.length && !temLog) return null
+              return (
+                <View style={e.marcas}>
+                  {/* 144: o LOG primeiro — "quantas vezes ele já voltou na agenda" */}
+                  {temLog && <SeloLog valor={logs.get(l.visita_id)} />}
+                  <SeloRevisita revisita={sn?.revisita} motivo={sn?.revisita_motivo} />
+                  <SeloEdificacao edificacao={sn?.edificacao} />
+                  {/* 200: o caso crítico do TOA OU o marcador OUVIDORIA do site — o mesmo selo preto */}
+                  <SeloOuvidoria ouvidoria={l.ouvidoria || ouvMarc} />
+                  <SeloSegmento segmento={l.segmento} />
+                  <SelosMarcadores marcas={mk} sem={['OUVIDORIA']} />
+                  <SeloTec1 tec1={l.tec1} />
+                </View>
+              )
+            })()}
 
             {/* Uma linha por informação, rótulo à esquerda na mesma coluna:
                 o olho desce pela coluna e acha o que procura sem ler tudo
