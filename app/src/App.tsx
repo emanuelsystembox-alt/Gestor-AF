@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { CentralProvider } from './lib/central'
 import Login from './pages/Login'
 const Controle = lazy(() => import('./pages/Controle'))
+// 217: o Dashboard da Visita Técnica, em tela própria.
+const DashboardVTPagina = lazy(() => import('./pages/DashboardVTPagina'))
 const Servicos = lazy(() => import('./pages/Servicos'))
 const Rota = lazy(() => import('./pages/Rota'))
 const Equipes = lazy(() => import('./pages/Equipes'))
@@ -151,6 +153,8 @@ function Rotas() {
 
         <Route path="/controle" element={
           <Protegida exige="GESTAO"><Controle /></Protegida>} />
+        <Route path="/controle/dashboard-vt" element={
+          <Protegida exige="GESTAO"><DashboardVTPagina /></Protegida>} />
         <Route path="/controle/servicos" element={
           <Protegida exige="GESTAO" permissao="servicos.ver"><Servicos /></Protegida>} />
         <Route path="/controle/rota" element={

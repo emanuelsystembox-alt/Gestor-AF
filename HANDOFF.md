@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-> **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-323, migrations 210 a 216; site
+> **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-326, migrations 210 a 218; site
 > publicado em 05/11 ~23h):
 > - **Reagendado 100 depois das 21:20** (210): importação de hoje, contrato "pendente" no TOA, ainda
 >   em entrada/deslocamento e sem código → Reagendamento com o 100 na baixa da AFLINE. O TOA NÃO é
@@ -11,6 +11,9 @@
 >   (212; base de clientes por área em Configurações — MA1 e MA5 cadastradas; o AT1 tira todo cancelado e o que o TOA cancelou pela central, 216); "Aguardando cliente" na
 >   Qualidade (213); "Fora da área" no Monitoramento (214); planilha sem ID entra com chave
 >   `SEMID-WO-…` e a planilha com ID a troca (215).
+> - **06/11:** Dashboard VT em tela própria no menu (ponto azul), metas, equipe de VT, janela × área
+>   e endereço/mesma rua nas listas (217, D-325); Monitoramento conta EQUIPES que saíram da área no
+>   dia (218, D-324); estouros de 8 s investigados — espera por bloqueio, 2 ajustes propostos (D-326).
 > - **App:** LOG e todos os marcadores (só código JS), publicado pelo ar pelo Emanuel (runtime 0.7.1,
 >   update `b4b238a9`). Perguntas abertas no fim de cada decisão (D-318, D-319, D-321, D-322).
 >   Ainda: na tarde de 05/11 ~40 importações estouraram os 8 s, causa não achada.

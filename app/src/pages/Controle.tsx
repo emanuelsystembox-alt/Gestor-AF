@@ -15,7 +15,6 @@ import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { SEM_BUCKET } from '../lib/filtroContratos'
 import { QuebraPorAgrupamento, tabelaQuebra } from '../components/QuebraPorAgrupamento'
 import { LinkContrato } from '../components/LinkContrato'
-import DashboardVT from '../components/DashboardVT'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -708,10 +707,6 @@ export default function Controle() {
             </div>
           </>
         )}
-
-        {/* D-321: o painel de Visita Técnica, abaixo do principal. É de UM dia:
-            com período de um dia ele segue o Dashboard; senão abre o seletor próprio. */}
-        <DashboardVT dia={dtInicio === dtFim ? dtInicio : undefined} />
       </div>
     </Shell>
   )

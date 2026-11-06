@@ -12710,7 +12710,7 @@ por contrato), e por isso nenhum indicador o conta como avaliado. Desmarcar ou r
 desfecho FECHA a linha (não apaga). Só se marca em contrato sem desfecho ou cujo desfecho não falou
 com ninguém (`qualidade_contatado` falso). Recusado: um décimo desfecho (contaria como avaliado) e
 coluna em `pesquisa_qualidade` (`desfecho` é NOT NULL e seis contas leem `count(desfecho)`).
-**A confirmar com o Emanuel:** qualquer analista com `qualidade.registrar` pode desmarcar.
+Qualquer analista com `qualidade.registrar` pode desmarcar — confirmado: *"todos"* (Emanuel, 06/11).
 
 ### D-319 · Monitoramento: card "Fora da área" (214)
 
@@ -12792,3 +12792,55 @@ movimento (189, D-278), e os Cancelados por outro motivo. O AT1 (card e tabela) 
 (`cancelado_central_em` ou `cancelado_pela_central()`), e sem nenhum Cancelado. Medido em 05/11:
 MA1 52 → 51, MA5 69 → 61 (121 → 112 VT com base). TEC1, LOG, AT5 e os ofensores não mudaram.
 A resposta ganhou `volume_at1`. Sem mudança na tela: não precisou republicar.
+
+### D-324 · Monitoramento: equipes que SAÍRAM da área no dia (218, revê a 214 e a D-319)
+
+*"Fora da área que ele está cadastrado, quantas equipes saíram no dia entendeu?"* (Emanuel, 06/11).
+O card conta EQUIPES que, no dia escolhido, passaram de DENTRO para fora de todas as áreas
+cadastradas para elas (a área de atuação é a soma das áreas da equipe), inclusive as que já
+voltaram; embaixo, hoje, quantas estão fora agora. Qualquer dia dentro da retenção do rastro (90
+dias); dia expurgado é recusado com o recado, não vira zero. `monitor_equipes_fora_da_area(p_data)`
+costura o que `registrar_rastro` já gravou (eventos SAIU/ENTROU do dia, o lado antes do primeiro
+evento e o `cerca_estado`; D-171), ignora eventos de antes do último salvamento da cerca e corta o
+dia do primeiro ao último ponto real. **Começar o dia fora não é sair** (decidido nesta sessão, a
+confirmar): quase todo técnico começa fora, vindo de casa — às 7h de 06/11 as 6 equipes "fora" de
+São Luís só não tinham chegado. Esse caso aparece como nota ("antes: fora no 1º ponto") e na dica
+do card, fora da conta; a função devolve as duas partes, e mudar é uma linha (`esteveFora` em
+`Monitor.tsx`). Clicar no card filtra lista e mapa e mostra a lista por equipe: técnicos, áreas,
+primeira saída, tempo fora depois de sair, se voltou e, se terminou fora, a distância até a borda.
+Limites: as equipes de cada cerca e a do técnico são as de hoje (`cerca_equipe` não tem histórico);
+o tempo fora inclui o que o rastro registrou depois da rota. A função da 214 foi retirada.
+
+### D-325 · Dashboard VT em tela própria, metas, equipe de VT, janela × área e endereço nas listas (217)
+
+*"precisa ser levado para abaixo do Dashboard, deve ter um menu abaixo dizendo Dashboard VT (...)
+com uma bolinha azul dizendo que é função nova"* (Emanuel, 06/11). O painel saiu do pé do Dashboard
+e virou `/controle/dashboard-vt`, logo abaixo de Dashboard no menu, mesma permissão, com o ponto
+azul "Função nova" (azul fixo: o vermelho do menu já é contador).
+- **Metas** (Emanuel, 06/11): TEC1 ≥ 94%, LOG ≤ 1,4%, AT5 ≥ 80%, AT1 ≤ 2,40%. O AT1 se julga pela
+  **projetada** (a do dia é sempre fração mínima); ✓/✗ ao lado da cor. Fixas no código por ora.
+- **Equipe de VT** = 4 ou mais VT no dia no universo do painel (fora Auditar e Cancelado pela
+  central); equipe com técnico de skill MANUTENÇÃO conta com qualquer número (*"4 contratos mínimo
+  em linha, isso para os técnicos que não forem do grupo de manutenção"*). Média = VT das equipes de
+  VT ÷ quantas são; as de fora são listadas (05/11: 6,7 em 18 equipes; 038 e 023 de fora).
+- **VT por janela × área**, com a média por equipe de VT de cada célula e totais.
+- **Endereço nas listas** (*"saber o log e saber o endereço, se tem casos na mesma rua"*): cada
+  contrato de um ofensor mostra LOG e endereço; dois ou mais na mesma rua sobem juntos e marcados.
+  A rua é chave do banco (logradouro até a vírgula + bairro, `norm_txt`) — uma regra só. Endereço só
+  na resposta para quem o RLS deixa ver o contrato, nunca na URL.
+**Perguntas abertas:** a média usa só as VT das equipes de VT (ou todas ÷ equipes de VT?); mínimo e
+metas viram parâmetro?; selo "mesmo contrato" quando o contrato vem duas vezes no dia.
+
+### D-326 · Os estouros de 8 s da importação em 05/11: espera por bloqueio, não lentidão (investigado)
+
+49 importações em ERRO em 05/11 (48 de Manaus), quase todas entre 13:55 e 17:00, todas com "o banco
+demorou mais que o limite". Medido: as que passam levam 1–2,5 s; as que falham passam de 8 s — não
+há meio-termo, o que é espera, não lentidão. **Não é o relógio**: cada falha começou 8–11 s depois de
+`sinais-pelo-relogio` e `rev-d10` terminarem. **Não é a fila da cidade**: `exigir_vez_importacao`
+recusa na hora, não espera. A planilha de 289 linhas (Sarah, Nonato) passava no mesmo minuto em que a
+de 402 (o sincronismo do admin) caía — compatível com UMA linha de contrato travada por outra conexão.
+O banco não tem `idle_in_transaction_session_timeout` (0) e o papel `postgres` (o do SSH e dos
+testes) não tem limite nenhum: uma transação aberta e parada (teste manual no psql, conexão caída)
+segura a linha sem prazo. `log_lock_waits` está desligado, então não dá para provar quem foi.
+**Proposto ao Emanuel, não aplicado:** `idle_in_transaction_session_timeout` de 60 s no papel
+`postgres` e `log_lock_waits = on` (só registra esperas acima de 1 s) — para a próxima vez ter nome.

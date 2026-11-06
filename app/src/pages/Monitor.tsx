@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PainelCercas, SELECT_CERCA, type Cerca, type EdicaoCerca } from '../components/Cercas'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
@@ -83,8 +83,8 @@ interface TecMonitor {
   /** Quando deu ciência do aviso de rastro (097). Nulo = ainda não deu. */
   ciencia_em: string | null
   /** Áreas (com aviso ao sair) de onde ele está FORA agora, cerca a cerca.
-   *  Desde a 214 a tela não usa: o selo vem de `monitor_fora_da_area`, que
-   *  só chama de fora quem saiu de TODAS as áreas dele. */
+   *  Desde a 214 a tela não usa: o selo vem de `monitor_equipes_fora_da_area`
+   *  (218), que só chama de fora quem saiu de TODAS as áreas dele. */
   fora_de_area: string | null
   /** Garagens onde ele está DENTRO agora. */
   na_garagem: string | null
@@ -128,27 +128,44 @@ type Estado = 'VIVO' | 'SEM_SINAL' | 'APP_FECHADO' | 'ENCERROU' | 'NUNCA' | 'DIA
   | 'GPS_SIMULADO' | 'GPS_DESLIGADO'
 
 /*
- * ┌─ 214 · fora da área de atuação ───────────────────────────────────┐
- * │ > "no Card de monitoramento deve aparecer a quantidade de técnico  │
- * │ >  que saiu da sua área de atuação, e quando clicar em cima deve   │
- * │ >  mostrar eles." — Emanuel, 05/11                                 │
+ * ┌─ 214/218 · equipes que saíram da área no dia ─────────────────────┐
+ * │ > "Fora da área que ele está cadastrado, quantas equipes saíram no │
+ * │ >  dia entendeu?" — Emanuel, 06/11                                 │
  * │                                                                    │
- * │ Quem decide dentro/fora é o BANCO (`cerca_estado`, 097: 2 pontos   │
- * │ seguidos, precisão até 100 m); a tela só lê `monitor_fora_da_area`. │
- * │ FORA = fora de TODAS as áreas que valem para a equipe dele — quem  │
- * │ está dentro da área 2 não saiu da atuação por estar fora da 4.     │
- * │ Sem área para a equipe = "sem cerca", fora da conta. Só hoje: o    │
- * │ estado é o presente, não guarda o dia.                             │
+ * │ Quem decide dentro/fora é o BANCO (097: 2 pontos seguidos,         │
+ * │ precisão até 100 m); `monitor_equipes_fora_da_area` costura os     │
+ * │ eventos do dia e a tela só soma. FORA = fora de TODAS as áreas que │
+ * │ valem para a equipe — dentro da área 2 não é fora por estar fora   │
+ * │ da 4. Conta quem esteve fora em algum momento do dia: saiu, ou já  │
+ * │ estava fora no 1º ponto ("começou fora", escrito à parte). Sem     │
+ * │ área para a equipe = "sem cerca", fora da conta.                   │
  * └────────────────────────────────────────────────────────────────────┘
  */
 interface AreaTec {
   tecnico_id: string
-  situacao: 'FORA' | 'DENTRO' | 'SEM_LEITURA'
+  equipe_id: string | null
   areas: number
   cercas: string
   cerca_ids: string[]
-  desde: string | null
-  ultimo_em: string | null
+  primeiro_ponto: string | null
+  ultimo_ponto: string | null
+  /** Passou de dentro para fora de todas. Nula = não saiu. */
+  primeira_saida: string | null
+  /** Segundos fora depois de ter estado dentro. */
+  fora_seg: number
+  /** O 1º ponto do dia já estava fora. */
+  comecou_fora: boolean
+  /** Segundos do 1º ponto até entrar (quando começou fora). */
+  inicial_seg: number
+  /** Fora no último ponto (hoje: fora agora). */
+  fora_no_fim: boolean
+}
+// D-324: "saíram" é passar de DENTRO para fora. Quem só começou o dia fora (vindo de casa)
+// não saiu de nada — às 7h de 06/11 eram as 6 equipes "fora" de São Luís.
+const esteveFora = (a: AreaTec | undefined) => !!a && !!a.primeira_saida
+function duracao(seg: number): string {
+  const min = Math.round(seg / 60)
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`
 }
 type Filtro = Estado | 'TODOS' | 'FORA_AREA'
 const COR_FORA_AREA = '#6366f1'
@@ -295,9 +312,10 @@ export default function Monitor() {
   const [agora, setAgora] = useState(Date.now())
   const [busca, setBusca] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<Filtro>('TODOS')
-  /** 214: área de atuação de cada técnico, hoje. Nulo = não consegui ler
-   *  (o card escreve "—", não 0). */
+  /** 218: a área de atuação de cada técnico no dia. Nulo = não consegui ler
+   *  (o card escreve "—", não 0, e o porquê vai na dica). */
   const [areaDe, setAreaDe] = useState<Map<string, AreaTec> | null>(new Map())
+  const [areaErro, setAreaErro] = useState<string | null>(null)
   /*
    * ┌─ 160 · o recorte: equipe, bucket, supervisor, área ───────────────┐
    * │ > "é importante também a gente colocar alguns filtros, como        │
@@ -372,13 +390,13 @@ export default function Monitor() {
       }
       setDonoDaEquipe(m)
     })
-    // 214: fora da área — só hoje (o estado da cerca é o presente).
-    if (data === isoLocal()) {
-      supabase.rpc('monitor_fora_da_area').then(({ data: fa, error: efa }) => {
-        if (meu !== pedido.current) return
-        setAreaDe(efa ? null : new Map(((fa ?? []) as AreaTec[]).map(x => [x.tecnico_id, x])))
-      })
-    } else setAreaDe(new Map())
+    // 218: quem saiu da área no dia (não segura a lista). Dia além dos 90
+    // de retenção do rastro volta recusado, com o recado.
+    supabase.rpc('monitor_equipes_fora_da_area', { p_data: data }).then(({ data: fa, error: efa }) => {
+      if (meu !== pedido.current) return
+      setAreaErro(efa ? efa.message : null)
+      setAreaDe(efa ? null : new Map(((fa ?? []) as AreaTec[]).map(x => [x.tecnico_id, x])))
+    })
     supabase.rpc('painel_equipes', { p_data: data }).then(({ data: p }) => {
       if (meu !== pedido.current) return
       setOciosas(new Set(((p ?? []) as { equipe_id: string; ocioso: boolean | null }[])
@@ -416,11 +434,7 @@ export default function Monitor() {
   // diz de quando é o mapa.
 
   // Trocar de dia limpa a seleção: a trilha é de um dia só.
-  // O card "fora da área" só existe hoje: em outro dia o filtro dele esvaziaria a lista sem card.
-  useEffect(() => {
-    setSel(null); setContratosDia(null); setRefContrato('')
-    setFiltroEstado(f => f === 'FORA_AREA' ? 'TODOS' : f)
-  }, [data])
+  useEffect(() => { setSel(null); setContratosDia(null); setRefContrato('') }, [data])
 
   // O sino (GPS, cerca) abre o técnico já selecionado.
   const pedidoUrl = params.get('tecnico')
@@ -551,16 +565,21 @@ export default function Monitor() {
     const q = busca.trim().toLowerCase()
     return comEstado
       .filter(x => filtroEstado === 'TODOS'
-        || (filtroEstado === 'FORA_AREA' ? areaDe?.get(x.t.tecnico_id)?.situacao === 'FORA' : x.e === filtroEstado))
+        || (filtroEstado === 'FORA_AREA' ? esteveFora(areaDe?.get(x.t.tecnico_id)) : x.e === filtroEstado))
       .filter(x => !q || [x.t.nome, x.t.matricula, x.t.equipe_codigo, x.t.placa, x.t.contrato_ativo]
         .some(v => v?.toLowerCase().includes(q)))
       // Os que pedem atenção primeiro: sem sinal, app fechado, baixa fora.
       .sort((a, b) => {
+        // 218: fora da área, a lista é POR EQUIPE (o cabeçalho vem no render).
+        if (filtroEstado === 'FORA_AREA') {
+          return (a.t.equipe_codigo ?? '~').localeCompare(b.t.equipe_codigo ?? '~', undefined, { numeric: true })
+            || a.t.nome.localeCompare(b.t.nome)
+        }
         const peso = (x: { t: TecMonitor; e: Estado }) =>
           (x.t.baixas_fora > 0 ? 0 : 10)
           + ({ GPS_SIMULADO: -2, GPS_DESLIGADO: -1, SEM_SINAL: 0, APP_FECHADO: 1, NUNCA: 2, VIVO: 3,
                ENCERROU: 4, DIA_PASSADO: 3 }[x.e])
-          + (areaDe?.get(x.t.tecnico_id)?.situacao === 'FORA' ? -1 : 0)
+          + (areaDe?.get(x.t.tecnico_id)?.fora_no_fim ? -1 : 0)
         return peso(a) - peso(b) || a.t.nome.localeCompare(b.t.nome)
       })
   }, [comEstado, filtroEstado, busca, areaDe])
@@ -644,27 +663,55 @@ export default function Monitor() {
   const kmTotal = comEstado.reduce((s, x) => s + Number(x.t.km), 0)
   const foraTotal = comEstado.reduce((s, x) => s + x.t.baixas_fora, 0)
   const baixasTotal = comEstado.reduce((s, x) => s + x.t.baixas_campo, 0)
-  // 214: do RECORTE também. "com área" = tem pelo menos uma área que vale
-  // para a equipe; o resto é "sem cerca" e não entra na conta.
-  const foraArea = areaDe && comEstado.filter(x => areaDe.get(x.t.tecnico_id)?.situacao === 'FORA').length
-  const comArea = areaDe ? comEstado.filter(x => areaDe.has(x.t.tecnico_id)).length : 0
-  const semLeitura = areaDe ? comEstado.filter(x => areaDe.get(x.t.tecnico_id)?.situacao === 'SEM_LEITURA').length : 0
-  /** Fora da área: de quais saiu, desde quando e a quanto da borda mais perto. */
-  function textoFora(t: TecMonitor): { cercas: string; desde: string; dist: string | null } | null {
+  // 218: do RECORTE também, contado por EQUIPE. "com área" = a equipe tem
+  // pelo menos uma área; o resto é "sem cerca" e não entra na conta.
+  const porEquipe = useMemo(() => {
+    const m = new Map<string, { saiu: boolean; agora: boolean; primeira: string | null; maior: number }>()
+    if (!areaDe) return m
+    for (const { t } of comEstado) {
+      const a = areaDe.get(t.tecnico_id)
+      if (!a) continue
+      const k = t.equipe_id ?? `tec:${t.tecnico_id}`
+      const d = m.get(k) ?? { saiu: false, agora: false, primeira: null, maior: 0 }
+      if (esteveFora(a)) {
+        d.saiu = true
+        const p = a.primeira_saida
+        if (p && (!d.primeira || p < d.primeira)) d.primeira = p
+        d.maior = Math.max(d.maior, a.fora_seg)
+      }
+      if (a.fora_no_fim) d.agora = true
+      m.set(k, d)
+    }
+    return m
+  }, [areaDe, comEstado])
+  const equipesSairam = areaDe ? [...porEquipe.values()].filter(d => d.saiu).length : null
+  const equipesForaAgora = [...porEquipe.values()].filter(d => d.agora).length
+  const comecaramFora = areaDe ? comEstado.filter(x => {
+    const a = areaDe.get(x.t.tecnico_id)
+    return !!a?.comecou_fora && !a.primeira_saida
+  }).length : 0
+  /** Fora da área no dia: de quais áreas, quando, quanto tempo, se voltou e
+   *  — se terminou fora — a quanto da borda mais perto estava o último ponto. */
+  function textoFora(t: TecMonitor) {
     const a = areaDe?.get(t.tecnico_id)
-    if (!a || a.situacao !== 'FORA') return null
+    if (!a || !esteveFora(a)) return null
     let m: number | null = null
-    if (t.ultimo_lat != null && t.ultimo_lng != null) {
+    if (a.fora_no_fim && t.ultimo_lat != null && t.ultimo_lng != null) {
       for (const c of cercas) {
         if (!a.cerca_ids.includes(c.id)) continue
         const d = metrosAteABorda(Number(t.ultimo_lat), Number(t.ultimo_lng), c.poligono)
         if (d != null && (m == null || d < m)) m = d
       }
     }
-    const desde = !a.desde ? '—'
-      : isoLocal(new Date(a.desde)) === data ? hhmm(a.desde)
-      : new Date(a.desde).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    return { cercas: a.cercas, desde, dist: m != null ? textoDistancia(m) : null }
+    return {
+      cercas: a.cercas,
+      // D-324: conta a partir da saída de dentro; o começo do dia fora fica de nota
+      quando: `saiu ${hhmm(a.primeira_saida)}`,
+      depois: a.comecou_fora ? `antes: fora no 1º ponto (${hhmm(a.primeiro_ponto)})` : null,
+      total: duracao(a.fora_seg),
+      fim: a.fora_no_fim ? (ehHoje ? 'fora agora' : 'terminou fora') : 'voltou',
+      dist: m != null ? textoDistancia(m) : null,
+    }
   }
 
   return (
@@ -701,26 +748,30 @@ export default function Monitor() {
               <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">{r}</div>
             </button>
           ))}
-          {ehHoje && (
-            <button onClick={() => setFiltroEstado(filtroEstado === 'FORA_AREA' ? 'TODOS' : 'FORA_AREA')}
-              aria-pressed={filtroEstado === 'FORA_AREA'}
-              title={areaDe
-                ? `Última posição fora de todas as áreas que valem para a equipe dele, de ${comArea} técnicos com área.`
-                  + (comEstado.length - comArea ? ` ${comEstado.length - comArea} sem cerca, fora da conta.` : '')
-                  + (semLeitura ? ` ${semLeitura} sem ponto hoje para saber.` : '')
-                : 'Não consegui ler as áreas'}
-              className={`bg-graf-900/40 p-3 text-left transition hover:bg-graf-800/60 ${
-                filtroEstado === 'FORA_AREA' ? 'ring-2 ring-inset ring-af-500' : ''}`}>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full" style={{ background: COR_FORA_AREA }} />
-                <span className="tabular text-2xl font-semibold text-graf-100">
-                  {foraArea ?? '—'}
-                  {areaDe && <span className="text-sm font-normal text-graf-400"> / {comArea}</span>}
-                </span>
+          <button onClick={() => setFiltroEstado(filtroEstado === 'FORA_AREA' ? 'TODOS' : 'FORA_AREA')}
+            aria-pressed={filtroEstado === 'FORA_AREA'}
+            title={areaDe
+              ? `Equipes que saíram de dentro de todas as áreas cadastradas para elas no dia, de ${porEquipe.size} com área.`
+                + (comecaramFora ? ` Fora da conta: ${comecaramFora} técnico(s) que começaram o dia fora e ainda não entraram e saíram.` : '')
+              : `Não consegui ler as áreas: ${areaErro ?? 'erro'}`}
+            className={`bg-graf-900/40 p-3 text-left transition hover:bg-graf-800/60 ${
+              filtroEstado === 'FORA_AREA' ? 'ring-2 ring-inset ring-af-500' : ''}`}>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: COR_FORA_AREA }} />
+              <span className="tabular text-2xl font-semibold text-graf-100">
+                {equipesSairam ?? '—'}
+                {areaDe && <span className="text-sm font-normal text-graf-400"> / {porEquipe.size}</span>}
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">
+              {ehHoje ? 'equipes saíram hoje' : 'equipes saíram no dia'}
+            </div>
+            {ehHoje && areaDe && (
+              <div className={`tabular text-[11px] ${equipesForaAgora ? 'font-semibold text-indigo-300' : 'text-graf-400'}`}>
+                {equipesForaAgora} fora agora
               </div>
-              <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">fora da área</div>
-            </button>
-          )}
+            )}
+          </button>
           <div className="bg-graf-900/40 p-3" title="Soma dos trechos medidos pelo GPS. Estimativa: linha reta entre pontos, só trechos com precisão até 100 m.">
             <div className="tabular text-2xl font-semibold text-graf-100">{kmTotal.toFixed(1).replace('.', ',')}</div>
             <div className="mt-0.5 text-[11px] uppercase tracking-wide text-graf-400">km estimados</div>
@@ -793,15 +844,32 @@ export default function Monitor() {
                   <Vazio titulo="Ninguém aqui"
                     descricao={tecnicos.length === 0
                       ? 'Nenhum técnico com contrato, sinal ou baixa neste dia. O rastro começa quando o técnico abre o aplicativo logado.'
-                      : filtroEstado === 'FORA_AREA' ? 'Ninguém fora da área de atuação agora.'
+                      : filtroEstado === 'FORA_AREA' ? 'Nenhuma equipe saiu da área neste dia.'
                       : 'Nenhum técnico passa no filtro.'} />
                 </li>
               )}
-              {visiveis.map(({ t, e }) => {
+              {visiveis.map(({ t, e }, i) => {
                 const ativo = sel === t.tecnico_id
                 const fora = textoFora(t)
+                // 218: fora da área, a lista vem por equipe — um cabeçalho a cada equipe.
+                const eqk = t.equipe_id ?? `tec:${t.tecnico_id}`
+                const eq = filtroEstado === 'FORA_AREA'
+                  && (i === 0 || (visiveis[i - 1].t.equipe_id ?? `tec:${visiveis[i - 1].t.tecnico_id}`) !== eqk)
+                  ? porEquipe.get(eqk) : undefined
                 return (
-                  <li key={t.tecnico_id}>
+                  <Fragment key={t.tecnico_id}>
+                  {eq && (
+                    <li className="flex flex-wrap items-baseline gap-x-2 border-b border-graf-800 bg-graf-900/70 px-3 py-1.5 text-[11px]">
+                      <span className="font-semibold uppercase tracking-wide text-graf-200">
+                        {t.equipe_codigo ? equipeRotulo(t.equipe_codigo, t.equipe_nome) : 'sem equipe'}
+                      </span>
+                      <span className="tabular text-graf-400">1ª saída {hhmm(eq.primeira)} · até {duracao(eq.maior)} fora</span>
+                      <span className={eq.agora ? 'font-semibold text-indigo-300' : 'text-graf-400'}>
+                        {eq.agora ? (ehHoje ? 'fora agora' : 'terminou fora') : 'voltou'}
+                      </span>
+                    </li>
+                  )}
+                  <li>
                     <button onClick={() => setSel(ativo ? null : t.tecnico_id)} aria-pressed={ativo}
                       className={`flex w-full items-start gap-2.5 border-b border-graf-800/70 px-3 py-2.5
                                   text-left transition hover:bg-graf-800/40 ${ativo ? 'bg-af-900/20' : ''}`}>
@@ -862,8 +930,8 @@ export default function Monitor() {
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
                           {fora && (
                             <span className="rounded bg-indigo-900/60 px-1 font-semibold text-indigo-200"
-                              title="Fora de todas as áreas que valem para a equipe dele (a distância é do último ponto até a borda mais perto)">
-                              FORA DA ÁREA: {fora.cercas} · desde {fora.desde}{fora.dist && ` · a ${fora.dist}`}
+                              title="Fora de todas as áreas cadastradas para a equipe dele. O tempo soma o dia inteiro; a distância é do último ponto até a borda mais perto.">
+                              FORA DA ÁREA ({fora.cercas}): {fora.quando}{fora.depois && ` · ${fora.depois}`} · {fora.total} fora · {fora.fim}{fora.dist && ` · a ${fora.dist}`}
                             </span>
                           )}
                           {t.na_garagem && (
@@ -886,6 +954,7 @@ export default function Monitor() {
                       </div>
                     </button>
                   </li>
+                  </Fragment>
                 )
               })}
             </ul>

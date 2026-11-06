@@ -15,6 +15,9 @@ interface Item {
   /** Palavras a mais para a busca (Ctrl+K) achar a tela pelo que ela faz. */
   busca?: string
   futuro?: boolean
+  /** 217: a bolinha azul de "função nova" (Emanuel, 06/11). Tire quando
+   *  a função deixar de ser novidade. */
+  novo?: boolean
   /** 161: a chave "Visualizar menu" que o item exige (Emanuel, 31/10: "pode
    *  ligar"). Sem ela o item some do menu, e a rota também barra (App.tsx). */
   permissao?: string
@@ -59,6 +62,9 @@ function lerFechados(): string[] {
 const OPERACAO: Modulo = {
   chave: 'operacao', titulo: 'Operação', icone: 'servicos', itens: [
     { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard', busca: 'painel controle inicio' },
+    // 217: o painel da Visita Técnica, em tela própria logo abaixo do Dashboard.
+    { para: '/controle/dashboard-vt', rotulo: 'Dashboard VT', icone: 'indicadores',
+      busca: 'visita tecnica vt tec1 log at5 at1 node revisita ofensor janela area', novo: true },
     { para: '/controle/servicos', rotulo: 'Serviços', icone: 'servicos', busca: 'contratos os visitas baixa', permissao: 'servicos.ver' },
     { para: '/controle/equipes', rotulo: 'Equipes', icone: 'equipes', busca: 'tecnicos login', permissao: 'equipes.ver' },
     { para: '/controle/rota', rotulo: 'Rota do dia', icone: 'rota', busca: 'mapa' },
@@ -163,6 +169,19 @@ function useModulos(): Modulo[] {
     ...(gestao ? [filtrar(AJUSTES)] : []),
     FUTURO,
   ]
+}
+
+/** 217: azul fixo (o de "a caminho", `--st-deslocamento`), que o tema claro
+ *  não inverte (D-303). Azul e não vermelho: o ponto vermelho do menu já
+ *  quer dizer "tem coisa aqui" (o contador). */
+const COR_NOVO = 'var(--st-deslocamento)'
+function PontoNovo() {
+  return (
+    <span title="Função nova" className="inline-flex shrink-0 items-center">
+      <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: COR_NOVO }} />
+      <span className="sr-only">Função nova</span>
+    </span>
+  )
 }
 
 /** A tela ativa é a do caminho EXATO. Prefixo não serve: o detalhe da
@@ -443,6 +462,7 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                 <Icone nome={i.icone} />
                 {!recolhido && <>
                   <span className="truncate">{i.rotulo}</span>
+                  {i.novo && <PontoNovo />}
                   {n != null && (
                     <span title={c!.titulo}
                       style={c!.cor ? { color: c!.cor, backgroundColor: 'color-mix(in oklab, ' + c!.cor + ' 18%, transparent)' } : undefined}
@@ -452,6 +472,10 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                     </span>
                   )}
                 </>}
+                {recolhido && i.novo && (
+                  <span aria-hidden className="absolute left-2 top-1 h-1.5 w-1.5 rounded-full"
+                    style={{ background: COR_NOVO }} />
+                )}
                 {recolhido && n != null && n > 0 && (
                   <span aria-hidden className="absolute right-2 top-1 h-1.5 w-1.5 rounded-full bg-af-500" />
                 )}
