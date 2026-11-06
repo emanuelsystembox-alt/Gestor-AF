@@ -12844,3 +12844,18 @@ testes) não tem limite nenhum: uma transação aberta e parada (teste manual no
 segura a linha sem prazo. `log_lock_waits` está desligado, então não dá para provar quem foi.
 **Proposto ao Emanuel, não aplicado:** `idle_in_transaction_session_timeout` de 60 s no papel
 `postgres` e `log_lock_waits = on` (só registra esperas acima de 1 s) — para a próxima vez ter nome.
+
+### D-327 · Revisita ofensora: sem técnico registrado, uma linha por equipe (219)
+
+*"Por que essas revisitas estão indo para o técnico 115 no dashboard da VT (...) sendo que
+anteriores não foi ele que fez?"* (Emanuel, 06/11). Defeito da 212: a revisita cujo serviço
+anterior não tem técnico era agrupada numa linha só e o rótulo levava `max(anterior_equipe)` — 5
+revisitas das equipes 115, 100, 113 e 042 apareciam como "sem técnico · equipe 115". Agora cada
+equipe é uma linha: "equipe 113 · técnico não registrado".
+
+Por que não há técnico: a carga do ngestor (D-282, 97.600 contratos até 02/11) trouxe a EQUIPE e o
+login do ngestor (um e-mail), nunca o técnico. O e-mail casa com o acesso de um técnico daqui em só
+25 de 232 logins (5% das visitas) — não serve de regra; atribuir ao técnico que está na equipe HOJE
+seria o sistema declarando no lugar de quem opera (D-088). Por isso a mesma equipe pode aparecer
+duas vezes (ex.: FAGNER, 113, com o anterior de novembro; "equipe 113 · técnico não registrado", com
+o de outubro). De novembro em diante a revisita sai com o nome.

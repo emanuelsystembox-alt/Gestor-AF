@@ -691,7 +691,8 @@ function CodigosOfensores({ c }: { c: DadosVT['codigos'] }) {
 function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number }) {
   const [aberto, setAberto] = useState<string | null>(null)
   const nome = (t: { tecnico: string; equipe: string | null }) =>
-    t.tecnico || `sem técnico${t.equipe ? ` · equipe ${t.equipe}` : ''}`
+    // D-327: sem técnico registrado (histórico do ngestor só tem a equipe), uma linha por equipe
+    t.tecnico || `equipe ${t.equipe ?? '?'} · técnico não registrado`
   const chave = (t: { tecnico: string; equipe: string | null }) => `${t.tecnico}|${t.equipe ?? ''}`
   const sel = r.tecnicos.find(t => chave(t) === aberto) ?? null
 
@@ -700,7 +701,7 @@ function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number
       dica="Quem fez o serviço anterior, concluído há até 30 dias."
       extra={<span className="tabular text-xs text-graf-400">{n0(r.total)} de {n0(volume)} VT</span>}
       tabela={<TabelaSimples colunas={['Técnico do serviço anterior', 'Equipe', 'Revisitas']}
-        linhas={r.tecnicos.map(t => [t.tecnico || 'sem técnico', t.equipe ?? '—', t.n])} />}>
+        linhas={r.tecnicos.map(t => [t.tecnico || 'técnico não registrado', t.equipe ?? '—', t.n])} />}>
       {r.tecnicos.length === 0 ? (
         <p className="py-6 text-center text-sm text-graf-400">Nenhuma revisita neste dia.</p>
       ) : (
