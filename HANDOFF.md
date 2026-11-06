@@ -11,8 +11,8 @@
 >   (212; base de clientes por área em Configurações — nasceu vazia); "Aguardando cliente" na
 >   Qualidade (213); "Fora da área" no Monitoramento (214); planilha sem ID entra com chave
 >   `SEMID-WO-…` e a planilha com ID a troca (215).
-> - **App:** LOG e todos os marcadores (só código JS) — **o `eas update` NÃO foi rodado** (barrado
->   pela permissão da sessão). Perguntas abertas no fim de cada decisão (D-318, D-319, D-321, D-322).
+> - **App:** LOG e todos os marcadores (só código JS), publicado pelo ar pelo Emanuel (runtime 0.7.1,
+>   update `b4b238a9`). Perguntas abertas no fim de cada decisão (D-318, D-319, D-321, D-322).
 >   Ainda: na tarde de 05/11 ~40 importações estouraram os 8 s, causa não achada.
 
 Última atualização: **03/11/2026**, por Claude (Opus 5.5).
