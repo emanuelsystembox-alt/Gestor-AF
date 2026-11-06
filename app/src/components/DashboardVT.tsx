@@ -46,7 +46,7 @@ interface DadosVT {
   at1: { vt_com_base: number; base: number | null; vt_sem_base: number }
   areas: { area_id: string; codigo: string; rotulo: string; clientes: number | null
            desde: string | null; vt: number }[]
-  equipes: { equipe_id: string | null; codigo: string | null; nome: string | null
+  equipes: { equipe_id: string | null; codigo: string | null; nome: string | null; tecnico?: string | null
              executados: number; nao_executados: number; em_aberto: number
              outros: number; total: number; equipe_vt?: boolean }[]
   revisita: { total: number
@@ -555,8 +555,8 @@ function ExecutadasPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes'];
       dica="Executada = código de sucesso; não executada = código improdutivo."
       extra={<span className="tabular text-xs text-graf-400">
         {n0(tot.exe)} de {n0(tot.exe + tot.nao + tot.abe + tot.out)}</span>}
-      tabela={<TabelaSimples colunas={['Equipe', 'Executadas', 'Não executadas', 'Em aberto', 'Canc./reag.', 'Total']}
-        linhas={equipes.map(e => [rot(e), e.executados, e.nao_executados, e.em_aberto, e.outros, e.total])} />}>
+      tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'Executadas', 'Não executadas', 'Em aberto', 'Canc./reag.', 'Total']}
+        linhas={equipes.map(e => [rot(e), e.tecnico ?? '—', e.executados, e.nao_executados, e.em_aberto, e.outros, e.total])} />}>
       {equipes.length === 0 ? (
         <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com ida neste dia.</p>
       ) : (
@@ -574,7 +574,11 @@ function ExecutadasPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes'];
                       &lt;{minimo ?? 4}
                     </span>
                   )}
-                  <span className="truncate text-graf-300">{rot(e)}</span>
+                  {/* D-329: a equipe em cima e o técnico embaixo (221) */}
+                  <span className="min-w-0 leading-tight" title={e.tecnico ? `${rot(e)} — ${e.tecnico}` : rot(e)}>
+                    <span className="block truncate font-semibold text-graf-200">{rot(e)}</span>
+                    {!!e.tecnico && <span className="block truncate text-[11px] text-graf-400">{e.tecnico}</span>}
+                  </span>
                 </span>
                 <div className="flex h-5 flex-1 overflow-hidden rounded-sm bg-graf-900">
                   {series.map(s => e[s.k] > 0 && (

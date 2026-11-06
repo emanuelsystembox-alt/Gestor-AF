@@ -12871,3 +12871,9 @@ do ngestor, D-282), o técnico ATIVO cadastrado na equipe, marcado "(cadastro)" 
 que a equipe é a pessoa. Por id e não por código: "113" existe em Manaus (FAGNER) e em São Luís
 (AGIVALDO), e o código juntava os dois. Em 06/11: 113 FAGNER 3, 115 LUIS 3, 042, 046, 100, 102 com 1.
 Limite: equipe que trocou de técnico depois de outubro mostra o de hoje para o serviço antigo.
+
+### D-329 · Executadas por equipe: o técnico embaixo da equipe (221)
+
+*"faça a mesma coisa nessa tabela também numero da equipe e embaixo o nome"* (Emanuel, 06/11), como
+a D-328. Cada equipe mostra embaixo o técnico responsável pelos contratos VT do dia; sem nenhum, o
+técnico ATIVO cadastrado nela. Pelo id da equipe. Também na "Ver tabela" (coluna Técnico).
