@@ -50,7 +50,7 @@ interface DadosVT {
              executados: number; nao_executados: number; em_aberto: number
              outros: number; total: number; equipe_vt?: boolean }[]
   revisita: { total: number
-              tecnicos: { tecnico: string; equipe: string | null; n: number; itens: ItemRev[] }[] }
+              tecnicos: { tecnico: string; equipe: string | null; nome_do_cadastro?: boolean; n: number; itens: ItemRev[] }[] }
   nodes: { distintos: number; sem_node: number
            lista: { node: string; n: number; log3: number; nao_executados: number
                     itens: { visita_id: string; contrato: string | null; log: number | null }[] }[] }
@@ -690,9 +690,11 @@ function CodigosOfensores({ c }: { c: DadosVT['codigos'] }) {
 // ============================================================ revisita --
 function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number }) {
   const [aberto, setAberto] = useState<string | null>(null)
-  const nome = (t: { tecnico: string; equipe: string | null }) =>
-    // D-327: sem técnico registrado (histórico do ngestor só tem a equipe), uma linha por equipe
-    t.tecnico || `equipe ${t.equipe ?? '?'} · técnico não registrado`
+  // D-328: a linha é a EQUIPE do serviço anterior; o técnico vai embaixo (o registrado na
+  // visita, ou o cadastrado na equipe quando o histórico do ngestor não trouxe — 220)
+  const nome = (t: { tecnico: string; equipe: string | null }) => `Equipe ${t.equipe ?? '?'}`
+  const quem = (t: { tecnico: string; nome_do_cadastro?: boolean }) =>
+    t.tecnico ? t.tecnico + (t.nome_do_cadastro ? ' (cadastro)' : '') : 'sem técnico na equipe'
   const chave = (t: { tecnico: string; equipe: string | null }) => `${t.tecnico}|${t.equipe ?? ''}`
   const sel = r.tecnicos.find(t => chave(t) === aberto) ?? null
 
@@ -700,13 +702,13 @@ function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number
     <Painel titulo="Revisita · técnico ofensor"
       dica="Quem fez o serviço anterior, concluído há até 30 dias."
       extra={<span className="tabular text-xs text-graf-400">{n0(r.total)} de {n0(volume)} VT</span>}
-      tabela={<TabelaSimples colunas={['Técnico do serviço anterior', 'Equipe', 'Revisitas']}
-        linhas={r.tecnicos.map(t => [t.tecnico || 'técnico não registrado', t.equipe ?? '—', t.n])} />}>
+      tabela={<TabelaSimples colunas={['Equipe do serviço anterior', 'Técnico', 'Revisitas']}
+        linhas={r.tecnicos.map(t => [t.equipe ?? '—', quem(t), t.n])} />}>
       {r.tecnicos.length === 0 ? (
         <p className="py-6 text-center text-sm text-graf-400">Nenhuma revisita neste dia.</p>
       ) : (
         <BarrasHorizontais rotuloLargo cor={COR.atencao}
-          dados={r.tecnicos.slice(0, 10).map(t => ({ rotulo: nome(t), valor: t.n }))}
+          dados={r.tecnicos.slice(0, 10).map(t => ({ rotulo: nome(t), sub: quem(t), valor: t.n }))}
           aoClicar={rot => {
             const t = r.tecnicos.find(x => nome(x) === rot)
             setAberto(a => (t && a !== chave(t) ? chave(t) : null))
@@ -714,7 +716,7 @@ function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number
           selecionado={sel ? nome(sel) : null} />
       )}
       {sel && (
-        <Detalhe titulo={nome(sel)} contagem={`${sel.n} revisita(s)`} aoFechar={() => setAberto(null)}>
+        <Detalhe titulo={`${nome(sel)} · ${quem(sel)}`} contagem={`${sel.n} revisita(s)`} aoFechar={() => setAberto(null)}>
           <TabelaItens cabecalho={['Serviço anterior', 'Baixa anterior']}
             linhas={sel.itens.map(i => ({
               id: i.visita_id, contrato: i.contrato,

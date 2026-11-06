@@ -12859,3 +12859,15 @@ login do ngestor (um e-mail), nunca o técnico. O e-mail casa com o acesso de um
 seria o sistema declarando no lugar de quem opera (D-088). Por isso a mesma equipe pode aparecer
 duas vezes (ex.: FAGNER, 113, com o anterior de novembro; "equipe 113 · técnico não registrado", com
 o de outubro). De novembro em diante a revisita sai com o nome.
+
+### D-328 · Revisita ofensora: a EQUIPE, com o técnico embaixo (220, revê a D-327)
+
+*"115 e LUIS é a mesma coisa (...) mostre o número da equipe e o nome do técnico embaixo, você
+colocou o 115 em um lugar e o nome dele em outro sendo que ele é um só. 113 também é o Fagner, por
+que não tem o nome?"* (Emanuel, 06/11). A D-327 separava "técnico registrado" de "equipe sem
+técnico", e a mesma pessoa aparecia em duas linhas. Agora a linha é a **equipe do serviço
+anterior** (pelo id), e embaixo vai o técnico: o registrado na visita anterior; sem ele (histórico
+do ngestor, D-282), o técnico ATIVO cadastrado na equipe, marcado "(cadastro)" — o Emanuel afirmou
+que a equipe é a pessoa. Por id e não por código: "113" existe em Manaus (FAGNER) e em São Luís
+(AGIVALDO), e o código juntava os dois. Em 06/11: 113 FAGNER 3, 115 LUIS 3, 042, 046, 100, 102 com 1.
+Limite: equipe que trocou de técnico depois de outubro mostra o de hoje para o serviço antigo.

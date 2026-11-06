@@ -69,7 +69,8 @@ export function BarrasHorizontais({
   /** `texto` troca só o que se LÊ ao lado da barra (ex.: `1h46`); o
    *  comprimento continua em `valor`, na mesma escala das outras. Barra
    *  em horas ao lado de barra em minutos mentiria no tamanho. */
-  dados: { rotulo: string; valor: number; cor?: string; nota?: string; texto?: string }[]
+  /** `sub`: segunda linha, menor, embaixo do rótulo (ex.: a equipe e o técnico, D-328). */
+  dados: { rotulo: string; valor: number; cor?: string; nota?: string; texto?: string; sub?: string }[]
   cor?: string
   sufixo?: string
   parte?: boolean
@@ -101,9 +102,18 @@ export function BarrasHorizontais({
           {/* O rotulo encolhe na tela estreita: 208px fixos somados as
               colunas de numero estouravam a largura da pagina e punham
               rolagem horizontal no corpo. */}
-          <span className={`${rotuloLargo ? 'w-36 sm:w-52' : 'w-28 sm:w-40'}
-                            shrink-0 truncate text-right text-xs text-graf-300`}
-                title={d.rotulo}>{d.rotulo}</span>
+          {d.sub ? (
+            <span className={`${rotuloLargo ? 'w-36 sm:w-52' : 'w-28 sm:w-40'}
+                              shrink-0 text-right leading-tight`}
+                  title={`${d.rotulo} — ${d.sub}`}>
+              <span className="block truncate text-xs font-semibold text-graf-200">{d.rotulo}</span>
+              <span className="block truncate text-[11px] text-graf-400">{d.sub}</span>
+            </span>
+          ) : (
+            <span className={`${rotuloLargo ? 'w-36 sm:w-52' : 'w-28 sm:w-40'}
+                              shrink-0 truncate text-right text-xs text-graf-300`}
+                  title={d.rotulo}>{d.rotulo}</span>
+          )}
           <div className="h-5 flex-1 rounded-sm bg-graf-900">
             <div className="h-full rounded-sm transition-all"
                  style={{ width: `${Math.max((d.valor / max) * 100, 1.5)}%`, background: d.cor ?? cor }} />
