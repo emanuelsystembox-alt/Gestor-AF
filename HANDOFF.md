@@ -1,6 +1,6 @@
 # Passagem de bastão — leia isto primeiro
 
-> **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-322, migrations 210 a 215; site
+> **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-323, migrations 210 a 216; site
 > publicado em 05/11 ~23h):
 > - **Reagendado 100 depois das 21:20** (210): importação de hoje, contrato "pendente" no TOA, ainda
 >   em entrada/deslocamento e sem código → Reagendamento com o 100 na baixa da AFLINE. O TOA NÃO é
@@ -8,7 +8,7 @@
 >   REV D-10 = a mesma com 10 dias. Marcadores LOG 1–6. Manual com equipe nasce Na entrada.
 > - Site: filtros de seleção múltipla e Ctrl+clique nas situações (Serviços, Equipes, Dashboard);
 >   grupo de serviço e card "Não compareceu" no Dashboard; **Dashboard Visita Técnica** embaixo
->   (212; base de clientes por área em Configurações — nasceu vazia); "Aguardando cliente" na
+>   (212; base de clientes por área em Configurações — MA1 e MA5 cadastradas; o AT1 tira todo cancelado e o que o TOA cancelou pela central, 216); "Aguardando cliente" na
 >   Qualidade (213); "Fora da área" no Monitoramento (214); planilha sem ID entra com chave
 >   `SEMID-WO-…` e a planilha com ID a troca (215).
 > - **App:** LOG e todos os marcadores (só código JS), publicado pelo ar pelo Emanuel (runtime 0.7.1,

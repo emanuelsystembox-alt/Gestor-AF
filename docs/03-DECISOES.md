@@ -12780,3 +12780,15 @@ em 4,7–5,6 s, 0 WO duplicada — folga de ~2,5 s para os 8 s.
 planilha sem ID — deveriam ser JORNADA?; selo "provisória" na tela do contrato.
 **Fora do escopo, a olhar:** na tarde de 05/11 (14h–17h) ~40 importações estouraram o tempo, com e
 sem ID; às 17:40 voltaram a 1–2,5 s. Causa não achada (o log do Postgres não registra).
+
+### D-323 · O AT1 não conta o que o TOA cancelou pela central, nem cancelado nenhum (216)
+
+*"para finalizar no calculo do AT1 dessa tabela não considere contratos cancelados pela central"*
+(Emanuel, 05/11, sobre a tabela "AT1 por área"; a frase terminou em "ou." e foi lida como "ou
+cancelados"). A 212 tirava o cancelado pela central só na situação Cancelada (a regra da web).
+Ficavam dentro os que o TOA cancelou pela central e seguem **Em execução** aqui por ter tido
+movimento (189, D-278), e os Cancelados por outro motivo. O AT1 (card e tabela) passa a contar
+`conta_at1`: sem Auditar, sem o que o TOA diz cancelado pela central em qualquer situação nossa
+(`cancelado_central_em` ou `cancelado_pela_central()`), e sem nenhum Cancelado. Medido em 05/11:
+MA1 52 → 51, MA5 69 → 61 (121 → 112 VT com base). TEC1, LOG, AT5 e os ofensores não mudaram.
+A resposta ganhou `volume_at1`. Sem mudança na tela: não precisou republicar.
