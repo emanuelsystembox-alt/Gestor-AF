@@ -12983,3 +12983,25 @@ Contrato e Situação ganharam piso de largura na visão detalhada: sem ele a ta
 os selos empilhavam um por linha (visto a 1400 px). Medido a 1400 px: as linhas com sinal caíram de
 170–183 px para 133–159 px; a média das 40 primeiras, 132 px. Revê a parte "três linhas fixas" da
 D-332.
+
+### D-335 · Dashboard VT: filtro de área, uma ou várias (224)
+
+*"nessa visão do dashboard da VT precisa ter o filtro por área por favor, e selecionar e poder
+selecionar mais de uma"* (Emanuel, 07/11). `SelecaoMultipla` no cabeçalho, ao lado do dia (nada
+marcado = todas). O filtro vai ao **banco** (`dashboard_visita_tecnica(p_dia, p_areas uuid[])`):
+cards, matriz janela × área, equipes, revisita, nodes e códigos saem filtrados; o **AT1** usa a base
+de clientes só das áreas escolhidas. As opções são as áreas **com VT no dia** (mais as marcadas) —
+não as 10 áreas cadastradas da cidade, com "FORA TOA" e AJU/ARN.
+
+**A equipe de VT (4 ou mais no dia, 217) continua decidida pelo DIA INTEIRO** — escolha nossa,
+para o Emanuel confirmar: quem fez 3 em MA1 e 3 em MA5 é equipe de VT também com o filtro só em
+MA1; o filtro escolhe os contratos, não reclassifica a equipe. As contas dentro do filtro usam só os
+contratos filtrados (por isso uma equipe que atuou nas duas áreas conta em cada uma: 7 + 11 = 18
+contra 17 sem filtro, em 06/11).
+
+Medido como `authenticated` numa transação desfeita: sem filtro e com filtro vazio, o resultado é
+IDÊNTICO ao da função antiga (fora as duas chaves novas). 06/11: MA1 base 38.897 + MA5 43.690 =
+82.587 (o total); VT com base 39 + 57 = 96. Na tela, 07/11: todas 86 VT; só MA1 32; MA1+MA5 73
+(= 86 − 13 de MA2). Parâmetro novo: `drop` da assinatura antiga (duas convivendo deixam a chamada
+ambígua) e ACL refeita — `anon` sem EXECUTE, conferido. A chamada antiga, só com `p_dia`, segue
+valendo (o site no ar não quebrou entre a migration e o deploy).

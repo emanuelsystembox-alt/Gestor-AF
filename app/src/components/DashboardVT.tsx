@@ -7,6 +7,7 @@ import { Alerta, Vazio } from './ui'
 import { BotaoAtualizar } from './BotaoAtualizar'
 import { LinkContrato } from './LinkContrato'
 import { SeloLog } from './SeloLog'
+import { SelecaoMultipla, type OpcaoMultipla } from './SelecaoMultipla'
 
 /**
  * Dashboard Visita Técnica (212) — desde a 217 em tela própria, "Dashboard VT"
@@ -44,6 +45,9 @@ interface DadosVT {
          por_log: { log: number; n: number }[] }
   tec1: { padrao: number; sem_padrao: number; expurgada: number; em_aberto: number }
   at1: { vt_com_base: number; base: number | null; vt_sem_base: number }
+  /** 224 (D-335): as áreas com VT no dia, para o filtro, e o filtro aplicado. */
+  areas_opcoes?: { area_id: string; rotulo: string }[]
+  areas_filtro?: string[]
   areas: { area_id: string; codigo: string; rotulo: string; clientes: number | null
            desde: string | null; vt: number }[]
   equipes: { equipe_id: string | null; codigo: string | null; nome: string | null; tecnico?: string | null
@@ -120,18 +124,28 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
   const [erro, setErro] = useState<string | null>(null)
   const [atualizado, setAtualizado] = useState<Date | null>(null)
   const [versao, setVersao] = useState(0)
+  // 224 (D-335): "precisa ter o filtro por área (...) e poder selecionar mais de uma"
+  // (Emanuel, 07/11). Nada marcado = todas. O filtro vai ao BANCO: os cards, a
+  // matriz e as listas saem de lá já filtrados.
+  const [areas, setAreas] = useState<string[]>([])
+  const [opcoesArea, setOpcoesArea] = useState<OpcaoMultipla[]>([])
 
   useEffect(() => {
     let vivo = true
     setCarregando(true); setErro(null)
-    supabase.rpc('dashboard_visita_tecnica', { p_dia: dia }).then(({ data, error }) => {
+    supabase.rpc('dashboard_visita_tecnica', { p_dia: dia, ...(areas.length ? { p_areas: areas } : {}) })
+      .then(({ data, error }) => {
       if (!vivo) return
       if (error) setErro(error.message)
-      else { setD(data as DadosVT); setAtualizado(new Date()) }
+      else {
+        const x = data as DadosVT
+        setD(x); setAtualizado(new Date())
+        setOpcoesArea((x.areas_opcoes ?? []).map(a => ({ valor: a.area_id, rotulo: a.rotulo })))
+      }
       setCarregando(false)
     })
     return () => { vivo = false }
-  }, [dia, versao])
+  }, [dia, versao, areas])
 
   return (
     <section aria-labelledby="dvt-titulo" className="space-y-3">
@@ -146,6 +160,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
             aria-label="Dia da visita técnica"
             className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
         )}
+        <SelecaoMultipla rotulo="Área" todos="Toda área" plural="áreas"
+          opcoes={opcoesArea} valor={areas} onChange={setAreas}
+          className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
         <div className="ml-auto flex items-center gap-3">
           <Link to={`/controle/servicos?de=${dia}&ate=${dia}&grupo=${encodeURIComponent('VISITA TECNICA')}`}
             className="text-[11px] text-af-400 underline-offset-2 hover:underline">
@@ -167,8 +184,11 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
 
       {d && d.total === 0 && !erro && (
         <div className="card-controle">
-          <Vazio titulo="Nenhuma visita técnica neste dia"
-            descricao="Nenhum contrato do grupo VISITA TECNICA na cidade ativa." />
+          {areas.length
+            ? <Vazio titulo="Nenhuma visita técnica nas áreas escolhidas"
+                descricao="Neste dia, as áreas marcadas no filtro não têm contrato de VISITA TECNICA." />
+            : <Vazio titulo="Nenhuma visita técnica neste dia"
+                descricao="Nenhum contrato do grupo VISITA TECNICA na cidade ativa." />}
         </div>
       )}
 
