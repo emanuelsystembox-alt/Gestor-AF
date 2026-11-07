@@ -499,7 +499,9 @@ export default function Almoxarifado() {
         ) : (<>
 
           {/* ====== a situação, em cartões (228, D-339) — clicar filtra a lista ====== */}
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {/* "diminui um card pra ficar todos na mesma linha" (Emanuel, 07/11):
+              na tela larga, uma linha só, os cartões dividindo a largura */}
+          <div className="grid gap-2 sm:grid-cols-2 lg:flex">
             {SITUACOES.map(sit => {
               const qtd = painel.por_situacao.find(x => x.situacao === sit.codigo)?.qtd ?? 0
               if (!qtd && !sit.sempre) return null
@@ -507,15 +509,16 @@ export default function Almoxarifado() {
               return (
                 <button key={sit.codigo} type="button"
                   onClick={() => setFSituacao(ativo ? null : sit.codigo)} aria-pressed={ativo}
-                  className={`card-controle flex items-stretch overflow-hidden text-left transition
-                              hover:ring-1 hover:ring-graf-600 ${ativo ? 'ring-2 ring-af-500' : ''}`}>
+                  className={`card-controle flex min-w-0 items-stretch overflow-hidden text-left transition
+                              hover:ring-1 hover:ring-graf-600 lg:flex-1 ${ativo ? 'ring-2 ring-af-500' : ''}`}>
                   <span aria-hidden className="w-1.5 shrink-0" style={{ background: sit.cor }} />
-                  <span className="min-w-0 flex-1 px-3 py-2.5">
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-graf-300">
+                  <span className="min-w-0 flex-1 px-2.5 py-2">
+                    <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-graf-300"
+                      title={ROTULO_SITUACAO[sit.codigo]}>
                       {ROTULO_SITUACAO[sit.codigo]}
                     </span>
                     <span className="mt-0.5 flex items-baseline gap-2">
-                      <span className="tabular text-2xl font-semibold leading-none text-graf-100">{n(qtd)}</span>
+                      <span className="tabular text-xl font-semibold leading-none text-graf-100">{n(qtd)}</span>
                       <span className="tabular text-[11px] text-graf-400">
                         {painel.total ? ((100 * qtd) / painel.total).toFixed(1) : '0'}%
                       </span>

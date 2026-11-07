@@ -13099,3 +13099,25 @@ Testado como `authenticated` em transação desfeita: painel 264 ms (17.993 peç
 recusado. Na tela: abas, cartões, filtro por tipo, busca pelo MAC, passos de Pagamento e Devolução.
 Baterias 33/33 e 29/29; sem tabela sem RLS; nada aberto ao anon. **Não verificado:** um pagamento
 de ponta a ponta pela tela nova (o piloto), o aceite no app depois de "deixar para o técnico".
+
+### D-340 · Data de reporte e operador no romaneio (só o ADMIN) e o piloto da equipe 004 (230, 231)
+
+*"agora vamos pagar apenas o técnico 004 (...) a ideia é ir com operador data movimentação, tem que
+aparecer, e não de hoje, como eu sou o admin eu posso controlar essa data de reporte"* (Emanuel,
+07/11). `romaneio.data_reporte` e `romaneio.operador`, gravados por `definir_reporte_romaneio` — só
+ADMIN, só com o documento aberto, data no passado (até um ano). Na confirmação a peça recebe a data
+de reporte como `posse_em` (é dela que saem os dias com o técnico). Movimentações, histórico do
+serial e a lista de romaneios mostram a data de reporte e o operador; `confirmado_em`/`por` seguem
+sendo quem registrou aqui e quando — o rastro real fica. Na tela, o último passo de Pagamento,
+Devolução e Transferência tem "Data do movimento" e "Operador" para o ADMIN (vazio = agora, por você).
+
+**O piloto:** equipe 004 = NICACIO DA SILVA MAIA (Z689678), 33 peças da planilha do ngestor, em 6
+romaneios — um por operador e horário de lá (yosef 28/10 07:43, cleberton 29/10 14:09, anderson
+30/10 08:34, leonardofarias 03/11 07:34 e 14:41, esnm007 06/11 08:05). 0 recusa; o MAC achado pelo
+bipe novo. Ensaiado numa transação desfeita, depois gravado.
+
+**231:** o piloto mostrou o painel com 33 "Com técnico · inicializado" e Equipes / Alocações com "0
+inicializadas, 33 sem condição" — a mesma tela se contradizendo. `estoque_cargas` conta a condição
+vazia como inicializada (igual a `situacao_estoque`); o histórico do serial acha também pelo MAC. E
+os cartões do painel numa linha só, na tela larga (*"diminui um card pra ficar todos na mesma
+linha"*).

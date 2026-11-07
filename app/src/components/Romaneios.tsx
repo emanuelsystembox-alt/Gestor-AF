@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Alerta, Vazio } from './ui'
 import { imprimirTermo, rotuloAceite } from '../lib/termo'
+import { useAuth } from '../lib/auth'
 
 /**
  * Romaneios — o documento que move a posse (fase 2, D-154).
@@ -48,6 +49,9 @@ interface Romaneio {
   solicitado_por_tecnico: boolean
   aceito_em: string | null
   aceito_metodo: string | null
+  /** 230 (D-340): quando o movimento aconteceu e quem fez — informado pelo ADMIN. */
+  data_reporte: string | null
+  operador: string | null
   romaneio_item: { id: string }[]
 }
 
@@ -58,7 +62,7 @@ const SELECT_ROMANEIO =
   + 'cancelado_motivo, tecnico_id, tecnico:tecnico_id ( nome, matricula ), '
   + 'tecnico_origem_id, origem:tecnico_origem_id ( nome, matricula ), '
   + 'condicao_destino, confirmado_metodo, solicitado_por_tecnico, aceito_em, aceito_metodo, '
-  + 'romaneio_item ( id )'
+  + 'data_reporte, operador, romaneio_item ( id )'
 
 const ROTULO_TIPO: Record<Tipo, string> = {
   ENTREGA: 'Entrega', DEVOLUCAO: 'Devolutiva', TRANSFERENCIA: 'Transferência',
@@ -178,6 +182,11 @@ export function Romaneios({ podeMexer, tipo }: {
   tipo?: Tipo
 }) {
   const [lista, setLista] = useState<Romaneio[]>([])
+  // 230 (D-340): data de reporte e operador — só o ADMIN (o banco confere)
+  const { temPapel } = useAuth()
+  const ehAdmin = temPapel('ADMIN')
+  const [dataReporte, setDataReporte] = useState('')
+  const [operador, setOperador] = useState('')
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([])
   const [itens, setItens] = useState<Item[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -270,7 +279,7 @@ export function Romaneios({ podeMexer, tipo }: {
   }, [])
 
   async function abrirDocumento(r: Romaneio) {
-    setAberto(r); setErro(null); setOk(null)
+    setAberto(r); setErro(null); setOk(null); setDataReporte(''); setOperador('')
     setColando(false); setColado(''); setRelatorio(null); setMarcadas(new Set())
     setVencida(null)
     // Na transferência, a carga que interessa é a de quem ENTREGA.
@@ -415,6 +424,16 @@ export function Romaneios({ podeMexer, tipo }: {
       + '\n\nDocumento confirmado NÃO se cancela — a correção é um romaneio inverso.'
     )) return
     setOcupado(true); setErro(null); setOk(null)
+    // 230 (D-340): o ADMIN informa quando o movimento aconteceu e quem fez —
+    // gravado no documento aberto, antes da confirmação; a peça recebe essa data
+    if (ehAdmin && (dataReporte || operador)) {
+      const { error: e1 } = await supabase.rpc('definir_reporte_romaneio', {
+        p_romaneio: aberto.id,
+        p_data: dataReporte ? new Date(dataReporte).toISOString() : null,
+        p_operador: operador || null,
+      })
+      if (e1) { setErro(traduzir(e1.message)); setOcupado(false); return }
+    }
     const { data, error } = await supabase.rpc('confirmar_romaneio', {
       p_romaneio: aberto.id,
     })
@@ -970,6 +989,24 @@ export function Romaneios({ podeMexer, tipo }: {
             </div>
           )}
 
+          {/* 230 (D-340): "como eu sou o admin eu posso controlar essa data de reporte"
+              (Emanuel, 07/11) — vazio = agora e quem confirma, como sempre */}
+          {aberto.situacao === 'ABERTO' && podeMexer && ehAdmin && !aberto.solicitado_por_tecnico && (
+            <div className="flex flex-wrap items-end gap-2 border-t border-graf-800 px-4 py-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-graf-400">Admin</span>
+              <label className="text-[11px] text-graf-400">
+                <span className="mb-1 block">Data do movimento</span>
+                <input type="datetime-local" value={dataReporte} onChange={e => setDataReporte(e.target.value)}
+                  className={campo} />
+              </label>
+              <label className="text-[11px] text-graf-400">
+                <span className="mb-1 block">Operador</span>
+                <input value={operador} onChange={e => setOperador(e.target.value)}
+                  placeholder="quem fez o movimento" className={`${campo} w-56`} />
+              </label>
+              <span className="pb-1.5 text-[11px] text-graf-400">em branco: agora, por você</span>
+            </div>
+          )}
           {aberto.situacao === 'ABERTO' && podeMexer && (
             <div className="flex flex-wrap items-center gap-2 border-t border-graf-800
                             px-4 py-3">
@@ -1073,7 +1110,7 @@ export function Romaneios({ podeMexer, tipo }: {
                 <th className="px-3 py-2 font-medium">Técnico</th>
                 <th className="px-3 py-2 text-right font-medium">Itens</th>
                 <th className="px-3 py-2 font-medium">Situação</th>
-                <th className="px-3 py-2 font-medium">Aberto em</th>
+                <th className="px-3 py-2 font-medium">Data</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -1120,7 +1157,13 @@ export function Romaneios({ podeMexer, tipo }: {
                     )}
                   </td>
                   <td className="tabular px-3 py-1.5 text-xs text-graf-400">
-                    {new Date(r.criado_em).toLocaleString('pt-BR')}
+                    {/* 230: a data de reporte (e o operador) vale mais que a de abertura */}
+                    {r.data_reporte ? (
+                      <span title={`Registrado aqui em ${new Date(r.criado_em).toLocaleString('pt-BR')}`}>
+                        <span className="text-graf-200">{new Date(r.data_reporte).toLocaleString('pt-BR')}</span>
+                        {r.operador && <span className="block text-[10px] text-graf-400">{r.operador}</span>}
+                      </span>
+                    ) : new Date(r.criado_em).toLocaleString('pt-BR')}
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     <button onClick={() => abrirDocumento(r)}
