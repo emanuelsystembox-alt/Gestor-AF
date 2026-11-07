@@ -70,8 +70,11 @@ export function origemCancelada(v: ParaOrigem): OrigemCancelada | null {
   // 208 (D-306): a marca do site vale como o TOA — no banco, a mesma
   // troca foi feita nas funções que separam o cancelado pela central.
   if (v.cancelado_central_em) return 'CANCELADO_CENTRAL'
+  const motivo = semAcento(v.motivo_fechamento_toa)
   if (semAcento(v.status_toa) === 'CANCELADO'
-      || semAcento(v.motivo_fechamento_toa).includes('CANCELADO NO SISTEMA')) {
+      || motivo.includes('CANCELADO NO SISTEMA')
+      // 227 (D-338): o "Liberado no Sistema NETSMS" também — fora o que o TOA concluiu
+      || (motivo.includes('LIBERADO NO SISTEMA') && semAcento(v.status_toa) !== 'CONCLUIDO')) {
     return 'CANCELADO_CENTRAL'
   }
   return null

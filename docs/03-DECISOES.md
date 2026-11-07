@@ -13050,3 +13050,16 @@ minha_empresa())` 17 ms; o painel, 1.857 → 146 ms. As seis funções de leitur
 `miscelanea_saldos`, `miscelanea_kardex`) tinham a mesma forma desde a 077 — com 33 peças ninguém
 via. Só a chamada mudou. Na tela: carrega em ~1 s (17.993 peças, 6.869 inicializadas, 8.294 em
 perda/sucata/inutilizado), lista de 50 por página, sem erro. Baterias 33/33 e 29/29.
+
+### D-338 · "Liberado no Sistema NETSMS" é cancelado pela central (227)
+
+*"esse status em nosso sistema é pra baixar igual como se fosse cancelado pela central, vamos puxar
+direto para cancelamento (...) se tiver status não precisa puxar direto, só se não tiver"* (Emanuel,
+07/11). O motivo de fechamento LIBERADO NO SISTEMA NETSMS passa a valer como o CANCELADO NO SISTEMA
+(D-289). A regra do movimento (D-278) fica: sem movimento → Cancelado pela central direto; com
+movimento → Em execução até a baixa do técnico. Fora, por escolha nossa (para o Emanuel confirmar):
+o "Liberado" com o TOA **concluído** — 6 a 10 por dia entre 01 e 07/11, fechando por código em
+Reagendamento; não foi pedido mexer neles. O expurgo do TEC1 (`tec1_da_os`, livro da CLARO, D-047)
+não muda. Duas cópias, mudadas juntas: `cancelado_pela_central()` e `origemCancelada()`. Vale nas
+próximas importações; contrato já Cancelado com esse motivo passa a aparecer como "Cancelado pela
+central" na tela.

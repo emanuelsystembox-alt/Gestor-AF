@@ -90,6 +90,8 @@ Auditar) como sempre. Concluído com código continua fechando sozinho. *"se tev
 sistema leva o contrato até em execução, depois disso o técnico precisa baixar manual"*
 (Emanuel, 03/11). **E o status posto à mão não volta pela importação** — só avança, até Em
 execução ("Vale o do técnico").
+**"Liberado no Sistema NETSMS"** também é cancelado pela central, fora quando o TOA deu
+**concluído** (227, D-338 — Emanuel, 07/11); a regra do movimento continua valendo para ele.
 **"Cancelado no Sistema NETSMS"** (vem como "não concluído") é cancelado pela central, e
 **movimento** é o TOA ter mostrado em rota/iniciado numa importação ou alguém ter mexido — não a
 conversão de "não concluído" em Em execução (198, D-289). `cancelado_pela_central()` no banco e
