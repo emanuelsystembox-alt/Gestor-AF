@@ -431,6 +431,27 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 07/11/2026 — almoxarifado e portal da Claro (224 a 231, D-335 a D-340)
+
+### Depende do Emanuel
+- **Mudar a VPS para Campinas?** Checklist em `docs/12-VPS-ERP.md` (TTL da HostGator 1 dia antes,
+  avisar o Alisson, backup + snapshot, à noite). Até lá, a leitura do portal pela VPS acerta ~metade.
+- **O resto da planilha "Com Técnico - Inicializado"**: 67 peças de 10 equipes sem técnico ativo
+  (002, 007, 040, 044, 049, 131, 205, 206, 207, 210), 96 com supervisores/coordenador (não são
+  técnicos), 6 seriais fora da carga. E quando pagar as outras 64 equipes.
+- **A equipe de VT no filtro de área** (D-335) segue o dia inteiro — confirmar.
+- **"Liberado" com o TOA concluído** ficou de fora do cancelado pela central (D-338) — confirmar.
+
+### Verificação que ninguém fez ainda
+- Pagamento de ponta a ponta pela tela nova, os campos de ADMIN (data de reporte/operador) pela tela,
+  o aceite do técnico no app depois de "Deixar para o técnico aceitar".
+- O app do técnico (carga, romaneio, transferência) depois da 225 (estoque por cidade).
+- Uma importação real com o "Liberado no Sistema NETSMS" novo.
+
+### Na fila (pedido, não começado)
+- Previsão de estoque (autonomia em dias), Movimentações com filtro por situação e Excel, Equipes /
+  Alocações como a do concorrente.
+
 ## Pendente em 06/11/2026 — o sinal do Portal Técnico da Claro (222, 223, D-330 a D-334)
 
 Feito: `sinal_claro` + `registrar_sinal_claro` + `resumir_sinal` (222, 223); aba Sinal e

@@ -731,3 +731,15 @@ confira as permissões resolvidas: `npx expo config --json` → `android.permiss
 `runtimeVersion` não é a do `app.json` — guarda de "peça nativa só no APK X+" pela runtime
 mostrou "precisa do app novo" no Expo Go. Pergunte `isRunningInExpoGo()` (do pacote `expo`)
 antes (D-210).
+
+## Rede e endereços
+
+**Uma das duas portas do portal da Claro recusa a VPS — a outra aceita.** `portaltecnico` e
+`prd-worker-mangerportal` resolvem para dois IPs da AWS; da VPS (Boston), `35.174.77.4` fecha a
+conexão logo depois do TLS e `100.25.108.9` responde. Parece "às vezes abre, às vezes não" e parece
+bloqueio por uso — não é: recusa até a página de login, sem cookie. Antes de concluir "fomos
+bloqueados", force cada IP com `curl --resolve host:443:IP`. Ver `docs/12-VPS-ERP.md`.
+
+**O DNS de `grupoafline.com.br` (HostGator) guarda o registro por 1 dia.** Trocar o IP de um
+registro com TTL 86400 deixa quem já consultou no endereço velho por até 24 h. Baixe o TTL para
+300 um dia antes de qualquer troca de IP (mudança de data center da VPS, por exemplo).

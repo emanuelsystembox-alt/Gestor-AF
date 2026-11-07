@@ -494,3 +494,48 @@ mandam usar o **MCP do Supabase** no projeto `kqfflkxjijzdtnfshdlv` — que não
 existe mais. Hoje o banco se acessa por SSH:
 `docker exec supabase-db psql -U postgres -d postgres` (como `authenticated`,
 para medir e testar, segue valendo o `set local role`).
+
+## O portal da Claro e a mudança para Campinas (estudado em 07/11/2026 — NÃO feito)
+
+**O problema.** O Chromium da VPS não abria o Portal Técnico da Claro (`ERR_EMPTY_RESPONSE`),
+e da máquina do Emanuel abria. Medido em 07/11, sem login nenhum (só a página de login pública):
+
+| Porta de entrada da Claro (AWS, us-east-1) | Da VPS | Da máquina do Emanuel |
+|---|---|---|
+| `35.174.77.4` | **recusa** — fecha logo depois do TLS, 4 de 4 | abre (200) |
+| `100.25.108.9` | abre (200; API 401 sem login), 4 de 4 | abre |
+
+O DNS da Claro sorteia uma das duas a cada acesso: da VPS, **metade abre e metade não**. Não é
+bloqueio por uso nosso (recusa até a página pública, sem cookie, igual em toda tentativa, e a outra
+porta aceita a mesma VPS): uma das portas tem um filtro que a outra não tem. A VPS está em
+**Boston** (data center 24 da Hostinger) e o IP é registrado nos EUA. Consequência: a leitura do
+portal pela extensão na VPS (D-330) acerta mais ou menos metade das rodadas.
+
+**Os caminhos, em ordem de preferência do que foi conversado:**
+1. **Mudar a VPS para o data center de Campinas (SP)** — existe na Hostinger (id 22, "cam"). Faz
+   pelo **hPanel** (a API não tem a operação). Provavelmente resolve o portal (a porta que recusa
+   aceita IP do Brasil) e deixa site/app mais rápidos para Manaus e São Luís. Pode não resolver se
+   o filtro for "nada de data center", mesmo brasileiro.
+2. **Fixar na VPS a porta que funciona** (`/etc/hosts` só para os nomes da Claro) — rápido e
+   frágil: a AWS troca esses IPs e um dia para sem aviso.
+3. **Extensão num computador no Brasil**, ligada sem bucket marcado, só para o portal (a VPS
+   continua com o TOA). Funciona hoje.
+4. Extensão de VPN no navegador: as boas gratuitas **não têm Brasil** no plano grátis (conferido
+   07/11 nos sites: Windscribe — só Pro; Proton — 10 países sorteados; TunnelBear — escolher país
+   só no pago). As grátis com Brasil (Hola, Urban VPN) não servem num navegador com sessões do TOA,
+   do PulsoLine e do portal (LGPD). Windscribe Pro anunciava US$ 29/ano até 30/11.
+
+**Checklist da mudança para Campinas (quando o Emanuel decidir):**
+- **Um dia ANTES:** baixar o TTL dos registros que apontam para `179.197.82.110` na **HostGator**
+  (DNS de `grupoafline.com.br`: `ns244/ns245.hostgator.com.br`, TTL padrão **86400 = 1 dia**) para
+  300. Sem isso, celular e PC continuam no IP velho por até 24 h depois da troca.
+- **Avisar o Alisson:** o n8n dele (`n8n-n8n-1`, `n8n-caddy-1`, `n8n-postgres-1`) mora aqui e
+  também troca de IP.
+- **Backup antes:** o único backup da Hostinger é de **03/11** (restauração ~46 min). Cópia do banco
+  (~1 GB) e de `/opt/supabase/volumes` para a máquina do Emanuel + **snapshot** da Hostinger logo
+  antes de clicar.
+- **A conta da VPS é de outro titular** (o Emanuel entra como administrador) — confirmar que o
+  acesso dele permite a mudança.
+- **À noite**, sem técnico em campo. Depois: novo IP nos registros da HostGator, conferir site, app,
+  `api.pulsoline`, as duas baterias, n8n, a extensão, o portal da Claro da VPS — e trocar o IP nos
+  16 lugares da documentação que citam `179.197.82.110` (`grep -rn 179.197.82.110`).

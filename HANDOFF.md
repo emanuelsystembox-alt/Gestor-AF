@@ -1,5 +1,25 @@
 # Passagem de bastão — leia isto primeiro
 
+> **07/11/2026 — almoxarifado por cidade e no jeito do concorrente; portal da Claro pela VPS**
+> (D-335 a D-340, migrations 224 a 231; site publicado):
+> - **Dashboard VT com filtro de área** (224, D-335) — vai ao banco; a equipe de VT continua
+>   decidida pelo dia inteiro.
+> - **Almoxarifado separado por cidade** (225, D-336): `base_id` carimbado por gatilho; romaneio e
+>   transferência entre cidades recusados; o estoque antigo foi apagado a pedido (cópia em
+>   `/root/copias-almox` na VPS). **Carga nova do Atlas de Manaus: 17.993 peças.** A tela estourava
+>   8 s: `minha_empresa()` solto por linha em 6 funções (226, D-337).
+> - **"Liberado no Sistema NETSMS" = cancelado pela central** (227, D-338), fora o que o TOA concluiu.
+> - **Almoxarifado no jeito do Alfa Gestor** (228/229, D-339): abas em cima (Painel · Pagamento ·
+>   Devolução · Transferência · Entrada · Equipes / Alocações…), SITUAÇÃO calculada, filtro de tipo e
+>   modelo, passo a passo, Entrada de material, bipe por MAC.
+> - **Data de reporte e operador no romaneio, só ADMIN** (230, D-340). **Piloto: equipe 004
+>   (NICACIO, 33 peças)** com as datas e operadores do ngestor. O pagamento da planilha inteira
+>   (1.828 peças, 65 técnicos) foi feito e **desfeito** a pedido — 65 romaneios cancelados com motivo.
+> - **Portal da Claro pela VPS:** uma das duas portas da Claro recusa o IP da VPS (Boston), a outra
+>   aceita — metade das leituras falha. Plano estudado, **não feito**: mudar a VPS para Campinas,
+>   com TTL da HostGator baixado um dia antes. Tudo em `docs/12-VPS-ERP.md`, última seção.
+> - **6 commits estavam sem push** até o fim do dia — empurrados junto com esta documentação.
+
 > **06/11/2026, noite — o sinal antes/depois do Portal Técnico da Claro** (D-330 a D-334, migrations
 > 222 e 223; site publicado, extensão 0.9.0 copiada para a VPS, app por `eas update`):
 > - **De onde vem:** o Portal Gestor da Claro (`portaltecnico.clarobrasil.mobi`, Timeline de falhas)
