@@ -13038,3 +13038,15 @@ nenhuma SECURITY DEFINER aberta ao anon. Site publicado.
 **Não verificado:** a importação de verdade da carga nova (o Emanuel vai subir); o app do técnico
 (romaneio, transferência, carga) com a cidade — as funções do app são por técnico e não mudaram, mas
 não foram exercitadas depois da 225.
+
+### D-337 · Almoxarifado: o escopo resolvido uma vez por consulta (226)
+
+Em 07/11 a carga nova do Atlas (Manaus, **17.993 peças**, 36 lotes de 500) **entrou inteira**, mas a
+tela respondeu "canceling statement due to statement timeout" e mostrou "Nenhuma peça". Era a
+LEITURA: `estoque_posicao` filtrava `e.empresa_id = minha_empresa()` solto — chamado por linha
+(traps.md, D-118). Medido como `authenticated`: `count(*)` solto 1.711 ms, com `(select
+minha_empresa())` 17 ms; o painel, 1.857 → 146 ms. As seis funções de leitura do estoque
+(`estoque_posicao`, `estoque_cargas`, `estoque_movimentacoes`, `estoque_historico_serial`,
+`miscelanea_saldos`, `miscelanea_kardex`) tinham a mesma forma desde a 077 — com 33 peças ninguém
+via. Só a chamada mudou. Na tela: carrega em ~1 s (17.993 peças, 6.869 inicializadas, 8.294 em
+perda/sucata/inutilizado), lista de 50 por página, sem erro. Baterias 33/33 e 29/29.
