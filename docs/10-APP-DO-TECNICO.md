@@ -486,6 +486,18 @@ celular. O primeiro teste com o Expo Go é o que fecha isso.
 
 ---
 
+## O sinal antes/depois na tela do contrato (06/11/2026, D-333)
+
+Caixa **"Sinal (portal Claro)"**, logo antes do "No TOA": Antes (Diagnóstico Inicial) e Depois
+(Validação) com o rótulo da Claro — "Sem validação" quando a O.S. foi finalizada no portal sem
+validar —, cada tipo (Internet, TV) com fora / offline / ok antes → depois, e **"Ver os níveis"**
+com os níveis de cada aparelho (Tx/Rx/SNR no cabo, Rx/Tx óptico no GPON, canais fora). Lê
+`sinal_claro` direto (RLS: o técnico vê só os seus). Sem leitura do portal para o contrato, a
+caixa não aparece. `campo/src/ui/SinalClaro.tsx` é cópia declarada da web (D-112).
+
+Publicado só JavaScript: `eas update` canal preview, runtime 0.7.1, grupo `48cd22ab`, junto com
+as cores novas do LOG (`corDoLog`, D-332).
+
 ## O que falta
 
 | O quê | Por quê |

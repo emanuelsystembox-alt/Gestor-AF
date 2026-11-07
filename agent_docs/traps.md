@@ -378,6 +378,24 @@ do tipo quebrava **uma palavra por linha**. O sintoma aparece longe da causa: o
 texto picado está numa coluna, o `nowrap` está em outra. Em tabela larga, dê TETO
 às colunas curtas (`w-36`) e PISO à que carrega o conteúdo. Ver D-225.
 
+**Tirar o conteúdo largo de uma coluna sem piso de largura deixa a tabela espremê-la.** Em
+06/11 o sinal Antes/Depois saiu da coluna Contrato para a Situação (D-334): a 1400 px as duas
+encolheram até o mínimo, os marcadores empilharam um por linha e o "Internet offline, TV offline"
+virou uma coluna de palavras. Quem segurava a largura era o bloco que saiu. Coluna que carrega
+selos precisa de piso (`min-w-[15rem]` no `th`) — e meça a altura das linhas antes e depois, a
+mais de uma largura de tela. É o par da armadilha do `whitespace-nowrap` (logo abaixo, D-225).
+
+**`bg-sky-200 text-sky-900` num selo some no tema claro.** O tema claro inverte as faixas
+200–400/700–900 (D-303): o CLIENTE ATIVADO saiu azul claro com texto claro, ilegível. Marcador de
+cor cheia vai em hex fixo, as MESMAS cores do app (`MARCADORES_COR`) — D-332.
+
+**Rótulo graf-400 sobre o fundo de um aviso reprova no escuro.** "Antes/Depois" no aviso do sinal
+deu 4,39:1 (graf-400 sobre `graf-800/60`); graf-300 dá 6,3. Meça sobre o fundo REAL, nos dois temas.
+
+**A extensão do Chromium da VPS é uma CÓPIA.** `npm run extensao` monta `extensao-toa/` aqui; o
+Chromium 24 h carrega `/opt/navegador/config/extensao-toa`. Sem copiar, o ↻ recarrega a versão
+velha. Passo a passo em `productivity.md`, "Publicar".
+
 **A matrícula do técnico É o login do TOA.** Medido: `tecnico.matricula` =
 `Z597207` e o login do TOA da faixa = `Z597207`. Escrever os dois lado a lado deu
 "Z597207Z597207" na Rota, e em Serviços roubou metade do nome por truncagem. Antes

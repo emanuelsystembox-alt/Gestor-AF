@@ -254,6 +254,33 @@ basta, enquanto a sessão da Claro durar) e "Sincronizar por este computador"
 ligado. Sessão caída aparece no painel e no log. Nome e endereço do
 assinante que o portal manda não saem da extensão.
 
+O que é gravado e como a tela mostra: `sinal_claro` (222) e o resumo por tipo
+(223, `resumir_sinal`) — regras em `agent_docs/business-rules.md`, "Sinal do
+portal Claro"; decisões D-330 a D-334.
+
+## O dia (0.9.0, D-332)
+
+O painel tem um **seletor de dia**: hoje (o normal) ou até **31 dias para
+trás**. Com outro dia, o botão vira "Atualizar DD/MM" e:
+
+1. importa a planilha do TOA **daquele dia** nos buckets marcados, cada um na
+   cidade dele — o mesmo caminho da importação manual com outra data (o dia de
+   atuação é escolha de quem opera, D-166);
+2. lê o sinal do portal do mesmo dia.
+
+Usa a trava da rota (`trava_baixa`): um de cada vez, sem atropelar a rodada de
+hoje. A memória dos níveis já lidos (`portal_detalhe`) é só de hoje; um dia
+para trás lê todos. "Ler o portal" também respeita o dia escolhido.
+
+O painel ficou mais limpo na 0.9.0: a lista de buckets não diz mais "livre" nem
+"este computador", nem conta o que falta varrer — só "com <outro computador>"
+no bucket marcado que está com outra máquina. Rota e Sinal ficam lado a lado
+(um embaixo do outro quando o painel é estreito).
+
+**Atualizar a extensão do Chromium da VPS** é copiar a pasta para
+`/opt/navegador/config/extensao-toa` e clicar ↻ — passo a passo em
+`agent_docs/productivity.md`, "Publicar".
+
 ---
 
 ## Como acrescentar uma ação nova

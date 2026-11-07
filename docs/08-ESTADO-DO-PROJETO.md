@@ -431,6 +431,34 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 06/11/2026 — o sinal do Portal Técnico da Claro (222, 223, D-330 a D-334)
+
+Feito: `sinal_claro` + `registrar_sinal_claro` + `resumir_sinal` (222, 223); aba Sinal e
+Antes/Depois na lista (site publicado); extensão 0.9.0 com leitura do portal e seletor de dia
+(copiada para a VPS); caixa no app (`eas update`, grupo `48cd22ab`). 62 de 62 O.S. de 06/11 ligadas
+a contratos; baterias 33/33 e 29/29.
+
+### Ação na operação (não precisa de código)
+
+| O quê | Por quê |
+|---|---|
+| **Abrir o Portal Técnico no Chromium da VPS**, logado, e dar ↻ na extensão | Até o fim de 06/11 a extensão não tinha capturado o login do portal: os níveis de 06/11 foram carregados à mão pelo mesmo RPC. Sem isso, nada novo entra. |
+| **Pôr mais técnicos na conta Z055246 do portal** | O portal só devolve a hierarquia do login lido (hoje 8 técnicos, MAN-AFLINE_01_VT). O Emanuel disse que vai pôr. |
+
+### Verificação que ninguém fez ainda
+
+- A extensão lendo o portal **sozinha**, a cada rota, no Chromium da VPS (o cookie da Claro numa
+  chamada do fundo da extensão — o mesmo modelo do TOA, mas não visto rodando).
+- O **seletor de dia** em uso real (importar e ler o portal de um dia para trás).
+- A caixa do sinal num **celular** de técnico; a **visão Compacta** da lista e telas < 1400 px.
+
+### Perguntas abertas
+
+- Nome do tipo: a tela escreve "Internet" (como o portal). Se preferir "Virtua" para a internet a
+  cabo, é troca de rótulo — perguntado em 06/11, sem resposta.
+- 9 O.S. de 06/11 vêm com o inicial "Pendente" no portal **e** aparelho medido (6 com canal fora).
+  A tela mostra os dois como a Claro manda; se isso significa outra coisa na operação, perguntar.
+
 ## Pendente em 04/11/2026 — mapa da baixa, cards, marcadores, Nova O.S. e supervisor em campo (202 a 208, D-295 a D-310)
 
 ### Ação na operação (não precisa de código)

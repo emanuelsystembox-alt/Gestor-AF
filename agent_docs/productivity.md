@@ -66,6 +66,21 @@ desfeita **não** dispara Realtime.
 
 ## Publicar
 
+**Extensão no Chromium da VPS** — o Chromium 24 h (container `navegador`, aberto pelo túnel em
+`https://localhost:3001`) carrega a extensão de **`/opt/navegador/config/extensao-toa`**, uma CÓPIA:
+`npm run extensao` só monta a pasta `extensao-toa/` daqui. Para atualizar (D-330):
+
+```bash
+cd extensao-toa
+ssh root@179.197.82.110 "cp -a /opt/navegador/config/extensao-toa /opt/navegador/config/extensao-toa-bkp"
+scp manifest.json fundo.js popup.js popup.html ponte.js toa.js toa-pagina.js portal-claro.js README.md root@179.197.82.110:/opt/navegador/config/extensao-toa/
+ssh root@179.197.82.110 "chown 1000:1000 /opt/navegador/config/extensao-toa/*"
+```
+
+Depois, no Chromium da VPS: `chrome://extensions` → **↻** na extensão, F5 na aba do TOA e na do
+Portal Técnico. Pelo seletor de pasta do "Carregar sem compactação" a pasta parece vazia — ele só
+mostra pastas, não arquivos.
+
 **Web** — deploy manual, e é fácil esquecer:
 
 ```powershell

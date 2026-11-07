@@ -1,5 +1,30 @@
 # Passagem de bastão — leia isto primeiro
 
+> **06/11/2026, noite — o sinal antes/depois do Portal Técnico da Claro** (D-330 a D-334, migrations
+> 222 e 223; site publicado, extensão 0.9.0 copiada para a VPS, app por `eas update`):
+> - **De onde vem:** o Portal Gestor da Claro (`portaltecnico.clarobrasil.mobi`, Timeline de falhas)
+>   mede o aparelho do cliente no **Diagnóstico Inicial** (antes) e na **Validação** (depois). É uma
+>   API (`prd-worker-mangerportal.clarobrasil.mobi/v1`) autenticada pelo **cookie** do login da Claro.
+>   A **extensão** lê com o login aberto no Chrome, junto com a rota — só GET; **nunca** o
+>   `new-measurement` (AWS), que dispara medição no cliente. Endereços e chaves de cruzamento em
+>   `docs/11-EXTENSAO-TOA.md` e na D-330.
+> - **Banco:** `sinal_claro` (um por contrato; RLS: vê quem vê o contrato), `registrar_sinal_claro`,
+>   `resumir_sinal()` (por tipo: FORA = canal vermelho da Claro > OFFLINE > ERRO > OK). A classificação
+>   é a da Claro — regra em `agent_docs/business-rules.md`. **Só mostra**, não trava baixa.
+> - **Site:** aba **Sinal** no contrato (Internet/TV, antes e depois lado a lado); na lista, o
+>   Antes/Depois na coluna **Situação**, com o "fora do raio" por último (D-334). **LOG por cor** (1
+>   amarelo, 2 laranja, 3 vermelho, 4+ preto, `corDoLog`), colunas **Área | LOG**, marcadores na linha
+>   do número, CLIENTE ATIVADO legível no tema claro, e o controle nasce em **90%** (D-332).
+> - **Extensão 0.9.0:** painel mais limpo, **seletor de dia** (até 31 para trás), Rota e Sinal lado a
+>   lado. A do Chromium 24 h da VPS mora em `/opt/navegador/config/extensao-toa` — atualizar é copiar
+>   para lá e clicar ↻ (`agent_docs/productivity.md`).
+> - **App:** caixa "Sinal (portal Claro)" no contrato + cores do LOG, `eas update` preview, runtime
+>   0.7.1, grupo `48cd22ab` (D-333).
+> - **Falta ver funcionando:** a extensão lendo o portal sozinha no Chromium da VPS (o login do portal
+>   ainda não tinha sido capturado; os níveis de 06/11 foram carregados à mão, pelo mesmo RPC), o
+>   seletor de dia em uso real, a caixa num celular, a visão Compacta. Por enquanto só o login
+>   Z055246 (8 técnicos); o Emanuel vai pôr mais técnicos nessa conta.
+
 > **05/11/2026, noite — 14 pedidos de uma vez** (D-312 a D-326, migrations 210 a 218; site
 > publicado em 05/11 ~23h):
 > - **Reagendado 100 depois das 21:20** (210): importação de hoje, contrato "pendente" no TOA, ainda
