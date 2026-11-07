@@ -5,6 +5,8 @@ import { lerCargaEstoque, type LeituraEstoque } from '../lib/estoque'
 import { Shell } from '../components/Shell'
 import { Alerta, Vazio } from '../components/ui'
 import { Romaneios } from '../components/Romaneios'
+import { Entrada } from '../components/Entrada'
+import { SelecaoMultipla } from '../components/SelecaoMultipla'
 import { PecaDetalhe, EstadoAfline } from '../components/PecaDetalhe'
 import { Miscelanea } from '../components/Miscelanea'
 import { Cargas } from '../components/Cargas'
@@ -60,6 +62,46 @@ interface Posicao {
 
 interface Posse { codigo: string; rotulo: string; cor: string | null; ordem: number }
 
+/** 228 (D-339): o painel por situação, com o filtro de tipo e modelo. */
+interface Painel {
+  total: number
+  por_situacao: { situacao: string; rotulo: string; qtd: number }[]
+  por_estado: { estado: string; qtd: number }[]
+  por_tipo: { tipo: string; qtd: number }[]
+  por_modelo: { modelo: string; tipo: string; qtd: number }[]
+  opcoes_tipo: { valor: string; qtd: number }[]
+  opcoes_modelo: { valor: string; qtd: number }[]
+}
+
+/**
+ * A SITUAÇÃO da peça (228, D-339) — o nome que o almoxarife já conhece do
+ * concorrente ("Com Técnico - Inicializado"), calculado no banco a partir
+ * de posse + condição (situacao_estoque). A cor diz o que fazer: verde
+ * pronto, azul voltando, vermelho com defeito, âmbar esperando alguém,
+ * cinza fora do nosso estoque. Hex fixo: o tema claro inverte (D-303).
+ */
+const SITUACOES: { codigo: string; cor: string; sempre?: boolean }[] = [
+  { codigo: 'ESTOQUE_INICIALIZADO', cor: '#16a34a', sempre: true },
+  { codigo: 'TECNICO_INICIALIZADO', cor: '#16a34a', sempre: true },
+  { codigo: 'TECNICO_RETIRADO', cor: '#2563eb', sempre: true },
+  { codigo: 'ESTOQUE_RETIRADO', cor: '#2563eb' },
+  { codigo: 'ESTOQUE_DEFEITO', cor: '#dc2626' },
+  { codigo: 'TECNICO_DEFEITO', cor: '#dc2626' },
+  { codigo: 'AGUARDANDO_ACEITE', cor: '#d97706', sempre: true },
+  { codigo: 'EM_TRANSITO', cor: '#d97706' },
+  { codigo: 'NO_CONTRATO', cor: '#64748b' },
+  { codigo: 'DEVOLVIDO_CLARO', cor: '#64748b' },
+  { codigo: 'SEM_POSSE', cor: '#d97706', sempre: true },
+]
+const ROTULO_SITUACAO: Record<string, string> = {
+  ESTOQUE_INICIALIZADO: 'Em estoque · inicializado', ESTOQUE_RETIRADO: 'Em estoque · retirado',
+  ESTOQUE_DEFEITO: 'Em estoque · com defeito', TECNICO_INICIALIZADO: 'Com técnico · inicializado',
+  TECNICO_RETIRADO: 'Com técnico · retirado', TECNICO_DEFEITO: 'Com técnico · com defeito',
+  AGUARDANDO_ACEITE: 'Aguardando aceite', NO_CONTRATO: 'No contrato (assinante)',
+  EM_TRANSITO: 'Em trânsito', DEVOLVIDO_CLARO: 'Devolvido à CLARO', SEM_POSSE: 'Sem posse declarada',
+}
+const corSituacao = (c: string) => SITUACOES.find(x => x.codigo === c)?.cor ?? '#64748b'
+
 interface Equipamento {
   id: string; serial: string; enderecavel: string | null
   tipo: string | null; modelo: string | null
@@ -69,6 +111,9 @@ interface Equipamento {
   estado_afline: string | null
   estado_afline_em: string | null
   estado_afline_motivo: string | null
+  /** 228: da view estoque_peca. */
+  situacao: string
+  tecnico_nome: string | null
 }
 
 const POR_PAGINA = 50
@@ -130,13 +175,21 @@ export default function Almoxarifado() {
    *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
    *  atravessa as tres no mesmo atendimento de balcao. */
   // A central leva direto à aba pelo endereço (?aba=sinalizacoes, 091).
-  const [aba, setAba] = useState<'posicao' | 'romaneios' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes' | 'sinalizacoes' | 'conferencia'>(
+  // 228 (D-339): os menus em abas EM CIMA ("os menus quero que fique em cima e não
+  // na lateral" — Emanuel, 07/11), na ordem do trabalho do balcão.
+  const [aba, setAba] = useState<'posicao' | 'pagamento' | 'devolucao' | 'transferencia' | 'entrada' | 'cargas' | 'miscelanea' | 'baixa' | 'movimentacoes' | 'sinalizacoes' | 'conferencia'>(
     () => {
       const a = new URLSearchParams(window.location.search).get('aba')
-      return a === 'sinalizacoes' || a === 'conferencia' ? a : 'posicao'
+      return a === 'sinalizacoes' || a === 'conferencia' ? a : a === 'romaneios' ? 'pagamento' : 'posicao'
     })
   const { dados: central } = useCentral()
   const [posicao, setPosicao] = useState<Posicao | null>(null)
+  const [painel, setPainel] = useState<Painel | null>(null)
+  // 228: filtro de tipo e modelo ("deve ter filtro do tipo de equipamento e modelo
+  // também" — Emanuel, 07/11): vale para os cartões, os gráficos e a lista
+  const [fTipos, setFTipos] = useState<string[]>([])
+  const [fModelos, setFModelos] = useState<string[]>([])
+  const [fSituacao, setFSituacao] = useState<string | null>(null)
   const [posses, setPosses] = useState<Posse[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -152,8 +205,6 @@ export default function Almoxarifado() {
   // ---- lista ----
   const [busca, setBusca] = useState('')
   const [fEstado, setFEstado] = useState('TODOS')
-  const [fTipo, setFTipo] = useState('TODOS')
-  const [fPosse, setFPosse] = useState('TODAS')
   const [lista, setLista] = useState<Equipamento[]>([])
   const [totalLista, setTotalLista] = useState(0)
   const [pagina, setPagina] = useState(1)
@@ -165,15 +216,18 @@ export default function Almoxarifado() {
 
   const recarregar = useCallback(async () => {
     setCarregando(true); setErro(null)
-    const [p, ps] = await Promise.all([
+    const [p, ps, pn] = await Promise.all([
       supabase.rpc('estoque_posicao'),
       supabase.from('estoque_posse').select('codigo, rotulo, cor, ordem').order('ordem'),
+      supabase.rpc('estoque_painel', { p_tipos: fTipos.length ? fTipos : null, p_modelos: fModelos.length ? fModelos : null }),
     ])
     if (p.error) setErro(p.error.message)
     else setPosicao(p.data as unknown as Posicao)
+    if (pn.error) setErro(pn.error.message)
+    else setPainel(pn.data as unknown as Painel)
     setPosses((ps.data ?? []) as Posse[])
     setCarregando(false)
-  }, [])
+  }, [fTipos, fModelos])
 
   useEffect(() => { recarregar() }, [recarregar])
 
@@ -183,16 +237,18 @@ export default function Almoxarifado() {
   useEffect(() => {
     let vivo = true
     setCarregandoLista(true)
-    let q = supabase.from('equipamento')
+    // 228: a lista vem da view estoque_peca (o RLS de equipamento vale), com a situação
+    let q = supabase.from('estoque_peca')
       .select('id, serial, enderecavel, tipo, modelo, estado_atlas, posse, ' +
               'local_atlas, atlas_em, estado_afline, estado_afline_em, ' +
-              'estado_afline_motivo', { count: 'exact' })
-    const t = busca.trim().toUpperCase().replace(/\s+/g, '')
-    if (t) q = q.like('serial', `${t}%`)
-    if (fEstado !== 'TODOS') q = q.eq('estado_atlas', fEstado)
-    if (fTipo !== 'TODOS') q = q.eq('tipo', fTipo)
-    if (fPosse === 'SEM') q = q.is('posse', null)
-    else if (fPosse !== 'TODAS') q = q.eq('posse', fPosse)
+              'estado_afline_motivo, situacao, tecnico_nome', { count: 'exact' })
+    const t = busca.trim().toUpperCase().replace(/[^0-9A-Z]/g, '')
+    // serial ou MAC (o "Endereçável" do Atlas)
+    if (t) q = q.or(`serial.like.${t}%,enderecavel.ilike.${t}%`)
+    if (fEstado !== 'TODOS') q = q.eq('estado', fEstado)
+    if (fTipos.length) q = q.in('tipo', fTipos)
+    if (fModelos.length) q = q.in('modelo', fModelos)
+    if (fSituacao) q = q.eq('situacao', fSituacao)
 
     q.order('serial').range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
       .then(({ data, count, error }) => {
@@ -203,9 +259,9 @@ export default function Almoxarifado() {
         setCarregandoLista(false)
       })
     return () => { vivo = false }
-  }, [busca, fEstado, fTipo, fPosse, pagina, posicao, versaoLista])
+  }, [busca, fEstado, fTipos, fModelos, fSituacao, pagina, posicao, versaoLista])
 
-  useEffect(() => { setPagina(1) }, [busca, fEstado, fTipo, fPosse])
+  useEffect(() => { setPagina(1) }, [busca, fEstado, fTipos, fModelos, fSituacao])
 
   const paginas = Math.max(1, Math.ceil(totalLista / POR_PAGINA))
   const rotuloPosse = useMemo(() => {
@@ -288,20 +344,20 @@ export default function Almoxarifado() {
         </div>
 
         <div className="flex flex-wrap rounded-lg bg-graf-900 p-0.5">
-          {/* D-165: as telas que faltavam em relação ao concorrente —
-              Alocações, Baixar Miscelâneas, Movimentações/Pesquisar Serial
-              e Kardex/Auditoria (este dentro de Miscelânea, por item). */}
-          {([['posicao', 'Posição'],
-             // "Entregas", e não "Romaneios": palavra que todo mundo
-             // entende de primeira (Emanuel, 25/10). A chave interna e o
-             // nome do documento no banco continuam `romaneio` — é o
-             // termo do almoxarifado, e trocar isso seria reescrever o
-             // domínio por causa de um rótulo.
-             ['romaneios', 'Entregas'],
-             ['cargas', 'Cargas por técnico'],
+          {/* 228 (D-339): a ordem do balcão do concorrente — painel, saídas
+              (pagamento), devoluções, transferências, entradas, alocações,
+              movimentações — em ABAS EM CIMA, não na lateral (Emanuel, 07/11).
+              D-165: Alocações, Baixar Miscelâneas, Movimentações/Pesquisar
+              Serial e Kardex/Auditoria (este dentro de Miscelânea, por item). */}
+          {([['posicao', 'Painel'],
+             ['pagamento', 'Pagamento'],
+             ['devolucao', 'Devolução'],
+             ['transferencia', 'Transferência'],
+             ['entrada', 'Entrada'],
+             ['cargas', 'Equipes / Alocações'],
+             ['movimentacoes', 'Movimentações e pesquisa'],
              ['miscelanea', 'Material e ferramenta'],
              ['baixa', 'Baixa por contrato'],
-             ['movimentacoes', 'Movimentações e pesquisa'],
              ['sinalizacoes', 'Sinalizações do campo'],
              ['conferencia', 'Conferência TOA']] as const).map(([a, rot]) => (
             <button key={a} onClick={() => setAba(a)} aria-pressed={aba === a}
@@ -317,7 +373,9 @@ export default function Almoxarifado() {
           ))}
         </div>
 
-        {aba === 'romaneios' && <Romaneios podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'pagamento' && <Romaneios tipo="ENTREGA" podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'devolucao' && <Romaneios tipo="DEVOLUCAO" podeMexer={pode('almoxarifado.editar')} />}
+        {aba === 'transferencia' && <Romaneios tipo="TRANSFERENCIA" podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'miscelanea' && <Miscelanea podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'cargas' && <Cargas />}
         {aba === 'baixa' && <BaixaContrato podeMexer={pode('almoxarifado.editar')} />}
@@ -325,11 +383,10 @@ export default function Almoxarifado() {
         {aba === 'sinalizacoes' && <Sinalizacoes podeMexer={pode('almoxarifado.editar')} />}
         {aba === 'conferencia' && <ConferenciaToa podeTratar={pode('almoxarifado.editar')} />}
 
-        {aba === 'posicao' && (<>
-
+        {aba === 'entrada' && (<>
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {ok && <Alerta tipo="ok">{ok}</Alerta>}
-
+        <Entrada podeMexer={pode('almoxarifado.editar')} />
         {/* ====== importar ====== */}
         {podeImportar && (
           <section className="card-controle p-4">
@@ -404,72 +461,69 @@ export default function Almoxarifado() {
           </section>
         )}
 
-        {carregando ? (
+        </>)}
+
+        {aba === 'posicao' && (<>
+
+        {erro && <Alerta tipo="erro">{erro}</Alerta>}
+
+        {/* ====== o filtro de tipo e modelo (228) ====== */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SelecaoMultipla rotulo="Tipo" todos="Todo tipo" plural="tipos"
+            opcoes={(painel?.opcoes_tipo ?? []).map(o => ({ valor: o.valor, rotulo: o.valor, qtd: o.qtd }))}
+            valor={fTipos} onChange={v => { setFTipos(v); setFModelos([]) }} className={campo} />
+          <SelecaoMultipla rotulo="Modelo" todos="Todo modelo" plural="modelos"
+            opcoes={(painel?.opcoes_modelo ?? []).map(o => ({ valor: o.valor, rotulo: o.valor, qtd: o.qtd }))}
+            valor={fModelos} onChange={setFModelos} className={campo} />
+          {(fTipos.length > 0 || fModelos.length > 0 || fSituacao) && (
+            <button onClick={() => { setFTipos([]); setFModelos([]); setFSituacao(null) }}
+              className="text-xs text-af-400 underline underline-offset-2">limpar filtros</button>
+          )}
+          {painel && (
+            <span className="tabular ml-auto text-xs text-graf-400">
+              <strong className="text-graf-100">{n(painel.total)}</strong> peça(s)
+              {(fTipos.length > 0 || fModelos.length > 0) && ' no filtro'}
+            </span>
+          )}
+        </div>
+
+        {carregando && !painel ? (
           <p className="py-16 text-center text-graf-400" role="status">
-            Carregando a posição…
+            Carregando o painel…
           </p>
-        ) : !posicao || posicao.total === 0 ? (
+        ) : !painel || !posicao || posicao.total === 0 ? (
           <Vazio titulo="Nenhuma peça no estoque ainda"
             descricao={podeImportar
-              ? 'Importe o relatório de carga do Atlas acima para o almoxarifado começar a existir.'
+              ? 'Importe o relatório de carga do Atlas na aba Entrada para o almoxarifado começar a existir.'
               : 'Ninguém importou a carga do Atlas ainda. Quem tem a permissão "Importar a carga" faz isso.'} />
         ) : (<>
 
-          {/* ====== os números ====== */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="card-controle p-3">
-              <div className="tabular text-2xl font-semibold leading-none">
-                {n(posicao.total)}
-              </div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
-                peças na carga
-              </div>
-            </div>
-            {/* O número que nomeia o trabalho que falta. */}
-            <div className="card-controle p-3">
-              <div className={`tabular text-2xl font-semibold leading-none ${
-                posicao.sem_posse > 0 ? 'text-amber-400' : ''}`}>
-                {n(posicao.sem_posse)}
-              </div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
-                sem posse declarada
-              </div>
-              <div className="mt-0.5 text-[10px] text-graf-400">
-                o Atlas não sabe onde a peça está — nós ainda também não
-              </div>
-            </div>
-            {(() => {
-              const perdidas = posicao.por_estado
-                .filter(e => ['PERDA', 'SUCATA', 'INUTILIZADO'].includes(e.estado))
-                .reduce((s, e) => s + e.qtd, 0)
-              const uteis = posicao.por_estado
-                .find(e => e.estado === 'INICIALIZADO')?.qtd ?? 0
-              return (<>
-                <div className="card-controle p-3">
-                  <div className="tabular text-2xl font-semibold leading-none
-                                  text-emerald-400">{n(uteis)}</div>
-                  <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
-                    inicializadas
-                  </div>
-                  <div className="mt-0.5 text-[10px] text-graf-400">
-                    o que a CLARO considera utilizável
-                  </div>
-                </div>
-                <div className="card-controle p-3">
-                  <div className="tabular text-2xl font-semibold leading-none text-af-400">
-                    {n(perdidas)}
-                  </div>
-                  <div className="mt-1 text-[11px] uppercase tracking-wide text-graf-400">
-                    perda, sucata ou inutilizado
-                  </div>
-                  <div className="mt-0.5 text-[10px] text-graf-400">
-                    {posicao.total > 0
-                      ? `${((100 * perdidas) / posicao.total).toFixed(1)}% da carga`
-                      : '—'}
-                  </div>
-                </div>
-              </>)
-            })()}
+          {/* ====== a situação, em cartões (228, D-339) — clicar filtra a lista ====== */}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {SITUACOES.map(sit => {
+              const qtd = painel.por_situacao.find(x => x.situacao === sit.codigo)?.qtd ?? 0
+              if (!qtd && !sit.sempre) return null
+              const ativo = fSituacao === sit.codigo
+              return (
+                <button key={sit.codigo} type="button"
+                  onClick={() => setFSituacao(ativo ? null : sit.codigo)} aria-pressed={ativo}
+                  className={`card-controle flex items-stretch overflow-hidden text-left transition
+                              hover:ring-1 hover:ring-graf-600 ${ativo ? 'ring-2 ring-af-500' : ''}`}>
+                  <span aria-hidden className="w-1.5 shrink-0" style={{ background: sit.cor }} />
+                  <span className="min-w-0 flex-1 px-3 py-2.5">
+                    <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-graf-300">
+                      {ROTULO_SITUACAO[sit.codigo]}
+                    </span>
+                    <span className="mt-0.5 flex items-baseline gap-2">
+                      <span className="tabular text-2xl font-semibold leading-none text-graf-100">{n(qtd)}</span>
+                      <span className="tabular text-[11px] text-graf-400">
+                        {painel.total ? ((100 * qtd) / painel.total).toFixed(1) : '0'}%
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
           {/* ====== as três leituras ====== */}
@@ -477,15 +531,12 @@ export default function Almoxarifado() {
             <section className="card-controle overflow-hidden">
               <div className="border-b border-graf-800 px-4 py-2.5">
                 <h2 className="text-sm font-semibold">O que a CLARO diz</h2>
-                <p className="mt-0.5 text-[11px] text-graf-400">
-                  estado no Atlas · não se edita aqui — o da AFLINE é declarado peça a
-                  peça, na lista abaixo, e fica ao lado deste
-                </p>
+                <p className="mt-0.5 text-[11px] text-graf-400">estado no Atlas (ou o da AFLINE, quando declarado)</p>
               </div>
               <ul className="px-4 py-2">
-                {posicao.por_estado.map(e => (
+                {painel.por_estado.map(e => (
                   <Barra key={e.estado} rotulo={e.estado} qtd={e.qtd}
-                    total={posicao.total} cor={COR_ESTADO[e.estado]} />
+                    total={painel.total} cor={COR_ESTADO[e.estado]} />
                 ))}
               </ul>
               {(posicao.com_estado_afline ?? 0) > 0 && (
@@ -503,38 +554,28 @@ export default function Almoxarifado() {
 
             <section className="card-controle overflow-hidden">
               <div className="border-b border-graf-800 px-4 py-2.5">
-                <h2 className="text-sm font-semibold">Onde está, para nós</h2>
-                <p className="mt-0.5 text-[11px] text-graf-400">
-                  posse declarada pelo almoxarifado
-                </p>
+                <h2 className="text-sm font-semibold">Por tipo</h2>
+                <p className="mt-0.5 text-[11px] text-graf-400">clique para filtrar</p>
               </div>
               <ul className="px-4 py-2">
-                {posicao.por_posse.map(p => (
-                  <Barra key={p.posse ?? 'nulo'}
-                    rotulo={p.posse ? rotuloPosse(p.posse) : 'Não sabemos onde está'}
-                    nota={p.posse ? undefined : '— ninguém declarou ainda'}
-                    qtd={p.qtd} total={posicao.total}
-                    cor={p.posse
-                      ? posses.find(x => x.codigo === p.posse)?.cor ?? undefined
-                      : 'var(--st-reagendamento)'} />
+                {painel.por_tipo.map(t => (
+                  <li key={t.tipo} className="cursor-pointer" onClick={() => { setFTipos([t.tipo]); setFModelos([]) }}>
+                    <ul><Barra rotulo={t.tipo} qtd={t.qtd} total={painel.total} /></ul>
+                  </li>
                 ))}
               </ul>
-              <p className="border-t border-graf-800 px-4 py-2 text-[11px] text-graf-400">
-                A posse muda por <strong>romaneio</strong> (entrega e devolutiva) e pela
-                baixa no campo. Para entregar uma peça, abra-a na lista abaixo.
-              </p>
             </section>
 
             <section className="card-controle overflow-hidden">
               <div className="border-b border-graf-800 px-4 py-2.5">
-                <h2 className="text-sm font-semibold">Por tipo</h2>
-                <p className="mt-0.5 text-[11px] text-graf-400">
-                  o que existe na carga
-                </p>
+                <h2 className="text-sm font-semibold">Por modelo</h2>
+                <p className="mt-0.5 text-[11px] text-graf-400">os 30 com mais peças · clique para filtrar</p>
               </div>
-              <ul className="px-4 py-2">
-                {posicao.por_tipo.map(t => (
-                  <Barra key={t.tipo} rotulo={t.tipo} qtd={t.qtd} total={posicao.total} />
+              <ul className="max-h-80 overflow-y-auto px-4 py-2">
+                {painel.por_modelo.map(m => (
+                  <li key={m.modelo + m.tipo} className="cursor-pointer" onClick={() => setFModelos([m.modelo])}>
+                    <ul><Barra rotulo={m.modelo} nota={m.tipo} qtd={m.qtd} total={painel.total} /></ul>
+                  </li>
                 ))}
               </ul>
             </section>
@@ -545,30 +586,22 @@ export default function Almoxarifado() {
             <div className="flex flex-wrap items-center gap-2 border-b border-graf-800
                             px-4 py-2.5">
               <h2 className="mr-2 text-sm font-semibold">Peça a peça</h2>
+              {fSituacao && (
+                <button onClick={() => setFSituacao(null)}
+                  className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
+                  style={{ background: corSituacao(fSituacao) }}>
+                  {ROTULO_SITUACAO[fSituacao] ?? fSituacao} ✕
+                </button>
+              )}
               <input value={busca} onChange={e => setBusca(e.target.value)}
-                placeholder="Número de série (começo)…"
-                aria-label="Buscar por número de série"
+                placeholder="Série ou MAC (começo)…"
+                aria-label="Buscar por número de série ou MAC"
                 className={`${campo} min-w-52 flex-1`} />
               <select value={fEstado} onChange={e => setFEstado(e.target.value)}
                 aria-label="Filtrar por estado no Atlas" className={campo}>
                 <option value="TODOS">Todo estado</option>
-                {posicao.por_estado.map(e => (
+                {painel.por_estado.map(e => (
                   <option key={e.estado} value={e.estado}>{e.estado}</option>
-                ))}
-              </select>
-              <select value={fTipo} onChange={e => setFTipo(e.target.value)}
-                aria-label="Filtrar por tipo" className={campo}>
-                <option value="TODOS">Todo tipo</option>
-                {posicao.por_tipo.map(t => (
-                  <option key={t.tipo} value={t.tipo}>{t.tipo}</option>
-                ))}
-              </select>
-              <select value={fPosse} onChange={e => setFPosse(e.target.value)}
-                aria-label="Filtrar por posse" className={campo}>
-                <option value="TODAS">Toda posse</option>
-                <option value="SEM">Sem posse declarada</option>
-                {posses.map(p => (
-                  <option key={p.codigo} value={p.codigo}>{p.rotulo}</option>
                 ))}
               </select>
             </div>
@@ -578,11 +611,12 @@ export default function Almoxarifado() {
                 <thead className="border-b border-graf-700 bg-graf-900 text-left
                                   text-[10px] uppercase tracking-wide text-graf-400">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Série</th>
+                    <th className="px-3 py-2 font-medium">Série · MAC</th>
                     <th className="px-3 py-2 font-medium">Tipo</th>
                     <th className="px-3 py-2 font-medium">Modelo</th>
+                    <th className="px-3 py-2 font-medium">Situação</th>
                     <th className="px-3 py-2 font-medium">Estado (Atlas · AFLINE)</th>
-                    <th className="px-3 py-2 font-medium">Posse (nossa)</th>
+                    <th className="px-3 py-2 font-medium">Técnico</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -591,8 +625,6 @@ export default function Almoxarifado() {
                       className={`cursor-pointer border-b border-graf-800 hover:bg-graf-800/40
                                   ${pecaAberta === e.id ? 'bg-graf-800/40' : ''}`}>
                       <td className="tabular px-3 py-1.5 text-xs font-medium text-graf-100">
-                        {/* O botão é o alvo de teclado; a linha inteira
-                            responde ao mouse. */}
                         <button onClick={ev => {
                             ev.stopPropagation()
                             setPecaAberta(pecaAberta === e.id ? null : e.id)
@@ -604,15 +636,19 @@ export default function Almoxarifado() {
                         </button>
                         {e.serial}
                         {e.enderecavel && (
-                          <span className="ml-1.5 text-[10px] text-graf-400">
-                            {e.enderecavel}
-                          </span>
+                          <span className="ml-1.5 text-[10px] text-graf-400">{e.enderecavel}</span>
                         )}
                       </td>
                       <td className="px-3 py-1.5 text-xs text-graf-300">{e.tipo ?? '—'}</td>
                       <td className="max-w-64 truncate px-3 py-1.5 text-xs text-graf-400"
                         title={e.modelo ?? undefined}>
                         {e.modelo ?? '—'}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs">
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-graf-200">
+                          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: corSituacao(e.situacao) }} />
+                          {ROTULO_SITUACAO[e.situacao] ?? e.situacao}
+                        </span>
                       </td>
                       <td className="px-3 py-1.5">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -623,29 +659,20 @@ export default function Almoxarifado() {
                               {e.estado_atlas}
                             </span>
                           ) : <span className="text-xs text-graf-400">—</span>}
-                          {/* A nossa, vazada, AO LADO -- nunca no lugar. */}
                           {e.estado_afline && (
                             <EstadoAfline estado={e.estado_afline}
                               cor={COR_ESTADO[e.estado_afline] ?? 'var(--color-graf-400)'} />
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-xs">
-                        {e.posse ? (
-                          <span className="text-graf-200">{rotuloPosse(e.posse)}</span>
-                        ) : (
-                          <span className="text-amber-400" title="Ninguém declarou onde esta peça está">
-                            não sabemos
-                          </span>
-                        )}
-                      </td>
+                      <td className="px-3 py-1.5 text-xs text-graf-300">{e.tecnico_nome ?? '—'}</td>
                     </tr>
                     {pecaAberta === e.id && (
                       <tr className="border-b border-graf-800 bg-graf-900">
-                        <td colSpan={5} className="p-0"
+                        <td colSpan={6} className="p-0"
                           style={{ boxShadow: 'inset 3px 0 0 0 var(--color-af-500)' }}>
                           <PecaDetalhe peca={e}
-                            estados={posicao.por_estado.map(x => x.estado)
+                            estados={painel.por_estado.map(x => x.estado)
                               .filter(x => x !== '(sem estado)')}
                             podeMexer={pode('almoxarifado.editar')}
                             corEstado={x => COR_ESTADO[x] ?? 'var(--color-graf-400)'}
@@ -657,7 +684,7 @@ export default function Almoxarifado() {
                   </Fragment>))}
                   {!carregandoLista && lista.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-xs text-graf-400">
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-graf-400">
                         Nenhuma peça com esses filtros.
                       </td>
                     </tr>

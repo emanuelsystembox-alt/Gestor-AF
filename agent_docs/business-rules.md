@@ -298,6 +298,14 @@ que já é de outra cidade **não mexe nele** (volta como "de outra cidade"). O 
 é da empresa (código SAP da CLARO); o saldo do depósito é por cidade. A cidade é carimbada por
 gatilho no insert (`estoque_carimba_cidade`) — função nova que grava estoque não precisa repetir.
 
+**A SITUAÇÃO da peça é calculada, não guardada** (228, D-339): `situacao_estoque(posse, condição)`
+dá o nome do concorrente ("Com técnico · inicializado", "Em estoque · retirado"…), e peça num
+romaneio aberto é "Aguardando aceite". Condição vazia conta como inicializado (a entrega não declara
+condição; o padrão do concorrente é "Com Técnico - Inicializado"). Os três eixos continuam
+separados no banco. **A ENTRADA** põe no estoque a peça da carga do Atlas sem posse, em trânsito ou
+devolvida à CLARO, com a condição declarada (sem padrão); peça com técnico volta pela Devolução; o
+que não está na carga é recusado — a entrada não inventa peça. O bipe aceita serial ou MAC.
+
 **Três eixos por peça, três donos.** `estado_atlas` é da CLARO e só a
 importação grava. `estado_afline` é a nossa correção dele, no
 vocabulário dele, com motivo (D-160). `posse` + `condicao` são a leitura

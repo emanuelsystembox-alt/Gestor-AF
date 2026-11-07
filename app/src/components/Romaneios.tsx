@@ -133,7 +133,50 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2 py-1.5 text-xs
 const qtd = (n: number) =>
   Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 
-export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
+/**
+ * Os passos de cada documento, como o concorrente mostra no topo da tela
+ * ("1 Escolher Equipe · 2 Bipar Serial · 3 Finalizado") — 07/11, D-339:
+ * "acho que podemos copiar a parte de pagar o técnico, devoluções (...)
+ * temos que fazer parecido" (Emanuel). Cada aba (Pagamento, Devolução,
+ * Transferência) fixa o tipo; os menus ficam em cima, em abas.
+ */
+const PASSOS: Record<Tipo, [string, string, string]> = {
+  ENTREGA: ['Escolher técnico', 'Bipar seriais', 'Finalizar'],
+  DEVOLUCAO: ['Técnico e situação', 'Bipar seriais', 'Finalizar'],
+  TRANSFERENCIA: ['De quem e para quem', 'Bipar seriais', 'Finalizar'],
+}
+const TITULO_TIPO: Record<Tipo, string> = {
+  ENTREGA: 'Pagamento ao técnico', DEVOLUCAO: 'Devolução', TRANSFERENCIA: 'Transferência entre técnicos',
+}
+
+function Passos({ tipo, atual, feito }: { tipo: Tipo; atual: 1 | 2 | 3; feito?: boolean }) {
+  return (
+    <ol className="flex items-center gap-2 text-xs" aria-label="Passos">
+      {PASSOS[tipo].map((rot, i) => {
+        const n = (i + 1) as 1 | 2 | 3
+        const passou = n < atual || (feito && n === atual)
+        const agora = n === atual && !feito
+        return (
+          <li key={rot} className="flex items-center gap-2">
+            {i > 0 && <span aria-hidden className={`h-px w-8 ${passou || agora ? 'bg-af-500' : 'bg-graf-700'}`} />}
+            <span aria-current={agora ? 'step' : undefined}
+              className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold ${
+                passou ? 'bg-af-600 text-white' : agora ? 'border-2 border-af-500 text-graf-100' : 'border border-graf-600 text-graf-400'}`}>
+              {passou ? '✓' : n}
+            </span>
+            <span className={agora ? 'font-semibold text-graf-100' : 'text-graf-400'}>{rot}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+export function Romaneios({ podeMexer, tipo }: {
+  podeMexer: boolean
+  /** 228 (D-339): a aba fixa o tipo e a tela vira passo a passo. Sem ele, a tela antiga (os três). */
+  tipo?: Tipo
+}) {
   const [lista, setLista] = useState<Romaneio[]>([])
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([])
   const [itens, setItens] = useState<Item[]>([])
@@ -143,7 +186,7 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
   const [ocupado, setOcupado] = useState(false)
 
   // ---- novo ----
-  const [novoTipo, setNovoTipo] = useState<Tipo>('ENTREGA')
+  const [novoTipo, setNovoTipo] = useState<Tipo>(tipo ?? 'ENTREGA')
   const [novoTecnico, setNovoTecnico] = useState('')
   const [novaOrigem, setNovaOrigem] = useState('')
   // Sem padrão, de propósito: no concorrente são três botões e nenhum vem
@@ -186,9 +229,10 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
+    let qr = supabase.from('romaneio').select(SELECT_ROMANEIO)
+    if (tipo) qr = qr.eq('tipo', tipo)
     const [r, t, i] = await Promise.all([
-      supabase.from('romaneio').select(SELECT_ROMANEIO)
-        .order('numero', { ascending: false }).limit(60),
+      qr.order('numero', { ascending: false }).limit(60),
       supabase.from('tecnico').select('id, nome, matricula')
         .eq('situacao', 'ATIVO').order('nome'),
       supabase.from('item_miscelanea').select('id, codigo, nome, unidade')
@@ -199,7 +243,7 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
     setTecnicos((t.data ?? []) as Tecnico[])
     setItens((i.data ?? []) as Item[])
     setCarregando(false)
-  }, [])
+  }, [tipo])
 
   useEffect(() => { recarregar() }, [recarregar])
 
@@ -468,14 +512,22 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
       {/* ---------- novo romaneio ---------- */}
       {podeMexer && !aberto && (
         <section className="card-controle p-4">
-          <h2 className="text-sm font-semibold">Novo romaneio</h2>
-          <p className="mt-1 max-w-3xl text-xs text-graf-400">
-            <strong>Entrega</strong> carrega o técnico; <strong>devolutiva</strong>{' '}
-            recebe de volta; <strong>transferência</strong> passa da carga de um
-            técnico para a de outro, sem voltar ao balcão. Nada se move até o
-            documento ser confirmado.
-          </p>
+          {tipo ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">{TITULO_TIPO[tipo]}</h2>
+              <Passos tipo={tipo} atual={1} />
+            </div>
+          ) : (<>
+            <h2 className="text-sm font-semibold">Novo romaneio</h2>
+            <p className="mt-1 max-w-3xl text-xs text-graf-400">
+              <strong>Entrega</strong> carrega o técnico; <strong>devolutiva</strong>{' '}
+              recebe de volta; <strong>transferência</strong> passa da carga de um
+              técnico para a de outro, sem voltar ao balcão. Nada se move até o
+              documento ser confirmado.
+            </p>
+          </>)}
           <div className="mt-3 flex flex-wrap items-end gap-2">
+            {!tipo && (
             <label className="text-[11px] text-graf-400">
               <span className="mb-1 block">Tipo</span>
               <select value={novoTipo} className={`${campo} w-44`}
@@ -485,6 +537,7 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
                 <option value="TRANSFERENCIA">Transferência entre técnicos</option>
               </select>
             </label>
+            )}
             {novoTipo === 'TRANSFERENCIA' && (
               <label className="text-[11px] text-graf-400">
                 <span className="mb-1 block">De (quem entrega)</span>
@@ -522,7 +575,7 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
             <button onClick={criar} disabled={ocupado || !podeCriar}
               className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
                          hover:bg-af-500 disabled:opacity-50">
-              Abrir
+              {tipo ? 'Avançar ›' : 'Abrir'}
             </button>
           </div>
 
@@ -562,6 +615,13 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
       {/* ---------- o documento ---------- */}
       {aberto && (
         <section className="card-controle overflow-hidden">
+          {tipo && (
+            <div className="border-b border-graf-800 px-4 py-2.5">
+              <Passos tipo={tipo}
+                atual={aberto.situacao !== 'ABERTO' || linhas.length > 0 ? 3 : 2}
+                feito={aberto.situacao === 'CONFIRMADO'} />
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b
                           border-graf-800 px-4 py-2.5">
             <h2 className="text-sm font-semibold">
@@ -931,11 +991,27 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
                   </span>
                 )
               ) : (
-                <button onClick={confirmar} disabled={ocupado || linhas.length === 0}
-                  className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
-                             hover:bg-af-500 disabled:opacity-40">
-                  Confirmar romaneio
-                </button>
+                <>
+                  <button onClick={confirmar} disabled={ocupado || linhas.length === 0}
+                    className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                               hover:bg-af-500 disabled:opacity-40">
+                    {tipo ? 'Confirmar no balcão' : 'Confirmar romaneio'}
+                  </button>
+                  {/* 228 (D-339): o "Aceite Digital" do concorrente — o documento fica
+                      aberto e o técnico confirma no app, com biometria ou senha (087-D). */}
+                  {aberto.tipo !== 'DEVOLUCAO' && (
+                    <button disabled={ocupado || linhas.length === 0}
+                      onClick={() => {
+                        setOk(`Romaneio ${aberto.numero} aguardando o aceite de `
+                              + `${aberto.tecnico?.nome ?? 'o técnico'} no aplicativo. As peças mudam de mão quando ele aceitar.`)
+                        setAberto(null); setLinhas([]); recarregar()
+                      }}
+                      className="rounded-md border border-af-600 px-4 py-1.5 text-xs font-medium text-af-300
+                                 hover:bg-af-900/30 disabled:opacity-40">
+                      Deixar para o técnico aceitar no app
+                    </button>
+                  )}
+                </>
               )}
               <button onClick={cancelar} disabled={ocupado}
                 className="rounded-md border border-graf-700 px-3 py-1.5 text-xs
@@ -1036,7 +1112,7 @@ export function Romaneios({ podeMexer }: { podeMexer: boolean }) {
                         {r.aceito_em ? 'aceito · aprovar' : 'aguardando aceite'}
                       </span>
                     )}
-                    {r.confirmado_metodo && (
+                    {r.confirmado_metodo && r.situacao === 'CONFIRMADO' && (
                       <span className="ml-1.5 text-[10px] text-graf-400"
                         title={rotuloAceite(r.confirmado_metodo, r.confirmado_em) ?? undefined}>
                         {r.confirmado_metodo === 'BALCAO' ? 'no balcão' : 'pelo técnico'}

@@ -13063,3 +13063,39 @@ Reagendamento; não foi pedido mexer neles. O expurgo do TEC1 (`tec1_da_os`, liv
 não muda. Duas cópias, mudadas juntas: `cancelado_pela_central()` e `origemCancelada()`. Vale nas
 próximas importações; contrato já Cancelado com esse motivo passa a aparecer como "Cancelado pela
 central" na tela.
+
+### D-339 · Almoxarifado no jeito do concorrente: situação, passo a passo, entrada e filtro de tipo e modelo (228, 229)
+
+*"acho que podemos copiar a parte de pagar o técnico, devoluções, entrada de material (...)
+movimentações, temos que fazer parecido, o nosso ta muito simples ainda"*, *"os menus quero que
+fique em cima e não na lateral"* e *"deve ter filtro do tipo de equipamento e modelo também"*
+(Emanuel, 07/11). Mapeado no Alfa Gestor (só leitura): 15 situações (Em Estoque/Com Técnico ×
+Inicializado/Retirado, No Contrato, Reversa, Perda, Duplicata, Aceite Digital, Em Trânsito…), saída
+em 3 passos com "Com Técnico [Padrão]" ou "Aceite Digital", devolução em 5 (com a situação),
+entrada por serial ou arquivo, movimentações por mudança de situação. O estoque deles também é
+por cidade (a D-336 bate).
+
+**Feito:** abas em cima — Painel · Pagamento · Devolução · Transferência · Entrada · Equipes /
+Alocações · Movimentações e o resto. **Painel** com cartões por SITUAÇÃO (calculada:
+`situacao_estoque`, view `estoque_peca`, `estoque_painel`), clicar filtra a lista; filtro de TIPO e
+MODELO (vários) em cartões, gráficos e lista; busca por serial ou MAC. **Pagamento, Devolução e
+Transferência** viram passo a passo (o componente de romaneio com o tipo fixo), e o fim oferece
+"Confirmar no balcão" ou "Deixar para o técnico aceitar no app" (o aceite digital — o app já
+mostrava o romaneio aberto). **Entrada** (`estoque_entrada`, `registrar_entrada`): bipa/cola,
+condição sem padrão, recusa o que está com técnico, no contrato, em romaneio aberto ou fora da carga;
+a importação do Atlas foi para esta aba. O bipe do romaneio também acha pelo MAC (o "Endereçável" do
+Atlas), recusando MAC ambíguo. A entrada aparece nas Movimentações e no histórico do serial (229).
+
+**O pagamento pela planilha, e o desfeito.** No mesmo dia a planilha "Com Técnico - Inicializado"
+do ngestor (1.997 seriais, 82 equipes) foi paga: 1.991 casaram com a carga (266 pelo serial, 1.725
+pelo MAC), 1.828 foram para os 65 técnicos de equipe com um técnico ativo (65 romaneios de entrega
+no balcão); ficaram de fora 67 de 10 equipes sem técnico ativo, 96 com supervisores/coordenador e
+6 seriais fora da carga. *"defaça os pagamentos da planilha por enquanto vamos fazer um piloto apenas
+com um técnico"* (Emanuel, 07/11): as 1.828 peças (todas intactas, nada lançado depois) voltaram a
+sem posse, e os 65 romaneios ficaram CANCELADOS com o motivo — não apagados, para o rastro.
+
+Testado como `authenticated` em transação desfeita: painel 264 ms (17.993 peças), filtro EMTA
+6.585 / 60 modelos; entrada por serial e por MAC, repetido e inexistente recusados, "já no estoque"
+recusado. Na tela: abas, cartões, filtro por tipo, busca pelo MAC, passos de Pagamento e Devolução.
+Baterias 33/33 e 29/29; sem tabela sem RLS; nada aberto ao anon. **Não verificado:** um pagamento
+de ponta a ponta pela tela nova (o piloto), o aceite no app depois de "deixar para o técnico".
