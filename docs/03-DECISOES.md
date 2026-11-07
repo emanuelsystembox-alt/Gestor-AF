@@ -12969,3 +12969,17 @@ equipes do login lido pela extensão, e "não lido" em todo contrato das outras 
 técnico lê pelo RLS de `sinal_claro` (vê só os seus — medido na 222). Publicado só JavaScript:
 `eas update` canal preview, runtime 0.7.1, grupo 48cd22ab; junto foram as cores novas do LOG
 (D-332). `app.json` e `eas.json` conferidos depois do comando: intactos.
+
+### D-334 · Linha do contrato mais baixa: sinal na coluna Situação, marcadores na linha do número (06/11)
+
+*"da pra ficar mais alguma coisa ao lado da seta (...) tipo, segmento e rev d-10, pra não ficar tão
+alto (...) a coluna de situação agora ficou com muito espaço, ou podemos tirar o antes e depois e
+colocar dentro da situação ao lado do concluido e o fora do raio seria a ultima da fila"* (Emanuel,
+06/11). **Contrato:** segmento e marcadores sobem para a linha do número, ao lado dos ícones (com
+teto de largura, para quebrar em vez de alargar a coluna — D-225); embaixo, o WO e uma linha só com
+pontos, relógio, evidências e equipamentos. **Situação:** a etiqueta, o sinal Antes/Depois, a
+palavra do TOA, o TEC1 e, por último, o local da baixa ("fora do raio") / mapa / aproximação.
+Contrato e Situação ganharam piso de largura na visão detalhada: sem ele a tabela espremia as duas e
+os selos empilhavam um por linha (visto a 1400 px). Medido a 1400 px: as linhas com sinal caíram de
+170–183 px para 133–159 px; a média das 40 primeiras, 132 px. Revê a parte "três linhas fixas" da
+D-332.
