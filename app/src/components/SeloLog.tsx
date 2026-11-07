@@ -1,4 +1,4 @@
-import { LOG_GRAVE, lerLog } from '../lib/log'
+import { LOG_GRAVE, corDoLog, lerLog } from '../lib/log'
 
 /**
  * O selo do LOG na linha do contrato (144).
@@ -37,17 +37,16 @@ export function SeloLog({ valor, titulo }: {
     : `LOG ${n} — o contrato já voltou ${n} ${n === 1 ? 'vez' : 'vezes'} para a agenda, pela contagem do TOA.`
       + `${n >= LOG_GRAVE ? ' Três ou mais é reincidência para olhar.' : ''}${titulo ? ` ${titulo}` : ''}`
 
-  // Preto a partir de 3, por decisão do Emanuel. Fixo, não variável de
-  // tema: o recado é o mesmo no claro e no escuro. O texto é branco
-  // (21:1 sobre preto) e o anel âmbar desenha a borda, que sem ele
-  // sumiria contra o grafite do cartão.
-  if (n >= LOG_GRAVE) {
+  // 1 amarelo claro, 2 laranja claro, 3 vermelho, 4+ preto (Emanuel, 06/11 —
+  // `corDoLog`). Hex fixo: o recado é o mesmo no claro e no escuro. A borda
+  // desenha o contorno, que no preto sumiria contra o grafite do cartão.
+  const c = corDoLog(n)
+  if (c) {
     return (
       <span title={dica}
-        style={{ background: '#000' }}
+        style={{ background: c.fundo, color: c.texto, boxShadow: `inset 0 0 0 1px ${c.borda}` }}
         className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded
-                   px-1.5 py-0.5 text-[10px] font-bold leading-none text-white
-                   ring-1 ring-amber-500/70">
+                   px-1.5 py-0.5 text-[10px] font-bold leading-none">
         LOG <span className="tabular">{n}</span>
       </span>
     )

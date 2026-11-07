@@ -642,6 +642,17 @@ usam a mesma.
 **O resumo do dia é foto das 18h** (177), na tela e no sino; humor e ocorrências cortados
 por permissão dentro de `resumo_do_dia()`.
 
+## Sinal do portal Claro (222, 223; D-330 a D-333)
+
+**Antes = Diagnóstico Inicial; Depois = Validação — e a classificação é a da CLARO.** O rótulo
+(Nível Regular/Irregular/Pendente) e a cor de cada canal vêm do Portal Técnico; faixa de dBm nossa
+seria regra inventada. Por tipo (Internet, TV), o pior aparelho: FORA (canal vermelho da Claro) >
+OFFLINE > ERRO > OK — `resumir_sinal()` no banco, `estadoDo()` na web e no app, mudam juntos.
+**"Sem validação" = Validação Pendente com a O.S. FINALIZADA no portal**; cancelada sem validação é
+natural. **Só mostra**: não avisa e não trava a baixa; validação irregular pode ser rede, não é
+ofensa automática (Emanuel, 06/11). A extensão lê só o que o portal mostra (GET) e **nunca** chama o
+`new-measurement`, que dispara medição no cliente. Nome e endereço do assinante não saem do portal.
+
 ## Em aberto — pergunte antes de assumir
 
 - `pontos_equipe` (o que a equipe recebe)

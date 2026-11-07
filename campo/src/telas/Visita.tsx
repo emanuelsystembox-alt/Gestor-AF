@@ -24,6 +24,7 @@ import {
   SeloTec1, agruparMarcas, textoRevisita, type LinhaMarcador, type MarcaDoContrato, type SinalContrato,
 } from '../ui/MarcasCliente'
 import { MaterialToa } from '../ui/MaterialToa'
+import { SinalClaro } from '../ui/SinalClaro'
 import { cor, raio, sombraCard, TOQUE } from '../ui/tema'
 import type { Pilha } from '../navegacao'
 
@@ -1307,6 +1308,9 @@ export default function Visita({ route, navigation }: Props) {
         {/* ---------- o que o TOA já registrou (125, Emanuel 24/10) ----------
             Antes do lançamento do técnico: se já está no TOA, ele vê antes
             de lançar de novo. */}
+        {/* D-333: o sinal antes/depois, do portal da Claro — some quando não há leitura */}
+        <SinalClaro visitaId={v.id} />
+
         <MaterialToa visitaId={v.id} varridoEm={v.toa_varrido_em}
           recarga={`${v.equipamento_movimento.length}-${miscLancada.length}`} />
 

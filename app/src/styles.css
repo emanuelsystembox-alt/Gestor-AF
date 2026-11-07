@@ -70,6 +70,20 @@
 }
 
 html, body, #root { height: 100%; }
+
+/* ┌─ a tela do controle nasce em "90%" (06/11) ─────────────────────────┐
+   │ > "esse é o zoom 100% do navegador, é diminuir (...) para 90% as     │
+   │ >  fontes (...) assim os contratos e detalhes se enquadram melhor"   │
+   │ >  — Emanuel, 06/11                                                  │
+   │ O tamanho de base (o `rem`) cai para 90% só quando há tela do        │
+   │ controle — texto e espaçamento do Tailwind são em rem e encolhem     │
+   │ juntos. NÃO é `zoom` CSS: ele desloca menu que abre pela posição do  │
+   │ mouse (MenuContrato, D-173). O campo (`.sup-campo`, alvo de toque    │
+   │ 48–52 px, D-011) não encolhe. O zoom do navegador continua valendo   │
+   │ por cima disto, para quem quiser maior ou menor.                     │
+   └─────────────────────────────────────────────────────────────────────┘ */
+html:has(.sup-controle) { font-size: 90%; }
+
 body {
   margin: 0;
   font-family: var(--font-sans);

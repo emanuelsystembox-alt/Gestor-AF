@@ -60,6 +60,13 @@ export interface Estado {
   escolha: { oQue: OQueVarrer }
   /** Quanto falta por bucket (contado agora há pouco), para a lista. */
   pendentes: { em: number; porBucket: { bucket: string; nomes: number; listas: number }[] } | null
+  /** O Portal Técnico da Claro (0.9.0, 222, D-330): o login do líder que a
+   *  aba do portal informou, e a última leitura do sinal antes/depois. */
+  portal: {
+    login: string | null; nome: string | null
+    sessao: 'OK' | 'CAIU' | null
+    rodando: boolean; ultimaEm: number | null; ultima: string | null
+  }
   log: LinhaLog[]
 }
 
@@ -76,6 +83,7 @@ export const ESTADO_VAZIO: Estado = {
   },
   escolha: { oQue: 'TUDO' },
   pendentes: null,
+  portal: { login: null, nome: null, sessao: null, rodando: false, ultimaEm: null, ultima: null },
   log: [],
 }
 
@@ -86,6 +94,7 @@ export async function lerEstado(): Promise<Estado> {
     config: { ...ESTADO_VAZIO.config, ...(e?.config ?? {}) },
     baixa: { ...ESTADO_VAZIO.baixa, ...(e?.baixa ?? {}) },
     varredura: { ...ESTADO_VAZIO.varredura, ...(e?.varredura ?? {}) },
+    portal: { ...ESTADO_VAZIO.portal, ...(e?.portal ?? {}) },
     escolha: { ...ESTADO_VAZIO.escolha, oQue: e?.escolha?.oQue ?? 'TUDO' } }
 }
 
@@ -103,3 +112,6 @@ export type Pedido =
   | { tipo: 'contar-pendentes' }
   | { tipo: 'parar-varredura' }
   | { tipo: 'abrir-janela-toa' }
+  | { tipo: 'ler-portal'; dia?: string }
+  /** 0.9.0: a rota e o sinal de um dia para trás, escolhido por quem opera (D-166) */
+  | { tipo: 'sincronizar-dia'; dia: string }

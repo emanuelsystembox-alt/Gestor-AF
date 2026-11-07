@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AFLINE — ponte com o TOA",
-  "description": "Sincronismo do Gestor AF com o TOA: baixa a planilha de Atividades e lê do TOA nome do cliente e equipamentos. Não altera nada no TOA.",
-  "version": "0.8.0",
+  "description": "Sincronismo do Gestor AF com o TOA: baixa a planilha de Atividades e lê do TOA nome do cliente e equipamentos; lê do Portal Técnico da Claro o sinal antes e depois da visita. Não altera nada no TOA nem no portal.",
+  "version": "0.9.0",
   "minimum_chrome_version": "116",
   "permissions": [
     "alarms",
@@ -10,7 +10,8 @@
     "sidePanel"
   ],
   "host_permissions": [
-    "https://clarobrasil.fs.ocs.oraclecloud.com/*"
+    "https://clarobrasil.fs.ocs.oraclecloud.com/*",
+    "https://prd-worker-mangerportal.clarobrasil.mobi/*"
   ],
   "action": {
     "default_title": "AFLINE — ponte com o TOA"
@@ -51,6 +52,15 @@
         "toa-pagina.js"
       ],
       "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://portaltecnico.clarobrasil.mobi/*"
+      ],
+      "js": [
+        "portal-claro.js"
+      ],
       "run_at": "document_idle"
     }
   ]

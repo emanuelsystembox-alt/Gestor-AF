@@ -22,3 +22,23 @@ export function lerLog(bruto?: string | number | null): number | null {
   const n = Number(bruto)
   return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null
 }
+
+/**
+ * A cor do LOG, a mesma no claro e no escuro (hex fixo — as faixas de cor
+ * do tema claro invertem, D-303). Nulo = LOG 0, o neutro de sempre.
+ *
+ * > "log 0 como esta, log 1, amarelo claro, visivel para ler, log 2,
+ * >  laranja claro, visivel para ler, log 3, vermelho, log 4 pra cima
+ * >  preto" — Emanuel, 06/11 (revê a de 26/10: preto era a partir de 3)
+ *
+ * `LOG_GRAVE` (3) continua sendo o corte das CONTAGENS ("3 ou mais"); a
+ * cor é outra coisa. Vale para o selo e para os marcadores manuais "LOG n".
+ */
+export const LOG_PRETO = 4
+export function corDoLog(n: number | null): { fundo: string; texto: string; borda: string } | null {
+  if (n == null || n <= 0) return null
+  if (n === 1) return { fundo: '#fef08a', texto: '#713f12', borda: '#eab308' }   // amarelo claro
+  if (n === 2) return { fundo: '#fed7aa', texto: '#7c2d12', borda: '#f97316' }   // laranja claro
+  if (n < LOG_PRETO) return { fundo: '#dc2626', texto: '#ffffff', borda: '#991b1b' } // vermelho
+  return { fundo: '#000000', texto: '#ffffff', borda: '#f59e0b' }                  // preto, aro âmbar
+}

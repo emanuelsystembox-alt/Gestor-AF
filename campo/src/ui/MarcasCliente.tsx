@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { cor } from './tema'
-import { LOG_GRAVE, lerLog } from '../lib/log'
+import { corDoLog, lerLog } from '../lib/log'
 
 /**
  * Os sinais do contrato que o controlador já vê na central (123, 124):
@@ -141,12 +141,12 @@ export function textoRevisita(s: SinalContrato): string {
  * O LOG do contrato (144): quantas vezes voltou para a agenda, pela conta
  * do TOA. Cópia DECLARADA de `app/src/components/SeloLog.tsx`.
  *
- * ┌─ três desenhos, como na web ──────────────────────────────────────┐
+ * ┌─ os desenhos, como na web (cores de 06/11, `corDoLog`) ───────────┐
  * │ nulo     → "log ?": a linha do TOA não trouxe a coluna. Não é 0.  │
- * │ 0 a 2    → cinza, contexto.                                       │
- * │ 3 ou +   → PRETO ("de 3 pra cima já precisa ficar preto",         │
- * │            Emanuel, 26/10), com borda âmbar — a mesma da web, e   │
- * │            é o que separa do selo preto da OUVIDORIA.             │
+ * │ 0        → cinza, contexto.                                       │
+ * │ 1        → amarelo claro · 2 → laranja claro · 3 → vermelho       │
+ * │ 4 ou +   → PRETO com borda âmbar — o que separa do selo preto da  │
+ * │            OUVIDORIA. (Até 06/11 o preto era a partir de 3.)      │
  * └───────────────────────────────────────────────────────────────────┘
  */
 export function SeloLog({ valor }: { valor?: string | number | null }) {
@@ -162,10 +162,13 @@ export function SeloLog({ valor }: { valor?: string | number | null }) {
   const dica = n === 0
     ? 'LOG 0: primeira ida, o contrato nunca voltou para a agenda'
     : `LOG ${n}: o contrato já voltou ${n} ${n === 1 ? 'vez' : 'vezes'} para a agenda, pela contagem do TOA`
-  if (n >= LOG_GRAVE) {
+  // 06/11: 1 amarelo claro, 2 laranja claro, 3 vermelho, 4+ preto (`corDoLog`)
+  const c = corDoLog(n)
+  if (c) {
     return (
-      <View style={[e.selo, e.logGrave]} accessibilityLabel={dica}>
-        <Text style={[e.seloTexto, { color: cor.branco, fontWeight: '800' }]}>LOG {n}</Text>
+      <View style={[e.selo, { backgroundColor: c.fundo, borderWidth: 1.5, borderColor: c.borda }]}
+        accessibilityLabel={dica}>
+        <Text style={[e.seloTexto, { color: c.texto, fontWeight: '800' }]}>LOG {n}</Text>
       </View>
     )
   }
@@ -234,17 +237,16 @@ export const MARCADORES_COR: Record<string, { fundo: string; borda: string; text
 }
 const COR_NEUTRA = { fundo: cor.graf100, borda: cor.graf300, texto: cor.graf600 }
 
-/** Os marcadores manuais "LOG 1" a "LOG 6" (211) seguem a regra do selo de
- *  LOG: de 3 para cima, preto com borda âmbar; abaixo, o neutro. */
+/** Os marcadores manuais "LOG 1" a "LOG 6" (211) seguem as cores do selo de
+ *  LOG (`corDoLog`, 06/11); LOG 0, o neutro. */
 const MARCADOR_LOG = /^LOG\s+(\d+)$/i
-const COR_LOG_GRAVE = { fundo: '#000000', borda: cor.ambar, texto: cor.branco }
 
 export function corDoMarcador(nome: string) {
   const conhecida = MARCADORES_COR[nome]
   if (conhecida) return conhecida
   const log = MARCADOR_LOG.exec(nome.trim())
-  if (log && Number(log[1]) >= LOG_GRAVE) return COR_LOG_GRAVE
-  return COR_NEUTRA
+  const c = log ? corDoLog(Number(log[1])) : null
+  return c ?? COR_NEUTRA
 }
 
 export function SeloMarcador({ nome }: { nome: string }) {
@@ -304,7 +306,6 @@ const e = StyleSheet.create({
   segmento: { borderWidth: 1, borderColor: cor.graf200, backgroundColor: cor.branco },
   segmentoTexto: { fontSize: 12, fontWeight: '700', color: cor.graf600 },
   logNeutro: { borderWidth: 1, borderColor: cor.graf200, backgroundColor: cor.graf50 },
-  logGrave: { backgroundColor: '#000000', borderWidth: 1.5, borderColor: cor.ambar },
   marcadorTexto: { textTransform: 'uppercase', letterSpacing: 0.3 },
   lista: {
     gap: 10, padding: 12, borderRadius: 10,

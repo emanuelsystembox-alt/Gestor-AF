@@ -5,6 +5,7 @@ import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Esqueleto, Pill } from '../components/ui'
 import { EquipamentoToa, contagemToa, useEquipamentoToa } from '../components/EquipamentoToa'
+import { SinalClaro, useSinalClaro } from '../components/SinalClaro'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
 import { AnexarEvidencia } from '../components/AnexarEvidencia'
@@ -116,7 +117,7 @@ const SELECT = `
  * equipamento e miscelânea e criar um menu pra ele, pra ganharmos mais
  * informações do contrato" (Emanuel, 25/10).
  */
-type Aba = 'detalhe' | 'responder' | 'historico' | 'anexos' | 'equipamento' | 'miscelanea' | 'anteriores'
+type Aba = 'detalhe' | 'responder' | 'historico' | 'anexos' | 'equipamento' | 'miscelanea' | 'sinal' | 'anteriores'
 
 const dt = (s: string | null) => s
   ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -207,6 +208,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
   const [anexos, setAnexos] = useState<Evidencia[]>([])
   // D-252: o que o TOA mostra, lido uma vez para as abas Equipamento e Miscelânea
   const itensToa = useEquipamentoToa(v?.id, v?.toa_varrido_em)
+  const sinal = useSinalClaro(v?.id)
   /**
    * ┌─ POR QUE PRECISA DE URL ASSINADA ──────────────────────────────┐
    * │ O bucket `evidencia` é PRIVADO (055-C). Um `<img src>` apontando │
@@ -422,6 +424,8 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
     // D-252: separadas, cada uma com o que foi lançado (sem leitura do TOA, sem número)
     ['equipamento', 'Equipamento', contagemToa(itensToa, v?.toa_varrido_em, 'EQUIPAMENTO')],
     ['miscelanea', 'Miscelânea', contagemToa(itensToa, v?.toa_varrido_em, 'MISCELANEA')],
+    // 222 (D-330): antes e depois, do portal da Claro
+    ['sinal', 'Sinal'],
     ['anteriores', 'Serviços anteriores', anteriores.length],
   ]
 
@@ -998,6 +1002,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
         {aba === 'miscelanea' && (
           <EquipamentoToa itens={itensToa} varridoEm={v.toa_varrido_em} tipo="MISCELANEA" />
         )}
+        {aba === 'sinal' && <SinalClaro sinal={sinal} />}
 
         {/* ---------- a evidência em tela cheia ---------- */}
         {ampliada && (

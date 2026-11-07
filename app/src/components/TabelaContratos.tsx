@@ -8,6 +8,8 @@ import { linkMapaDaBaixa, textoDistancia, type LocalBaixa } from '../lib/localBa
 import { SeloOuvidoria, SeloSegmento } from './MarcasCliente'
 import { RelogioServico } from './RelogioServico'
 import { SeloLog } from './SeloLog'
+import { corDoLog } from '../lib/log'
+import { SeloSinal, type SinalResumo } from './SinalClaro'
 import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 import { idadeMin, tendencia, useAproximacao, type Aproximacao } from '../lib/aproximacao'
@@ -78,6 +80,24 @@ function BalaoObservacao({ texto, em }: { texto: string; em: string | null }) {
   )
 }
 
+/**
+ * Marcadores de cor CHEIA, em hex fixo — os mesmos do app (`MARCADORES_COR`).
+ * As faixas 200–400/700–900 invertem no tema claro (D-303): o CLIENTE ATIVADO
+ * em `bg-sky-200 text-sky-900` saía azul claro com texto claro, ilegível
+ * ("precisa ajeitar esse marcador azul", Emanuel, 06/11).
+ * D-297: CLIENTE ATIVADO azul claro, FP2 laranja claro. LOG n marcado à mão
+ * segue o selo de LOG (D-314, cores de 06/11 em `corDoLog`).
+ */
+const COR_MARCADOR_FIXA: Record<string, { fundo: string; texto: string; borda: string }> = {
+  'CLIENTE ATIVADO': { fundo: '#bae6fd', texto: '#075985', borda: '#38bdf8' },
+  FP2: { fundo: '#fed7aa', texto: '#9a3412', borda: '#fb923c' },
+}
+function corFixaDoMarcador(nome: string) {
+  if (COR_MARCADOR_FIXA[nome]) return COR_MARCADOR_FIXA[nome]
+  const log = /^LOG\s+(\d+)$/i.exec(nome.trim())
+  return log ? corDoLog(Number(log[1])) : null
+}
+
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
@@ -105,6 +125,8 @@ export const SELECT_CONTRATO = `
     baixa_em
   ),
   visita_marcador ( id, indicador_id, cumprido, observacao, indicador:indicador_id ( nome ) ),
+  sinal_claro ( inicial_texto, inicial_cor, validacao_texto, validacao_cor, status_os_texto,
+                inicial_resumo, validacao_resumo ),
   evidencias:evidencia ( count ),
   equipamentos:equipamento_movimento ( count )
 `
@@ -138,6 +160,9 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
    *  (Emanuel, 24/10). O PostgREST devolve `[{ count }]`. */
   evidencias?: { count: number }[] | null
   equipamentos?: { count: number }[] | null
+  /** O sinal antes/depois do portal da Claro (222, D-330). Um-para-um:
+   *  o PostgREST devolve OBJETO. Nulo = o portal ainda não foi lido. */
+  sinal_claro?: SinalResumo | null
   /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
    *  quem nao encerrou (D-103). */
@@ -448,7 +473,7 @@ export function TabelaContratos({
   const temSelecao = !!(selecionados && aoSelecionar)
   const todosMarcados = temSelecao && linhas.length > 0
     && linhas.every(l => selecionados!.has(l.id))
-  const nCols = 5 + (mostra.equipe ? 1 : 0) + (mostra.area ? 1 : 0)
+  const nCols = 5 + (mostra.equipe ? 1 : 0) + (mostra.area ? 2 : 0)
                   + (mostra.data ? 1 : 0) + (renderAcoes ? 1 : 0)
                   + (temSelecao ? 1 : 0)
 
@@ -519,11 +544,14 @@ export function TabelaContratos({
           <th className={`px-3 py-2 font-medium ${detalhada ? 'w-36' : ''}`}>Grupo</th>
           <th className={`px-3 py-2 font-medium ${detalhada ? 'w-56' : ''}`}>Endereço</th>
           {mostra.equipe && <th className="px-3 py-2 font-medium">Equipe</th>}
-          {/* 145: 96 px e o que "MA1 + LOG 0" ocupa lado a lado, medido no
-              navegador; com os 66px que a coluna tinha, o selo caia para a
-              linha de baixo -- que e exatamente o que ele nao queria. */}
+          {/* 06/11: Área e LOG em colunas próprias -- "divida AREA | LOG (...)
+              pra não ficar tudo junto" (Emanuel). Antes (145) o selo ia ao lado
+              do código da área, na mesma célula. */}
           {mostra.area && (
-            <th className={`px-3 py-2 font-medium ${detalhada ? 'w-28' : ''}`}>Área</th>
+            <>
+              <th className={`px-3 py-2 font-medium ${detalhada ? 'w-20' : ''}`}>Área</th>
+              <th className={`px-3 py-2 font-medium ${detalhada ? 'w-20' : ''}`}>LOG</th>
+            </>
           )}
           <th className={`px-3 py-2 font-medium ${detalhada ? 'w-[28rem]' : 'text-center'}`}>
             {detalhada ? 'Ordens de serviço' : 'O.S.'}
@@ -636,9 +664,17 @@ export function TabelaContratos({
                   // pontos nem segmento continua tendo tempo correndo.
                   const emAndamento = v.situacao === 'EM_DESLOCAMENTO' || v.situacao === 'EM_EXECUCAO'
                   const temTempo = emAndamento || (!!v.inicio && !!v.fim)
-                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip && !temTempo && !marcados.length) return null
+                  if (!p?.achou && !v.segmentacao?.nome && !nEvid && !nEquip && !temTempo && !marcados.length
+                      && !v.sinal_claro) return null
+                  const temIdentidade = !!p?.achou || !!v.segmentacao?.nome || marcados.length > 0
+                  // 06/11: três linhas fixas, não uma fila que quebra onde calhar —
+                  // "precisa melhorar a organização desses icones" (Emanuel):
+                  // 1) pontos, segmento, marcadores; 2) o sinal Antes/Depois;
+                  // 3) o relógio com evidências e equipamentos ao lado.
                   return (
-                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <div className="mt-1.5 flex flex-col items-start gap-1.5">
+                      {temIdentidade && (
+                    <div className="flex flex-wrap items-center gap-1">
                       {p?.achou && <span
                         title={`Edificação ${p.edificacao} (${p.edificacao_de.toLowerCase()})`}
                         className="rounded bg-emerald-900/30 px-1.5 py-0.5 text-[10px]
@@ -648,7 +684,16 @@ export function TabelaContratos({
                       <SeloSegmento segmentacao={v.segmentacao?.nome} />
                       {/* Marcadores ao lado do segmento, nas duas visões — embaixo
                           das O.S. o REV D-10 passava despercebido (Emanuel, 03/11). */}
-                      {marcados.map(({ m, ind }) => (
+                      {marcados.map(({ m, ind }) => {
+                        const fixa = corFixaDoMarcador(ind!.nome)
+                        if (fixa) return (
+                          <span key={m.id} title={m.observacao ?? `Marcador ${ind!.nome}`}
+                            style={{ background: fixa.fundo, color: fixa.texto, boxShadow: `inset 0 0 0 1px ${fixa.borda}` }}
+                            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                            {ind!.nome}
+                          </span>
+                        )
+                        return (
                         <span key={m.id}
                           title={m.observacao ?? `Marcador ${ind!.nome}`}
                           // REV D-10 em vermelho suave: é a revisita, pede atenção
@@ -660,25 +705,22 @@ export function TabelaContratos({
                                         // o aro claro é estrutural — preto some no cartão escuro
                                         : ind!.nome === 'OUVIDORIA'
                                         ? 'bg-black text-white ring-graf-400'
-                                        // D-297: CLIENTE ATIVADO azul claro, FP2 laranja claro
-                                        // (Emanuel, 04/11) — cheios, para não confundir com o
-                                        // azul escuro translúcido dos outros marcadores
-                                        : ind!.nome === 'CLIENTE ATIVADO'
-                                        ? 'bg-sky-200 text-sky-900 ring-sky-400'
-                                        : ind!.nome === 'FP2'
-                                        ? 'bg-orange-200 text-orange-900 ring-orange-400'
-                                        // D-314: LOG 1–6 marcados à mão seguem o selo de LOG —
-                                        // de 3 para cima preto com aro âmbar (igual ao app)
-                                        : /^LOG [3-9]$/.test(ind!.nome)
-                                        ? 'bg-black text-white ring-amber-500'
+                                        // LOG 0 marcado à mão: o neutro do selo de LOG
                                         : /^LOG \d$/.test(ind!.nome)
                                         ? 'bg-graf-800 text-graf-200 ring-graf-600'
                                         : 'bg-sky-900/40 text-sky-300 ring-sky-700/40'}`}>
                           {ind!.nome}
                         </span>
-                      ))}
-                      {/* 138: o relógio do serviço, ao lado do segmento —
-                          "é onde estou vendo espaço" (Emanuel, 25/10). */}
+                        )
+                      })}
+                    </div>
+                      )}
+                      {/* 222/223: o sinal antes → depois, do portal da Claro (D-330, D-331) —
+                          linha própria, Antes em cima e Depois embaixo, acima do relógio */}
+                      <SeloSinal sinal={v.sinal_claro} />
+                      {(temTempo || nEvid > 0 || nEquip > 0) && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* 138: o relógio do serviço (Emanuel, 25/10). */}
                       <RelogioServico v={{
                         situacao: v.situacao, situacao_em: v.situacao_em,
                         // 145: cancelado pela central e desatribuído não
@@ -705,6 +747,8 @@ export function TabelaContratos({
                           className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] font-medium text-graf-300">
                           {nEquip} equipamento(s)
                         </span>
+                      )}
+                    </div>
                       )}
                     </div>
                   )
@@ -915,20 +959,20 @@ export function TabelaContratos({
               )}
 
               {mostra.area && (
+                <>
                 <td className="px-3 py-2 align-top text-xs text-graf-400">
-                  {/* 144: "ao lado da área vamos colocar uma tag (...) chamada
-                      LOG" (Emanuel, 26/10). Jornada não é contrato e não tem
-                      LOG — ali o selo seria um "?" em toda linha, sem informar.
-                      145: AO LADO mesmo — empilhado ele engordava a linha e
-                      ficava torto contra o código da área. */}
-                  <div className="flex flex-nowrap items-center gap-1.5">
-                    <span className="whitespace-nowrap">{v.area?.apelido ?? '—'}</span>
-                    {!jornada && (
-                      <SeloLog valor={v.contador_log}
-                        titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
-                    )}
-                  </div>
+                  <span className="whitespace-nowrap">{v.area?.apelido ?? '—'}</span>
                 </td>
+                {/* 144: o LOG do TOA (Emanuel, 26/10); 06/11: coluna própria.
+                    Jornada não é contrato e não tem LOG — ali o selo seria um
+                    "?" em toda linha, sem informar. */}
+                <td className="px-3 py-2 align-top text-xs">
+                  {!jornada && (
+                    <SeloLog valor={v.contador_log}
+                      titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
+                  )}
+                </td>
+                </>
               )}
 
               {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}

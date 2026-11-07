@@ -267,6 +267,9 @@ async function ciclo(forcar: boolean, assumir: string[] = []) {
     await anotar(`Falha no ciclo: ${String((err as Error)?.message ?? err)}`, 'erro')
   } finally {
     await mudar(x => { x.baixa.rodando = false; x.baixa.atual = null })
+    // 0.9.0: o sinal do portal Claro, no ritmo da rota (Emanuel, 06/11) —
+    // mesmo sem bucket marcado; ele mesmo confere se está vencido
+    await lerPortal(forcar).catch(() => {})
     await soltar('trava_baixa')
   }
 }
@@ -283,7 +286,9 @@ async function registrar(cli: SupabaseClient, base: string, bucketId: string, di
 }
 
 /** Uma rodada de baixa de um bucket — o mesmo caminho da importação manual, na cidade DELE. */
-async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuarioId: string) {
+async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuarioId: string, rotuloDia?: string) {
+  // 0.9.0: num dia para trás, o log diz qual dia foi
+  const nomeB = rotuloDia ? `${b.nome} (${rotuloDia})` : b.nome
   const base = b.base_id
   const cli = naCidade(base)
   const iniciada = new Date().toISOString()
@@ -291,7 +296,7 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
     await anotar(texto, tom)
     await mudar(x => { x.baixa.ultimaEm = Date.now(); x.baixa.ultima = texto })
   }
-  await mudar(x => { x.baixa.rodando = true; x.baixa.atual = `${b.nome}: baixando do TOA…` })
+  await mudar(x => { x.baixa.rodando = true; x.baixa.atual = `${nomeB}: baixando do TOA…` })
 
   const r = await exportar(b.numero_toa, dia)
   if (!r.ok) {
@@ -300,7 +305,7 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
       await mudar(x => { x.toaSessao = 'CAIU' })
       selo('!', '#b45309', 'AFLINE — a sessão do TOA caiu: entre no TOA de novo')
     }
-    return fim(`${b.nome}: ${r.mensagem}`, 'erro')
+    return fim(`${nomeB}: ${r.mensagem}`, 'erro')
   }
   await mudar(x => { x.toaSessao = 'OK' })
   chrome.action.getBadgeText({}).then(t => { if (t === '!') selo('') })
@@ -308,7 +313,7 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
   const nome = r.nome ?? nomePadrao(b.nome, dia)
   const doNome = bucketDoNome(nome)
   if (doNome && doNome !== b.nome) {
-    const msg = `O número ${b.numero_toa} no TOA é do bucket ${doNome}, não de ${b.nome}. Corrija o número no Gestor AF.`
+    const msg = `O número ${b.numero_toa} no TOA é do bucket ${doNome}, não de ${nomeB}. Corrija o número no Gestor AF.`
     await registrar(cli, base, b.id, dia, iniciada, 'ERRO', { mensagem: msg })
     return fim(msg, 'erro')
   }
@@ -318,7 +323,7 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
     const leitura = await lerPlanilhaTOA(new File([r.bytes], nome))
     if (leitura.linhas.length === 0) {
       await registrar(cli, base, b.id, dia, iniciada, 'SEM_MUDANCA', { mensagem: 'Planilha sem nenhuma atividade.', linhas: 0 })
-      return fim(`${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.`, 'info')
+      return fim(`${nomeB}: conferido — o TOA não tem atividade neste bucket hoje.`, 'info')
     }
     const problemas = validarPlanilha(leitura)
     if (problemas.length) throw new Error(problemas.join(' '))
@@ -328,25 +333,25 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
     const vazia = /vazia/i.test(msg)
     await registrar(cli, base, b.id, dia, iniciada, vazia ? 'SEM_MUDANCA' : 'ERRO',
       { mensagem: vazia ? 'Planilha sem nenhuma atividade.' : msg, linhas: vazia ? 0 : undefined })
-    return fim(vazia ? `${b.nome}: conferido — o TOA não tem atividade neste bucket hoje.` : `${b.nome}: ${msg}`, vazia ? 'info' : 'erro')
+    return fim(vazia ? `${nomeB}: conferido — o TOA não tem atividade neste bucket hoje.` : `${nomeB}: ${msg}`, vazia ? 'info' : 'erro')
   }
 
   const impressao = await impressaoDasLinhas(linhas)
   if (!forcar && b.impressao && b.impressao === impressao) {
     await registrar(cli, base, b.id, dia, iniciada, 'SEM_MUDANCA', { impressao, linhas: linhas.length })
-    return fim(`${b.nome}: conferido — ${linhas.length} atividades iguais à última importação; contratos em dia.`, 'ok')
+    return fim(`${nomeB}: conferido — ${linhas.length} atividades iguais à última importação; contratos em dia.`, 'ok')
   }
 
   try {
     const res = await importarLinhasToa(cli, {
       linhas, arquivoNome: nome, baseId: base, dia, usuarioId, origem: 'sincronismo', impressao,
-      aoAvancar: (_e, n) => { mudar(x => { x.baixa.atual = `${b.nome}: importando (${n}/${linhas.length})…` }) },
+      aoAvancar: (_e, n) => { mudar(x => { x.baixa.atual = `${nomeB}: importando (${n}/${linhas.length})…` }) },
       // 165: a fila da cidade — o robô espera a vez como a gente espera.
-      aoEsperar: f => { mudar(x => { x.baixa.atual = `${b.nome}: na fila de ${b.cidade} (posição ${f.posicao ?? '?'}), esperando ${f.na_frente ?? 'outra importação'} terminar…` }) },
+      aoEsperar: f => { mudar(x => { x.baixa.atual = `${nomeB}: na fila de ${b.cidade} (posição ${f.posicao ?? '?'}), esperando ${f.na_frente ?? 'outra importação'} terminar…` }) },
     })
     await registrar(cli, base, b.id, dia, iniciada, 'IMPORTADA', { importacao: res.importacaoId, impressao, linhas: linhas.length })
     const s = res.resumo
-    return fim(`${b.nome}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, ${s.atualizadas} atualizadas`
+    return fim(`${nomeB}: importado com sucesso — ${linhas.length} atividades, ${s.criadas} novas, ${s.atualizadas} atualizadas`
       + (s.erros ? `, ${s.erros} com erro` : '')
       + (res.desatribuicao?.desatribuidos ? `; ${res.desatribuicao.desatribuidos} desatribuídos (saíram do TOA)` : '')
       + (res.desatribuicao?.devolvidos ? `; ${res.desatribuicao.devolvidos} voltaram Na entrada` : '')
@@ -357,7 +362,7 @@ async function rodarBucket(b: OrdemBucket, dia: string, forcar: boolean, usuario
     await registrar(cli, base, b.id, dia, iniciada, 'ERRO', {
       mensagem: msg, importacao: e instanceof ErroImportacao ? e.importacaoId : null, linhas: linhas.length,
     })
-    return fim(`${b.nome}: ${msg}`, 'erro')
+    return fim(`${nomeB}: ${msg}`, 'erro')
   }
 }
 
@@ -594,16 +599,207 @@ async function aoEventoDaVarredura(ev: EventoVarredura) {
   }
 }
 
+// ── o Portal Técnico da Claro: o sinal antes/depois (0.9.0, 222, D-330) ─
+/*
+ * ┌─ o que é e o que não é ──────────────────────────────────────────┐
+ * │ > "quero mostrar em cada contrato, se os niveis estão regular ou │
+ * │ >  irregulares, antes e depois da visita" — Emanuel, 06/11       │
+ * │                                                                  │
+ * │ O Portal Gestor da Claro (Timeline de falhas) lê a API           │
+ * │ prd-worker-mangerportal com o COOKIE do login da Claro: sem ele, │
+ * │ 401. A extensão faz o mesmo GET, com o login aberto neste Chrome,│
+ * │ junto com a rota. SÓ LEITURA: nunca o "new-measurement" (na AWS),│
+ * │ que dispara medição nova no equipamento do cliente.              │
+ * │                                                                  │
+ * │ O filtro da lista é o login do LÍDER no portal — quem informa é a│
+ * │ aba do portal (portal-claro.js lê o "User" dela). Nome e endereço│
+ * │ do assinante não saem daqui: só vão os campos de CAMPOS_PORTAL.  │
+ * │ O detalhe por equipamento (os níveis) é um pedido por O.S.: só se│
+ * │ pede o que mudou desde a última leitura, ou que tem mais de 1 h. │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
+const PORTAL = 'https://portaltecnico.clarobrasil.mobi'
+const PORTAL_API = 'https://prd-worker-mangerportal.clarobrasil.mobi/v1'
+const CAMPOS_PORTAL = ['id', 'osNumber', 'workOrderCode', 'operatorCode', 'initialDiagnosis', 'validationDiagnosis',
+  'pnmDiagnosis', 'osStatus', 'attendingType', 'technologyType', 'technicianLogin', 'workOrderStatus', 'updatedAt'] as const
+const DETALHE_VELHO_MS = 60 * 60_000
+
+interface Rotulo { type?: number; text?: string; color?: string }
+interface ItemPortal {
+  id: number; osNumber?: string; updatedAt?: string
+  initialDiagnosis?: Rotulo; validationDiagnosis?: Rotulo; osStatus?: Rotulo
+  equipamentos?: unknown[]
+  [k: string]: unknown
+}
+
+async function pedirAoPortal(caminho: string): Promise<{ status: number; json: unknown }> {
+  const r = await fetch(PORTAL_API + caminho, { credentials: 'include', cache: 'no-store' })
+  if (!r.ok) return { status: r.status, json: null }
+  return { status: r.status, json: await r.json().catch(() => null) }
+}
+
+/** O que, mudando, pede o detalhe de novo. */
+const impressaoPortal = (i: ItemPortal) =>
+  [i.updatedAt, i.initialDiagnosis?.type, i.validationDiagnosis?.type, i.osStatus?.type].join('|')
+
+/** `fazer` em todos, no máximo `n` de cada vez — o portal não precisa de rajada. */
+async function emParalelo<T>(itens: T[], n: number, fazer: (x: T) => Promise<void>) {
+  let k = 0
+  await Promise.all(Array.from({ length: Math.min(n, itens.length) }, async () => {
+    while (k < itens.length) await fazer(itens[k++])
+  }))
+}
+
+async function lerPortal(forcar: boolean, diaPedido?: string) {
+  const e = await lerEstado()
+  if (!e.ligado || !e.usuario || !e.portal.login) return
+  if (!forcar && e.portal.ultimaEm && Date.now() - e.portal.ultimaEm < e.config.rotaMin * 60_000 - 30_000) return
+  if (!(await travar('trava_portal', 10))) return
+  const login = e.portal.login
+  const dia = diaPedido ?? hojeLocal()
+  // dia para trás: a leitura do relógio (`ultimaEm`) continua sendo a de hoje
+  const deHoje = dia === hojeLocal()
+  await mudar(x => { x.portal.rodando = true })
+  const fim = async (texto: string, tom: LinhaLog['tom']) => {
+    const t = deHoje ? texto : `${dia.slice(8, 10)}/${dia.slice(5, 7)}: ${texto}`
+    await anotar(`Portal Claro: ${t}`, tom)
+    await mudar(x => { if (deHoje) x.portal.ultimaEm = Date.now(); x.portal.ultima = t })
+  }
+  try {
+    // 1. a lista do dia, página a página
+    const lidos: ItemPortal[] = []
+    for (let p = 0; p < 20; p++) {
+      const r = await pedirAoPortal(`/workorder?date=${dia}&filter=${encodeURIComponent(login)}&size=50&page=${p}`)
+      if (r.status === 401 || r.status === 403) {
+        await mudar(x => { x.portal.sessao = 'CAIU' })
+        return fim('a sessão caiu. Entre no Portal Técnico da Claro de novo neste Chrome.', 'erro')
+      }
+      if (!r.json) return fim(`o portal respondeu ${r.status}.`, 'erro')
+      const j = r.json as { content?: ItemPortal[]; totalPages?: number }
+      lidos.push(...(j.content ?? []))
+      if (p >= (j.totalPages ?? 1) - 1) break
+    }
+    await mudar(x => { x.portal.sessao = 'OK' })
+    if (!lidos.length) return fim(`nenhuma O.S. hoje para ${login}.`, 'info')
+
+    // só os campos de medição e de cruzamento — nada do assinante
+    const itens = lidos.map(i => Object.fromEntries(CAMPOS_PORTAL.map(k => [k, i[k]])) as ItemPortal)
+
+    // 2. os níveis, só de quem mudou (ou está velho); a memória vale para o dia
+    const guardado = await chrome.storage.local.get(['portal_detalhe', 'portal_detalhe_dia'])
+    type Memoria = Record<string, { imp: string; em: number }>
+    // a memória é só de HOJE; um dia para trás lê os níveis de tudo e não mexe nela
+    const memoria: Memoria = deHoje && guardado.portal_detalhe_dia === dia
+      ? ((guardado.portal_detalhe as Memoria | undefined) ?? {}) : {}
+    const agora = Date.now()
+    const pedir = itens.filter(i => {
+      const m = memoria[i.id]
+      return forcar || !m || m.imp !== impressaoPortal(i) || agora - m.em > DETALHE_VELHO_MS
+    })
+    let falhas = 0
+    await emParalelo(pedir, 4, async i => {
+      try {
+        const r = await pedirAoPortal(`/workorder/${i.id}/equipment`)
+        if (Array.isArray(r.json)) i.equipamentos = r.json; else falhas++
+      } catch { falhas++ }
+    })
+
+    // 3. grava em lotes; quem não achou contrato pede o detalhe de novo depois
+    let gravados = 0, semContrato = 0
+    const sem = new Set<string>()
+    for (let k = 0; k < itens.length; k += 40) {
+      const lote = itens.slice(k, k + 40)
+      const { data, error } = await sb.rpc('registrar_sinal_claro', { p_dia: dia, p_itens: lote })
+      if (error) return fim(`não gravou — ${error.message}`, 'erro')
+      const d = data as { gravados: number; sem_contrato: number; sem_contrato_os: string[] }
+      gravados += d.gravados; semContrato += d.sem_contrato
+      for (const os of d.sem_contrato_os ?? []) sem.add(os)
+    }
+    for (const i of itens) {
+      if (i.equipamentos && !sem.has(String(i.osNumber ?? ''))) memoria[i.id] = { imp: impressaoPortal(i), em: agora }
+    }
+    if (deHoje) await chrome.storage.local.set({ portal_detalhe: memoria, portal_detalhe_dia: dia })
+
+    return fim(`${itens.length} O.S. de ${login}, ${gravados} ligadas a contratos`
+      + (semContrato ? `, ${semContrato} sem contrato no dia` : '')
+      + `; níveis lidos de ${pedir.length - falhas}` + (falhas ? ` (${falhas} falharam)` : '') + '.',
+      semContrato || falhas ? 'info' : 'ok')
+  } catch (err) {
+    return fim(`falhou — ${String((err as Error)?.message ?? err)}`, 'erro')
+  } finally {
+    await mudar(x => { x.portal.rodando = false })
+    await soltar('trava_portal')
+  }
+}
+
+// ── um dia para trás (0.9.0) ───────────────────────────────────────────
+/*
+ * > "deve ter um sistema de seletor de data, pra eu querer atualizar a
+ * >  importação de outro dia para trás" — Emanuel, 06/11
+ *
+ * O dia de atuação é escolha de quem importa (D-166): aqui a pessoa escolhe,
+ * e o arquivo do TOA daquele dia entra NAQUELE dia — o mesmo caminho da
+ * importação manual com outra data. Só os buckets marcados neste computador,
+ * na cidade de cada um; depois, o sinal do portal do mesmo dia. Usa a mesma
+ * trava da rota: um dia por vez, sem atropelar a rodada de hoje.
+ */
+const DIAS_PARA_TRAS = 31
+function diaValido(dia: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return false
+  const hoje = hojeLocal()
+  if (dia > hoje) return false
+  const [a, m, d] = hoje.split('-').map(Number)
+  const x = new Date(Date.UTC(a, m - 1, d - DIAS_PARA_TRAS))
+  const min = `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`
+  return dia >= min
+}
+
+async function rodarDia(dia: string) {
+  if (!(await travar('trava_baixa', 15))) { await anotar('Já há uma rodada em andamento: tente de novo em instantes.'); return }
+  const rotulo = `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
+  try {
+    if (!(await carregarQuemSou())) return
+    const e = await lerEstado()
+    const bs = infoDosBuckets(e, e.config.buckets)
+    await anotar(`Atualizando o dia ${rotulo}: ${bs.length} bucket(s) e o sinal do portal.`)
+    for (const b of bs) {
+      await rodarBucket({ ...b, vez: true, outro: null, ultima: null, impressao: null }, dia, true, e.usuario!.id, rotulo)
+    }
+    await lerPortal(true, dia).catch(() => {})
+  } catch (err) {
+    await anotar(`Dia ${rotulo}: ${String((err as Error)?.message ?? err)}`, 'erro')
+  } finally {
+    await mudar(x => { x.baixa.rodando = false; x.baixa.atual = null })
+    await soltar('trava_baixa')
+  }
+}
+
 // ── as mensagens: janelinha, aba do TOA ────────────────────────────────
 let filaVarredura: Promise<unknown> = Promise.resolve()
 
-chrome.runtime.onMessage.addListener((msg: Pedido | EventoVarredura, sender, responder) => {
+interface LoginDoPortal { tipo: 'portal-claro-login'; login: unknown; nome: string | null }
+
+chrome.runtime.onMessage.addListener((msg: Pedido | EventoVarredura | LoginDoPortal, sender, responder) => {
   if (sender.id !== chrome.runtime.id || !msg) return false
 
   if (msg.tipo === 'varredura-evento') {
     if (!sender.url?.startsWith(TOA + '/')) return false
     // um de cada vez, na ordem: quem grava grava antes do próximo
     filaVarredura = filaVarredura.then(() => aoEventoDaVarredura(msg)).catch(() => {})
+    return false
+  }
+
+  // 0.9.0: a aba do Portal Técnico da Claro diz qual é o login do líder
+  if (msg.tipo === 'portal-claro-login') {
+    if (!sender.url?.startsWith(PORTAL + '/')) return false
+    const login = typeof msg.login === 'string' && /^[A-Z]\d{4,9}$/i.test(msg.login) ? msg.login.toUpperCase() : null
+    if (!login) return false
+    lerEstado().then(async e => {
+      if (e.portal.login === login && e.portal.sessao !== 'CAIU') return
+      await mudar(x => { x.portal.login = login; x.portal.nome = msg.nome ?? null; x.portal.sessao = null })
+      await anotar(`Portal Claro: login ${login} ligado a este computador.`, 'ok')
+      lerPortal(true)
+    })
     return false
   }
 
@@ -667,6 +863,22 @@ async function tratar(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
     }
     case 'contar-pendentes': await contarPendentes(); return { ok: true }
     case 'abrir-janela-toa': return abrirJanelaDaVarredura()
+    case 'ler-portal': {
+      const e = await lerEstado()
+      if (!e.portal.login) return { ok: false, mensagem: 'Abra o Portal Técnico da Claro numa aba deste Chrome, já logado.' }
+      if (!e.ligado) return { ok: false, mensagem: 'Ligue "Sincronizar por este computador" primeiro.' }
+      const dia = p.dia ?? hojeLocal()
+      if (!diaValido(dia)) return { ok: false, mensagem: `Escolha um dia entre hoje e ${DIAS_PARA_TRAS} dias atrás.` }
+      lerPortal(true, dia); return { ok: true }
+    }
+    case 'sincronizar-dia': {
+      const e = await lerEstado()
+      if (!e.ligado) return { ok: false, mensagem: 'Ligue "Sincronizar por este computador" primeiro.' }
+      if (!diaValido(p.dia)) return { ok: false, mensagem: `Escolha um dia entre hoje e ${DIAS_PARA_TRAS} dias atrás.` }
+      if (!e.config.buckets.length) return { ok: false, mensagem: 'Marque ao menos um bucket na lista.' }
+      if (p.dia === hojeLocal()) { ciclo(true); return { ok: true } }
+      rodarDia(p.dia); return { ok: true }
+    }
     case 'parar-varredura': {
       const aba = await abaDoToa()
       if (aba?.id) await chrome.tabs.sendMessage(aba.id, { tipo: 'cancelar-varredura' }).catch(() => {})

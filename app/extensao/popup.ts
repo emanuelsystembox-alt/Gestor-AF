@@ -26,6 +26,17 @@ async function pedir(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
   }
 }
 
+/** Hoje em Manaus — o mesmo `hoje_local()` do banco (nunca toISOString, D-084). */
+const hojeLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Manaus' }).format(new Date())
+/** Até quantos dias para trás se pode atualizar pela extensão. */
+const DIAS_PARA_TRAS = 31
+function diasAtras(n: number) {
+  const [a, m, d] = hojeLocal().split('-').map(Number)
+  const x = new Date(Date.UTC(a, m - 1, d - n))
+  return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}`
+}
+const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+
 const hora = (ms: number | null) =>
   ms ? new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'
 
@@ -103,6 +114,16 @@ function desenhar(e: Estado) {
     r.checked = r.value === e.escolha.oQue; r.disabled = v.rodando
   }
 
+  // 0.9.0 (D-330): o sinal antes/depois, lido junto com a rota
+  const po = e.portal
+  $('portal-texto').textContent = !po.login
+    ? 'Abra o Portal Técnico da Claro (portaltecnico.clarobrasil.mobi) numa aba deste Chrome, já logado.'
+    : po.sessao === 'CAIU' ? `A sessão do portal caiu (login ${po.login}): entre no portal de novo neste Chrome.`
+    : po.rodando ? `Lendo o portal (login ${po.login})…`
+    : po.ultima ? `Login ${po.login}. Última (${hora(po.ultimaEm)}): ${po.ultima}`
+    : `Login ${po.login}. Lê junto com a rota.`
+  ;($('ler-portal') as HTMLButtonElement).disabled = po.rodando
+
   const log = $('log')
   log.replaceChildren(...e.log.slice(0, 12).map(l => {
     const li = document.createElement('li')
@@ -124,7 +145,6 @@ function desenharBuckets(e: Estado) {
   for (const b of e.disponiveis?.itens ?? []) lista.set(b.id, b)
   for (const id of e.config.buckets) if (!lista.has(id) && e.vezes[id]) lista.set(id, e.vezes[id])
   const itens = [...lista.values()].sort((a, b) => a.cidade.localeCompare(b.cidade) || a.nome.localeCompare(b.nome))
-  const pend = new Map((e.pendentes?.porBucket ?? []).map(p => [p.bucket, p]))
 
   if (!itens.length) {
     caixa.innerHTML = e.disponiveis
@@ -147,15 +167,16 @@ function desenharBuckets(e: Estado) {
         configurar({ buckets: cx.checked ? [...atual, b.id] : atual.filter(x => x !== b.id) })
       })
       const nome = document.createElement('span'); nome.textContent = b.nome
-      const vez = document.createElement('span')
+      label.append(cx, nome)
+      // 0.9.0, "deixe ela mais limpa" (Emanuel, 06/11): sem "livre", sem
+      // "este computador" e sem a conta do que falta varrer. Fica só o que
+      // muda a ação: o bucket marcado que está com OUTRO computador.
       const v = e.vezes[b.id]
-      if (v?.vez) { vez.className = 'vez minha'; vez.textContent = 'este computador' }
-      else if (v?.outro) { vez.className = 'vez outro'; vez.textContent = `com ${v.outro}` }
-      else { vez.className = 'vez'; vez.textContent = 'livre' }
-      const conta = document.createElement('span'); conta.className = 'conta'
-      const p = pend.get(b.nome)
-      conta.textContent = cx.checked ? (p ? `${p.nomes} s/ nome · ${p.listas} equip.` : (e.pendentes ? 'nada a varrer' : '')) : ''
-      label.append(cx, nome, vez, conta)
+      if (cx.checked && v?.outro) {
+        const vez = document.createElement('span')
+        vez.className = 'vez outro'; vez.textContent = `com ${v.outro}`
+        label.append(vez)
+      }
       filhos.push(label)
     }
     caixa.replaceChildren(...filhos)
@@ -207,18 +228,41 @@ async function iniciar() {
     const v = (ev.target as HTMLSelectElement).value
     configurar({ varreduraMin: v ? Number(v) as Intervalo : null })
   })
-  $('sincronizar').addEventListener('click', () => pedir({ tipo: 'sincronizar-agora' }))
+  // 0.9.0: o dia — hoje, ou um para trás que a pessoa escolhe (D-166)
+  const campoDia = $('dia') as HTMLInputElement
+  campoDia.max = hojeLocal(); campoDia.min = diasAtras(DIAS_PARA_TRAS); campoDia.value = hojeLocal()
+  const mostrarDia = () => {
+    const outro = campoDia.value !== hojeLocal()
+    $('dia-caixa').classList.toggle('outro', outro)
+    $('dia-hoje').hidden = !outro
+    $('sincronizar').textContent = outro ? `Atualizar ${dataBR(campoDia.value)}` : 'Sincronizar agora'
+  }
+  campoDia.addEventListener('change', () => {
+    if (!campoDia.value || campoDia.value > campoDia.max || campoDia.value < campoDia.min) campoDia.value = hojeLocal()
+    mostrarDia()
+  })
+  $('dia-hoje').addEventListener('click', () => { campoDia.value = hojeLocal(); mostrarDia() })
+  mostrarDia()
+  $('sincronizar').addEventListener('click', async () => {
+    const dia = campoDia.value || hojeLocal()
+    if (dia === hojeLocal()) { pedir({ tipo: 'sincronizar-agora' }); return }
+    const r = await pedir({ tipo: 'sincronizar-dia', dia })
+    if (!r?.ok) alert(r?.mensagem ?? 'Não consegui atualizar o dia.')
+  })
   $('varrer').addEventListener('click', async () => {
     const r = await pedir({ tipo: 'varrer-agora' })
     if (!r?.ok) alert(r?.mensagem ?? 'Não consegui começar a varredura.')
   })
   $('parar').addEventListener('click', () => pedir({ tipo: 'parar-varredura' }))
+  $('ler-portal').addEventListener('click', async () => {
+    const r = await pedir({ tipo: 'ler-portal', dia: ($('dia') as HTMLInputElement).value || hojeLocal() })
+    if (!r?.ok) alert(r?.mensagem ?? 'Não consegui ler o portal.')
+  })
   for (const r of document.querySelectorAll<HTMLInputElement>('input[name=oque]')) {
     r.addEventListener('change', () => pedir({ tipo: 'escolher-varredura', oQue: r.value as OQueVarrer }))
   }
-  // a lista do login e quanto falta: ao abrir o painel, e a cada 2 min com ele aberto
+  // a lista do login, ao abrir o painel
   pedir({ tipo: 'atualizar-buckets' })
-  setInterval(() => pedir({ tipo: 'contar-pendentes' }), 120_000)
   $('janela-toa').addEventListener('click', ev => { ev.preventDefault(); pedir({ tipo: 'abrir-janela-toa' }) })
   $('sair').addEventListener('click', () => pedir({ tipo: 'sair' }))
   $('abrir').addEventListener('click', () => chrome.tabs.create({ url: 'https://pulsoline.grupoafline.com.br/controle/sincronismo' }))

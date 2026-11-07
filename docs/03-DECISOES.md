@@ -12877,3 +12877,95 @@ Limite: equipe que trocou de técnico depois de outubro mostra o de hoje para o 
 *"faça a mesma coisa nessa tabela também numero da equipe e embaixo o nome"* (Emanuel, 06/11), como
 a D-328. Cada equipe mostra embaixo o técnico responsável pelos contratos VT do dia; sem nenhum, o
 técnico ATIVO cadastrado nela. Pelo id da equipe. Também na "Ver tabela" (coluna Técnico).
+
+### D-330 · O sinal antes/depois, lido do Portal Técnico da Claro (222, extensão 0.9.0)
+
+*"quero mostrar em cada contrato, se os niveis estão regular ou irrregulas, antes e depois da
+visita (...) e trazer o status de pendente, que no caso ele não validou sinal"* (Emanuel, 06/11).
+O Portal Gestor da Claro (Timeline de falhas) mede o equipamento do cliente no **Diagnóstico
+Inicial** (antes) e na **Validação** (depois). A tela é só a API
+`prd-worker-mangerportal.clarobrasil.mobi/v1`, autenticada pelo **cookie** do login da Claro (401
+sem ele): `/workorder?date&filter=<login do líder>` (a lista) e `/workorder/{id}/equipment` (os
+níveis por equipamento: Tx/Rx/SNR por canal no DOCSIS, Rx/Tx óptico no GPON, cada valor já com a
+cor da Claro).
+
+**Pela extensão, não pelo servidor:** ler pelo servidor exigiria guardar a senha Claro de alguém. A
+extensão faz o GET com o login aberto no Chrome (o mesmo modelo da D-250), junto com a rota. O
+login do líder vem da aba do portal (`portal-claro.js` lê o `User` do localStorage). Os níveis são um
+pedido por O.S.: só de quem mudou ou com mais de 1 h. **Nunca** o `new-measurement` (AWS), que
+dispara medição nova no cliente.
+
+**O cruzamento** (10 de 10 em 06/11; 62 de 62 na gravação): `operatorCode|workOrderCode` =
+`visita.wo_numero` no dia lido; senão `osNumber` = `ordem_servico.numero_os` no dia. A WO é a chave
+porque a mesma O.S. tem visitas em dias diferentes (D-169). A 222 criou o índice
+`(wo_numero, data_agendada)` — não havia nenhum, em 96 mil visitas.
+
+**A classificação é a da Claro** (texto + cor do portal). Faixa de dBm nossa seria regra inventada.
+Decisões do Emanuel (06/11): **só mostrar** — sem aviso e sem trava na baixa; validação irregular
+**pode ser rede**, não é ofensa automática; lê **junto com a rota**; contrato cuja situação diverge
+do portal (2615079839: Finalizada lá, Cancelada aqui) **recebe o nível assim mesmo**. Por enquanto
+só o login Z055246 (8 técnicos, MAN-AFLINE_01_VT); o Emanuel vai pôr mais técnicos nessa conta.
+
+**Na tela:** aba **Sinal** no contrato (Antes × Depois, por equipamento, com a data da coleta — o
+"antes" pode ser do dia em que a O.S. abriu, não da chegada do técnico) e o selo
+`Sinal Irr → Reg` na linha. **"Sem validação"** = Validação Pendente com a O.S. **Finalizada** no
+portal; cancelada sem validação é natural e não ganha o rótulo. Sem registro, o selo some (não é
+"Pendente" — regra 6).
+
+**LGPD:** nome e endereço do assinante que o portal manda **não** saem da extensão; só os campos de
+medição e de cruzamento, modelo e MAC.
+
+### D-331 · Sinal Claro: o que ficou fora, por tipo, e o aviso em duas linhas (223)
+
+*"é bom mostrar o que ficou fora, se é Virtua, ou TV (...) ir nos equipamentos e colocar o sinal
+dele antes e depois"* e *"é bom colocar uma em cima e outra embaixo em cima do em execução (...) eu
+quero que fique bonito os aviso"* (Emanuel, 06/11). Por etapa e por tipo do portal (INTERNET, TV),
+o pior aparelho: **FORA** = algum canal que a Claro pintou de vermelho; **OFFLINE**; **ERRO** de
+coleta; **OK**. Medido em 06/11 (119 aparelhos, 62 O.S.): "Nível Regular" nunca tem canal
+vermelho, e todo "Nível Irregular" tem canal fora ou aparelho offline; TV offline aparece em "Nível
+Regular" 3 vezes — por isso OFFLINE fica separado de FORA, e não é "irregular" por conta nossa.
+Calculado na gravação (`resumir_sinal`) e guardado em `inicial_resumo`/`validacao_resumo`, para a
+lista não carregar os canais. A aba Sinal agrupa por tipo, com o antes e o depois de cada aparelho
+lado a lado e "aparelho trocado" quando o MAC de depois não é nenhum dos de antes. Na linha do
+contrato, o aviso tem linha própria acima do relógio: **Antes** em cima, **Depois** embaixo, cada
+um com o rótulo da Claro e o que ficou fora. O nome do tipo é o do portal ("Internet", não
+"Virtua"). 9 O.S. têm o inicial "Pendente" no portal com aparelho medido — a tela mostra as duas
+coisas como a Claro manda.
+
+### D-332 · LOG por cor, coluna LOG própria, selos em três linhas, tela em 90% e a extensão com dia (06/11)
+
+**LOG:** *"log 0 como esta, log 1, amarelo claro, visivel para ler, log 2, laranja claro, visivel para
+ler, log 3, vermelho, log 4 pra cima preto"* (Emanuel, 06/11 — revê a de 26/10, que era preto a
+partir de 3). A cor mora em `corDoLog()` (`lib/log.ts`, web e app — cópia declarada), em hex fixo
+porque as faixas do tema claro invertem (D-303); vale para o selo e para o marcador manual "LOG n".
+`LOG_GRAVE` (3) continua sendo o corte das CONTAGENS ("3 ou mais"). **O app foi alterado e compilado,
+mas não publicado** (precisa de `eas update`). **Área e LOG em colunas próprias** (*"divida AREA |
+LOG"*). **CLIENTE ATIVADO e FP2** em hex fixo, as mesmas cores do app: `bg-sky-200 text-sky-900`
+invertia no tema claro e o texto sumia. **Célula do contrato em três linhas fixas** (pontos,
+segmento e marcadores · o sinal Antes/Depois · relógio com evidências e equipamentos), no lugar de
+uma fila que quebrava onde calhasse.
+
+**90%:** *"é diminuir o zoom para 90% as fontes (...) assim os contratos e detalhes se enquadram
+melhor"*. `html:has(.sup-controle) { font-size: 90% }` — o rem cai e texto e espaço do Tailwind
+encolhem juntos. Recusado: CSS `zoom`, que desloca o menu que abre pela posição do mouse (D-173).
+O campo (`.sup-campo`) não encolhe; o zoom do navegador continua valendo por cima.
+
+**Extensão:** sem "livre", sem "este computador" e sem a conta do que falta varrer — fica só
+"com <outro computador>" no bucket marcado (*"deixe ela mais limpa"*). **Seletor de dia** (hoje
+até 31 dias atrás): com outro dia, o botão vira "Atualizar DD/MM" e importa a rota daquele dia
+nos buckets marcados, na cidade de cada um, e lê o sinal do portal do mesmo dia — o dia de atuação
+é escolha de quem opera (D-166), nunca adivinhado. Usa a mesma trava da rota. **Rota e Sinal lado a
+lado** no painel (um embaixo do outro quando o painel é estreito).
+
+### D-333 · O sinal antes/depois também no app do técnico, por `eas update` (06/11)
+
+*"se eles tiverem alguma forma de olhar os niveis antes e depois na tela deles sem atualizar o app
+seria bom também (...) atualizar por eas update"* (Emanuel, 06/11). Caixa "Sinal (portal Claro)" na
+tela do contrato, antes do "No TOA": Antes e Depois com o rótulo da Claro ("Sem validação" quando a
+O.S. foi finalizada sem validar), cada tipo (Internet, TV) com fora/offline/ok antes → depois, e
+"Ver os níveis" com os níveis de cada aparelho. `campo/src/ui/SinalClaro.tsx` é cópia DECLARADA da
+web (D-112). Sem leitura do portal para o contrato, a caixa não aparece: o portal só cobre as
+equipes do login lido pela extensão, e "não lido" em todo contrato das outras seria ruído. O
+técnico lê pelo RLS de `sinal_claro` (vê só os seus — medido na 222). Publicado só JavaScript:
+`eas update` canal preview, runtime 0.7.1, grupo 48cd22ab; junto foram as cores novas do LOG
+(D-332). `app.json` e `eas.json` conferidos depois do comando: intactos.

@@ -218,8 +218,11 @@ real, e a rodada é recusada antes de importar.
    `managedgroup`, nem `sync/write` com ação na pilha. Ação que ESCREVE no TOA (baixar O.S.,
    mudar status, mover atividade) é decisão de negócio e de risco com a
    CLARO — pergunte antes, e registre em `docs/03-DECISOES.md`.
-3. **Permissões mínimas.** `host_permissions` só com o endereço do TOA;
-   `content_scripts.matches` só com os endereços do Gestor AF. Nada de
+3. **Permissões mínimas.** `host_permissions` só com o endereço do TOA e,
+   desde a 0.9.0, a API do Portal Técnico da Claro
+   (`prd-worker-mangerportal.clarobrasil.mobi`, D-330);
+   `content_scripts.matches` só com os endereços do Gestor AF, do TOA e da
+   página do portal (`portal-claro.js`, que só lê o login do líder). Nada de
    `<all_urls>`, `cookies`, `tabs` ou `storage` sem necessidade escrita.
 4. **Não guarde senha nem dado de assinante.** A planilha passa pela
    memória, em base64, até a página — que a importa e descarta. Nada em
@@ -230,6 +233,26 @@ real, e a rodada é recusada antes de importar.
 6. **Quem decide é o servidor.** A extensão não sabe de dia, de cidade, de
    vez nem de intervalo — ela executa o pedido. Regra de negócio fica no
    banco (`sincronismo_pulso`), como todo o resto (D-189).
+
+---
+
+## O Portal Técnico da Claro — o sinal antes/depois (0.9.0, D-330)
+
+A extensão também lê o **Portal Gestor da Claro** (Timeline de falhas), junto
+com a rota, e grava em `sinal_claro` pela `registrar_sinal_claro` (222).
+
+| | |
+|---|---|
+| Lista do dia | `GET prd-worker-mangerportal.clarobrasil.mobi/v1/workorder?date=AAAA-MM-DD&filter=<login do líder>&size=50&page=N` |
+| Níveis | `GET …/v1/workorder/{id}/equipment` — só de quem mudou ou tem mais de 1 h |
+| Autenticação | o **cookie** do login da Claro neste Chrome (401 sem ele) |
+| Login do líder | `portal-claro.js`, na aba do portal, lê o `User` do localStorage |
+| **Nunca chamar** | `blyhax9weg.execute-api.us-east-1.amazonaws.com/new-measurement` — dispara medição nova no equipamento do cliente |
+
+Para funcionar: o Portal Técnico logado numa aba **deste Chrome** (uma vez
+basta, enquanto a sessão da Claro durar) e "Sincronizar por este computador"
+ligado. Sessão caída aparece no painel e no log. Nome e endereço do
+assinante que o portal manda não saem da extensão.
 
 ---
 

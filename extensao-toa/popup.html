@@ -55,6 +55,13 @@
     #rota-min button[aria-pressed=true] { border-color: var(--af); background: #fdecee; color: var(--af-escuro); font-weight: 600; }
     select { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); }
     a { color: var(--af); }
+    /* 0.9.0: o dia que se atualiza; rota e sinal lado a lado quando cabe */
+    input[type=date] { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; }
+    .dia { margin: 14px 0 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--cinza); }
+    .dia.outro { border-color: var(--aviso); background: #fffbeb; }
+    .lado-a-lado { display: grid; gap: 0 16px; }
+    @media (min-width: 560px) { .lado-a-lado { grid-template-columns: 1fr 1fr; } }
+    .lado-a-lado > div { min-width: 0; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -77,8 +84,7 @@
       <div id="situacao" class="situacao"></div>
 
       <!-- 0.8.0 (D-251): os buckets e os tempos são DESTE computador -->
-      <h2>Buckets do seu login</h2>
-      <p class="pequeno">Os que a árvore do TOA deste Chrome mostra e que são de cidades que você acessa no PulsoLine. Um bucket é sincronizado por um computador por vez.</p>
+      <h2>Buckets</h2>
       <div class="escolha">
         <div id="buckets"><p class="pequeno">Abra o TOA numa aba deste Chrome e clique em "Atualizar a lista".</p></div>
         <p id="fora" class="pequeno"></p>
@@ -88,16 +94,32 @@
         </div>
       </div>
 
-      <h2>Importar a rota (planilha do TOA)</h2>
-      <div class="linha" id="rota-min" role="group" aria-label="Importar a rota a cada">
-        <span class="pequeno">a cada</span>
-        <button data-min="5">5 min</button><button data-min="15">15 min</button>
-        <button data-min="30">30 min</button><button data-min="60">1 hora</button>
+      <!-- 0.9.0: hoje, ou um dia para trás escolhido por quem opera (D-166: o
+           dia de atuação é escolha de quem importa, nunca adivinhado) -->
+      <div id="dia-caixa" class="linha dia">
+        <label class="pequeno" for="dia"><strong>Dia</strong></label>
+        <input id="dia" type="date">
+        <button id="dia-hoje" hidden>Voltar para hoje</button>
+        <button id="sincronizar" class="forte" style="margin-left:auto">Sincronizar agora</button>
       </div>
-      <p id="baixa-atual" class="pequeno"></p>
-      <p id="baixa-ultima" class="pequeno"></p>
-      <div class="linha">
-        <button id="sincronizar" class="forte">Sincronizar agora</button>
+
+      <div class="lado-a-lado">
+        <div>
+          <h2>Rota (planilha do TOA)</h2>
+          <div class="linha" id="rota-min" role="group" aria-label="Importar a rota a cada">
+            <span class="pequeno">a cada</span>
+            <button data-min="5">5 min</button><button data-min="15">15 min</button>
+            <button data-min="30">30 min</button><button data-min="60">1 hora</button>
+          </div>
+          <p id="baixa-atual" class="pequeno"></p>
+          <p id="baixa-ultima" class="pequeno"></p>
+        </div>
+        <div>
+          <!-- 0.9.0 (D-330): lido junto com a rota -->
+          <h2>Sinal (portal Claro)</h2>
+          <p id="portal-texto" class="pequeno"></p>
+          <div class="linha"><button id="ler-portal">Ler o portal</button></div>
+        </div>
       </div>
 
       <h2>Varredura (nome, equipamento, miscelânea)</h2>
@@ -115,7 +137,7 @@
         <label><input type="radio" name="oque" value="NOME"> Só o nome do cliente</label>
         <label><input type="radio" name="oque" value="EQUIPAMENTO"> Só equipamento e material (encerrados)</label>
       </div>
-      <p class="pequeno">Pede os dados direto ao TOA, nos buckets marcados acima: basta o TOA logado numa aba deste Chrome, em qualquer tela. O que não vier direto é lido pelas telas, que precisam do Console de Alocação à vista (<a href="#" id="janela-toa">abrir a janela da varredura</a>).</p>
+      <p class="pequeno">Precisa do TOA logado numa aba deste Chrome (<a href="#" id="janela-toa">abrir a janela da varredura</a>).</p>
       <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
       <p id="var-texto" class="pequeno"></p>
       <div class="linha">
