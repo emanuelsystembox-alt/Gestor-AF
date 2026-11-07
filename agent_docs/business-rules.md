@@ -288,6 +288,14 @@ alimenta o painel do técnico, o ranking e a central; não some de outro jeito.
 
 ## Almoxarifado (077 a 087, D-152 a D-163)
 
+**Cada cidade tem o seu estoque** (225, D-336). *"não podemos juntar os estoques (...) tem que
+separar os assuntos"* (Emanuel, 07/11). A carga do Atlas entra na **cidade ativa** do topo; cada um
+vê o estoque só da cidade ativa; romaneio e transferência **entre cidades são recusados** pelo banco,
+e peça de uma cidade não vai para técnico de outra. O serial é único na empresa: importar um serial
+que já é de outra cidade **não mexe nele** (volta como "de outra cidade"). O catálogo de miscelânea
+é da empresa (código SAP da CLARO); o saldo do depósito é por cidade. A cidade é carimbada por
+gatilho no insert (`estoque_carimba_cidade`) — função nova que grava estoque não precisa repetir.
+
 **Três eixos por peça, três donos.** `estado_atlas` é da CLARO e só a
 importação grava. `estado_afline` é a nossa correção dele, no
 vocabulário dele, com motivo (D-160). `posse` + `condicao` são a leitura

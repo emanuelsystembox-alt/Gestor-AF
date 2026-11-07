@@ -14,6 +14,7 @@ import { Sinalizacoes } from '../components/Sinalizacoes'
 // 182: o que o TOA diz instalado/retirado contra a carga — só acusa (D-262).
 import { ConferenciaToa } from '../components/ConferenciaToa'
 import { useCentral } from '../lib/central'
+import { useCidades } from '../lib/cidade'
 
 /**
  * Almoxarifado — a posição da carga (fase 1 do módulo).
@@ -123,6 +124,8 @@ function Barra({ rotulo, qtd, total, cor, nota }: {
 
 export default function Almoxarifado() {
   const { pode } = useAuth()
+  // 225 (D-336): cada cidade tem o seu estoque; a carga entra na cidade ativa
+  const { ativa: cidadeAtiva } = useCidades()
   /** As tres metades do almoxarifado (a terceira e o documento que
    *  liga as duas primeiras). Aba e nao tres telas: o almoxarife
    *  atravessa as tres no mesmo atendimento de balcao. */
@@ -234,6 +237,9 @@ export default function Almoxarifado() {
     setSubindo(true); setErro(null); setOk(null); setProgresso(0)
     const LOTE = 500
     let criados = 0, atualizados = 0, ignorados = 0
+    // 225 (D-336): serial que já é do estoque de OUTRA cidade não é tocado
+    let outraCidade = 0
+    const seriaisOutra: string[] = []
     try {
       for (let i = 0; i < previa.linhas.length; i += LOTE) {
         const pedaco = previa.linhas.slice(i, i + LOTE)
@@ -241,12 +247,17 @@ export default function Almoxarifado() {
           p_arquivo: previa.nome, p_formato: previa.formato, p_linhas: pedaco,
         })
         if (error) throw new Error(error.message)
-        const r = data as { criados: number; atualizados: number; ignorados: number }
+        const r = data as { criados: number; atualizados: number; ignorados: number
+                            outra_cidade?: number; seriais_outra_cidade?: string[] }
         criados += r.criados; atualizados += r.atualizados; ignorados += r.ignorados
+        outraCidade += r.outra_cidade ?? 0
+        for (const s of r.seriais_outra_cidade ?? []) if (seriaisOutra.length < 10) seriaisOutra.push(s)
         setProgresso(Math.min(100, Math.round((100 * (i + LOTE)) / previa.linhas.length)))
       }
       setOk(`${n(criados)} peça(s) nova(s), ${n(atualizados)} atualizada(s)`
-            + (ignorados ? `, ${n(ignorados)} sem série utilizável` : '') + '.')
+            + (ignorados ? `, ${n(ignorados)} sem série utilizável` : '')
+            + (outraCidade ? `, ${n(outraCidade)} já no estoque de outra cidade (não mexidas: ${seriaisOutra.join(', ')}${outraCidade > seriaisOutra.length ? '…' : ''})` : '')
+            + '.')
       setPrevia(null)
       if (arquivo.current) arquivo.current.value = ''
       await recarregar()
@@ -322,7 +333,10 @@ export default function Almoxarifado() {
         {/* ====== importar ====== */}
         {podeImportar && (
           <section className="card-controle p-4">
-            <h2 className="text-sm font-semibold">Importar a carga do Atlas</h2>
+            <h2 className="text-sm font-semibold">
+              Importar a carga do Atlas
+              {cidadeAtiva && <span className="font-normal text-graf-300"> · entra em <strong>{cidadeAtiva.nome}</strong></span>}
+            </h2>
             <p className="mt-1 max-w-3xl text-xs text-graf-400">
               Aceita os dois relatórios: a <strong>carga</strong> da empreiteira e a{' '}
               <strong>consulta</strong> de posição. O formato é descoberto pelo

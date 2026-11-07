@@ -13005,3 +13005,36 @@ IDÊNTICO ao da função antiga (fora as duas chaves novas). 06/11: MA1 base 38.
 (= 86 − 13 de MA2). Parâmetro novo: `drop` da assinatura antiga (duas convivendo deixam a chamada
 ambígua) e ACL refeita — `anon` sem EXECUTE, conferido. A chamada antiga, só com `p_dia`, segue
 valendo (o site no ar não quebrou entre a migration e o deploy).
+
+### D-336 · O almoxarifado separado por cidade (225) — e o estoque zerado antes
+
+*"apague todo o estoque do almoxarifado de equipamentos, vou importar uma nova (...) não podemos
+juntar os estoques, estou vendo que o mesmo estoque de Manaus está aparecendo em São Luís, tem que
+separar os assuntos"* (Emanuel, 07/11). **Antes:** apagados, a pedido e com confirmação, as 33 peças
+(`equipamento`), 1 evento de estado, 1 importação do Atlas e 1 romaneio vazio — cópia em
+`/root/copias-almox/almox-antes-de-apagar-2026-11-07.json` na VPS (só root; não vai ao Git). **Não**
+apagado: os 109 lançamentos do técnico nos contratos (`equipamento_movimento`), que são registro da
+baixa, não estoque.
+
+O almoxarifado nasceu (077–089) por EMPRESA: nenhuma tabela tinha cidade. Decisões do Emanuel
+(07/11), as três recomendadas: carga do Atlas na **cidade ativa**; romaneio/transferência entre
+cidades **bloqueados**; cada um vê **só a cidade ativa**. `base_id` em `equipamento`,
+`estoque_importacao`, `romaneio`, `miscelanea_movimento`; carimbo por **gatilho** no insert (peça e
+importação = cidade ativa; romaneio = cidade do técnico; miscelânea = do romaneio, do técnico ou a
+ativa) — nenhuma das funções que gravam precisou mudar. Trava no banco: técnicos de cidades
+diferentes no romaneio, serial de outra cidade no romaneio, peça para técnico de outra cidade. O
+gatilho do campo procura a peça só na cidade do contrato (D-157: o que o campo declara não trava).
+16 funções de leitura/saldo filtram a cidade (o saldo do DEPÓSITO de miscelânea passou a ser por
+cidade), e as policies de `equipamento`, `romaneio`, `miscelanea_movimento`, `estoque_importacao`,
+`equipamento_estado_evento` e `sinalizacao_material` — esta última deixava o almoxarifado ler o
+pedido de FERRAMENTAL de todas as cidades. Importar serial de outra cidade: não é tocado, volta como
+"já no estoque de outra cidade" na tela. O título da importação diz em que cidade entra.
+
+Testado como `authenticated` numa transação desfeita: Manaus importa 2 e vê 2; São Luís vê 0;
+São Luís importa o mesmo serial → "outra_cidade 1", a peça de Manaus intacta; romaneio entre cidades
+e posse para técnico de outra cidade recusados. Baterias 33/33 e 29/29; nenhuma tabela sem RLS;
+nenhuma SECURITY DEFINER aberta ao anon. Site publicado.
+
+**Não verificado:** a importação de verdade da carga nova (o Emanuel vai subir); o app do técnico
+(romaneio, transferência, carga) com a cidade — as funções do app são por técnico e não mudaram, mas
+não foram exercitadas depois da 225.
