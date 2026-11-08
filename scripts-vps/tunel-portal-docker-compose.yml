@@ -1,0 +1,46 @@
+# Túnel do portal da Claro (07/11/2026, D-341).
+# O FortiWeb da Claro recusa o IP de data center da VPS ("Web Page Blocked").
+# Este container entra na rede privada Tailscale do Emanuel e usa o celular
+# dele como SAÍDA ("exit node"): só o que passa por aqui sai pela internet do
+# celular — para a Claro, o mesmo tipo de acesso que ele faz do PC.
+#
+# Só o Edge usa, e só para os endereços da Claro (regra PAC no EDGE_CLI de
+# /opt/edge/docker-compose.yml). A VPS, o banco e a API NÃO passam por aqui:
+# o container roda em "userspace" e não mexe na rede da máquina.
+#
+# Nada é publicado para fora: o proxy escuta só dentro da rede do Docker do
+# Edge (edge_default). Sem chave guardada em arquivo: o login do Tailscale foi
+# feito pelo Emanuel no link que o container imprime no primeiro start; o
+# estado fica em ./estado (apagar = deslogar).
+#
+# Se o celular estiver desligado ou sem internet, o portal não abre (o resto
+# continua). Trocar o aparelho de saída:
+#   docker exec tunel-portal tailscale set --exit-node=<nome-ou-IP-do-aparelho>
+name: tunel-portal
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.104.4
+    container_name: tunel-portal
+    hostname: vps-erp-portal
+    restart: unless-stopped
+    # O tailscaled direto, sem o "containerboot" da imagem: o containerboot
+    # espera o login só 60 s, desiste, reinicia e o link que a pessoa abriu
+    # passa a valer para um aparelho que já não existe (07/11, 3 reinícios).
+    # O login se faz uma vez, à mão:
+    #   docker exec tunel-portal tailscale up --hostname=vps-erp-portal --accept-dns=false
+    # (imprime o link e espera o tempo que for). O estado fica em ./estado.
+    entrypoint:
+      - tailscaled
+      - --tun=userspace-networking
+      - --statedir=/var/lib/tailscale
+      - --socket=/var/run/tailscale/tailscaled.sock
+      - --outbound-http-proxy-listen=0.0.0.0:1055
+    volumes:
+      - ./estado:/var/lib/tailscale
+    networks:
+      - edge
+    mem_limit: 256m
+networks:
+  edge:
+    name: edge_default
+    external: true

@@ -463,12 +463,12 @@ a contratos; baterias 33/33 e 29/29.
 
 | O quê | Por quê |
 |---|---|
-| **Abrir o Portal Técnico no Chromium da VPS**, logado, e dar ↻ na extensão | Até o fim de 06/11 a extensão não tinha capturado o login do portal: os níveis de 06/11 foram carregados à mão pelo mesmo RPC. Sem isso, nada novo entra. |
+| **Abrir o Portal Técnico no Edge da VPS**, logado, e dar ↻ na extensão | Até o fim de 06/11 a extensão não tinha capturado o login do portal: os níveis de 06/11 foram carregados à mão pelo mesmo RPC. Sem isso, nada novo entra. |
 | **Pôr mais técnicos na conta Z055246 do portal** | O portal só devolve a hierarquia do login lido (hoje 8 técnicos, MAN-AFLINE_01_VT). O Emanuel disse que vai pôr. |
 
 ### Verificação que ninguém fez ainda
 
-- A extensão lendo o portal **sozinha**, a cada rota, no Chromium da VPS (o cookie da Claro numa
+- A extensão lendo o portal **sozinha**, a cada rota, no Edge da VPS (o cookie da Claro numa
   chamada do fundo da extensão — o mesmo modelo do TOA, mas não visto rodando).
 - O **seletor de dia** em uso real (importar e ler o portal de um dia para trás).
 - A caixa do sinal num **celular** de técnico; a **visão Compacta** da lista e telas < 1400 px.

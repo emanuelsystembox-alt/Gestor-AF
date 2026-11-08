@@ -392,8 +392,8 @@ cor cheia vai em hex fixo, as MESMAS cores do app (`MARCADORES_COR`) — D-332.
 **Rótulo graf-400 sobre o fundo de um aviso reprova no escuro.** "Antes/Depois" no aviso do sinal
 deu 4,39:1 (graf-400 sobre `graf-800/60`); graf-300 dá 6,3. Meça sobre o fundo REAL, nos dois temas.
 
-**A extensão do Chromium da VPS é uma CÓPIA.** `npm run extensao` monta `extensao-toa/` aqui; o
-Chromium 24 h carrega `/opt/navegador/config/extensao-toa`. Sem copiar, o ↻ recarrega a versão
+**A extensão do navegador da VPS é uma CÓPIA.** `npm run extensao` monta `extensao-toa/` aqui; o
+Edge 24 h carrega `/opt/edge/config/extensao-toa`. Sem copiar, o ↻ recarrega a versão
 velha. Passo a passo em `productivity.md`, "Publicar".
 
 **A matrícula do técnico É o login do TOA.** Medido: `tecnico.matricula` =
@@ -743,3 +743,10 @@ bloqueados", force cada IP com `curl --resolve host:443:IP`. Ver `docs/12-VPS-ER
 **O DNS de `grupoafline.com.br` (HostGator) guarda o registro por 1 dia.** Trocar o IP de um
 registro com TTL 86400 deixa quem já consultou no endereço velho por até 24 h. Baixe o TTL para
 300 um dia antes de qualquer troca de IP (mudança de data center da VPS, por exemplo).
+
+**O portal da Claro recusa o IP de data center por FortiWeb — e a página de bloqueio parece erro do site.**
+De Campinas (Hostinger, 07/11) as duas portas do `portaltecnico` devolvem **HTTP 500** com "The URL you
+requested has been blocked" (ícone `fgd_icon`, FortiGuard). Não é a Hostinger nem um proxy: o certificado é
+o da Claro e o nome é `fwebvirg-…elb` (FortiWeb na AWS). Antes de mudar máquina de lugar para "destravar" um
+site, teste do lugar novo com `curl --resolve` em cada IP **e leia o corpo do 500** — o código sozinho
+engana. Ver D-341.

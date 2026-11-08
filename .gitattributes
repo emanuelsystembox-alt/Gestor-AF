@@ -1,0 +1,2 @@
+# Scripts que rodam na VPS (Linux): quebra de linha LF sempre, mesmo no Windows.
+*.sh text eol=lf

@@ -16,10 +16,10 @@ Ver "A migração do Supabase", abaixo.
 
 | | |
 |---|---|
-| Provedor | Hostinger, plano KVM 2 (id 2098432), datacenter **Boston (EUA)** |
+| Provedor | Hostinger, plano KVM 2 (id 2098432), datacenter **Campinas (SP)** desde 07/11/2026 (era Boston) |
 | Recursos | 2 vCPU · 8 GB RAM · 100 GB disco |
 | Sistema | Ubuntu 26.04.1 LTS |
-| IP | `179.197.82.110` (reverso `srv2098432.hstgr.cloud`) |
+| IP | `187.41.127.166` (Campinas, desde 07/11/2026; antes `179.197.82.110` em Boston) |
 | Conta | **de outro titular**: o Emanuel entra no hPanel como "acesso de administrador" |
 
 A mesma conta tem a VPS `gestao.gruporainhaisabel.com` (2.25.99.214). **Não é a
@@ -34,7 +34,7 @@ qual é (`root@erp` × `root@gestao`).
 | `/opt/n8n` | n8n + Postgres 16 + Caddy (HTTPS) | **80/443, públicas** | "alisson", 26/10 |
 | `/opt/dashboard` | página estática, com usuário e senha, servida pelo Caddy | (pelo Caddy) | "alisson", 26/10 |
 | `/opt/portainer` | Portainer CE 2.45.2 — painel visual do Docker | 9443, **só local** | 29/10 |
-| `/opt/navegador` | Chromium (linuxserver/chromium `2dba585f-ls60`) visto pela web | 3001, **só local** | 29/10 |
+| `/opt/edge` | Microsoft Edge (linuxserver/msedge `157.0.4341.42-1-ls214`) visto pela web — trocou o Chromium em 07/11 | 3001, **só local** | 07/11 |
 | `/opt/supabase` | **Supabase self-hosted** `self-hosted/v0.8.3` (11 containers) | 8000 API, 5432/6543 banco — **só local** | 31/10 |
 | `/opt/monitor` | Netdata v2.12.1 — carga da máquina e de cada container | 19999, **só local** | 31/10 |
 
@@ -62,7 +62,7 @@ o navegador **nunca** — só o Portainer, e com a senha dele como única porta.
 ## Como entrar
 
 ```bash
-ssh -L 3001:127.0.0.1:3001 -L 9443:127.0.0.1:9443 -L 8000:127.0.0.1:8000 -L 19999:127.0.0.1:19999 root@179.197.82.110
+ssh -L 3001:127.0.0.1:3001 -L 9443:127.0.0.1:9443 -L 8000:127.0.0.1:8000 -L 19999:127.0.0.1:19999 root@187.41.127.166
 ```
 
 Com o túnel aberto: **https://localhost:3001** (navegador),
@@ -73,7 +73,7 @@ certificado é do próprio container, e a conexão já vai dentro do SSH.
 
 **O túnel é só a janela.** Fechar a aba, o túnel ou desligar o PC não fecha o
 Chromium: ele continua aberto na VPS, com abas e logins (perfil em
-`/opt/navegador/config`).
+`/opt/edge/config`).
 
 O SSH entra com a chave `~/.ssh/id_ed25519` da máquina do Emanuel, cadastrada no
 root pela API da Hostinger. O Web console do hPanel usa `root` e a senha
@@ -319,13 +319,13 @@ pedido do Emanuel (*"podemos criar então pulsoline.grupoafline.com.br?"*):
 
 | Nome | Registro | Para quê |
 |---|---|---|
-| `api.pulsoline.grupoafline.com.br` | **A** → `179.197.82.110` | a **API** (o Supabase da VPS). Ninguém digita: web, app e extensão usam por trás |
+| `api.pulsoline.grupoafline.com.br` | **A** → `187.41.127.166` (TTL 300) | a **API** (o Supabase da VPS). Ninguém digita: web, app e extensão usam por trás |
 | `pulsoline.grupoafline.com.br` | **CNAME** → `gestor-af.pages.dev` | o **site**, com nome da empresa. Cadastrado também como domínio do projeto `gestor-af` na Cloudflare Pages (API, com o login do Wrangler) |
 
 `gestor-af.pages.dev` continua funcionando; o nome novo é um segundo caminho
 para o mesmo site.
 
-Já existia no mesmo DNS `erp.grupoafline.com.br` → `179.197.82.110`, criado
+Já existia no mesmo DNS `erp.grupoafline.com.br` → hoje `187.41.127.166`, criado
 antes por alguém; nada na VPS usa esse nome. Não foi mexido.
 
 Tentativas que NÃO deram certo, para ninguém repetir: o `grupoafline.com`
@@ -539,3 +539,118 @@ portal pela extensão na VPS (D-330) acerta mais ou menos metade das rodadas.
 - **À noite**, sem técnico em campo. Depois: novo IP nos registros da HostGator, conferir site, app,
   `api.pulsoline`, as duas baterias, n8n, a extensão, o portal da Claro da VPS — e trocar o IP nos
   16 lugares da documentação que citam `179.197.82.110` (`grep -rn 179.197.82.110`).
+
+## A mudança para Campinas por REINSTALAÇÃO (decidida em 07/11/2026, à noite)
+
+O Emanuel escolheu a opção do hPanel **"Alterar localização do servidor"**, sabendo que ela
+**reinstala** (apaga o disco) e que não há volta pela Hostinger. A volta é a nossa cópia, no PC.
+Não existe operação de mudar de lugar na API da Hostinger (conferido em 07/11).
+
+**O que roda na VPS e precisa voltar** (inventário de 07/11, 22:51 UTC):
+
+| Peça | Onde | Volta por |
+|---|---|---|
+| Supabase (11 containers, banco 1,06 GB, Storage 1,1 GB, funções, `.env` com as chaves) | `/opt/supabase` | `opt.tar.gz` (banco cru, cópia fria) · plano B `supabase-pg_dumpall.sql.gz` |
+| n8n + Postgres 16 + Caddy do Alisson (o Caddy também publica a nossa API) | `/opt/n8n`, `/opt/dashboard`, volumes `n8n_*` | `opt.tar.gz` + `volumes.tar.gz` · plano B `n8n-pg_dumpall.sql.gz` |
+| Chromium 24 h com a extensão e os logins | `/opt/navegador/config` | `opt.tar.gz` |
+| Portainer, Netdata | `/opt/portainer`, `/opt/monitor`, volume `portainer_portainer_data` | idem (o histórico do Netdata não volta: 1,2 GB de gráfico) |
+| Chaves de entrada SSH (Emanuel + celular), chaves do servidor, sshd, firewall (22/80/443) | `/root/.ssh`, `/etc/ssh`, ufw | `sistema.tar.gz` |
+| `pg_cron` (6 jobs) | dentro do banco | vem com o banco |
+| Imagens `n8n:stable`, `postgres:16-alpine`, `caddy:2-alpine` (etiqueta que muda) | — | baixadas pelo **digest** guardado (a mesma versão) |
+
+**Os scripts** (`scripts-vps/`): `copia-para-mudanca.sh quente|fria` faz a cópia na VPS e confere
+(sha256); `volta-depois-da-mudanca.sh <pasta-fria>` monta tudo de novo na máquina nova. A cópia
+desce para **`C:\Users\Emanu\backup-vps-erp\`** — fora do OneDrive e do Git de propósito: tem dado de
+assinante e as chaves (`service_role`, JWT). Ensaio quente em 07/11: 1,3 GB em 1 min 21 s na VPS.
+
+**Contagens de referência** (07/11, 22:51 UTC — a volta tem de bater, depois da cópia fria):
+visita 100.905 · ordem_servico 143.185 · visita_evento 111.575 · evidencia 4.590 ·
+storage.objects 4.621 · equipamento 17.993 · romaneio 71 · rastro_ponto 14.917 · auth.users 99.
+
+**O DNS** (medido em 07/11): `api.pulsoline.grupoafline.com.br` A com TTL **14400 (4 h)** na
+HostGator; `afline.alissonia.cloud` 4 h e `n8n.alissonia.cloud` 5 min, na conta do **Alisson**.
+`pulsoline.grupoafline.com.br` (site) é da Cloudflare e **não muda**. O app e a extensão usam o nome
+`api.pulsoline`, não o IP: voltam sozinhos quando o DNS virar.
+
+**A ordem na noite:**
+1. TTL do `api.pulsoline` para 300 na HostGator (e o Alisson nos dele) — **4 h antes** da troca do IP.
+2. Avisar o Alisson que o n8n para.
+3. Último técnico encerrado → `copia-para-mudanca.sh fria` (o sistema PARA aqui) → baixar para o PC →
+   `sha256sum -c SHA256SUMS` no PC. **Só com a conferência OK** se clica em reinstalar.
+4. hPanel da VPS **erp** (conferir o título — não a `gestao`) → Alterar localização → **Campinas**,
+   Ubuntu 26.04 limpo, senha do root pelo Emanuel. A chave SSH (`~/.ssh/id_ed25519.pub` do Emanuel) volta pela API
+   (`vps_ssh-keys_add-virtual-machine`, que só acrescenta).
+5. Subir a cópia para a máquina nova e rodar `volta-depois-da-mudanca.sh`.
+6. Antes do DNS: testar com `curl --resolve api.pulsoline.grupoafline.com.br:443:<IP novo>` e as duas
+   portas do portal da Claro (`35.174.77.4` e `100.25.108.9`) a partir da máquina nova.
+7. Trocar o IP na HostGator (e o Alisson nos dele). Conferir site, app, as baterias
+   (`testar_policies`, `testar_campo`), `perm-conferir.sql`, a extensão no Chromium, o n8n.
+8. Trocar o IP na documentação e no atalho `Paineis da VPS.bat`; voltar o TTL para 14400.
+
+### Como foi (07/11/2026, 18h58–19h50 em Manaus)
+
+| Hora (Manaus) | O quê |
+|---|---|
+| 18h51 | cópia **quente** (ensaio): 1,3 GB em 1 min 21 s, baixada em 3 min 39 s, sha256 OK |
+| 18h58 | **sistema parado** — cópia **fria**: 1,7 GB em 1 min 34 s; baixada em 5 min 47 s; sha256 OK |
+| 19h07 | TTL do `api.pulsoline` 14400 → **300** na HostGator (cPanel do `br244`, Zone Editor) |
+| ~19h15 | o Emanuel clica em Alterar localização → **Campinas** no hPanel (reinstala) |
+| 19h22 | máquina nova no ar, **IP `187.41.127.166`**; impressão SSH diferente = disco novo de verdade |
+| 19h28 | chave SSH pela API (`vps_ssh-keys_add-virtual-machine`); Docker do Ubuntu; 17 imagens pelo digest em 1 min 31 s (IDs iguais aos de Boston) |
+| 19h31 | cópia sobe do PC em 2 min 37 s; `volta-depois-da-mudanca.sh` monta tudo em ~1 min |
+| 19h32 | **contagens idênticas à cópia fria**; 17 containers saudáveis; baterias 33/33 e 29/29; 0 tabela sem RLS; 0 definer aberta ao anon; 6/6 jobs do pg_cron; portas internas fechadas por fora |
+| 19h40 | `api.pulsoline` e `erp.grupoafline.com.br` → `187.41.127.166` na HostGator; Google, Cloudflare e OpenDNS já respondem o novo |
+
+No ar de novo: ~45 min de sistema parado. Ficou no PC: `C:\Users\Emanu\backup-vps-erp\` (as duas cópias e o
+atalho antigo). Na VPS nova, a cópia fria continua em `/root/volta/` (só root) — apagar quando firmar.
+
+**O portal da Claro NÃO abriu de Campinas** — o motivo da mudança. As duas portas (`35.174.77.4` e
+`100.25.108.9`) respondem 500 com a página **"The URL you requested has been blocked"** do FortiGuard. O
+certificado é o verdadeiro da Claro (Sectigo, `*.claro.com.br`) e o nome por trás é
+`fwebvirg-…elb.us-east-1.amazonaws.com`: é o **FortiWeb da própria Claro** recusando este IP. Do PC do
+Emanuel, no mesmo minuto, as duas abrem (200 e 401). O TOA (`clarobrasil.fs.ocs.oraclecloud.com`) abre da
+VPS normalmente. Em Boston metade abria; em Campinas, nada. Ver D-341.
+
+**O navegador agora é o Microsoft Edge** (pedido do Emanuel): `/opt/edge`, linuxserver/msedge
+`157.0.4341.42-1-ls214`, mesma porta 3001 só local, teto de 3 GB. A extensão foi copiada para
+`/opt/edge/config/extensao-toa`. Os logins do Chromium não passam (cada navegador cifra os cookies com a
+própria chave): **entrar de novo no TOA e no PulsoLine e carregar a extensão** (`edge://extensions` → modo
+de desenvolvedor → carregar sem compactação → `/config/extensao-toa`). O Chromium foi **apagado** a pedido
+dele (container, imagem e `/opt/navegador`); o perfil antigo só existe na cópia do PC.
+
+**Corrige o que estava escrito:** a Hostinger mostra **"Cronograma de backup: Semanalmente"** nesta VPS —
+existe backup semanal deles (não diário, e é o deles, não o nosso).
+
+**Falta (07/11, noite):**
+- `alissonia.cloud` (conta Hostinger do Alisson): `@`, `gestao`, `afline` e `n8n` ainda apontam para
+  `179.197.82.110`. Até trocar, **o n8n e o painel do Alisson ficam fora** (a nossa API não depende disso).
+  A troca pela API foi barrada pelo filtro de segurança do Claude Code; o Emanuel troca no hPanel ou libera.
+  O `@` tem também um AAAA `2a02:4780:95:7fd4::1` — conferir de quem é; o IPv6 da VPS nova é
+  `2a02:4780:c6:352d::1`.
+- Nome do host no hPanel: voltou `srv2098432.hstgr.cloud`; pôr `erp.grupoafline.com` de novo (só rótulo).
+- Logar o Edge (TOA, PulsoLine) e carregar a extensão; dar ↻ e ver a rota e a varredura voltarem.
+- TTL do `api.pulsoline` de volta para 14400 quando firmar (1–2 dias).
+- O portal da Claro: decidir o caminho (D-341).
+
+### O túnel do portal pelo celular (07/11/2026, 21h)
+
+**Funciona.** O portal da Claro abre pela VPS através do celular do Emanuel (Galaxy S26 Ultra), que é
+a "saída" (exit node) de uma rede privada **Tailscale** (conta emanuel.systembox@gmail.com, plano grátis).
+Medido de dentro do Edge da VPS: portal **200** (3/3), API do sinal **401** (responde, pede login),
+`ipc.claro.com.br` **200**; a Claro vê o acesso vindo de **Manaus, Telefônica/Vivo** (o celular).
+Qualquer outro endereço continua saindo direto pela VPS (`187.41.127.166`).
+
+| Peça | Onde |
+|---|---|
+| Porteiro Tailscale (`tailscale/tailscale:v1.104.4`, userspace, proxy HTTP `:1055` só na rede `edge_default`) | `/opt/tunel-portal` · aparelho `vps-erp-portal` (`100.77.118.27`) · compose em `scripts-vps/tunel-portal-docker-compose.yml` |
+| Regra do Edge: `*.clarobrasil.mobi` e `ipc.claro.com.br` → `PROXY tunel-portal:1055`; o resto `DIRECT` | `EDGE_CLI=--proxy-pac-url=data:…` em `/opt/edge/docker-compose.yml` |
+| A saída | `s26-ultra-de-emanuel` (`100.90.74.34`), app Tailscale com "Run as exit node", aprovado no painel (Edit route settings → Use as exit node) |
+
+**Armadilha resolvida na montagem:** o `containerboot` da imagem espera o login só 60 s, desiste, reinicia e o
+link aberto passa a valer para um aparelho que já não existe (3 reinícios). O compose roda o `tailscaled`
+direto; o login é `docker exec tunel-portal tailscale up --hostname=vps-erp-portal --accept-dns=false`, uma vez.
+
+**Limites:** celular desligado, sem sinal, em modo avião ou com outra VPN ligada = o portal não abre pela VPS
+(o TOA e o resto continuam). O app Tailscale fica em "Não restrito" na bateria. Trocar de aparelho:
+`docker exec tunel-portal tailscale set --exit-node=<aparelho>`. A liberação do IP pela Claro (D-341)
+continua sendo o caminho sem dependência — o Emanuel não tem contato lá hoje.

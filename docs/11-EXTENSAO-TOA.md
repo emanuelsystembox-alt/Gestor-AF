@@ -277,8 +277,8 @@ O painel ficou mais limpo na 0.9.0: a lista de buckets não diz mais "livre" nem
 no bucket marcado que está com outra máquina. Rota e Sinal ficam lado a lado
 (um embaixo do outro quando o painel é estreito).
 
-**Atualizar a extensão do Chromium da VPS** é copiar a pasta para
-`/opt/navegador/config/extensao-toa` e clicar ↻ — passo a passo em
+**Atualizar a extensão do Edge da VPS** é copiar a pasta para
+`/opt/edge/config/extensao-toa` e clicar ↻ — passo a passo em
 `agent_docs/productivity.md`, "Publicar".
 
 ---

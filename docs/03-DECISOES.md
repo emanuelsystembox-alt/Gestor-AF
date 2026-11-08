@@ -13121,3 +13121,28 @@ inicializadas, 33 sem condição" — a mesma tela se contradizendo. `estoque_ca
 vazia como inicializada (igual a `situacao_estoque`); o histórico do serial acha também pelo MAC. E
 os cartões do painel numa linha só, na tela larga (*"diminui um card pra ficar todos na mesma
 linha"*).
+
+### D-341 · A VPS foi para Campinas por reinstalação, e o portal da Claro continua fora dela (07/11/2026)
+
+**O que foi feito.** A VPS erp saiu de Boston para **Campinas** (Hostinger, "Alterar localização", que
+**reinstala**). *"vamos fazer a reinstalação para o sevidor de Brasil mesmo ok?"* (Emanuel, 07/11). Volta
+pela nossa cópia: fria (sistema parado), conferida por sha256 no PC **antes** do clique, montada pelo script
+`scripts-vps/volta-depois-da-mudanca.sh` — banco cru na mesma imagem do Postgres, `--numeric-owner` (a pasta
+do banco é do uid 100), imagens de etiqueta móvel baixadas pelo digest. Contagens idênticas, baterias verdes.
+~45 min parado. IP novo `187.41.127.166`.
+
+**O que NÃO resolveu.** O motivo era o portal da Claro (D-330), que de Boston abria pela metade. De Campinas
+**não abre**: o FortiWeb da Claro devolve "URL blocked" nas duas portas, com o certificado verdadeiro deles —
+o bloqueio é da Claro, por IP (ou faixa/ASN da Hostinger), não do navegador nem da Hostinger. O TOA abre.
+
+**Recusado / descartado:**
+- *VPS nova em paralelo* (recomendada antes, com volta): o Emanuel preferiu a reinstalação.
+- *Trocar de navegador para passar no portal:* o bloqueio pega até o `curl`. O Edge entrou por preferência
+  do Emanuel, não por isso.
+- *Fixar uma porta da Claro no /etc/hosts:* em Campinas as duas recusam.
+
+**Caminhos para o portal (a decidir):** a extensão num computador no Brasil, só para o portal (a VPS fica
+com o TOA); ou pedir à Claro que libere o IP `187.41.127.166`; ou VPN paga com saída residencial.
+Não decidido — pergunte ao Emanuel.
+
+**Atualização (07/11, 21h): o portal passa pelo celular do Emanuel.** Sem contato na Claro para pedir a liberação do IP, ele escolheu o túnel: rede Tailscale com o S26 Ultra dele como saída, só para os endereços da Claro (regra PAC no Edge da VPS). Medido: portal 200, API 401, saída Telefônica/Manaus. Recusados: proxy residencial alugado (contorna a proteção da Claro com o login dele por trás, e o dado do portal passaria por terceiros) e VPN comercial (IP de data center, provavelmente também barrado). Detalhes em docs/12, "O túnel do portal pelo celular".

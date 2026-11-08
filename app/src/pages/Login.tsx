@@ -119,9 +119,16 @@ export default function Login() {
     setEnviando(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
     setEnviando(false)
-    // Mensagem genérica de propósito: dizer "e-mail não existe" entrega a
-    // quem tenta adivinhar quais contas existem.
-    if (error) setErro('E-mail ou senha incorretos.')
+    if (!error) return
+    // Só o 400 é "credencial errada" — e a mensagem é genérica de propósito:
+    // dizer "e-mail não existe" entrega a quem tenta adivinhar as contas.
+    // O resto NÃO é a senha. Na mudança da VPS para Campinas (07/11, D-341)
+    // o navegador ainda ia ao IP antigo, o pedido nem chegava ao servidor, e
+    // a tela acusava a senha certa de errada.
+    if (error.status === 400) setErro('E-mail ou senha incorretos.')
+    else if (error.status === 429) setErro('Muitas tentativas. Espere alguns minutos e tente de novo.')
+    else if (!error.status) setErro('Sem conexão com o servidor. Confira a internet; se continuar, feche e abra o navegador.')
+    else setErro(`O servidor não respondeu (erro ${error.status}). Tente de novo em instantes.`)
   }
 
   const ind = INDICADORES_ENTRADA

@@ -15,11 +15,11 @@ function Item($nome, $ok, $dica) {
 }
 
 # 1. SSH da VPS (o banco mora la)
-$ssh = & ssh -o BatchMode=yes -o ConnectTimeout=10 root@179.197.82.110 "test -r /opt/supabase/.env && docker ps --format '{{.Names}}' | grep -c supabase" 2>$null
-Item "SSH root@179.197.82.110 e o Supabase da VPS" ($LASTEXITCODE -eq 0 -and [int]("0" + $ssh) -gt 0) "chave ~/.ssh/id_ed25519 (secoes 2 e 4 do doc)"
+$ssh = & ssh -o BatchMode=yes -o ConnectTimeout=10 root@187.41.127.166 "test -r /opt/supabase/.env && docker ps --format '{{.Names}}' | grep -c supabase" 2>$null
+Item "SSH root@187.41.127.166 e o Supabase da VPS" ($LASTEXITCODE -eq 0 -and [int]("0" + $ssh) -gt 0) "chave ~/.ssh/id_ed25519 (secoes 2 e 4 do doc)"
 
 # 2. Banco respondendo
-$q = & ssh -o BatchMode=yes -o ConnectTimeout=10 root@179.197.82.110 "docker exec supabase-db psql -U postgres -d postgres -Atc 'select hoje_local()'" 2>$null
+$q = & ssh -o BatchMode=yes -o ConnectTimeout=10 root@187.41.127.166 "docker exec supabase-db psql -U postgres -d postgres -Atc 'select hoje_local()'" 2>$null
 Item "Banco (psql na VPS) respondendo" ($LASTEXITCODE -eq 0 -and $q) "docker do Supabase na VPS (docs/12-VPS-ERP.md)"
 
 # 3. MCPs do Claude Code

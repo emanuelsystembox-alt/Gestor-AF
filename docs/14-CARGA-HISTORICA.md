@@ -90,8 +90,8 @@ precisam ser explicados. 97.600 linhas viraram 133 MB (20 MB comprimido).
 
 ```bash
 gzip -k ngestor.jsonl
-scp ngestor.jsonl.gz root@179.197.82.110:/tmp/
-ssh root@179.197.82.110 "gunzip -f /tmp/ngestor.jsonl.gz && docker cp /tmp/ngestor.jsonl supabase-db:/tmp/ngestor.jsonl"
+scp ngestor.jsonl.gz root@187.41.127.166:/tmp/
+ssh root@187.41.127.166 "gunzip -f /tmp/ngestor.jsonl.gz && docker cp /tmp/ngestor.jsonl supabase-db:/tmp/ngestor.jsonl"
 ```
 
 Monte o ensaio = `carga.sql` + uma linha `rollback;` no fim, copie para o
@@ -99,7 +99,7 @@ container e rode **em segundo plano** (em 03/11 levou ~3,5 min — a O.S.
 dispara um gatilho por linha):
 
 ```bash
-ssh root@179.197.82.110 "docker exec supabase-db psql -U postgres -d postgres -f /tmp/carga_ensaio.sql"
+ssh root@187.41.127.166 "docker exec supabase-db psql -U postgres -d postgres -f /tmp/carga_ensaio.sql"
 ```
 
 O fim imprime a conferência. Em 03/11:
@@ -126,7 +126,7 @@ analyze visita; analyze ordem_servico; analyze visita_evento; analyze equipe;
 ## 7. Limpar o dado de cliente
 
 ```bash
-ssh root@179.197.82.110 "docker exec supabase-db rm -f /tmp/ngestor.jsonl /tmp/carga_*.sql; rm -f /tmp/ngestor.jsonl* /tmp/carga_*.sql"
+ssh root@187.41.127.166 "docker exec supabase-db rm -f /tmp/ngestor.jsonl /tmp/carga_*.sql; rm -f /tmp/ngestor.jsonl* /tmp/carga_*.sql"
 ```
 
 E apague o `.jsonl` e o `.gz` da máquina. Confira que não sobrou nada.

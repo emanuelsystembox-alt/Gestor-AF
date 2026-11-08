@@ -1,0 +1,35 @@
+# Navegador da VPS: Microsoft Edge (pedido do Emanuel, 07/11/2026). Trocou o
+# Chromium de /opt/navegador, que foi APAGADO na mesma noite, a pedido dele.
+# Escuta SO em 127.0.0.1 de proposito: nao tem senha propria, e quem abre a
+# tela usa o navegador como se estivesse na VPS. Acesso pelo tunel SSH:
+#   ssh -L 3001:127.0.0.1:3001 root@<IP da VPS>   ->   https://localhost:3001
+# Perfil (logins, abas, favoritos) fica em ./config e sobrevive a reinicio.
+# A extensao do TOA e copia em ./config/extensao-toa (productivity.md).
+# Os logins do Chromium NAO passam para ca: cada navegador cifra os cookies
+# com a chave dele. Entrar de novo no TOA, no PulsoLine e no portal.
+# A imagem e fixa: navegador velho e porta de ataque, atualizar trocando a tag.
+name: edge
+services:
+  msedge:
+    image: lscr.io/linuxserver/msedge:157.0.4341.42-1-ls214
+    container_name: edge
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Manaus
+      - LC_ALL=pt_BR.UTF-8
+      # Só os endereços da Claro passam pelo túnel do celular (D-341); o resto
+      # sai direto. A regra (PAC), decodificada:
+      #   *.clarobrasil.mobi ou ipc.claro.com.br -> PROXY tunel-portal:1055
+      #   qualquer outro                          -> DIRECT
+      # tunel-portal = /opt/tunel-portal (Tailscale com o celular como saída).
+      - EDGE_CLI=--proxy-pac-url=data:application/x-ns-proxy-autoconfig;base64,ZnVuY3Rpb24gRmluZFByb3h5Rm9yVVJMKHVybCwgaG9zdCkgewogIGlmIChkbnNEb21haW5Jcyhob3N0LCAiLmNsYXJvYnJhc2lsLm1vYmkiKSB8fCBob3N0ID09ICJpcGMuY2xhcm8uY29tLmJyIikKICAgIHJldHVybiAiUFJPWFkgdHVuZWwtcG9ydGFsOjEwNTUiOwogIHJldHVybiAiRElSRUNUIjsKfQo=
+    volumes:
+      - ./config:/config
+    ports:
+      - "127.0.0.1:3001:3001"
+    shm_size: "1gb"
+    security_opt:
+      - seccomp:unconfined
+    mem_limit: 3g

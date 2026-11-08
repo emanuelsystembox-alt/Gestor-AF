@@ -43,7 +43,7 @@ Conferir: `claude mcp list` (mostra estado de cada um, sem mostrar segredo).
 
 | O quê | Onde mora (nesta máquina) | Conferir | Para que serve |
 |---|---|---|---|
-| **SSH da VPS** `root@179.197.82.110` | `~/.ssh/id_ed25519` (+ `known_hosts`), sem frase-senha | `ssh -o BatchMode=yes root@179.197.82.110 "echo ok"` | **o banco** (`docker exec supabase-db psql -U postgres`), migrations, Edge Functions, `/opt/supabase` — ver `agent_docs/productivity.md` e `docs/12-VPS-ERP.md` |
+| **SSH da VPS** `root@187.41.127.166` | `~/.ssh/id_ed25519` (+ `known_hosts`), sem frase-senha | `ssh -o BatchMode=yes root@187.41.127.166 "echo ok"` | **o banco** (`docker exec supabase-db psql -U postgres`), migrations, Edge Functions, `/opt/supabase` — ver `agent_docs/productivity.md` e `docs/12-VPS-ERP.md` |
 | **Segredos do Supabase** (`SERVICE_ROLE_KEY`, `JWT_SECRET`, senha do Postgres…) | **só** em `/opt/supabase/.env` na VPS (`chmod 600`) | `ssh … "test -r /opt/supabase/.env && echo ok"` | ignoram o RLS — **nunca** saem da VPS, nunca vão para o front, o Git ou o chat |
 | **Cloudflare (Wrangler)** | OAuth em `%APPDATA%\xdg.config\.wrangler\config\default.toml` — conta `emanuel.systembox@gmail.com` (account `26e1a6bdbdf08d94609afe5be850a23e`) | `cd app` e `npx wrangler whoami` | publicar a web (`docs/09-PUBLICAR.md`) |
 | **Expo / EAS** | `~/.expo/state.json` — usuário `xlemanuelx`, org `afline-instalacao-e-manutencao-eletrica` | `cd campo` e `npx eas-cli@latest whoami` | APK e `eas update` (`campo/README.md`) |

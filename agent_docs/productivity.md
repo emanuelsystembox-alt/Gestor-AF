@@ -14,7 +14,7 @@ Supabase instalado na VPS `erp.grupoafline.com` — ver `docs/12-VPS-ERP.md`.
 | | |
 |---|---|
 | API (site, app, extensão) | `https://api.pulsoline.grupoafline.com.br` |
-| SSH | `ssh root@179.197.82.110` (chave `~/.ssh/id_ed25519` da máquina do Emanuel) |
+| SSH | `ssh root@187.41.127.166` (chave `~/.ssh/id_ed25519` da máquina do Emanuel) |
 | Pasta | `/opt/supabase` · segredos em `/opt/supabase/.env` (`chmod 600`) |
 | Banco | container `supabase-db`, Postgres 17 |
 | **Backup** | **nenhum** — decisão do Emanuel. Antes de mexer em dado, saiba disso |
@@ -23,14 +23,14 @@ Supabase instalado na VPS `erp.grupoafline.com` — ver `docs/12-VPS-ERP.md`.
 `supabase_admin` é; use `postgres` para o trabalho normal):
 
 ```bash
-ssh root@179.197.82.110 "docker exec supabase-db psql -U postgres -d postgres -c 'select count(*) from visita'"
+ssh root@187.41.127.166 "docker exec supabase-db psql -U postgres -d postgres -c 'select count(*) from visita'"
 ```
 
 **Migration** — o arquivo em `supabase/migrations/` é o registro; o banco é
 o estado. Aplicar numa transação, parando no primeiro erro:
 
 ```bash
-cat supabase/migrations/NNN_nome.sql | ssh root@179.197.82.110 "docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction"
+cat supabase/migrations/NNN_nome.sql | ssh root@187.41.127.166 "docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction"
 ```
 
 E depois, como sempre, `notify pgrst, 'reload schema';` e as duas baterias.
@@ -66,18 +66,18 @@ desfeita **não** dispara Realtime.
 
 ## Publicar
 
-**Extensão no Chromium da VPS** — o Chromium 24 h (container `navegador`, aberto pelo túnel em
-`https://localhost:3001`) carrega a extensão de **`/opt/navegador/config/extensao-toa`**, uma CÓPIA:
+**Extensão no Edge da VPS** — o Microsoft Edge 24 h (container `edge`, aberto pelo túnel em
+`https://localhost:3001`) carrega a extensão de **`/opt/edge/config/extensao-toa`**, uma CÓPIA:
 `npm run extensao` só monta a pasta `extensao-toa/` daqui. Para atualizar (D-330):
 
 ```bash
 cd extensao-toa
-ssh root@179.197.82.110 "cp -a /opt/navegador/config/extensao-toa /opt/navegador/config/extensao-toa-bkp"
-scp manifest.json fundo.js popup.js popup.html ponte.js toa.js toa-pagina.js portal-claro.js README.md root@179.197.82.110:/opt/navegador/config/extensao-toa/
-ssh root@179.197.82.110 "chown 1000:1000 /opt/navegador/config/extensao-toa/*"
+ssh root@187.41.127.166 "cp -a /opt/edge/config/extensao-toa /opt/edge/config/extensao-toa-bkp"
+scp manifest.json fundo.js popup.js popup.html ponte.js toa.js toa-pagina.js portal-claro.js README.md root@187.41.127.166:/opt/edge/config/extensao-toa/
+ssh root@187.41.127.166 "chown 1000:1000 /opt/edge/config/extensao-toa/*"
 ```
 
-Depois, no Chromium da VPS: `chrome://extensions` → **↻** na extensão, F5 na aba do TOA e na do
+Depois, no Edge da VPS: `edge://extensions` → **↻** na extensão, F5 na aba do TOA e na do
 Portal Técnico. Pelo seletor de pasta do "Carregar sem compactação" a pasta parece vazia — ele só
 mostra pastas, não arquivos.
 

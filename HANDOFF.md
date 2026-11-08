@@ -1,5 +1,27 @@
 # Passagem de bastão — leia isto primeiro
 
+> **07/11/2026, noite — a VPS foi para Campinas, e o portal da Claro passa pelo celular** (D-341;
+> site publicado; sem migration):
+> - **A VPS foi reinstalada em Campinas** (hPanel "Alterar localização", que apaga o disco). IP novo
+>   **`187.41.127.166`** (o `179.197.82.110` de Boston não existe mais). Volta pela nossa cópia fria,
+>   com `scripts-vps/copia-para-mudanca.sh` e `volta-depois-da-mudanca.sh`: contagens idênticas,
+>   baterias 33/33 e 29/29, ~45 min parado. Cópias no PC em `C:\Users\Emanu\backup-vps-erp\` (fora do
+>   OneDrive e do Git). DNS na HostGator: `api.pulsoline` (TTL 300 — voltar a 14400) e `erp` → IP novo.
+>   Relato hora a hora em `docs/12-VPS-ERP.md`, "Como foi".
+> - **O navegador da VPS agora é o Microsoft Edge** (`/opt/edge`, pedido do Emanuel); o Chromium foi
+>   apagado. Não fechar a janela do Edge lá dentro (fica tela preta; `docker restart edge` reabre).
+> - **O portal da Claro continua barrado na VPS** — o FortiWeb da Claro recusa IP de data center, em
+>   Boston e em Campinas. **Saída montada:** túnel Tailscale com o **Galaxy S26 do Emanuel** como
+>   saída, só para `*.clarobrasil.mobi` e `ipc.claro.com.br` (`/opt/tunel-portal` + regra PAC no Edge).
+>   **Medido funcionando:** 95 contratos com sinal gravados em 15 min, todos pelo Edge da VPS. Celular
+>   desligado = só o sinal para. Ver docs/12, "O túnel do portal pelo celular".
+> - **Login do site acusava a senha certa** quando o pedido nem chegava ao servidor (navegador ainda
+>   no IP antigo): agora 400 = senha; sem status = "Sem conexão com o servidor" (`Login.tsx`).
+> - **Pendente:** o `alissonia.cloud` (n8n e painel do Alisson, conta Hostinger dele) ainda aponta
+>   para Boston — o Emanuel troca no hPanel (a API foi barrada pelo filtro de segurança do assistente);
+>   testar o túnel com o celular desligado; voltar o TTL do `api.pulsoline`; apagar `/root/volta` na
+>   VPS quando firmar.
+
 > **07/11/2026 — almoxarifado por cidade e no jeito do concorrente; portal da Claro pela VPS**
 > (D-335 a D-340, migrations 224 a 231; site publicado):
 > - **Dashboard VT com filtro de área** (224, D-335) — vai ao banco; a equipe de VT continua
@@ -36,12 +58,12 @@
 >   amarelo, 2 laranja, 3 vermelho, 4+ preto, `corDoLog`), colunas **Área | LOG**, marcadores na linha
 >   do número, CLIENTE ATIVADO legível no tema claro, e o controle nasce em **90%** (D-332).
 > - **Extensão 0.9.0:** painel mais limpo, **seletor de dia** (até 31 para trás), Rota e Sinal lado a
->   lado. A do Chromium 24 h da VPS mora em `/opt/navegador/config/extensao-toa` — atualizar é copiar
+>   lado. A do Edge 24 h da VPS mora em `/opt/edge/config/extensao-toa` — atualizar é copiar
 >   para lá e clicar ↻ (`agent_docs/productivity.md`).
 > - **App:** caixa "Sinal (portal Claro)" no contrato + cores do LOG, `eas update` preview, runtime
 >   0.7.1, grupo `48cd22ab` (D-333).
-> - **Falta ver funcionando:** a extensão lendo o portal sozinha no Chromium da VPS (o login do portal
->   ainda não tinha sido capturado; os níveis de 06/11 foram carregados à mão, pelo mesmo RPC), o
+> - **Falta ver funcionando:** ~~a extensão lendo o portal sozinha na VPS~~ (visto em 07/11, pelo
+>   túnel do celular — D-341), o
 >   seletor de dia em uso real, a caixa num celular, a visão Compacta. Por enquanto só o login
 >   Z055246 (8 técnicos); o Emanuel vai pôr mais técnicos nessa conta.
 
@@ -200,7 +222,7 @@ Nasce **multi-empresa** — o Emanuel pretende vendê-lo a outras credenciadas.
 |---|---|
 | Repositório | `github.com/emanuelsystembox-alt/Gestor-AF` |
 | Pasta local | `C:\Users\Emanu\OneDrive\Documentos\PROJETO - NGESTOR AFLINE` |
-| Banco | **Supabase self-hosted na VPS** `erp.grupoafline.com` (179.197.82.110) · API `https://api.pulsoline.grupoafline.com.br` · **sem backup** · ver `docs/12-VPS-ERP.md`. A nuvem (`kqfflkxjijzdtnfshdlv`) foi apagada em 01/11/2026 |
+| Banco | **Supabase self-hosted na VPS** `erp.grupoafline.com` (187.41.127.166) · API `https://api.pulsoline.grupoafline.com.br` · **sem backup** · ver `docs/12-VPS-ERP.md`. A nuvem (`kqfflkxjijzdtnfshdlv`) foi apagada em 01/11/2026 |
 | App (local) | `cd app; npm install; npm run dev` → localhost:5173 |
 | **Aplicativo do técnico** | `cd campo; npm install; npx expo start` → QR Code no **Expo Go**. Ver `campo/README.md` |
 | **App no ar** | **https://pulsoline.grupoafline.com.br** (o `gestor-af.pages.dev` redireciona) — Cloudflare Pages · ver `docs/09-PUBLICAR.md` |
