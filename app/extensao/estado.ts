@@ -36,10 +36,16 @@ export interface Estado {
   usuario: { id: string; nome: string | null; email: string | null } | null
   /** Este computador: sorteado uma vez; a vez de cada bucket é de pessoa + máquina. */
   maquina: string | null
+  /** 0.10.0 (D-342): cada importação tem o seu Iniciar/Parar e o seu
+   *  intervalo — rota (planilha), equipamentos (varredura) e níveis (portal). */
   config: {
+    rotaLigada: boolean
     rotaMin: Intervalo
-    /** nulo = só no botão */
-    varreduraMin: Intervalo | null
+    varreduraLigada: boolean
+    varreduraMin: Intervalo
+    portalLigado: boolean
+    /** o portal da Claro não aceita menos de 15 min (D-342) */
+    portalMin: Intervalo
     /** os ids marcados para sincronizar e varrer */
     buckets: string[]
   }
@@ -66,6 +72,11 @@ export interface Estado {
     login: string | null; nome: string | null
     sessao: 'OK' | 'CAIU' | null
     rodando: boolean; ultimaEm: number | null; ultima: string | null
+    /** 0.10.0 (D-342): o andamento da rodada, um detalhe por vez */
+    feitos: number; total: number
+    /** O firewall da Claro bloqueou (ou o portal não respondeu): a extensão
+     *  não pede nada até esta hora — insistir estende o bloqueio. */
+    pausaAte: number | null; pausaMotivo: string | null
   }
   log: LinhaLog[]
 }
@@ -74,7 +85,10 @@ export const CHAVE = 'af_estado'
 
 export const ESTADO_VAZIO: Estado = {
   ligado: false, usuario: null, maquina: null,
-  config: { rotaMin: 60, varreduraMin: null, buckets: [] },
+  config: {
+    rotaLigada: true, rotaMin: 60, varreduraLigada: false, varreduraMin: 60,
+    portalLigado: true, portalMin: 60, buckets: [],
+  },
   disponiveis: null, vezes: {}, toaSessao: null, pulsoEm: null,
   baixa: { rodando: false, atual: null, ultimaEm: null, ultima: null },
   varredura: {
@@ -83,15 +97,36 @@ export const ESTADO_VAZIO: Estado = {
   },
   escolha: { oQue: 'TUDO' },
   pendentes: null,
-  portal: { login: null, nome: null, sessao: null, rodando: false, ultimaEm: null, ultima: null },
+  portal: { login: null, nome: null, sessao: null, rodando: false, ultimaEm: null, ultima: null,
+            feitos: 0, total: 0, pausaAte: null, pausaMotivo: null },
   log: [],
+}
+
+/**
+ * A configuração gravada por uma versão anterior vira a desta: até a 0.9.0
+ * `varreduraMin` nulo queria dizer "só no botão" — agora é a varredura
+ * PARADA, e o intervalo fica guardado para quando ela for iniciada.
+ */
+function normalizarConfig(c: Record<string, unknown> | undefined): Estado['config'] {
+  const v = ESTADO_VAZIO.config
+  const intervalo = (x: unknown, padrao: Intervalo) => INTERVALOS.includes(x as Intervalo) ? x as Intervalo : padrao
+  const varAntiga = c?.varreduraMin
+  return {
+    rotaLigada: typeof c?.rotaLigada === 'boolean' ? c.rotaLigada : v.rotaLigada,
+    rotaMin: intervalo(c?.rotaMin, v.rotaMin),
+    varreduraLigada: typeof c?.varreduraLigada === 'boolean' ? c.varreduraLigada : varAntiga != null,
+    varreduraMin: intervalo(varAntiga, v.varreduraMin),
+    portalLigado: typeof c?.portalLigado === 'boolean' ? c.portalLigado : v.portalLigado,
+    portalMin: Math.max(15, intervalo(c?.portalMin, v.portalMin)) as Intervalo,
+    buckets: Array.isArray(c?.buckets) ? (c.buckets as string[]) : [],
+  }
 }
 
 export async function lerEstado(): Promise<Estado> {
   const r = await chrome.storage.local.get(CHAVE)
   const e = r[CHAVE] as Partial<Estado> | undefined
   return { ...ESTADO_VAZIO, ...(e ?? {}),
-    config: { ...ESTADO_VAZIO.config, ...(e?.config ?? {}) },
+    config: normalizarConfig(e?.config as Record<string, unknown> | undefined),
     baixa: { ...ESTADO_VAZIO.baixa, ...(e?.baixa ?? {}) },
     varredura: { ...ESTADO_VAZIO.varredura, ...(e?.varredura ?? {}) },
     portal: { ...ESTADO_VAZIO.portal, ...(e?.portal ?? {}) },
@@ -103,7 +138,8 @@ export type Pedido =
   | { tipo: 'entrar'; email: string; senha: string }
   | { tipo: 'sair' }
   | { tipo: 'ligar'; sim: boolean }
-  | { tipo: 'configurar'; rotaMin: Intervalo; varreduraMin: Intervalo | null; buckets: string[] }
+  /** só o pedaço que mudou; o fundo confere cada campo */
+  | { tipo: 'configurar'; config: Partial<Estado['config']> }
   | { tipo: 'atualizar-buckets' }
   | { tipo: 'sincronizar-agora' }
   | { tipo: 'assumir'; buckets: string[] }
@@ -115,3 +151,10 @@ export type Pedido =
   | { tipo: 'ler-portal'; dia?: string }
   /** 0.9.0: a rota e o sinal de um dia para trás, escolhido por quem opera (D-166) */
   | { tipo: 'sincronizar-dia'; dia: string }
+  /** 0.10.0 (D-342): o menu Importar — Iniciar e Parar de cada importação, no dia escolhido */
+  | { tipo: 'iniciar'; oQue: Importacao; dia: string }
+  | { tipo: 'parar'; oQue: Importacao }
+  /** tirar a pausa do portal antes da hora (quem opera decide) */
+  | { tipo: 'retomar-portal' }
+
+export type Importacao = 'ROTA' | 'EQUIPAMENTOS' | 'NIVEIS'

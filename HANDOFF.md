@@ -1,5 +1,26 @@
 # Passagem de bastão — leia isto primeiro
 
+> **08/11/2026 — a Claro bloqueou a leitura do portal, e a extensão passou a pedir no ritmo de uma
+> pessoa** (D-342; migration 232; extensão 0.10.2 copiada para a VPS; site publicado):
+> - **O que aconteceu:** o FortiWeb da Claro bloqueou o IP do túnel ("Web Page Blocked", *Attack ID
+>   20000046*) — e, com ele, o celular e o PC na mesma internet. Causa provável: a 0.9.0 pedia o detalhe
+>   de ~95 O.S. de uma vez a cada login/"Ler o portal"/virada de dia; e o campo Dia do painel ficava
+>   preso em ontem (releu 07/11 inteiro). A página do portal tem defesa anti-robô (`/bot_deception.html`,
+>   script `fwb_client`). Esperar destravou; o IP voltou antes do navegador.
+> - **Extensão 0.10.x:** portal um pedido por vez, **9 s** entre um e outro, **30** por rodada; relê só
+>   o que mudou de classificação/status; encerrada sem mudança nunca; bloqueio → pausa de 3 h
+>   (resposta vazia → 30 min) com "Retomar agora". "Já lido" = memória do navegador **ou** banco
+>   (`sinal_claro_ja_lidos`, 232). Equipamentos do TOA: 1 técnico por vez (eram 3).
+> - **Painel novo:** abas **Configuração** (cidades e buckets; caixinha da cidade marca todos) e
+>   **Importar** (Dia + Iniciar/Parar/intervalo de Rota, Equipamentos e Níveis). O Dia segue o relógio.
+> - **Recusado:** imitar pessoa (mouse, pausas sorteadas, desviar das armadilhas), trocar IP para fugir
+>   do bloqueio, e a revisão automática de ontem ("não habilite").
+> - **Não teste o portal em rajada pelo túnel** — sai pelo mesmo IP do Emanuel e conta contra ele.
+> - **Não verificado:** o fundo da 0.10.x rodando de verdade (ritmo, Parar, pausa no bloqueio) — só tipo
+>   e o painel num navegador de teste. Primeira varredura de equipamentos na 0.10.0 passou.
+> - **Pendente:** teste do túnel com o celular no 5G (no 08/11 cedo não passava nada; no Wi-Fi sim) —
+>   rede só-IPv6 da Vivo ou economia de dados do Android, não se sabe.
+
 > **07/11/2026, noite — a VPS foi para Campinas, e o portal da Claro passa pelo celular** (D-341;
 > site publicado; sem migration):
 > - **A VPS foi reinstalada em Campinas** (hPanel "Alterar localização", que apaga o disco). IP novo

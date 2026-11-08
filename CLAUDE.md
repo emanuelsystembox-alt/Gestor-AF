@@ -89,6 +89,7 @@ app/                  web do controle (17 telas, com Almoxarifado, Frota, Monito
 extensao-toa/         EXTENSÃO do Chrome — sincroniza e varre o TOA sozinha (D-193); 0.8.0:
                       pede os dados direto ao TOA (D-250), buckets e tempos por computador (D-251)
                       0.9.0: lê o sinal antes/depois do Portal Técnico da Claro (D-330), seletor de dia (D-332)
+                      0.10.0: portal no ritmo de uma pessoa e pausa no bloqueio; abas Configuração/Importar (D-342)
                       fundo.js/popup.js são GERADOS de app/extensao/ (npm run extensao)
                       a do Edge da VPS é CÓPIA, em /opt/edge/config/extensao-toa (productivity.md)
 campo/                APLICATIVO do técnico (Expo) — projeto Node separado
@@ -96,8 +97,8 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir · Mural
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
-docs/                 mapeamento, domínio, 341 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (até a 231)
+docs/                 mapeamento, domínio, 342 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (até a 232)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -134,7 +135,7 @@ tarefa pedir.
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/13-CONEXOES-E-CHAVES.md` | **MCPs, logins e chaves**: onde cada um mora e `conferir-conexoes.ps1` |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 341 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 342 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |

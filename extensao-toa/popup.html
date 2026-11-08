@@ -2,15 +2,18 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AFLINE — ponte com o TOA</title>
-  <!-- A janelinha da extensão (D-193). O comportamento está em popup.js,
-       GERADO a partir de app/extensao/popup.ts — não edite o .js à mão. -->
+  <!-- O painel da extensão (D-193). O comportamento está em popup.js,
+       GERADO a partir de app/extensao/popup.ts — não edite o .js à mão.
+       0.10.0 (D-342): duas abas no topo — Configuração (cidades e buckets)
+       e Importar (o dia e o Iniciar/Parar de cada importação). -->
   <style>
     :root { --af: #c81a23; --af-escuro: #9f141b; --texto: #14171c; --suave: #5b6577;
             --borda: #d8dce3; --fundo: #ffffff; --cinza: #f3f4f6;
             --ok: #047857; --aviso: #b45309; --erro: #b01e25; }
     * { box-sizing: border-box; }
-    /* 0.4.0: mora no painel lateral (largura do painel); mínimo para não espremer */
+    /* mora no painel lateral (largura do painel); mínimo para não espremer */
     body { min-width: 300px; margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
            color: var(--texto); background: var(--fundo); }
     header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
@@ -35,34 +38,48 @@
     .barra { height: 8px; border-radius: 99px; background: var(--cinza); overflow: hidden; margin: 6px 0 2px; }
     .barra > div { height: 100%; background: var(--af); width: 0; transition: width .3s; }
     #erro-entrar { color: var(--erro); min-height: 1em; }
-    ul#log { list-style: none; margin: 0; padding: 6px 8px; max-height: 160px; overflow-y: auto;
+    ul#log { list-style: none; margin: 0; padding: 6px 8px; max-height: 180px; overflow-y: auto;
              background: var(--cinza); border-radius: 6px; font-size: 11px; }
     ul#log li { margin: 2px 0; } ul#log li.ok { color: var(--ok); } ul#log li.erro { color: var(--erro); }
     footer { display: flex; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--borda); }
     footer button { border: 0; padding: 2px 0; color: var(--suave); background: none; }
     footer button:hover { color: var(--af); }
-    /* 0.6.0: o que varrer */
+    select { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); }
+    input[type=date] { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; }
+    a { color: var(--af); }
+    [hidden] { display: none !important; }
+
+    /* 0.10.0: o menu do topo */
+    nav.abas { display: flex; gap: 2px; margin: 12px 0 0; border-bottom: 1px solid var(--borda); }
+    nav.abas button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 12px;
+                      background: none; color: var(--suave); font-weight: 600; margin-bottom: -1px; }
+    nav.abas button[aria-selected=true] { color: var(--af-escuro); border-bottom-color: var(--af); }
+    nav.abas button:hover { color: var(--texto); }
+
+    /* Configuração: cidades e buckets */
     .escolha { margin: 6px 0 8px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; }
     .escolha label { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; cursor: pointer; }
-    .escolha .conta { margin-left: auto; color: var(--suave); font-variant-numeric: tabular-nums; }
-    .escolha .titulo { font-size: 11px; color: var(--suave); margin: 2px 0; }
-    /* 0.8.0: a lista de buckets, por cidade, e os tempos */
-    .cidade { font-size: 11px; font-weight: 600; color: var(--suave); margin: 8px 0 2px; }
-    .cidade:first-child { margin-top: 0; }
-    .escolha .vez { font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--cinza); color: var(--suave); white-space: nowrap; }
-    .escolha .vez.minha { background: #ecfdf5; color: var(--ok); }
-    .escolha .vez.outro { background: #fffbeb; color: var(--aviso); }
-    #rota-min button[aria-pressed=true] { border-color: var(--af); background: #fdecee; color: var(--af-escuro); font-weight: 600; }
-    select { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); }
-    a { color: var(--af); }
-    /* 0.9.0: o dia que se atualiza; rota e sinal lado a lado quando cabe */
-    input[type=date] { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; }
-    .dia { margin: 14px 0 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--cinza); }
+    label.cidade { font-size: 12px; font-weight: 700; margin: 10px 0 2px; }
+    label.cidade:first-child { margin-top: 0; }
+    .cidade .conta { font-weight: 400; color: var(--suave); }
+    label.bucket { margin-left: 20px; }
+    .vez { font-size: 11px; padding: 0 5px; border-radius: 4px; white-space: nowrap; }
+    .vez.outro { background: #fffbeb; color: var(--aviso); }
+
+    /* Importar: o dia e um cartão por importação */
+    .dia { margin: 12px 0 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--cinza); }
     .dia.outro { border-color: var(--aviso); background: #fffbeb; }
-    .lado-a-lado { display: grid; gap: 0 16px; }
-    @media (min-width: 560px) { .lado-a-lado { grid-template-columns: 1fr 1fr; } }
-    .lado-a-lado > div { min-width: 0; }
-    [hidden] { display: none !important; }
+    .cartao { margin-top: 10px; padding: 10px; border: 1px solid var(--borda); border-radius: 8px; }
+    .cartao h3 { margin: 0; font-size: 13px; }
+    .cartao .topo { display: flex; align-items: center; gap: 8px; }
+    .estado { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px;
+              background: var(--cinza); color: var(--suave); white-space: nowrap; }
+    .estado.ligado { background: #ecfdf5; color: var(--ok); }
+    .estado.rodando { background: #fdecee; color: var(--af-escuro); }
+    .estado.pausa { background: #fffbeb; color: var(--aviso); }
+    .cartao .acoes { margin-top: 8px; }
+    .cartao .acoes select { margin-left: auto; }
+    .pausa-aviso { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #fffbeb; color: var(--aviso); font-size: 12px; }
   </style>
 </head>
 <body>
@@ -83,70 +100,95 @@
       <label class="linha"><input id="ligado" type="checkbox"> <strong>Sincronizar por este computador</strong></label>
       <div id="situacao" class="situacao"></div>
 
-      <!-- 0.8.0 (D-251): os buckets e os tempos são DESTE computador -->
-      <h2>Buckets</h2>
-      <div class="escolha">
-        <div id="buckets"><p class="pequeno">Abra o TOA numa aba deste Chrome e clique em "Atualizar a lista".</p></div>
-        <p id="fora" class="pequeno"></p>
-        <div class="linha" style="margin-top:6px">
-          <button id="atualizar">Atualizar a lista</button>
-          <button id="assumir" hidden>Assumir os marcados</button>
-        </div>
-      </div>
+      <nav class="abas" role="tablist">
+        <button id="aba-config" role="tab" data-aba="config">Configuração</button>
+        <button id="aba-importar" role="tab" data-aba="importar">Importar</button>
+      </nav>
 
-      <!-- 0.9.0: hoje, ou um dia para trás escolhido por quem opera (D-166: o
-           dia de atuação é escolha de quem importa, nunca adivinhado) -->
-      <div id="dia-caixa" class="linha dia">
-        <label class="pequeno" for="dia"><strong>Dia</strong></label>
-        <input id="dia" type="date">
-        <button id="dia-hoje" hidden>Voltar para hoje</button>
-        <button id="sincronizar" class="forte" style="margin-left:auto">Sincronizar agora</button>
-      </div>
-
-      <div class="lado-a-lado">
-        <div>
-          <h2>Rota (planilha do TOA)</h2>
-          <div class="linha" id="rota-min" role="group" aria-label="Importar a rota a cada">
-            <span class="pequeno">a cada</span>
-            <button data-min="5">5 min</button><button data-min="15">15 min</button>
-            <button data-min="30">30 min</button><button data-min="60">1 hora</button>
+      <!-- ── Configuração: as cidades e os buckets DESTE computador (D-251) ── -->
+      <div id="pagina-config" role="tabpanel">
+        <h2>Cidades e buckets</h2>
+        <div class="escolha">
+          <div id="buckets"><p class="pequeno">Abra o TOA numa aba deste navegador e clique em "Atualizar a lista".</p></div>
+          <p id="fora" class="pequeno"></p>
+          <div class="linha" style="margin-top:6px">
+            <button id="atualizar">Atualizar a lista</button>
+            <button id="assumir" hidden>Assumir os marcados</button>
           </div>
-          <p id="baixa-atual" class="pequeno"></p>
-          <p id="baixa-ultima" class="pequeno"></p>
         </div>
-        <div>
-          <!-- 0.9.0 (D-330): lido junto com a rota -->
-          <h2>Sinal (portal Claro)</h2>
+        <p class="pequeno">A varredura precisa do TOA logado numa aba deste navegador (<a href="#" id="janela-toa">abrir a janela da varredura</a>).
+          Os níveis precisam do Portal Técnico da Claro logado numa aba.</p>
+      </div>
+
+      <!-- ── Importar: o dia e o Iniciar/Parar de cada importação (D-342) ── -->
+      <div id="pagina-importar" role="tabpanel" hidden>
+        <!-- o dia de atuação é escolha de quem importa (D-166); "hoje" segue o relógio -->
+        <div id="dia-caixa" class="linha dia">
+          <label class="pequeno" for="dia"><strong>Dia</strong></label>
+          <input id="dia" type="date">
+          <button id="dia-hoje" hidden>Voltar para hoje</button>
+          <span id="dia-rotulo" class="pequeno" style="margin-left:auto"></span>
+        </div>
+
+        <div class="cartao">
+          <div class="topo"><h3>Rota do dia</h3><span id="rota-estado" class="estado"></span></div>
+          <p class="pequeno">A planilha do TOA dos buckets marcados.</p>
+          <div class="linha acoes">
+            <button id="rota-iniciar" class="forte">Iniciar</button>
+            <button id="rota-parar">Parar</button>
+            <select id="rota-min" aria-label="Rota a cada">
+              <option value="5">a cada 5 min</option><option value="15">a cada 15 min</option>
+              <option value="30">a cada 30 min</option><option value="60">a cada 1 hora</option>
+            </select>
+          </div>
+          <p id="rota-texto" class="pequeno"></p>
+        </div>
+
+        <div class="cartao">
+          <div class="topo"><h3>Equipamentos</h3><span id="var-estado" class="estado"></span></div>
+          <p class="pequeno">Nome do cliente, equipamento e miscelânea, lidos do TOA. Só o dia de hoje.</p>
+          <div class="linha acoes">
+            <button id="var-iniciar" class="forte">Iniciar</button>
+            <button id="var-parar">Parar</button>
+            <select id="var-min" aria-label="Equipamentos a cada">
+              <option value="5">a cada 5 min</option><option value="15">a cada 15 min</option>
+              <option value="30">a cada 30 min</option><option value="60">a cada 1 hora</option>
+            </select>
+          </div>
+          <div class="linha" style="margin-top:6px">
+            <label class="pequeno" for="var-oque">Ler</label>
+            <select id="var-oque">
+              <option value="TUDO">nome e equipamento</option>
+              <option value="NOME">só o nome do cliente</option>
+              <option value="EQUIPAMENTO">só equipamento e material (encerrados)</option>
+            </select>
+          </div>
+          <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
+          <p id="var-texto" class="pequeno"></p>
+        </div>
+
+        <div class="cartao">
+          <div class="topo"><h3>Níveis (portal Claro)</h3><span id="portal-estado" class="estado"></span></div>
+          <p class="pequeno">O sinal antes e depois, um pedido por vez.</p>
+          <div class="linha acoes">
+            <button id="portal-iniciar" class="forte">Iniciar</button>
+            <button id="portal-parar">Parar</button>
+            <select id="portal-min" aria-label="Níveis a cada">
+              <option value="15">a cada 15 min</option>
+              <option value="30">a cada 30 min</option><option value="60">a cada 1 hora</option>
+            </select>
+          </div>
+          <div id="portal-pausa" class="pausa-aviso" hidden>
+            <span id="portal-pausa-texto"></span>
+            <div class="linha" style="margin-top:6px"><button id="portal-retomar">Retomar agora</button></div>
+          </div>
+          <div id="portal-barra" class="barra" hidden><div id="portal-preenche"></div></div>
           <p id="portal-texto" class="pequeno"></p>
-          <div class="linha"><button id="ler-portal">Ler o portal</button></div>
         </div>
-      </div>
 
-      <h2>Varredura (nome, equipamento, miscelânea)</h2>
-      <div class="linha">
-        <label class="pequeno" for="var-min">Varrer sozinho</label>
-        <select id="var-min">
-          <option value="">só no botão</option>
-          <option value="5">a cada 5 min</option><option value="15">a cada 15 min</option>
-          <option value="30">a cada 30 min</option><option value="60">a cada 1 hora</option>
-        </select>
+        <h2>Últimos acontecimentos</h2>
+        <ul id="log"></ul>
       </div>
-      <div class="escolha">
-        <p class="titulo">Ler</p>
-        <label><input type="radio" name="oque" value="TUDO"> Nome e equipamento</label>
-        <label><input type="radio" name="oque" value="NOME"> Só o nome do cliente</label>
-        <label><input type="radio" name="oque" value="EQUIPAMENTO"> Só equipamento e material (encerrados)</label>
-      </div>
-      <p class="pequeno">Precisa do TOA logado numa aba deste Chrome (<a href="#" id="janela-toa">abrir a janela da varredura</a>).</p>
-      <div id="var-barra" class="barra" hidden><div id="var-preenche"></div></div>
-      <p id="var-texto" class="pequeno"></p>
-      <div class="linha">
-        <button id="varrer" class="forte">Varrer o TOA agora</button>
-        <button id="parar" hidden>Parar a varredura</button>
-      </div>
-
-      <h2>Últimos acontecimentos</h2>
-      <ul id="log"></ul>
     </section>
   </main>
   <footer>

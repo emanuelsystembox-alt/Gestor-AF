@@ -431,6 +431,22 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 08/11/2026 — o bloqueio da Claro e a extensão 0.10 (232, D-342)
+
+Feito: extensão 0.10.2 (portal 9 s/pedido, 30 por rodada, pausa no bloqueio; abas Configuração e
+Importar; Dia que segue o relógio; TOA 1 técnico por vez), `sinal_claro_ja_lidos` (232), tela
+Sincronismo dizendo "rota parada"/"equipamentos parados" (site publicado). Baterias 33/33 e 29/29.
+
+### Verificação que ninguém fez ainda
+- O fundo da 0.10.x de verdade: o registro "níveis lidos de N; faltam M", o Parar no meio de uma
+  rodada, e a pausa de 3 h quando a Claro bloquear (só tipo e o painel em navegador de teste).
+- O túnel com o celular no 5G (no Wi-Fi passa; no 5G, em 08/11 cedo, não passava nada).
+
+### Depende do Emanuel
+- Se o bloqueio voltar mesmo com 9 s/30: pedir à Claro (o *Message ID* da página identifica o evento),
+  não apertar o ritmo às cegas. Alternativa oferecida: a extensão ler só o que o portal já carregou
+  na aba aberta por uma pessoa, sem pedido próprio.
+
 ## Pendente em 07/11/2026 — almoxarifado e portal da Claro (224 a 231, D-335 a D-340)
 
 ### Depende do Emanuel

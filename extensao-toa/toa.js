@@ -80,7 +80,10 @@ async function varrerDireto(itens, dia, aoLer) {
       if (!porTecnico.has(a.tecnico)) porTecnico.set(a.tecnico, [])
       porTecnico.get(a.tecnico).push(it)
     }
-    await emParalelo([...porTecnico], 3, async ([tecnico, dele]) => {
+    // 0.10.2 (D-342): um técnico por vez (eram 3) — "o mais devagar, desde que
+    // não bloqueie" (Emanuel, 08/11). Sem pausa com relógio: na aba escondida
+    // o Chrome estica cada espera para até 1 min (traps.md); o ritmo é o da rede.
+    await emParalelo([...porTecnico], 1, async ([tecnico, dele]) => {
       let r
       try { r = await pedirPagina('tecnico', { tecnico, aids: dele.map((x) => x.aid), dia }) }
       catch (e) { motivos.add(`${bucket}: ${e.message}`); sobra.push(...dele); return }

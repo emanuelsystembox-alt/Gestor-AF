@@ -244,7 +244,7 @@ com a rota, e grava em `sinal_claro` pela `registrar_sinal_claro` (222).
 | | |
 |---|---|
 | Lista do dia | `GET prd-worker-mangerportal.clarobrasil.mobi/v1/workorder?date=AAAA-MM-DD&filter=<login do líder>&size=50&page=N` |
-| Níveis | `GET …/v1/workorder/{id}/equipment` — só de quem mudou ou tem mais de 1 h |
+| Níveis | `GET …/v1/workorder/{id}/equipment` — só de quem mudou, nunca lido ou com mais de 4 h; **um por vez, 9 s entre um e outro, no máximo 30 por rodada** (0.10.2, D-342) |
 | Autenticação | o **cookie** do login da Claro neste Chrome (401 sem ele) |
 | Login do líder | `portal-claro.js`, na aba do portal, lê o `User` do localStorage |
 | **Nunca chamar** | `blyhax9weg.execute-api.us-east-1.amazonaws.com/new-measurement` — dispara medição nova no equipamento do cliente |
@@ -258,6 +258,58 @@ O que é gravado e como a tela mostra: `sinal_claro` (222) e o resumo por tipo
 (223, `resumir_sinal`) — regras em `agent_docs/business-rules.md`, "Sinal do
 portal Claro"; decisões D-330 a D-334.
 
+### O firewall da Claro — no ritmo de uma pessoa (0.10.0, D-342)
+
+Na frente do portal há um **FortiWeb** da Claro. Em 08/11 ele bloqueou o IP de
+onde a extensão lia ("Web Page Blocked", *Attack ID 20000046*) — e, com o IP,
+o celular e o PC que usavam a mesma internet. A 0.9.0 pedia o detalhe das ~95
+O.S. de uma vez (4 em paralelo, sem pausa) a cada login, a cada "Ler o portal"
+e a cada virada de dia. A regra exata é da Claro; a 0.10.0 pede como quem clica:
+
+| | |
+|---|---|
+| Ritmo | um pedido por vez, `PORTAL_PAUSA_MS` = 9 s entre um e outro (lista e níveis; 0.10.2 — eram 4 s). Lote de 30 ≈ 4,5 min |
+| Teto | `PORTAL_TETO` = 30 níveis por rodada; o resto fica para a próxima ("faltam N" no log) |
+| Ordem | o que mudou → o nunca lido → o nunca lido "Pendente/Pendente" → o aberto lido há mais de 4 h → o sem contrato (a cada 4 h) |
+| "Mudou" (0.10.1) | a classificação Antes/Depois ou o status da O.S. — não o `updatedAt`, que muda a cada passo do técnico |
+| Encerrada | finalizada/cancelada sem mudança **nunca** é relida (08/11: nenhuma das 68 de 07/11 mudou depois de lida) |
+| Já lido | memória do navegador (`portal_memoria`, 7 dias) **ou** nível no banco (`sinal_claro_ja_lidos`, 232) — nenhum contrato fica descoberto porque a memória se perdeu |
+| Dia | sozinha, só **hoje**; outro dia, só pelo Iniciar com o dia escolhido. Revisão automática de ontem: oferecida e **recusada** (Emanuel, 08/11) |
+| Login no portal | só registra o login; **não** dispara leitura |
+| Intervalo | próprio (`portalMin`), no mínimo 15 min |
+| Bloqueio | página "blocked" / "Attack ID" em qualquer resposta → para na hora e **não pede nada por 3 h** |
+| Silêncio | conexão cortada / resposta vazia → para e não pede nada por 30 min |
+| Retomar | o painel mostra "pausa até HH:MM" e tem "Retomar agora" (com aviso) |
+
+Os números (4 s, 30, 3 h) são escolha nossa, não regra conhecida da Claro.
+**Não** se disfarça navegador nem se troca IP para passar pelo firewall.
+
+## O menu do painel (0.10.0, D-342)
+
+> "Criar um menu em cima, para configuração de importação que seria para
+> selecionar as cidades, e ao lado seria Menu Import (...) Iniciar e Parar
+> importação, tanto da rota do dia, tanto dos equipamentos, tanto dos níveis.
+> Então eu preciso ter o controle disso." — Emanuel, 08/11
+
+- **Configuração**: as cidades e os buckets deste computador. A caixinha da
+  cidade marca/desmarca todos os buckets dela.
+- **Importar**: o **Dia**, e um cartão por importação — **Rota do dia**
+  (planilha do TOA), **Equipamentos** (varredura do TOA) e **Níveis** (portal
+  Claro) —, cada um com **Iniciar**, **Parar**, o intervalo e o estado
+  (ligado / parado / rodando / pausa).
+  - Hoje: Iniciar liga a importação automática e roda já; Parar desliga e
+    interrompe a que está rodando (a rota termina o bucket em andamento).
+  - Outro dia: Iniciar importa **aquele dia, uma vez** (rota ou níveis).
+    Equipamentos só de hoje (a varredura é dos contratos de hoje).
+- "Sincronizar por este computador" continua sendo a chave geral (a vez dos
+  buckets). Rota parada **não** solta o bucket: a tela Sincronismo mostra
+  "rota parada" / "equipamentos parados".
+
+**O dia não fica preso em ontem.** Até a 0.9.0 o campo recebia "hoje" uma vez,
+ao abrir o painel; aberto de um dia para o outro (no Edge da VPS, sempre), ele
+continuava no dia anterior e "Ler o portal" lia ontem inteiro. Agora "hoje" é
+a falta de escolha e é recalculado a cada 10 s.
+
 ## O dia (0.9.0, D-332)
 
 O painel tem um **seletor de dia**: hoje (o normal) ou até **31 dias para
@@ -266,11 +318,11 @@ trás**. Com outro dia, o botão vira "Atualizar DD/MM" e:
 1. importa a planilha do TOA **daquele dia** nos buckets marcados, cada um na
    cidade dele — o mesmo caminho da importação manual com outra data (o dia de
    atuação é escolha de quem opera, D-166);
-2. lê o sinal do portal do mesmo dia.
+2. lê o sinal do portal do mesmo dia. *(Desde a 0.10.0 são dois Iniciar
+   separados, e os níveis seguem o ritmo e a memória por dia acima.)*
 
 Usa a trava da rota (`trava_baixa`): um de cada vez, sem atropelar a rodada de
-hoje. A memória dos níveis já lidos (`portal_detalhe`) é só de hoje; um dia
-para trás lê todos. "Ler o portal" também respeita o dia escolhido.
+hoje.
 
 O painel ficou mais limpo na 0.9.0: a lista de buckets não diz mais "livre" nem
 "este computador", nem conta o que falta varrer — só "com <outro computador>"

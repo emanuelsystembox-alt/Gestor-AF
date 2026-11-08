@@ -13146,3 +13146,59 @@ com o TOA); ou pedir à Claro que libere o IP `187.41.127.166`; ou VPN paga com 
 Não decidido — pergunte ao Emanuel.
 
 **Atualização (07/11, 21h): o portal passa pelo celular do Emanuel.** Sem contato na Claro para pedir a liberação do IP, ele escolheu o túnel: rede Tailscale com o S26 Ultra dele como saída, só para os endereços da Claro (regra PAC no Edge da VPS). Medido: portal 200, API 401, saída Telefônica/Manaus. Recusados: proxy residencial alugado (contorna a proteção da Claro com o login dele por trás, e o dado do portal passaria por terceiros) e VPN comercial (IP de data center, provavelmente também barrado). Detalhes em docs/12, "O túnel do portal pelo celular".
+
+### D-342 · A extensão lê o portal da Claro no ritmo de uma pessoa, e o painel ganha Configuração e Importar (0.10.0, 08/11/2026)
+
+**O que aconteceu.** Com o túnel pelo celular funcionando (D-341), o portal voltou a recusar — agora com o IP
+do celular: "Web Page Blocked", `Client IP: 152.241.112.199` (o celular, Vivo), *Attack ID 20000046*. Não era
+o bloqueio de IP de data center: era uma **regra de ataque** do FortiWeb da Claro. Na noite anterior o túnel
+saía pelo Wi-Fi de casa, e de madrugada o PC do Emanuel (mesmo IP) levava *reset* do portal. Bloqueado o IP,
+cai tudo que sai por ele — por isso "nem no celular abre".
+
+**A causa provável (não comprovada; a regra é da Claro):** a 0.9.0 pedia a lista do dia e logo o detalhe de
+**todas** as O.S. (95 no registro de 08/11), 4 em paralelo, sem pausa — ~100 pedidos em segundos — a cada
+login no portal, a cada "Ler o portal" e na primeira leitura de cada dia. Histórico do Edge da VPS em 08/11:
+login 08:28, navegação normal até 08:33, sessão derrubada 08:34, seis tentativas de login, bloqueio às 08:37.
+E o campo Dia do painel ficava preso no dia em que foi aberto: o registro tem "07/11: 102 O.S." lido em 08/11,
+uma releitura completa de ontem.
+
+**O que mudou (0.10.0):**
+- O portal é lido um pedido por vez, 4 s entre um e outro, no máximo 30 níveis por rodada; primeiro o que
+  mudou, depois o nunca lido, por fim o velho (4 h). Memória por dia: "ler agora" e dia para trás não relêem
+  o que não mudou. O login no portal não dispara leitura.
+- Bloqueio ("blocked"/"Attack ID" na resposta) → para na hora e **não pede nada por 3 h**; resposta vazia ou
+  conexão cortada → 30 min. O painel mostra a pausa e tem "Retomar agora", com aviso.
+- O painel ganhou duas abas: **Configuração** (cidades e buckets; a caixinha da cidade marca todos) e
+  **Importar** (o Dia, e Iniciar/Parar/intervalo de Rota do dia, Equipamentos e Níveis). *"eu preciso ter o
+  controle disso"* (Emanuel, 08/11). Rota e equipamentos parados aparecem assim na tela Sincronismo.
+- O Dia do painel segue o relógio: "hoje" é a falta de escolha, recalculada a cada 10 s.
+
+**Recusado:** disfarçar a extensão de navegador comum, variar ritmo para "parecer humano" ou trocar de IP para
+fugir do bloqueio — é a proteção da Claro, com o login do Emanuel por trás (o pedido foi "driblar o bloqueio";
+a resposta foi pedir menos e parar quando bloquear). Os números (4 s, 30, 3 h) são nossos, não regra conhecida
+da Claro: se o bloqueio voltar com eles, o próximo passo é perguntar à Claro (o *Message ID* da página de
+bloqueio identifica o evento para o administrador deles) — não apertar mais o ritmo às cegas.
+
+**Também visto:** com o celular no 5G da Vivo, o túnel parou de passar qualquer coisa (até o Google), e no
+Wi-Fi passava. Não comprovado se é a rede só-IPv6 da Vivo ou a economia de dados do Android — pendente de teste
+com o Emanuel (docs/12, "O túnel do portal pelo celular").
+
+**Atualização (08/11, tarde): o que a página do portal mostra e como voltou.** A página do portal traz as
+defesas do FortiWeb contra robôs: um link escondido para `/bot_deception.html` (quem segue é marcado) e o
+script `fwb_client`, que observa se há uma pessoa mexendo na página. O IP voltou antes do navegador: um
+pedido limpo pelo túnel já dava 200 enquanto o Edge (de onde saiu a rajada da 0.9.0) passava do login e caía
+em `ERR_EMPTY_RESPONSE`. Esperar resolveu: o Edge entrou de novo e a primeira varredura com a 0.10.0 passou.
+Os testes por `curl` pelo túnel saem pelo mesmo IP e também contam — não se diagnostica o portal em rajada.
+**Recusado (de novo):** fazer a ferramenta "o mais humana possível" no sentido de imitar pessoa (mouse,
+teclado, pausas sorteadas, desviar das armadilhas do firewall). Oferecido em troca: a extensão aproveitar o
+que o próprio portal carrega quando uma pessoa navega, sem pedido próprio; ou pedir acesso/liberação à Claro.
+
+**0.10.1 (08/11, fim da tarde): nenhum contrato descoberto, sem reler o que não mudou.** *"so não quero deixar
+nenhum contrato descoberto"* (Emanuel). Medido no banco: as 68 finalizadas de 07/11 não mudaram depois de
+lidas; a última mudança no portal de 07/11 foi às 19:49. O detalhe só é relido quando a classificação
+Antes/Depois ou o status mudam (não mais pelo `updatedAt`, que mexe a cada passo do técnico); encerrada sem
+mudança nunca; "Pendente" nos dois vai por último (22 de 31 vinham vazias, 9 tinham medição — não se pula); sem
+contrato, a cada 4 h. "Já lido" = memória do navegador OU nível no banco (`sinal_claro_ja_lidos`, migration
+232, só leitura, mesma trava de `registrar_sinal_claro`). Teto continua 30 por rodada: fila grande se resolve
+encurtando o intervalo, não aumentando o lote. **Recusado:** revisão automática do dia anterior ("não
+preciso disso, não habilite" — Emanuel); outro dia só pelo Iniciar com o dia escolhido.

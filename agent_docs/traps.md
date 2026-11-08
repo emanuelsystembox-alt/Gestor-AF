@@ -392,6 +392,21 @@ cor cheia vai em hex fixo, as MESMAS cores do app (`MARCADORES_COR`) — D-332.
 **Rótulo graf-400 sobre o fundo de um aviso reprova no escuro.** "Antes/Depois" no aviso do sinal
 deu 4,39:1 (graf-400 sobre `graf-800/60`); graf-300 dá 6,3. Meça sobre o fundo REAL, nos dois temas.
 
+**Leitura em rajada de site de terceiro queima o IP de quem está atrás.** A extensão 0.9.0 pedia ao
+portal da Claro o detalhe de ~95 O.S. de uma vez; o FortiWeb deles bloqueou o IP por regra de ataque
+(*Attack ID 20000046*) — primeiro o Wi-Fi de casa, depois o 5G do celular do túnel —, e junto foi o
+acesso normal de quem usava a mesma internet. Site que não é nosso se lê um pedido por vez, com teto
+por rodada e **parada na primeira recusa** (insistir estende o bloqueio). Ver D-342.
+E **teste também conta**: `curl` pelo túnel sai pelo MESMO IP do Edge e do celular — dez pedidos de
+diagnóstico em 30 s (08/11) voltaram 200, 500 e depois só resposta vazia. Não diagnostique o portal
+da Claro em rajada pelo túnel; um pedido, e pare. O bloqueio também aparece SEM a página "blocked":
+o Edge passava do login e caía em `ERR_EMPTY_RESPONSE` no `/admin/home` — esperar resolveu.
+
+**Campo de data "hoje" gravado uma vez numa tela que fica aberta.** O painel lateral da extensão fica
+aberto dias a fio; o Dia recebia `hojeLocal()` só ao abrir e, depois da meia-noite, os botões agiam
+sobre ONTEM (releu o portal de 07/11 inteiro em 08/11). "Hoje" é a falta de escolha, recalculada a cada
+desenho. Ver D-342.
+
 **A extensão do navegador da VPS é uma CÓPIA.** `npm run extensao` monta `extensao-toa/` aqui; o
 Edge 24 h carrega `/opt/edge/config/extensao-toa`. Sem copiar, o ↻ recarrega a versão
 velha. Passo a passo em `productivity.md`, "Publicar".

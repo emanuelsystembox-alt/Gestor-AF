@@ -190,8 +190,9 @@ function LinhaBucket({ b, vez, ultima, agora, souAdmin, aoMudarNumero }: {
   else if (vez.toa_sessao === 'CAIU') { tom = 'text-af-300'; texto = `${vez.executor?.nome ?? 'alguém'}: a sessão do TOA caiu nesse computador` }
   else {
     tom = 'text-emerald-300'
-    texto = `${vez.executor?.nome ?? 'alguém'} · rota a cada ${ritmo(vez.rota_min) ?? '?'}`
-      + ` · varredura ${vez.varredura_min ? `a cada ${ritmo(vez.varredura_min)}` : 'só no botão'}`
+    // 0.10.0 (D-342): nulo é a importação PARADA no painel da extensão
+    texto = `${vez.executor?.nome ?? 'alguém'} · rota ${vez.rota_min ? `a cada ${ritmo(vez.rota_min)}` : 'parada'}`
+      + ` · equipamentos ${vez.varredura_min ? `a cada ${ritmo(vez.varredura_min)}` : 'parados'}`
   }
 
   return (
