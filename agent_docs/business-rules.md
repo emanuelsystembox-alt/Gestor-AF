@@ -588,6 +588,11 @@ cancelado pela central. Só de 03/11 em diante. A visita anterior vem de
 `revisita_dos_contratos` — não reescreva a busca. **Tirado à mão, não volta naquele contrato**
 (194, D-286) — só noutro dia, se acontecer de novo. O técnico vê o aviso no app.
 
+**A Revisita 30 D do Dashboard VT é uma TERCEIRA régua** (250, D-363): só VT ← VT, nos 30 dias antes, e a
+anterior vale em QUALQUER situação, **menos Auditar e cancelado pela central** — essas são puladas e conta a VT
+antes delas (*"Tudo menos Cancelada pela Central e Auditar"*, Emanuel, 10/11). Card = revisitas ÷ VT na conta.
+Mora em `revisita_30d_vt()`; não confunda com `revisita_dos_contratos` (anterior concluída).
+
 ## Mural Nexus (163, D-245)
 
 **Só o ADMIN publica; todo o time lê.** No banco (RLS de `mural_post` e do bucket

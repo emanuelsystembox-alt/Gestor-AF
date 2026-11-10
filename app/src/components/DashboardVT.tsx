@@ -60,6 +60,10 @@ interface DadosVT {
   areas_opcoes?: { area_id: string; rotulo: string }[]
   /** 246 (D-358): os buckets com VT no período, para o filtro */
   buckets_opcoes?: { bucket: string; n: number }[]
+  /** 250 (D-364): os supervisores (D-134) com VT no período, para o filtro */
+  supervisores_opcoes?: { supervisor: string; n: number }[]
+  /** 250 (D-363): a Revisita 30 D — VT que voltou de VT em até 30 dias */
+  revisita30?: { base: number; n: number; lista: ItemRev30[] }
   areas_filtro?: string[]
   areas: { area_id: string; codigo: string; rotulo: string; clientes: number | null
            desde: string | null; vt: number }[]
@@ -112,10 +116,18 @@ interface DadosCertidao {
               itens: { visita_id: string; contrato: string | null; dia: string
                        classe: 'COM_FALHA' | 'SEM_VALIDACAO'; equipe: string | null }[] }[]
 }
+interface ItemRev30 {
+  visita_id: string; contrato: string | null; dia: string; situacao: string
+  equipe: string | null; tecnico: string | null
+  anterior_id: string; anterior_data: string; anterior_situacao: string; dias: number
+  anterior_equipe: string | null; anterior_tecnico: string | null; anterior_baixa: string | null
+}
 interface ItemLog {
   dia?: string
   visita_id: string; contrato: string | null; log: number; situacao: string
   central: boolean; equipe: string | null; tecnico: string | null
+  /** 251 (D-365): o código de baixa (TOA; sem ele, AFLINE) */
+  baixa?: string | null
 }
 type ClasseTec1 = 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA'
 interface ItemTec1 {
@@ -192,6 +204,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
   // 246 (D-358): "falta adicionar o filtro do bucket" (Emanuel, 10/11) — igual ao de área
   const [buckets, setBuckets] = useState<string[]>([])
   const [opcoesBucket, setOpcoesBucket] = useState<OpcaoMultipla[]>([])
+  // 250 (D-364): "criar o filtro por supervisor também nessa janela" (Emanuel, 10/11)
+  const [supervisores, setSupervisores] = useState<string[]>([])
+  const [opcoesSup, setOpcoesSup] = useState<OpcaoMultipla[]>([])
 
   useEffect(() => {
     let vivo = true
@@ -200,6 +215,7 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
       p_dia: de, p_ate: ate,
       ...(areas.length ? { p_areas: areas } : {}),
       ...(buckets.length ? { p_buckets: buckets } : {}),
+      ...(supervisores.length ? { p_supervisores: supervisores } : {}),
     })
       .then(({ data, error }) => {
       if (!vivo) return
@@ -211,11 +227,14 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
         setOpcoesBucket((x.buckets_opcoes ?? []).map(b => ({
           valor: b.bucket, rotulo: b.bucket === 'SEM_BUCKET' ? 'Sem bucket' : b.bucket, qtd: b.n,
         })))
+        setOpcoesSup((x.supervisores_opcoes ?? []).map(s => ({
+          valor: s.supervisor, rotulo: s.supervisor === 'SEM_SUPERVISOR' ? 'Sem supervisor' : s.supervisor, qtd: s.n,
+        })))
       }
       setCarregando(false)
     })
     return () => { vivo = false }
-  }, [de, ate, versao, areas, buckets])
+  }, [de, ate, versao, areas, buckets, supervisores])
 
   return (
     <section aria-labelledby="dvt-titulo" className="space-y-3">
@@ -253,6 +272,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
         <SelecaoMultipla rotulo="Bucket" todos="Todo bucket" plural="buckets"
           opcoes={opcoesBucket} valor={buckets} onChange={setBuckets}
           className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
+        <SelecaoMultipla rotulo="Supervisor" todos="Todo supervisor" plural="supervisores"
+          opcoes={opcoesSup} valor={supervisores} onChange={setSupervisores}
+          className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
         <div className="ml-auto flex items-center gap-3">
           <Link to={`/controle/servicos?de=${de}&ate=${ate}&grupo=${encodeURIComponent('VISITA TECNICA')}`}
             className="text-[11px] text-af-400 underline-offset-2 hover:underline">
@@ -274,9 +296,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
 
       {d && d.total === 0 && !erro && (
         <div className="card-controle">
-          {areas.length || buckets.length
+          {areas.length || buckets.length || supervisores.length
             ? <Vazio titulo="Nenhuma visita técnica nos filtros escolhidos"
-                descricao="No período, as áreas e os buckets marcados não têm contrato de VISITA TECNICA." />
+                descricao="No período, a combinação de área, bucket e supervisor marcada não tem contrato de VISITA TECNICA." />
             : <Vazio titulo="Nenhuma visita técnica no período"
                 descricao="Nenhum contrato do grupo VISITA TECNICA na cidade ativa." />}
         </div>
@@ -308,7 +330,11 @@ function Conteudo({ d }: { d: DadosVT }) {
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
   // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
-  type Card = 'LOG' | 'TEC1' | 'MEDIA' | 'AT1'
+  type Card = 'LOG' | 'REV30' | 'TEC1' | 'MEDIA' | 'AT1'
+  // 250 (D-363): a Revisita 30 D — VT que voltou de VT ÷ VT da conta
+  const r30 = d.revisita30
+  const pRev30 = r30 ? pct(r30.n, r30.base) : null
+  const r30Mesmo = r30 ? r30.lista.filter(i => i.anterior_tecnico && i.anterior_tecnico === i.tecnico).length : 0
   const [ver, setVer] = useState<Card | null>(null)
   const logAlto = d.log_lista ?? []
   const alternar = (k: Card) => setVer(v => v === k ? null : k)
@@ -367,6 +393,27 @@ function Conteudo({ d }: { d: DadosVT }) {
                 </span>
               )}
             </>} />
+
+          {/* 250 (D-363): "mais um card chamado Revisita 30 D ao lado do log (...) VT da VT
+              apenas" (Emanuel, 10/11). Sem meta combinada: o número não ganha cor de meta. */}
+          {r30 && (
+            <Indicador rotulo="Revisita 30 D" valor={pRev30} sufixo="%"
+              cor={r30.n > 0 ? COR.atencao : undefined}
+              dica="VT que voltou de outra VT do mesmo contrato em até 30 dias ÷ VT na conta. A VT anterior Auditar ou cancelada pela central é pulada: vale a VT antes dela."
+              aoClicar={() => alternar('REV30')} aberto={ver === 'REV30'} chamada="ver de onde voltou"
+              barra={r30.base > 0 && (
+                <BarraMeta valor={(r30.n * 100) / r30.base} cor={COR.atencao} />
+              )}
+              apoio={<>
+                <span className="tabular">{n0(r30.n)}</span> de{' '}
+                <span className="tabular">{n0(r30.base)}</span> VT voltaram de VT
+                {r30Mesmo > 0 && (
+                  <span className="block" title="A VT anterior foi feita pelo mesmo técnico da VT de agora">
+                    <span className="tabular font-semibold text-amber-300">{n0(r30Mesmo)}</span> com o mesmo técnico
+                  </span>
+                )}
+              </>} />
+          )}
 
           <Indicador rotulo="AT5" valor={pAt5} sufixo="%" cor={corMeta(okAt5)}
             meta={`meta ≥ ${META_AT5}%`} atingiu={okAt5}
@@ -460,6 +507,11 @@ function Conteudo({ d }: { d: DadosVT }) {
         {ver === 'LOG' && d.log_lista && (
           <div className="px-4 pb-3">
             <ListaLogAlto itens={d.log_lista} aoFechar={() => setVer(null)} />
+          </div>
+        )}
+        {ver === 'REV30' && r30 && (
+          <div className="px-4 pb-3">
+            <ListaRevisita30 itens={r30.lista} aoFechar={() => setVer(null)} />
           </div>
         )}
         {ver === 'TEC1' && d.tec1_lista && (
@@ -1238,13 +1290,67 @@ function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => v
         <p className="px-3 py-4 text-xs text-graf-400">Nenhum contrato de VT com LOG acima de 1 no período.</p>
       ) : (<>
         <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
-        <TabelaItens cabecalho={['Situação', 'Equipe · técnico']}
+        <TabelaItens cabecalho={['Situação', 'Código de baixa', 'Equipe · técnico']}
           linhas={lista.map(i => ({
             id: i.visita_id, contrato: i.contrato, dia: i.dia,
             cols: [
               <>{situacaoRotulo(i.situacao)}
                 {i.central && <span className="block text-[10px] text-graf-400">cancelado pela central</span>}</>,
+              // 251 (D-365): "coloque o código de baixa também na parte do log" (Emanuel, 10/11)
+              i.baixa ?? <span className="text-graf-400">sem baixa</span>,
               quem(i.equipe, i.tecnico),
+            ],
+          }))} />
+      </>)}
+    </Detalhe>
+  )
+}
+
+/**
+ * A Revisita 30 D (250, D-363): cada VT que voltou de VT, com a VT de onde ela
+ * veio — quando, há quantos dias, como fechou e quem fez. Os botões filtram pela
+ * situação da ANTERIOR; "mesmo técnico" separa quem voltou na própria VT.
+ */
+function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: () => void }) {
+  const [so, setSo] = useState<string | null>(null)
+  const mesmo = (i: ItemRev30) => !!i.anterior_tecnico && i.anterior_tecnico === i.tecnico
+  const opcoes = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const i of itens) m.set(i.anterior_situacao, (m.get(i.anterior_situacao) ?? 0) + 1)
+    const sits = [...m.entries()].sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => ({ k, rotulo: <>anterior {situacaoRotulo(k).toLowerCase()}</>, n }))
+    const nm = itens.filter(mesmo).length
+    return nm ? [...sits, { k: 'MESMO', rotulo: <>mesmo técnico</>, n: nm }] : sits
+  }, [itens])
+  const lista = so == null ? itens
+    : so === 'MESMO' ? itens.filter(mesmo) : itens.filter(i => i.anterior_situacao === so)
+  const haDias = (n: number) => n === 0 ? 'no mesmo dia' : n === 1 ? 'há 1 dia' : `há ${n} dias`
+  return (
+    <Detalhe titulo="Revisita 30 D · VT que voltou de VT" contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
+      {itens.length === 0 ? (
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhuma VT voltou de outra VT em 30 dias no período.</p>
+      ) : (<>
+        <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
+        <TabelaItens cabecalho={['Veio da VT de', 'Como a anterior fechou', 'Quem fez a anterior', 'Agora']}
+          linhas={lista.map(i => ({
+            id: i.visita_id, contrato: i.contrato, dia: i.dia,
+            cols: [
+              <span className="whitespace-nowrap">
+                <LinkContrato to={`/controle/visita/${i.anterior_id}`}
+                  className="tabular text-af-400 underline underline-offset-2">{curta(i.anterior_data)}</LinkContrato>
+                <span className="tabular block text-[10px] font-semibold"
+                  style={{ color: i.dias <= 7 ? COR.naoExecutado : COR.atencao }}>{haDias(i.dias)}</span>
+              </span>,
+              <>{situacaoRotulo(i.anterior_situacao)}
+                {i.anterior_baixa && <span className="block text-[10px] text-graf-400">{i.anterior_baixa}</span>}</>,
+              <>{quem(i.anterior_equipe, i.anterior_tecnico)}
+                {mesmo(i) && (
+                  <span className="mt-0.5 inline-block rounded bg-amber-900/40 px-1.5 py-px text-[10px] font-semibold
+                                   text-amber-200 ring-1 ring-amber-700/50">mesmo técnico</span>
+                )}</>,
+              <>{situacaoRotulo(i.situacao)}
+                <span className="block text-[10px] text-graf-400">
+                  {i.equipe ? `equipe ${i.equipe}` : 'sem equipe'}{i.tecnico ? ` · ${i.tecnico}` : ''}</span></>,
             ],
           }))} />
       </>)}

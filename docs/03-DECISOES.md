@@ -13555,3 +13555,41 @@ Enter e Delete conferidos pelo que seria enviado, com a gravação travada; e as
   verde quando a linha fecha o mês na meta (o SE projetado), vermelho quando não.
 - Não mudou: na visão Real com "Mês todo", o dia de HOJE entra pela metade e pode pôr a linha no vermelho (o
   ELIECER: 4,00 ontem + 1,00 hoje = 2,50). "Até ontem" mostra o dia fechado.
+
+### D-363 · Dashboard VT: o card Revisita 30 D — VT que voltou de VT (250 — 10/11/2026)
+
+*"vamos criar mais um card chamado Revisita 30 D ao lado do log, lembrando que é VT da VT apenas, não entra outros
+serviços (...) quantas revisita tem no dia, dividido pelo total de VT do dia (...) o sistema pularia a VT cancelada e
+olharia outra VT que estivesse dentro de 30 dias"* (Emanuel, 10/11). Perguntado sobre a anterior reagendada (20 das
+32 VT com anterior tinham a anterior concluída, 8 reagendada, 4 noutra situação): *"Tudo menos Cancelada pela
+Central e Auditar"*.
+
+- **Régua própria**, `revisita_30d_vt(visitas)`: a VT anterior do MESMO contrato, do grupo VISITA TECNICA, nos 30
+  dias antes (mesmo dia conta se foi criada antes — o "até 30 dias" da revisita oficial). **Pula** a VT anterior
+  Auditar (800 na baixa da AFLINE) e cancelada pela central (status do TOA OU a marca do COP) e olha a de antes
+  dela. Qualquer outra situação conta: concluída, reagendada, em aberto, cancelada por outro motivo.
+- **Card = revisitas ÷ VT na conta** (sem Auditar e sem cancelado pela central — a VT de agora que é uma dessas não
+  é VT do dia). Sem meta combinada: o número não ganha cor de meta. Hoje (Manaus): 19 de 112 = 17,0%.
+- **Não é a revisita oficial.** `revisita_dos_contratos` (anterior concluída, qualquer serviço → VT) continua no
+  REV D-10, no painel "Revisita" dos ofensores e nos sinais. As duas existem lado a lado de propósito.
+- O clique abre a lista: o contrato, **de qual VT voltou** (data com link, "há N dias"), como a anterior fechou
+  (situação + código), quem fez a anterior e a situação de agora. Botões por situação da anterior e "mesmo técnico"
+  (a VT anterior foi do mesmo técnico da atual).
+
+Ensaiado como `authenticated` numa transação desfeita: o resto do painel saiu idêntico (`=` do jsonb sem as chaves
+novas) hoje e no mês; 160 ms no dia, 730 ms no mês.
+
+### D-364 · Dashboard VT: filtro de supervisor (250 — 10/11/2026)
+
+*"criar o filtro por supervisor também nessa janela"* (Emanuel, 10/11). Igual ao de área e bucket: vários, nada =
+todos, filtrado no banco. O supervisor é o da D-134 (o declarado no técnico → o login ligado à equipe → o texto da
+planilha); sem nenhum, "Sem supervisor". A equipe de VT continua decidida pelo dia inteiro, sem filtro. A versão de
+4 parâmetros saiu (ambígua no PostgREST). Em Manaus, 10/11: 58 das 129 VT caem em "Sem supervisor" — é cadastro
+que falta, não defeito do filtro.
+
+### D-365 · Dashboard VT: o código de baixa na lista do LOG (251 — 10/11/2026)
+
+*"coloque o código de baixa também por favor na parte do log"* (Emanuel, 10/11). Cada contrato da lista "LOG acima
+de 1" mostra os códigos das O.S. com baixa do TOA; sem nenhuma, os da AFLINE — a regra do código ofensor. Sem baixa,
+"sem baixa".
+
