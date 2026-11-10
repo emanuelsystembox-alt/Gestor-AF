@@ -13342,3 +13342,31 @@ tabela de Serviços tinha altura fixa (`100vh − 21rem`); agora mede o que sobr
 menos o que vem depois (paginação e rodapé, medidos pelo conteúdo da página — o `<main>` estica até o pé da
 janela, e medir pelo documento dava a própria altura do quadro). Medido a 1600×950: aberto 571 px (5
 contratos), recolhido 701 px (6), sobra embaixo ≤ 1 px.
+
+### D-353 · A janela do LOG olha 30 dias e conta revisita em qualquer situação; LOG acima de 1 e TEC1 clicáveis no Dashboard VT (241 — 10/11/2026)
+
+*"nessa lista de anterior, o correto é aparecer somente contratos anterior de até 30 dias, passou disso não
+precisa. entra como revisita nessa tela, mesmo que seja cancelamento, pra eu saber de onde vem a revisita"*
+(Emanuel, 10/11). Na janela do LOG (Dashboard), "Anterior aqui" procura só nos 30 dias antes — sem anterior
+nesse prazo, "nada aqui nos últimos 30 dias" (era "nunca passou por aqui", que mostrava anterior de 217 dias).
+**Revisita nessa tela** = par de grupos (D-245/D-313) + até 30 dias, em **qualquer** situação da anterior
+(cancelada, reagendada, em aberto, Auditar, cancelado pela central); a célula continua escrevendo "não
+concluiu". Entre as anteriores dos 30 dias, a preferida é a que faz par, depois a concluída, depois a mais recente.
+
+**Só nessa tela.** A revisita oficial (anterior **concluída**) segue a mesma no REV D-10, nos sinais, no
+Dashboard VT, no resumo e no risco de quebra. Para não ter duas cópias da regra: `anteriores_dos_contratos(ids,
+p_qualquer_situacao)` é a única busca, `revisita_dos_contratos(ids)` virou ela com o interruptor desligado, e o
+par de grupos mora em `par_de_revisita()`. Conferido antes de aplicar: a revisita oficial de 8.272 visitas (40
+dias) saiu **idêntica** antes e depois. Recusado: deixar a tela reclassificar a resposta da função antiga — ela
+prefere a concluída mais antiga à cancelada de 4 dias, e a tela não tem como achar a outra.
+
+*"adesão para retorno, em até 10 dias tem que subir o marcador rev d-10 também"* — já é a regra (D-313). O
+contrato do print (227106486, Adesão concluída 08/11 → Retorno 10/11) tem o REV D-10 no banco desde 06:25 de
+10/11, e a linha de Serviços mostra. Não reproduziu; nada mudou.
+
+*"o sistema deve mostrar nos card os log alto acima de 1, da opção para o usuario clicar tanto no log como no
+TEC1"* (Emanuel, 10/11). Dashboard VT: o card do LOG ganha "N com LOG acima de 1" e os dois cards (LOG e TEC1)
+viram botão que abre a lista embaixo da régua. LOG: os contratos com LOG 2+ no universo do card (sem Auditar; o
+cancelado pela central entra, 216), com filtro por valor. TEC1: cada O.S. que o card conta, com a classe de
+`tec1_da_os` (a mesma chamada — card e lista batem: 101 O.S., 9 no prazo, 92 em aberto em 10/11), fora do prazo
+primeiro. O LOG continua sendo julgado pelo LOG 3+ (meta 1,4%); "acima de 1" é só a lista.

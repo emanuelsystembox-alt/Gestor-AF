@@ -269,7 +269,8 @@ function Tec1Perdido({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
  * A ordem e por LOG decrescente: quem voltou oito vezes e a primeira
  * linha, nao a decima — e por ela que se abre a tela.
  */
-/** 163: a visita anterior do contrato NA NOSSA agenda (`revisita_dos_contratos`). */
+/** 163: a visita anterior do contrato NA NOSSA agenda — 241: pelos 30 dias da
+ *  janela do LOG (`anteriores_dos_contratos` com o interruptor ligado). */
 interface Anterior {
   visita_id: string
   anterior_id: string | null
@@ -294,11 +295,14 @@ type FiltroAqui = 'REVISITA' | 'PASSOU' | 'NUNCA'
  * │ >  revisita" — Emanuel, 31/10                                     │
  * │                                                                    │
  * │ O LOG é da CLARO e conta a agenda inteira dela. A coluna "Anterior │
- * │ aqui" é a NOSSA: a última visita concluída do contrato na nossa   │
- * │ agenda (sem concluída, a última de qualquer situação). REVISITA   │
- * │ é a regra do Emanuel, que mora no banco (163): anterior concluída,│
- * │ até 30 dias, e o par de grupos certo. "Nunca passou por aqui" só  │
- * │ vale desde que a cidade começou a ser importada.                  │
+ * │ aqui" é a NOSSA, e só olha os 30 dias antes (241, D-353): "passou │
+ * │ disso não precisa" (Emanuel, 10/11).                              │
+ * │                                                                    │
+ * │ REVISITA aqui é o par de grupos + até 30 dias, em QUALQUER        │
+ * │ situação da anterior — "mesmo que seja cancelamento, pra eu saber │
+ * │ de onde vem a revisita" (Emanuel, 10/11). Só NESTA tela: o REV    │
+ * │ D-10 e os painéis seguem a revisita oficial (anterior concluída,  │
+ * │ D-245). A célula escreve "não concluiu" quando for o caso.        │
  * └────────────────────────────────────────────────────────────────────┘
  */
 function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => void }) {
@@ -328,7 +332,8 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
     if (!chaveIds) { setAnteriores(new Map()); return }
     let vivo = true
     setAnteriores(null); setErroAnterior(null)
-    supabase.rpc('revisita_dos_contratos', { p_visitas: chaveIds.split(',') })
+    supabase.rpc('anteriores_dos_contratos',
+      { p_visitas: chaveIds.split(','), p_qualquer_situacao: true })
       .then(({ data, error }) => {
         if (!vivo) return
         if (error) { setErroAnterior(error.message); setAnteriores(new Map()); return }
@@ -475,7 +480,7 @@ function LogRetornos({ linhas, aoFechar }: { linhas: Visita[]; aoFechar: () => v
             ) : erroAnterior ? (
               <span className="text-xs text-af-400">Não consegui ler as anteriores: {erroAnterior}</span>
             ) : ([['REVISITA', 'Revisita'], ['PASSOU', 'Já passou, não é revisita'],
-                  ['NUNCA', 'Nunca passou por aqui']] as const).map(([k, rot]) => (
+                  ['NUNCA', 'Nada aqui em 30 dias']] as const).map(([k, rot]) => (
               <button key={k} onClick={() => setSoAqui(soAqui === k ? null : k)}
                 aria-pressed={soAqui === k}
                 className={`rounded px-2 py-0.5 text-xs ${soAqui === k
@@ -558,7 +563,7 @@ function CelulaAnterior({ a, carregando, erro }:
   // Erro não é "nunca passou": é "não sei" (regra 6).
   if (erro) return <span className="text-graf-400">não consegui ler</span>
   if (!a?.anterior_id) {
-    return <span className="text-graf-400">nunca passou por aqui</span>
+    return <span className="text-graf-400">nada aqui nos últimos 30 dias</span>
   }
   const concluiu = a.anterior_situacao === 'CONCLUIDA'
   return (

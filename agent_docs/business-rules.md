@@ -570,6 +570,11 @@ REINSTALACAO, MUDANCA DE ENDERECO → RETORNO DE CREDENCIADA; RETORNO → RETORN
 SERVICO→SERVICO e ADESAO→ADESAO **não** contam (perguntado, 31/10). Não escreva a
 regra de novo em outra tela: chame a função.
 
+**Na janela do LOG (só nela) a revisita vale em qualquer situação da anterior** (241, D-353):
+*"entra como revisita nessa tela, mesmo que seja cancelamento"* (Emanuel, 10/11). Lá a anterior
+só é procurada nos 30 dias antes. É `anteriores_dos_contratos(ids, true)`; a oficial é a mesma
+função com `false` (`revisita_dos_contratos`), e o par de grupos mora em `par_de_revisita()`.
+
 **O card de Revisita do técnico tem conta própria** (`revisita_do_tecnico`, 164,
 D-246), e é diferente por skill. Conta para quem fez o serviço ANTERIOR; serviços do
 período, retorno até 30 dias depois. ADESÃO: concluídos que voltaram como retorno ou

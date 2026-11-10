@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, SITUACAO_INFO } from '../lib/supabase'
 import { isoLocal, equipeRotulo } from '../lib/formato'
 import { Painel, BarrasHorizontais, TabelaSimples } from './graficos'
 import { Alerta, Vazio } from './ui'
@@ -74,6 +74,22 @@ interface DadosVT {
               vt: number; vt_eq: number; equipes: number }[]
   /** 217: LOG, endereço e a chave da rua (normalizada no banco) de cada contrato. */
   contratos?: Record<string, InfoContrato>
+  /** 241: os contratos com LOG acima de 1, no universo do card do LOG. */
+  log_lista?: ItemLog[]
+  /** 241: cada O.S. que o card do TEC1 conta, com a classe dela. */
+  tec1_lista?: ItemTec1[]
+}
+interface ItemLog {
+  visita_id: string; contrato: string | null; log: number; situacao: string
+  central: boolean; equipe: string | null; tecnico: string | null
+}
+type ClasseTec1 = 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA'
+interface ItemTec1 {
+  visita_id: string; os_id: string; contrato: string | null; numero_os: string | null
+  /** nulo = em aberto: não entra no TEC1 ainda */
+  classe: ClasseTec1 | null
+  janela_inicio: string | null; janela_fim: string | null; fim: string | null
+  situacao: string; equipe: string | null; tecnico: string | null; baixa: string | null
 }
 interface InfoContrato {
   log: number | null; endereco: string | null; complemento: string | null
@@ -214,6 +230,10 @@ function Conteudo({ d }: { d: DadosVT }) {
   const okLog = vLog == null ? null : vLog <= META_LOG
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
+  // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
+  const [ver, setVer] = useState<'LOG' | 'TEC1' | null>(null)
+  const logAlto = d.log_lista ?? []
+  const alternar = (k: 'LOG' | 'TEC1') => setVer(v => v === k ? null : k)
 
   return (
     <ContratosCtx.Provider value={d.contratos ?? {}}>
@@ -224,6 +244,8 @@ function Conteudo({ d }: { d: DadosVT }) {
             cor={medidasTec1 === 0 ? undefined : corMeta(naMeta)}
             meta={`meta ≥ ${META_TEC1}%`} atingiu={medidasTec1 === 0 ? null : naMeta}
             dica="Atendimento no prazo, por O.S., só do que o TOA encerrou"
+            aoClicar={d.tec1_lista ? () => alternar('TEC1') : undefined} aberto={ver === 'TEC1'}
+            chamada="ver as O.S."
             barra={medidasTec1 > 0 && (
               <BarraMeta valor={(d.tec1.padrao * 100) / medidasTec1} meta={META_TEC1}
                 cor={naMeta ? COR.executado : COR.atencao} />
@@ -244,10 +266,19 @@ function Conteudo({ d }: { d: DadosVT }) {
           <Indicador rotulo="LOG" valor={pLog} sufixo="%" cor={corMeta(okLog)}
             meta={`meta ≤ ${fmtMeta(META_LOG)}%`} atingiu={okLog}
             dica="Contratos com LOG 3 ou mais"
+            aoClicar={d.log_lista ? () => alternar('LOG') : undefined} aberto={ver === 'LOG'}
+            chamada="ver LOG acima de 1"
             barra={d.log.base > 0 && <FaixaLog porLog={d.log.por_log} base={d.log.base} />}
             apoio={<>
               <span className="tabular">{n0(d.log.log3)}</span> de{' '}
               <span className="tabular">{n0(d.log.base)}</span> contratos em LOG 3+
+              {/* 241: "mostrar nos card os log alto acima de 1" (Emanuel, 10/11) */}
+              {d.log_lista && (
+                <span className="block">
+                  <span className={`tabular font-semibold ${logAlto.length ? 'text-amber-300' : ''}`}>
+                    {n0(logAlto.length)}</span> com LOG acima de 1
+                </span>
+              )}
               {d.log.sem_log > 0 && (
                 <span className="block" title="A planilha do TOA não trouxe o Contador de log: não é LOG 0, fica fora da conta">
                   <span className="tabular">{n0(d.log.sem_log)}</span> sem log
@@ -303,6 +334,16 @@ function Conteudo({ d }: { d: DadosVT }) {
           {d.auditar > 0 && <> · <span className="tabular">{n0(d.auditar)}</span> Auditar</>}
           {d.cancelado_central > 0 && <> · <span className="tabular">{n0(d.cancelado_central)}</span> Cancelado pela central</>}
         </p>
+        {ver === 'LOG' && d.log_lista && (
+          <div className="px-4 pb-3">
+            <ListaLogAlto itens={d.log_lista} aoFechar={() => setVer(null)} />
+          </div>
+        )}
+        {ver === 'TEC1' && d.tec1_lista && (
+          <div className="px-4 pb-3">
+            <ListaTec1 itens={d.tec1_lista} aoFechar={() => setVer(null)} />
+          </div>
+        )}
       </section>
 
       {/* ===== 2. a carga: média por equipe de VT, janela × área ===== */}
@@ -467,7 +508,8 @@ function JanelaPorArea({ celulas, className = '' }: { celulas: CelulaJA[]; class
 }
 
 // ========================================================== indicador --
-function Indicador({ rotulo, valor, sufixo, cor, apoio, barra, segundo, dica, meta, atingiu }: {
+function Indicador({ rotulo, valor, sufixo, cor, apoio, barra, segundo, dica, meta, atingiu,
+  aoClicar, aberto, chamada }: {
   rotulo: string
   /** nulo = não há denominador: "—", nunca 0 (regra 6) */
   valor: string | null
@@ -481,9 +523,18 @@ function Indicador({ rotulo, valor, sufixo, cor, apoio, barra, segundo, dica, me
   meta?: string
   /** nulo = não dá para julgar (sem denominador) */
   atingiu?: boolean | null
+  /** 241: com ele, o card inteiro vira botão e abre a lista embaixo da régua */
+  aoClicar?: () => void
+  aberto?: boolean
+  chamada?: string
 }) {
+  const Caixa = aoClicar ? 'button' : 'div'
   return (
-    <div title={dica}>
+    <Caixa title={dica} onClick={aoClicar} type={aoClicar ? 'button' : undefined}
+      aria-expanded={aoClicar ? !!aberto : undefined}
+      className={aoClicar
+        ? `block w-full rounded-md text-left transition hover:bg-graf-900/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-af-500 ${aberto ? 'bg-graf-900/70' : ''}`
+        : undefined}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="flex items-baseline gap-1">
           <span className={`tabular font-bold leading-none ${valor && valor.length > 7 ? 'text-xl' : 'text-3xl'}`}
@@ -505,7 +556,12 @@ function Indicador({ rotulo, valor, sufixo, cor, apoio, barra, segundo, dica, me
       </div>
       {barra && <div className="mt-2">{barra}</div>}
       <div className="mt-1.5 text-[11px] leading-snug text-graf-400">{apoio}</div>
-    </div>
+      {aoClicar && (
+        <div className="mt-1 text-[11px] font-medium text-af-400">
+          {aberto ? 'fechar a lista' : `${chamada ?? 'ver a lista'} →`}
+        </div>
+      )}
+    </Caixa>
   )
 }
 
@@ -874,14 +930,18 @@ function Detalhe({ titulo, contagem, aoFechar, children }: {
  * O endereço é dado de assinante: aparece aqui porque o RLS já deixa esta
  * pessoa ver o contrato, e nunca vai para a URL.
  */
-function TabelaItens({ cabecalho = [], linhas }: {
+function TabelaItens({ cabecalho = [], linhas, agruparRua = true }: {
   /** as colunas DEPOIS de Contrato, LOG e Endereço */
   cabecalho?: string[]
   linhas: { id: string; contrato: string | null; cols: ReactNode[] }[]
+  /** 241: falso na lista por O.S. (TEC1) — duas O.S. do mesmo contrato não são
+   *  "dois na mesma rua", e a ordem da lista é a da classe. */
+  agruparRua?: boolean
 }) {
   const info = useContext(ContratosCtx)
   const { ordenadas, porRua, ruasRepetidas } = useMemo(() => {
     const porRua = new Map<string, number>()
+    if (!agruparRua) return { ordenadas: linhas, porRua, ruasRepetidas: 0 }
     for (const l of linhas) {
       const r = info[l.id]?.rua
       if (r) porRua.set(r, (porRua.get(r) ?? 0) + 1)
@@ -898,7 +958,7 @@ function TabelaItens({ cabecalho = [], linhas }: {
       return a.i - b.i
     }).map(x => x.l)
     return { ordenadas, porRua, ruasRepetidas: [...porRua.values()].filter(v => v > 1).length }
-  }, [linhas, info])
+  }, [linhas, info, agruparRua])
 
   return (
     <div className="max-h-72 overflow-y-auto">
@@ -947,5 +1007,120 @@ function TabelaItens({ cabecalho = [], linhas }: {
         </tbody>
       </table>
     </div>
+  )
+}
+
+// =============================================== 241: LOG alto e TEC1 --
+const situacaoRotulo = (s: string) =>
+  SITUACAO_INFO[s as keyof typeof SITUACAO_INFO]?.label ?? s
+const quem = (equipe: string | null, tecnico: string | null) => (
+  <>
+    {equipe ? `equipe ${equipe}` : <span className="text-graf-400">sem equipe</span>}
+    {tecnico && <span className="block text-[10px] text-graf-400">{tecnico}</span>}
+  </>
+)
+
+/** Botões de filtro de uma lista: "Todos" + um por valor, com a contagem. */
+function Chips<K extends string | number>({ opcoes, valor, aoEscolher, total }: {
+  opcoes: { k: K; rotulo: ReactNode; n: number }[]
+  valor: K | null; aoEscolher: (k: K | null) => void; total: number
+}) {
+  const cls = (on: boolean) => `inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs ${on
+    ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-3 py-2">
+      <button type="button" onClick={() => aoEscolher(null)} aria-pressed={valor == null} className={cls(valor == null)}>
+        Todos <span className="tabular opacity-80">{total}</span>
+      </button>
+      {opcoes.map(o => (
+        <button key={String(o.k)} type="button" aria-pressed={valor === o.k}
+          onClick={() => aoEscolher(valor === o.k ? null : o.k)} className={cls(valor === o.k)}>
+          {o.rotulo} <span className="tabular">{o.n}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Os contratos com LOG acima de 1 (241, D-353) — o mesmo universo do card do
+ * LOG (sem Auditar; o cancelado pela central entra, 216). LOG 1 fica de fora:
+ * "os log alto acima de 1" (Emanuel, 10/11).
+ */
+function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => void }) {
+  const [so, setSo] = useState<number | null>(null)
+  const opcoes = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const i of itens) m.set(i.log, (m.get(i.log) ?? 0) + 1)
+    return [...m.entries()].sort((a, b) => a[0] - b[0])
+      .map(([k, n]) => ({ k, rotulo: <SeloLog valor={k} />, n }))
+  }, [itens])
+  const lista = so == null ? itens : itens.filter(i => i.log === so)
+  return (
+    <Detalhe titulo="LOG acima de 1" contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
+      {itens.length === 0 ? (
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhum contrato de VT com LOG acima de 1 neste dia.</p>
+      ) : (<>
+        <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
+        <TabelaItens cabecalho={['Situação', 'Equipe · técnico']}
+          linhas={lista.map(i => ({
+            id: i.visita_id, contrato: i.contrato,
+            cols: [
+              <>{situacaoRotulo(i.situacao)}
+                {i.central && <span className="block text-[10px] text-graf-400">cancelado pela central</span>}</>,
+              quem(i.equipe, i.tecnico),
+            ],
+          }))} />
+      </>)}
+    </Detalhe>
+  )
+}
+
+const TEC1_ROTULO: Record<ClasseTec1 | 'ABERTO', string> = {
+  SEM_PADRAO: 'Fora do prazo', PADRAO: 'No prazo', EXPURGADA: 'Expurgada', ABERTO: 'Em aberto',
+}
+const horaDe = (iso: string | null) => iso
+  ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'
+
+/**
+ * As O.S. que o card do TEC1 conta (241, D-353), com a classe de
+ * `tec1_da_os` — a mesma chamada do card, então card e lista batem. A
+ * ordem vem do banco: fora do prazo primeiro.
+ */
+function ListaTec1({ itens, aoFechar }: { itens: ItemTec1[]; aoFechar: () => void }) {
+  const [so, setSo] = useState<ClasseTec1 | 'ABERTO' | null>(null)
+  const opcoes = useMemo(() => (['SEM_PADRAO', 'PADRAO', 'EXPURGADA', 'ABERTO'] as const)
+    .map(k => ({ k, rotulo: TEC1_ROTULO[k], n: itens.filter(i => (i.classe ?? 'ABERTO') === k).length }))
+    .filter(o => o.n > 0), [itens])
+  const lista = so == null ? itens : itens.filter(i => (i.classe ?? 'ABERTO') === so)
+  return (
+    <Detalhe titulo="TEC1 por O.S." contagem={`${lista.length} O.S.`} aoFechar={aoFechar}>
+      {itens.length === 0 ? (
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhuma O.S. de VT neste dia.</p>
+      ) : (<>
+        <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
+        <TabelaItens agruparRua={false} cabecalho={['O.S.', 'Janela', 'Fim', 'TEC1', 'Equipe · técnico']}
+          linhas={lista.map(i => ({
+            id: i.visita_id, contrato: i.contrato,
+            cols: [
+              <>{i.numero_os ?? '—'}
+                {i.baixa && <span className="block text-[10px] text-graf-400">{i.baixa}</span>}</>,
+              <span className="tabular whitespace-nowrap">
+                {i.janela_inicio ? `${i.janela_inicio.slice(0, 5)}–${i.janela_fim?.slice(0, 5) ?? '?'}` : 'sem janela'}
+              </span>,
+              <span className="tabular">{horaDe(i.fim)}</span>,
+              <span className="whitespace-nowrap font-medium" style={{
+                color: i.classe === 'SEM_PADRAO' ? COR.atencao
+                  : i.classe === 'PADRAO' ? COR.executado : undefined }}>
+                {TEC1_ROTULO[i.classe ?? 'ABERTO']}
+                {i.classe == null && (
+                  <span className="block text-[10px] font-normal text-graf-400">{situacaoRotulo(i.situacao)}</span>
+                )}
+              </span>,
+              quem(i.equipe, i.tecnico),
+            ],
+          }))} />
+      </>)}
+    </Detalhe>
   )
 }
