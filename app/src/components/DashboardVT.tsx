@@ -58,6 +58,8 @@ interface DadosVT {
   at1: { vt_com_base: number; base: number | null; vt_sem_base: number }
   /** 224 (D-335): as áreas com VT no dia, para o filtro, e o filtro aplicado. */
   areas_opcoes?: { area_id: string; rotulo: string }[]
+  /** 246 (D-358): os buckets com VT no período, para o filtro */
+  buckets_opcoes?: { bucket: string; n: number }[]
   areas_filtro?: string[]
   areas: { area_id: string; codigo: string; rotulo: string; clientes: number | null
            desde: string | null; vt: number }[]
@@ -187,11 +189,18 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
   // matriz e as listas saem de lá já filtrados.
   const [areas, setAreas] = useState<string[]>([])
   const [opcoesArea, setOpcoesArea] = useState<OpcaoMultipla[]>([])
+  // 246 (D-358): "falta adicionar o filtro do bucket" (Emanuel, 10/11) — igual ao de área
+  const [buckets, setBuckets] = useState<string[]>([])
+  const [opcoesBucket, setOpcoesBucket] = useState<OpcaoMultipla[]>([])
 
   useEffect(() => {
     let vivo = true
     setCarregando(true); setErro(null)
-    supabase.rpc('dashboard_visita_tecnica', { p_dia: de, p_ate: ate, ...(areas.length ? { p_areas: areas } : {}) })
+    supabase.rpc('dashboard_visita_tecnica', {
+      p_dia: de, p_ate: ate,
+      ...(areas.length ? { p_areas: areas } : {}),
+      ...(buckets.length ? { p_buckets: buckets } : {}),
+    })
       .then(({ data, error }) => {
       if (!vivo) return
       if (error) setErro(error.message)
@@ -199,11 +208,14 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
         const x = data as DadosVT
         setD(x); setAtualizado(new Date())
         setOpcoesArea((x.areas_opcoes ?? []).map(a => ({ valor: a.area_id, rotulo: a.rotulo })))
+        setOpcoesBucket((x.buckets_opcoes ?? []).map(b => ({
+          valor: b.bucket, rotulo: b.bucket === 'SEM_BUCKET' ? 'Sem bucket' : b.bucket, qtd: b.n,
+        })))
       }
       setCarregando(false)
     })
     return () => { vivo = false }
-  }, [de, ate, versao, areas])
+  }, [de, ate, versao, areas, buckets])
 
   return (
     <section aria-labelledby="dvt-titulo" className="space-y-3">
@@ -238,6 +250,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
         <SelecaoMultipla rotulo="Área" todos="Toda área" plural="áreas"
           opcoes={opcoesArea} valor={areas} onChange={setAreas}
           className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
+        <SelecaoMultipla rotulo="Bucket" todos="Todo bucket" plural="buckets"
+          opcoes={opcoesBucket} valor={buckets} onChange={setBuckets}
+          className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
         <div className="ml-auto flex items-center gap-3">
           <Link to={`/controle/servicos?de=${de}&ate=${ate}&grupo=${encodeURIComponent('VISITA TECNICA')}`}
             className="text-[11px] text-af-400 underline-offset-2 hover:underline">
@@ -259,9 +274,9 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
 
       {d && d.total === 0 && !erro && (
         <div className="card-controle">
-          {areas.length
-            ? <Vazio titulo="Nenhuma visita técnica nas áreas escolhidas"
-                descricao="No período, as áreas marcadas no filtro não têm contrato de VISITA TECNICA." />
+          {areas.length || buckets.length
+            ? <Vazio titulo="Nenhuma visita técnica nos filtros escolhidos"
+                descricao="No período, as áreas e os buckets marcados não têm contrato de VISITA TECNICA." />
             : <Vazio titulo="Nenhuma visita técnica no período"
                 descricao="Nenhum contrato do grupo VISITA TECNICA na cidade ativa." />}
         </div>

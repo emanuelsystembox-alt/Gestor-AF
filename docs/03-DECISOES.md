@@ -13461,3 +13461,13 @@ dele compara com `$AI$3 = 3` (os outros com `$AI$2 = 5,7`).
 Testado sem gravar ninguém: no banco, numa transação desfeita (gestão grava; sobreposição recusada; técnico
 recusado; anon sem EXECUTE); na tela, com períodos fingidos no navegador e toda gravação travada. **Nenhum login
 foi marcado ETN** — o ELIECER, que é ETN na planilha (01 a 08/11), fica para a operação marcar.
+
+### D-358 · Dashboard VT: filtro de bucket (246 — 10/11/2026)
+
+*"falta adicionar o filtro do bucket por favor em nosso dashboard da VT"* (Emanuel, 10/11). Ao lado do filtro de
+área e igual a ele (D-335): vários buckets, nada marcado = todos, cada opção com a contagem de VT no período, e o
+filtro vai ao **banco** — cards, gráficos e listas saem filtrados. A equipe de VT continua decidida pelo dia
+inteiro, como na área. Sem bucket = `SEM_BUCKET` ("Sem bucket" na tela), o token da Certidão em Indicadores. O
+grupo VISITA TECNICA vem de mais de um bucket (10/11: MAN-AFLINE 40, MAN-AFLINE_01_VT 79, sem bucket 1) — por isso
+o filtro importa. A RPC ganhou `p_buckets`; a versão de 3 parâmetros saiu (chamada ambígua). Conferido: sem
+filtro, a resposta é idêntica à de antes (fora as duas chaves novas).
