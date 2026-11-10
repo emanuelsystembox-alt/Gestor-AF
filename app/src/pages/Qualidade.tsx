@@ -11,6 +11,7 @@ import {
   type Desfecho, type Triagem, type Estagio,
 } from '../lib/qualidade'
 import { LinkContrato } from '../components/LinkContrato'
+import { useSearchParams } from 'react-router-dom'
 
 /*
  * ┌─ 238: o décimo desfecho, REFAZER CABEAMENTO ─────────────────────────┐
@@ -144,8 +145,14 @@ export default function Qualidade() {
   const podeRegistrar = pode('qualidade.registrar')
 
   const [aba, setAba] = useState<'FILA' | 'PAINEL'>('FILA')
-  const [de, setDe] = useState(isoLocal())
-  const [ate, setAte] = useState(isoLocal())
+  // 253 (D-367): o selo "Pós" de Serviços e da Revisita 30 D abre a fila no
+  // contrato: ?dia=AAAA-MM-DD&visita=<id>&contrato=<n>
+  const [params] = useSearchParams()
+  const diaLink = /^\d{4}-\d{2}-\d{2}$/.test(params.get('dia') ?? '') ? params.get('dia')! : null
+  const foco = params.get('visita')
+    ? { visita: params.get('visita')!, contrato: params.get('contrato') ?? '' } : null
+  const [de, setDe] = useState(diaLink ?? isoLocal())
+  const [ate, setAte] = useState(diaLink ?? isoLocal())
 
   return (
     <Shell acoes={
@@ -179,7 +186,7 @@ export default function Qualidade() {
         </div>
 
         {aba === 'FILA'
-          ? <AbaFila de={de} ate={ate} podeRegistrar={podeRegistrar} />
+          ? <AbaFila de={de} ate={ate} podeRegistrar={podeRegistrar} foco={foco} />
           : <AbaPainel de={de} ate={ate} />}
       </div>
     </Shell>
@@ -190,16 +197,18 @@ export default function Qualidade() {
 //  ABA 1 · LIGAÇÕES DO DIA
 // ================================================================== //
 
-function AbaFila({ de, ate, podeRegistrar }: {
+function AbaFila({ de, ate, podeRegistrar, foco }: {
   de: string; ate: string; podeRegistrar: boolean
+  /** 253: veio pelo selo "Pós" — abre este contrato, em Todos, buscado */
+  foco?: { visita: string; contrato: string } | null
 }) {
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
-  const [aberto, setAberto] = useState<string | null>(null)
+  const [aberto, setAberto] = useState<string | null>(foco?.visita ?? null)
 
-  const [triagem, setTriagem] = useState<Triagem>('PENDENTE')
-  const [busca, setBusca] = useState('')
+  const [triagem, setTriagem] = useState<Triagem>(foco ? 'TODOS' : 'PENDENTE')
+  const [busca, setBusca] = useState(foco?.contrato ?? '')
   const [fGrupo, setFGrupo] = useState('TODOS')
   const [fSituacao, setFSituacao] = useState('TODAS')
   const [fBaixa, setFBaixa] = useState('TODOS')
@@ -223,6 +232,12 @@ function AbaFila({ de, ate, podeRegistrar }: {
   }, [de, ate])
 
   useEffect(() => recarregar(), [recarregar])
+
+  // 253: depois de carregar, leva a tela até o contrato do link
+  useEffect(() => {
+    if (!foco || carregando) return
+    document.getElementById(`qualidade-${foco.visita}`)?.scrollIntoView({ block: 'center' })
+  }, [foco?.visita, carregando])
 
   // O "há 2 h" do aguardando anda sozinho; um tique por minuto basta.
   const [agora, setAgora] = useState(() => Date.now())
@@ -468,7 +483,7 @@ function LinhaFila({ l, agora, aberto, podeRegistrar, aoAbrir, aoSalvar, aoMudar
 }) {
   const d = l.desfecho ? DESFECHO_POR_CHAVE[l.desfecho] : null
   return (<>
-    <tr onClick={aoAbrir}
+    <tr onClick={aoAbrir} id={`qualidade-${l.visita_id}`}
       className={`cursor-pointer border-b border-graf-800/60 align-top hover:bg-graf-900/60
                   ${aberto ? 'bg-graf-900' : ''}`}>
       <td className="tabular px-3 py-2.5 font-semibold">

@@ -10,6 +10,7 @@ import { RelogioServico } from './RelogioServico'
 import { SeloLog } from './SeloLog'
 import { corDoLog } from '../lib/log'
 import { SeloSinal, type SinalResumo } from './SinalClaro'
+import { SeloPosAtivo, linkPosAtivo, type PosAtivo } from './SeloPosAtivo'
 import { SinaisContrato, useSinaisDasVisitas } from './SinaisContrato'
 import { ORIGEM_CANCELADA_INFO, origemCancelada } from '../lib/filtroContratos'
 import { idadeMin, tendencia, useAproximacao, type Aproximacao } from '../lib/aproximacao'
@@ -127,6 +128,15 @@ function SeloMarcador({ m, nome }: { m: { observacao?: string | null }; nome: st
   )
 }
 
+/** 253: junta o desfecho e o aguardando ABERTO num pós só. */
+const posDaLinha = (v: ContratoLinha): PosAtivo | null => {
+  const ag = (v.pos_aguardando ?? []).find(a => a.encerrado_em == null) ?? null
+  if (!v.pos && !ag) return null
+  return { desfecho: v.pos?.desfecho ?? null, observacao: v.pos?.observacao ?? null,
+           registrado_em: v.pos?.registrado_em ?? null, tentativas: v.pos?.tentativas ?? null,
+           aguardando_em: ag?.marcado_em ?? null }
+}
+
 export const SELECT_CONTRATO = `
   id, toa_atividade_id, wo_numero, contrato, cliente_nome,
   logradouro, complemento, bairro,
@@ -157,7 +167,9 @@ export const SELECT_CONTRATO = `
   sinal_claro ( inicial_texto, inicial_cor, validacao_texto, validacao_cor, status_os_texto,
                 inicial_resumo, validacao_resumo ),
   evidencias:evidencia ( count ),
-  equipamentos:equipamento_movimento ( count )
+  equipamentos:equipamento_movimento ( count ),
+  pos:pesquisa_qualidade ( desfecho, observacao, registrado_em, tentativas ),
+  pos_aguardando:qualidade_aguardando ( marcado_em, encerrado_em )
 `
 
 /** Baixa é dupla (D-042): a da operadora vem do TOA, a da AFLINE é nossa. */
@@ -192,6 +204,10 @@ export type ContratoLinha = Omit<Visita, 'ordem_servico'> & {
   /** O sinal antes/depois do portal da Claro (222, D-330). Um-para-um:
    *  o PostgREST devolve OBJETO. Nulo = o portal ainda não foi lido. */
   sinal_claro?: SinalResumo | null
+  /** 253 (D-367): o pós-ativo. `pesquisa_qualidade` é um-para-um (OBJETO);
+   *  `qualidade_aguardando` vem em lista (o aberto tem `encerrado_em` nulo). */
+  pos?: Omit<PosAtivo, 'aguardando_em'> | null
+  pos_aguardando?: { marcado_em: string; encerrado_em: string | null }[] | null
   /** O tecnico fechou a atividade no TOA.  vem preenchido mesmo
    *  em atividade so iniciada -- sem isto a tela dizia "encerrou" para
    *  quem nao encerrou (D-103). */
@@ -836,6 +852,12 @@ export function TabelaContratos({
                 {detalhada && (
                   <FaixaJanela inicio={v.janela_inicio} fim={v.janela_fim}
                     encerrou={v.finalizado_toa ? hora(v.fim) : null} tec1={v.tec1} />
+                )}
+                {/* 253 (D-367): o pós-ativo, só quando ele registrou algo */}
+                {!jornada && (
+                  <SeloPosAtivo
+                    pos={posDaLinha(v)}
+                    para={linkPosAtivo(v.id, v.data_agendada, v.contrato)} />
                 )}
               </td>
 

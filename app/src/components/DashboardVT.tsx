@@ -6,6 +6,7 @@ import { Painel, BarrasHorizontais, TabelaSimples } from './graficos'
 import { Alerta, Vazio } from './ui'
 import { BotaoAtualizar } from './BotaoAtualizar'
 import { LinkContrato } from './LinkContrato'
+import { SeloPosAtivo, linkPosAtivo, temPosAtivo, type PosAtivo } from './SeloPosAtivo'
 import { SeloLog } from './SeloLog'
 import { SelecaoMultipla, type OpcaoMultipla } from './SelecaoMultipla'
 
@@ -125,6 +126,8 @@ interface ItemRev30 {
    *  (rótulo e cor da CLARO). Nulo = o portal não foi lido para ela. */
   anterior_sinal?: { validacao: string | null; cor: string | null; status_os: string | null
                      inicial: string | null; classe: string | null } | null
+  /** 253 (D-367): o pós-ativo da VT anterior. Nulo = ninguém registrou nada. */
+  anterior_pos?: PosAtivo | null
 }
 
 /** 252: a chave do filtro de validação — o rótulo da CLARO; sem leitura à parte. */
@@ -1367,7 +1370,7 @@ function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: ()
       ) : (<>
         <Chips rotulo="Situação da anterior" opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
         <Chips rotulo="Validação da anterior" opcoes={opcoesSinal} valor={soSinal} aoEscolher={setSoSinal} total={itens.length} />
-        <TabelaItens cabecalho={['Veio da VT de', 'Como a anterior fechou', 'Validação de sinal da anterior', 'Quem fez a anterior', 'Agora']}
+        <TabelaItens cabecalho={['Veio da VT de', 'Como a anterior fechou', 'Validação de sinal da anterior', 'Pós-ativo da anterior', 'Quem fez a anterior', 'Agora · com quem está']}
           linhas={lista.map(i => ({
             id: i.visita_id, contrato: i.contrato, dia: i.dia,
             cols: [
@@ -1397,14 +1400,22 @@ function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: ()
                   )}
                 </span>
               ) : <span className="text-graf-400" title="O Portal Técnico não foi lido para esta VT (a leitura começou em 06/11)">sem leitura do portal</span>,
+              // 253 (D-367): "preciso saber na anterior se teve pós ativo ou não, e o que foi informado"
+              temPosAtivo(i.anterior_pos)
+                ? <SeloPosAtivo pos={i.anterior_pos} comObservacao
+                    para={linkPosAtivo(i.anterior_id, i.anterior_data, i.contrato)} />
+                : <span className="text-graf-400">sem pós-ativo</span>,
               <>{quem(i.anterior_equipe, i.anterior_tecnico)}
                 {mesmo(i) && (
                   <span className="mt-0.5 inline-block rounded bg-amber-900/40 px-1.5 py-px text-[10px] font-semibold
                                    text-amber-200 ring-1 ring-amber-700/50">mesmo técnico</span>
                 )}</>,
-              <>{situacaoRotulo(i.situacao)}
-                <span className="block text-[10px] text-graf-400">
-                  {i.equipe ? `equipe ${i.equipe}` : 'sem equipe'}{i.tecnico ? ` · ${i.tecnico}` : ''}</span></>,
+              // 253: "preciso saber da equipe atual, com quem tá" — a equipe em destaque
+              <>{i.equipe
+                  ? <span className="font-semibold text-graf-100">equipe {i.equipe}</span>
+                  : <span className="text-amber-300">sem equipe</span>}
+                {i.tecnico && <span className="block text-[11px] text-graf-200">{i.tecnico}</span>}
+                <span className="block text-[10px] text-graf-400">{situacaoRotulo(i.situacao)}</span></>,
             ],
           }))} />
       </>)}

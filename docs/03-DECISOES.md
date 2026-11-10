@@ -13607,3 +13607,23 @@ não fez, ficou pendente"* (Emanuel, 10/11).
 - Segunda fileira de filtro na lista ("Validação da anterior") e, no card, "N com a anterior irregular" (vermelho do
   portal).
 
+### D-367 · O marcador do pós-ativo em Serviços e na Revisita 30 D (253 — 10/11/2026)
+
+*"preciso saber nessa tabela de serviços se o setor de pós ativo passou no contrato ou não (...) tem que ser uma
+sinalização suave, é bom mostrar só quando o pós atendimento colocar algum status (...) se ele não fez nada deixa
+vazio mesmo (...) e clicar em cima, jogar para o pós ativo pra entender mais no detalhe"* · *"no anexo 2 preciso
+saber da equipe atual com quem tá, e preciso saber na anterior se teve pós ativo ou não, e o que foi informado"*
+(Emanuel, 10/11).
+
+- **Serviços**: debaixo da janela, um selo discreto "Pós · <desfecho>" (bolinha na cor do desfecho, ✎ quando há
+  observação). Só aparece com desfecho registrado (`pesquisa_qualidade`) ou "aguardando cliente" aberto
+  (`qualidade_aguardando`, que é o estágio quando existe — `estagioDe`). Sem nada, a célula fica como era. Rótulo e
+  cor são os da Qualidade (`DESFECHOS`), num componente só (`SeloPosAtivo`). A dica diz se falou com o assinante,
+  quando, quantas tentativas e a observação.
+- **O clique** abre a Qualidade no dia do contrato, em "Todos", buscado pelo contrato e já aberto
+  (`/controle/qualidade?dia=&visita=&contrato=`).
+- **Revisita 30 D**: coluna "Pós-ativo da anterior" (o selo + a observação escrita; "sem pós-ativo" quando não há) e
+  "Agora · com quem está" com a equipe atual em destaque.
+- As duas tabelas têm RLS por `qualidade.ver`: quem não tem a permissão não vê o selo (o embed vem vazio, sem erro).
+  No mês, só 3 das 127 VT anteriores tinham pós-ativo registrado.
+
