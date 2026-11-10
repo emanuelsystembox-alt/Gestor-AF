@@ -13431,3 +13431,33 @@ lado a lado) — metade da altura.
 
 *"em cima o dashboard — vamos colocar Dashboard INST, renomear"*: o item do menu (e o caminho no topo) é
 **Dashboard INST**; a rota continua `/controle`.
+
+### D-357 · VT por equipe: o técnico ETN com meta 3, por período do login, e as cores da planilha (245 — 10/11/2026)
+
+*"Podemos clicar em cima do nome e dizer se o Técnico é ETN ou não, o ETN a meta dele é 3, ou seja é mais fácil,
+temos que ter a opção de duplicar o login, pois ele pode sair de ETN no dia tal e entrar como técnico normal no
+dia x, ou seja a soma é diferente, e temos que aplicar formatação de cores, tá muito sem vida (...) mas tá certo,
+só temos que fazer essa regra para o técnico ETN"* (Emanuel, 10/11).
+
+Derivado da planilha dele (*VT POR EQP MNS NOVEMBRO*): o ETN é marcado na aba ESCALA dia a dia, e o SE da linha
+dele compara com `$AI$3 = 3` (os outros com `$AI$2 = 5,7`).
+
+- **O ETN é um PERÍODO do login** (`vt_etn`: de, até; sem "até" = em aberto), não um atributo do técnico. Clicar
+  no nome abre o menu: os períodos do mês (Encerrar / Remover) e "Novo período ETN".
+- **"Duplicar o login"**: os dias dentro do período vão para uma segunda linha do mesmo login (selo ETN, meta
+  `vt_meta_etn` = 3); os de fora ficam na linha normal (meta 5,7). Cada linha tem DIAS, MÉDIA e SE próprios, e
+  a SOMA 1/0 conta as duas separadas. Na linha, o dia que pertence à outra aparece como "⋯". Se o mês inteiro
+  for ETN, a linha normal não aparece.
+- Períodos do mesmo login **não se sobrepõem** — o dia teria duas metas; o banco recusa com o recado.
+- Grava só a gestão, por RPC (`definir_etn_vt`, `encerrar_etn_vt`, `remover_etn_vt`), na cidade ativa, autor
+  carimbado — como a escala (234). Leitura por RLS na cidade ativa.
+- **Cores** = a formatação condicional da planilha, hex fixo nos dois temas: o dia acima de 6 verde, igual a 6
+  amarelo, abaixo vermelho; a média verde/vermelha contra a meta da linha; a média do dia no rodapé idem. O "6"
+  é a meta arredondada para cima — na linha ETN, **3** (a planilha usa 6 em toda linha; estender o corte para o
+  ETN foi escolha nossa, para a linha dele não ficar toda vermelha batendo a meta — confirmar com o Emanuel).
+- **Recusado:** o ETN como código da escala diária (como na planilha). Um dia com F dentro do período ETN
+  perderia o ETN, e o período teria de ser clicado dia a dia.
+
+Testado sem gravar ninguém: no banco, numa transação desfeita (gestão grava; sobreposição recusada; técnico
+recusado; anon sem EXECUTE); na tela, com períodos fingidos no navegador e toda gravação travada. **Nenhum login
+foi marcado ETN** — o ELIECER, que é ETN na planilha (01 a 08/11), fica para a operação marcar.

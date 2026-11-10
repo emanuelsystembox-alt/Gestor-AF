@@ -637,6 +637,15 @@ regra existe duas vezes e **muda junto**: `agrupamento_da_quebra()` no banco e
 `agrupamentoDaQuebra()` em `lib/metricas.ts`. O 205 (Falta Tap) é INFRA CLARO, como o 211
 (Falta NAP) da instalação.
 
+## VT por equipe: o técnico ETN (245, D-357)
+
+**O ETN tem meta 3 (`vt_meta_etn`); o técnico normal, 5,7 (`vt_meta_media`).** *"o ETN a meta dele é 3"*
+(Emanuel, 10/11; na planilha, `$AI$3`). O ETN é **período do login** (`vt_etn`, de/até, "até" vazio =
+em aberto), não marca do técnico: *"ele pode sair de ETN no dia tal e entrar como técnico normal no dia
+x"*. Os dias do período vão para uma segunda linha do login, com DIAS/MÉDIA/SE próprios — a SOMA 1/0
+conta as duas linhas separadas. Períodos do mesmo login não se sobrepõem (o banco recusa). Só a gestão
+grava, pela RPC, na cidade ativa.
+
 ## Relatórios (172, 173; D-259, D-260)
 
 **Até 3 meses por download, para todos — só o login admin@afline.com.br passa disso.** Pedido
