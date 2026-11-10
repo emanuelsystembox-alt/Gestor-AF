@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lerLog } from '../lib/log'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, EM_ABERTO, SITUACAO_INFO } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
@@ -96,8 +97,11 @@ function textoParaWhatsApp(vs: V[], de: string, ate: string): string {
   const blocos = vs.map(v => {
     const toa = codigos(v.ordem_servico.map(o => o.codigo_baixa))
     const afline = codigos(v.ordem_servico.map(o => o.baixa_afline))
+    // "falta saber qual é o log, é importante colocar" (Emanuel, 09/11). O mesmo
+    // leitor do selo da tabela; sem a coluna no TOA é "sem leitura", não 0.
+    const log = lerLog(v.contador_log)
     return [
-      `*Contrato ${v.contrato ?? '—'}*`,
+      `*Contrato ${v.contrato ?? '—'}* · ${log == null ? 'LOG sem leitura do TOA' : `LOG ${log}`}`,
       ...(variosDias ? [`Data: ${dataBR(v.data_agendada)}`] : []),
       `Equipe: ${v.equipe ? equipeRotulo(v.equipe.codigo, v.equipe.nome) : 'sem equipe'}`,
       `Técnico: ${v.tecnico?.nome ?? 'sem técnico'}`,
