@@ -74,10 +74,70 @@ const n1 = (x: number | null | undefined) =>
 const n2 = (x: number | null) => x == null ? '—' : x.toFixed(2).replace('.', ',')
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 
-/** O tom de um valor do dia: contra o limite (a meta arredondada para cima). */
+/** O tom de um valor do dia: contra o limite (a meta arredondada para cima).
+ *  Compara o que a tela MOSTRA (2 casas): "6,00" é amarelo, "5,99" vermelho. */
 function tomDoDia(v: number, limite: number) {
-  const r = Math.round(v * 10) / 10
+  const r = Math.round(v * 100) / 100
   return r > limite ? TOM.bom : r === limite ? TOM.meio : TOM.ruim
+}
+
+/** O que a conta precisa de um login — a tabela e o agregado por cidade (247). */
+interface LinhaConta {
+  login: string; nome?: string | null; equipe?: string | null
+  por_dia: { dia: string; vt: number; atividades?: number }[]
+  escala?: { dia: string; codigo: string }[]
+  sem_ponto?: number
+}
+
+/**
+ * As contas da planilha sobre um PERÍODO (de–até, dentro do mês). Uma função
+ * só para a tabela da cidade ativa e para o agregado por cidade (247, D-359),
+ * para os dois nunca divergirem. Dia fora do período não conta.
+ */
+function calcularVt<L extends LinhaConta>(linhas: L[], etns: PeriodoEtn[], p: {
+  meta: number; metaEtn: number; diasEquipe: number; de: string; ate: string
+  diasMes: number; corridos: number; dias: string[]
+}) {
+  const noPeriodo = (d: string) => d >= p.de && d <= p.ate
+  const rows = linhas.flatMap(l => {
+    const per = etns.filter(e => e.login === l.login)
+    const ehEtn = (d: string) => per.some(e => d >= e.de && (e.ate == null || d <= e.ate))
+    const monta = (etn: boolean, dentro: (d: string) => boolean) => {
+      const m = etn ? p.metaEtn : p.meta
+      const vt = new Map(l.por_dia.filter(x => Number(x.vt) > 0 && dentro(x.dia) && noPeriodo(x.dia))
+        .map(x => [x.dia, Number(x.vt)]))
+      const at = new Map(l.por_dia.map(x => [x.dia, x.atividades ?? 0]))
+      const esc = new Map((l.escala ?? []).filter(x => dentro(x.dia)).map(x => [x.dia, x.codigo]))
+      const valores = [...vt.values()]
+      const total = valores.reduce((s, x) => s + x, 0)
+      const nDias = valores.length
+      const media = nDias ? total / nDias : null
+      return {
+        ...l, chave: `${l.login}|${etn ? 'ETN' : 'N'}`, etn, meta: m, limiteDia: Math.ceil(m),
+        dentro, periodos: per, vt, at, esc, total, nDias, media, se: media != null && media >= m,
+      }
+    }
+    if (per.length === 0) return [monta(false, () => true)]
+    const doLogin = [monta(true, ehEtn)]
+    // a linha normal só some se o mês inteiro for ETN
+    if (!p.dias.every(ehEtn)) doLogin.unshift(monta(false, d => !ehEtn(d)))
+    return doLogin
+  })
+  const soma1 = rows.filter(r => r.se).reduce((s, r) => s + r.nDias, 0)
+  const soma0 = rows.filter(r => !r.se).reduce((s, r) => s + r.nDias, 0)
+  const realizadas = soma1 / p.diasEquipe
+  const proj = (x: number) => p.corridos ? (x / p.corridos) * p.diasMes : null
+  const porDia = p.dias.map(d => {
+    const v = rows.map(r => r.vt.get(d)).filter((x): x is number => x != null)
+    return { total: v.reduce((s, x) => s + x, 0), media: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null }
+  })
+  return {
+    rows, soma1, soma0, geral: soma1 + soma0, realizadas,
+    /** GERAL ÷ 21 — o número entre parênteses do relatório da operação */
+    soma10: (soma1 + soma0) / p.diasEquipe,
+    projetadas: proj(realizadas), projetadas10: proj((soma1 + soma0) / p.diasEquipe),
+    porDia, nEtn: rows.filter(r => r.etn).length,
+  }
 }
 
 export function VtPorEquipe() {
@@ -128,50 +188,28 @@ export function VtPorEquipe() {
     return () => { vivo = false }
   }, [mes, versao, dias])
 
-  // Dias corridos: o mês até hoje; mês fechado conta inteiro; mês futuro, zero.
-  const corridos = mes < hoje.slice(0, 7) ? dias.length
-    : mes > hoje.slice(0, 7) ? 0 : Number(hoje.slice(8, 10))
+  // 247 (D-359): "é bom ter um dia inicial e dia final dentro do mês" (Emanuel, 10/11).
+  // Abre no mês até hoje; trocar o mês volta para o mês inteiro (até hoje, se for o atual).
+  const ultimoDia = dias[dias.length - 1]
+  const fimPadrao = ultimoDia < hoje ? ultimoDia : hoje
+  const [deEsc, setDeEsc] = useState<string | null>(null)
+  const [ateEsc, setAteEsc] = useState<string | null>(null)
+  useEffect(() => { setDeEsc(null); setAteEsc(null) }, [mes])
+  const de = deEsc && deEsc.slice(0, 7) === mes ? deEsc : `${mes}-01`
+  const ateBruto = ateEsc && ateEsc.slice(0, 7) === mes ? ateEsc : fimPadrao
+  const ate = ateBruto < de ? de : ateBruto
+  const ontem = (() => { const d = new Date(hoje + 'T12:00'); d.setDate(d.getDate() - 1); return isoLocal(d) })()
 
-  const calc = useMemo(() => {
-    // Um login vira uma ou duas linhas: os dias em período ETN e os de fora.
-    const rows = linhas.flatMap(l => {
-      const per = etns.filter(p => p.login === l.login)
-      const ehEtn = (d: string) => per.some(p => d >= p.de && (p.ate == null || d <= p.ate))
-      const monta = (etn: boolean, dentro: (d: string) => boolean) => {
-        const m = etn ? metaEtn : meta
-        const vt = new Map(l.por_dia.filter(x => Number(x.vt) > 0 && dentro(x.dia)).map(x => [x.dia, Number(x.vt)]))
-        const at = new Map(l.por_dia.map(x => [x.dia, x.atividades]))
-        const esc = new Map(l.escala.filter(x => dentro(x.dia)).map(x => [x.dia, x.codigo]))
-        const valores = [...vt.values()]
-        const total = valores.reduce((s, x) => s + x, 0)
-        const nDias = valores.length
-        const media = nDias ? total / nDias : null
-        return {
-          ...l, chave: `${l.login}|${etn ? 'ETN' : 'N'}`, etn, meta: m, limiteDia: Math.ceil(m),
-          dentro, periodos: per, vt, at, esc, total, nDias, media, se: media != null && media >= m,
-        }
-      }
-      if (per.length === 0) return [monta(false, () => true)]
-      const linhasDoLogin = [monta(true, ehEtn)]
-      // a linha normal só some se o mês inteiro for ETN
-      if (!dias.every(ehEtn)) linhasDoLogin.unshift(monta(false, d => !ehEtn(d)))
-      return linhasDoLogin
-    })
-    const soma1 = rows.filter(r => r.se).reduce((s, r) => s + r.nDias, 0)
-    const soma0 = rows.filter(r => !r.se).reduce((s, r) => s + r.nDias, 0)
-    const realizadas = soma1 / diasEquipe
-    const proj = (x: number) => corridos ? (x / corridos) * dias.length : null
-    const porDia = dias.map(d => {
-      const v = rows.map(r => r.vt.get(d)).filter((x): x is number => x != null)
-      return { total: v.reduce((s, x) => s + x, 0), media: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null }
-    })
-    return {
-      rows, soma1, soma0, geral: soma1 + soma0, realizadas,
-      projetadas: proj(realizadas), projetadas10: proj((soma1 + soma0) / diasEquipe),
-      porDia, semPonto: linhas.reduce((s, r) => s + r.sem_ponto, 0),
-      nEtn: rows.filter(r => r.etn).length,
-    }
-  }, [linhas, etns, meta, metaEtn, diasEquipe, dias, corridos])
+  // Dias corridos: os dias do período que já passaram (até hoje) — a planilha tinha
+  // "DIAS" digitado à mão; aqui é contado.
+  const corridos = dias.filter(d => d >= de && d <= ate && d <= hoje).length
+  const parametros = { meta, metaEtn, diasEquipe, de, ate, diasMes: dias.length, corridos, dias }
+
+  const calc = useMemo(() => ({
+    ...calcularVt(linhas, etns, parametros),
+    semPonto: linhas.reduce((s, r) => s + r.sem_ponto, 0),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [linhas, etns, meta, metaEtn, diasEquipe, de, ate, dias, corridos])
 
   const marcar = useCallback(async (login: string, dia: string, codigo: string | null) => {
     setMenu(null)
@@ -192,13 +230,36 @@ export function VtPorEquipe() {
             onChange={e => e.target.value && setMes(e.target.value)}
             className="ml-1 rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-sm" />
         </label>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-graf-400" role="group" aria-label="Período dentro do mês">
+          <label htmlFor="vt-de">de</label>
+          <input id="vt-de" type="date" value={de} min={`${mes}-01`} max={ultimoDia}
+            onChange={e => e.target.value && setDeEsc(e.target.value)}
+            className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-sm" />
+          <label htmlFor="vt-ate">até</label>
+          <input id="vt-ate" type="date" value={ate} min={de} max={ultimoDia}
+            onChange={e => e.target.value && setAteEsc(e.target.value)}
+            className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-sm" />
+          {([['Mês todo', `${mes}-01`, fimPadrao],
+             ...(ontem.slice(0, 7) === mes ? [['Até ontem', `${mes}-01`, ontem] as const] : [])] as const).map(([r, a, b]) => {
+            const on = de === a && ate === b
+            return (
+              <button key={r} type="button" aria-pressed={on}
+                onClick={() => { setDeEsc(a); setAteEsc(b) }}
+                className={`rounded-md px-2 py-1 ${on ? 'bg-af-600 font-semibold text-white'
+                  : 'border border-graf-700 text-graf-300 hover:border-af-600'}`}>{r}</button>
+            )
+          })}
+        </div>
         <span className="text-[11px] text-graf-400"
           title="Por login do TOA e dia: soma dos pontos da 1ª O.S. de cada atividade finalizada ÷ 35, nos buckets de VT">
-          Buckets de VT · {nomeMes} · {corridos} de {dias.length} dias
+          Buckets de VT · {nomeMes} · {corridos} dia(s) corrido(s) de {dias.length}
         </span>
       </div>
 
       {erro && <p className="text-sm text-af-400">{erro}</p>}
+
+      <AgregadoCidades mes={mes} de={de} ate={ate} hoje={hoje} dias={dias}
+        meta={meta} metaEtn={metaEtn} diasEquipe={diasEquipe} versao={versao} />
 
       <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
@@ -272,9 +333,11 @@ export function VtPorEquipe() {
                     const dt = new Date(d + 'T12:00')
                     const fds = dt.getDay() === 0 || dt.getDay() === 6
                     const eHoje = d === hoje
+                    const fora = d < de || d > ate
                     return (
-                      <th key={d} className={`min-w-[2.4rem] border-b px-0.5 py-1 text-center font-medium ${
-                        eHoje ? 'border-af-500 text-af-400' : 'border-graf-800'} ${fds ? 'bg-graf-900/70 text-graf-300' : ''}`}>
+                      <th key={d} className={`min-w-[2.9rem] border-b px-0.5 py-1 text-center font-medium ${
+                        eHoje ? 'border-af-500 text-af-400' : 'border-graf-800'} ${fds ? 'bg-graf-900/70 text-graf-300' : ''} ${fora ? 'opacity-40' : ''}`}
+                        title={fora ? 'Fora do período escolhido: não conta' : undefined}>
                         <span className="block text-[9px] uppercase">
                           {dt.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
                         </span>
@@ -315,6 +378,15 @@ export function VtPorEquipe() {
                           </td>
                         )
                       }
+                      if (d < de || d > ate) {
+                        const bruto = l.por_dia.find(x => x.dia === d && Number(x.vt) > 0)?.vt
+                        return (
+                          <td key={d} className={`border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}
+                            title="Fora do período escolhido: não conta">
+                            <span className="tabular text-[10px] text-graf-500">{bruto != null ? n2(Number(bruto)) : '·'}</span>
+                          </td>
+                        )
+                      }
                       const v = l.vt.get(d)
                       const e = l.esc.get(d)
                       const clicavel = podeMarcar && d <= hoje
@@ -328,7 +400,7 @@ export function VtPorEquipe() {
                               : e ? `Escala: ${e}` : clicavel ? 'Marcar escala' : ''}
                             className={`tabular w-full rounded px-0.5 py-0.5 ${clicavel ? 'hover:ring-1 hover:ring-graf-500' : 'cursor-default'}`}
                             style={tom ? { background: tom.fundo, color: tom.texto, fontWeight: 600 } : undefined}>
-                            {v != null ? n1(v)
+                            {v != null ? n2(v)
                               : e ? <SeloEscala codigo={e} />
                               : <span className="text-graf-700">·</span>}
                           </button>
@@ -336,7 +408,7 @@ export function VtPorEquipe() {
                       )
                     })}
                     <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{l.nDias}</td>
-                    <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{n1(l.total)}</td>
+                    <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{n2(l.total)}</td>
                     <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right">
                       {l.media == null ? <span className="text-graf-400">—</span> : (
                         <span className="rounded px-1.5 py-0.5 font-semibold"
@@ -360,7 +432,7 @@ export function VtPorEquipe() {
                   <td className="sticky left-0 z-10 border-t border-graf-700 bg-graf-950 px-2 py-1 font-medium">Total de pontos</td>
                   {calc.porDia.map((p, i) => (
                     <td key={dias[i]} className="tabular border-t border-graf-700 px-0.5 py-1 text-center font-semibold text-graf-200">
-                      {p.total ? n1(p.total) : ''}
+                      {p.total ? n2(p.total) : ''}
                     </td>
                   ))}
                   <td colSpan={4} className="border-t border-graf-700" />
@@ -368,13 +440,13 @@ export function VtPorEquipe() {
                 <tr>
                   <td className="sticky left-0 z-10 bg-graf-950 px-2 py-1 font-medium">Média</td>
                   {calc.porDia.map((p, i) => {
-                    const m = p.media == null ? null : Math.round(p.media * 10) / 10
+                    const m = p.media == null ? null : Math.round(p.media * 100) / 100
                     const tom = m == null ? null : tomDoDia(m, limiteNormal)
                     return (
                       <td key={dias[i]} className="tabular px-0.5 py-1 text-center">
                         {m != null && (
                           <span className="block rounded px-0.5 font-semibold" style={{ background: tom!.fundo, color: tom!.texto }}>
-                            {n1(m)}
+                            {n2(m)}
                           </span>
                         )}
                       </td>
@@ -396,6 +468,131 @@ export function VtPorEquipe() {
           aoMudar={() => setVersao(v => v + 1)} aoErro={setErro} aoFechar={() => setMenuEtn(null)} />
       )}
     </div>
+  )
+}
+
+/**
+ * O agregado por cidade (247, D-359) — o relatório que a operação manda por dia:
+ *
+ * > "agregado · Eqps realizadas / Eqps projetadas · BSB - 8,48 (10,00) · MAO -
+ * >  2,57 (3,24) (...) 08/11 · BSB - 1,00 (1,24) (...) isso é um simulado do
+ * >  que o rapaz manda por dia (...) é bom o sistema mostrar também" — Emanuel, 10/11
+ *
+ * Fora dos parênteses, EQUIPES REALIZADAS (SOMA 1 ÷ 21); dentro, SOMA 1 + 0 ÷ 21
+ * — na planilha dele, "EQUIPES PROJETADAS ATUAL SOMA 1 + 0" com DIAS = MÊS, ou
+ * seja, sem projeção. O bloco do dia é a mesma conta com o período de um dia só
+ * (o último do período escolhido). A conta é `calcularVt`, a mesma da tabela.
+ * Só aparecem as cidades com VT no sistema que a pessoa pode ver.
+ */
+function AgregadoCidades({ mes, de, ate, hoje, dias, meta, metaEtn, diasEquipe, versao }: {
+  mes: string; de: string; ate: string; hoje: string; dias: string[]
+  meta: number; metaEtn: number; diasEquipe: number; versao: number
+}) {
+  type Linha = { base_id: string; codigo: string; cidade: string; login: string
+                 por_dia: { dia: string; vt: number }[]; etn: PeriodoEtn[] }
+  const [dados, setDados] = useState<Linha[] | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    setDados(null); setErro(null)
+    supabase.rpc('vt_por_equipe_cidades', { p_ini: `${mes}-01`, p_fim: dias[dias.length - 1] })
+      .then(({ data, error }) => {
+        if (!vivo) return
+        if (error) setErro(error.message)
+        else setDados((data ?? []) as Linha[])
+      })
+    return () => { vivo = false }
+  }, [mes, dias, versao])
+
+  const cidades = useMemo(() => {
+    if (!dados) return []
+    const porBase = new Map<string, Linha[]>()
+    for (const l of dados) porBase.set(l.base_id, [...(porBase.get(l.base_id) ?? []), l])
+    const conta = (ls: Linha[], a: string, b: string) => calcularVt(ls, ls.flatMap(l => l.etn), {
+      meta, metaEtn, diasEquipe, de: a, ate: b, diasMes: dias.length, dias,
+      corridos: dias.filter(d => d >= a && d <= b && d <= hoje).length,
+    })
+    return [...porBase.values()].map(ls => {
+      const per = conta(ls, de, ate)
+      const dia = conta(ls, ate, ate)
+      return { codigo: ls[0].codigo, cidade: ls[0].cidade, per, dia }
+    }).sort((x, y) => y.per.realizadas - x.per.realizadas)
+  }, [dados, de, ate, hoje, dias, meta, metaEtn, diasEquipe])
+
+  const porDia = [...cidades].sort((x, y) => y.dia.realizadas - x.dia.realizadas)
+  const texto = [
+    'agregado', 'Eqps realizadas / Eqps projetadas',
+    ...cidades.map(c => `${c.codigo} - ${n2(c.per.realizadas)} (${n2(c.per.soma10)})`),
+    '-----------------------',
+    dm(ate), 'Eqps realizadas / Eqps projetadas',
+    ...porDia.map(c => `${c.codigo} - ${n2(c.dia.realizadas)} (${n2(c.dia.soma10)})`),
+    '-----------------------',
+  ].join('\n')
+
+  async function copiar() {
+    try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2500) }
+    catch { setErro('Não consegui copiar — selecione o texto na caixa ao lado.') }
+  }
+
+  const Tabela = ({ titulo, linhas, campo }: {
+    titulo: string; linhas: typeof cidades; campo: 'per' | 'dia'
+  }) => (
+    <div className="min-w-0 flex-1">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-graf-300">{titulo}</p>
+      <table className="w-full text-xs">
+        <thead className="text-[10px] uppercase tracking-wide text-graf-400">
+          <tr>
+            <th className="py-1 text-left font-medium">Cidade</th>
+            <th className="py-1 text-right font-medium" title="SOMA 1 ÷ 21">Realizadas</th>
+            <th className="py-1 text-right font-medium" title="(SOMA 1 + SOMA 0) ÷ 21 — o número entre parênteses do relatório">(1 + 0)</th>
+            {campo === 'per' && <th className="py-1 text-right font-medium" title="Realizadas ÷ dias corridos × dias do mês">Projetadas</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map(c => {
+            const x = c[campo]
+            return (
+              <tr key={c.codigo} className="border-t border-graf-800/60">
+                <td className="py-1 pr-2" title={c.cidade}>
+                  <span className="font-semibold text-graf-100">{c.codigo}</span>
+                  <span className="ml-1.5 text-[11px] text-graf-400">{c.cidade}</span>
+                </td>
+                <td className="tabular py-1 text-right font-semibold text-graf-100">{n2(x.realizadas)}</td>
+                <td className="tabular py-1 text-right text-graf-300">({n2(x.soma10)})</td>
+                {campo === 'per' && <td className="tabular py-1 text-right text-graf-300">{n2(x.projetadas)}</td>}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  return (
+    <section className="card-controle p-4" aria-label="Agregado por cidade">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-semibold">Agregado por cidade</h2>
+        <span className="text-[11px] text-graf-400">Eqps realizadas (soma 1 + 0) · {dm(de)} a {dm(ate)}</span>
+        {cidades.length > 0 && (
+          <button type="button" onClick={copiar}
+            className="ml-auto rounded-md border border-graf-700 px-2.5 py-1 text-[11px] text-graf-200 hover:border-af-600">
+            {copiado ? 'Copiado ✓' : 'Copiar para o WhatsApp'}
+          </button>
+        )}
+      </div>
+      {erro ? <p className="text-sm text-af-400">{erro}</p>
+        : dados == null ? <CarregandoBloco className="py-6" />
+        : cidades.length === 0 ? (
+          <p className="py-4 text-center text-sm text-graf-400">Nenhuma cidade com VT finalizada no período.</p>
+        ) : (
+          <div className="flex flex-col gap-4 md:flex-row">
+            <Tabela titulo={`Período · ${dm(de)} a ${dm(ate)}`} linhas={cidades} campo="per" />
+            <Tabela titulo={`Dia · ${dm(ate)}`} linhas={porDia} campo="dia" />
+          </div>
+        )}
+    </section>
   )
 }
 

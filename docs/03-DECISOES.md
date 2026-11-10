@@ -13471,3 +13471,23 @@ inteiro, como na área. Sem bucket = `SEM_BUCKET` ("Sem bucket" na tela), o toke
 grupo VISITA TECNICA vem de mais de um bucket (10/11: MAN-AFLINE 40, MAN-AFLINE_01_VT 79, sem bucket 1) — por isso
 o filtro importa. A RPC ganhou `p_buckets`; a versão de 3 parâmetros saiu (chamada ambígua). Conferido: sem
 filtro, a resposta é idêntica à de antes (fora as duas chaves novas).
+
+### D-359 · VT por equipe: período dentro do mês, agregado por cidade e duas casas decimais (247 — 10/11/2026)
+
+*"é bom ter um dia inicial e dia final dentro do mês"* · *"isso é um simulado do que o rapaz manda por dia (...)
+é bom o sistema mostrar também"* · *"vamos adicionar uma casa decimal também pra ficar igual"* (Emanuel, 10/11).
+
+- **Período**: além do mês, "de" e "até" dentro dele (atalhos **Mês todo** e **Até ontem**). Dia fora do período
+  aparece apagado e não conta. Os dias corridos da projeção são os do período até hoje.
+- **Agregado por cidade**: o relatório da operação — fora dos parênteses EQUIPES REALIZADAS (SOMA 1 ÷ 21), dentro
+  SOMA 1 + 0 ÷ 21 (na planilha, "EQUIPES PROJETADAS ATUAL SOMA 1 + 0" com DIAS = MÊS, isto é, sem projeção) — do
+  período e do último dia dele, com **Copiar para o WhatsApp** no formato do relatório. **Conferido com o
+  relatório colado**: de 01 a 09/11, MAN 2,57 (3,24) e SLS 1,14 (3,86); no dia 09/11, MAN 0,24 (0,48) e SLS 0,19
+  (0,48) — os mesmos números (o relatório chamava o bloco do dia de "08/11"). Só há VT no sistema de Manaus e São
+  Luís; as cidades do relatório que não estão aqui (BSB, BLM, PMJ) não aparecem. O código é o nosso (`base.codigo`:
+  MAN, SLS), não o do relatório (MAO, SLZ).
+- Uma regra só: as atividades com ponto saíram de `vt_por_equipe_mes` para `_vt_atividades` (interna, sem grant),
+  e `vt_por_equipe_cidades` (cidades de `bases_permitidas()`) lê dela; a saída de `vt_por_equipe_mes` foi
+  conferida idêntica. Na tela, a conta é `calcularVt`, a mesma para a tabela e o agregado.
+- **Duas casas** nos valores do dia, no total e no rodapé, como a planilha; a cor do dia compara o valor de duas
+  casas com o corte.
