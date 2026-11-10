@@ -62,7 +62,7 @@ function lerFechados(): string[] {
  */
 const OPERACAO: Modulo = {
   chave: 'operacao', titulo: 'Operação', icone: 'servicos', itens: [
-    { para: '/controle', rotulo: 'Dashboard', icone: 'dashboard', busca: 'painel controle inicio' },
+    { para: '/controle', rotulo: 'Dashboard INST', icone: 'dashboard', busca: 'painel controle inicio instalacao' },
     // 217: o painel da Visita Técnica, em tela própria logo abaixo do Dashboard.
     { para: '/controle/dashboard-vt', rotulo: 'Dashboard VT', icone: 'indicadores',
       busca: 'visita tecnica vt tec1 log at5 at1 node revisita ofensor janela area', novo: true },

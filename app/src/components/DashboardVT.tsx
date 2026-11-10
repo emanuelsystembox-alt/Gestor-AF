@@ -47,6 +47,10 @@ interface ItemRev {
 }
 interface DadosVT {
   dia: string; dias_mes: number; total: number; auditar: number
+  /** 244: o período (de = dia) e quantos dias ele tem */
+  de?: string; ate?: string; dias_periodo?: number
+  /** 244: a certidão de atendimento (a régua da 235) */
+  certidao?: DadosCertidao
   cancelado_central: number; volume: number
   log: { base: number; sem_log: number; log3: number; log0: number
          por_log: { log: number; n: number }[] }
@@ -62,6 +66,7 @@ interface DadosVT {
              outros: number; total: number; equipe_vt?: boolean
              /** 242: pela SITUAÇÃO do contrato */
              concluidos?: number; reagendados?: number; cancelados?: number; abertos?: number }[]
+  /** 244: equipe-dia em `equipes`; aqui, quantas equipes diferentes */
   /** 242: contratos por sub-falha (o mesmo universo do código ofensor) */
   sub_falhas?: { contratos_com_codigo: number; sem_sub_falha: number
                  lista: { sub_falha: string; n: number
@@ -70,7 +75,10 @@ interface DadosVT {
               tecnicos: { tecnico: string; equipe: string | null; nome_do_cadastro?: boolean; n: number; itens: ItemRev[] }[] }
   nodes: { distintos: number; sem_node: number
            lista: { node: string; n: number; log3: number; nao_executados: number
-                    itens: { visita_id: string; contrato: string | null; log: number | null }[] }[] }
+                    itens: { visita_id: string; contrato: string | null; log: number | null
+                             /** 243: janela, situação e código (TOA; sem ele, AFLINE) */
+                             situacao?: string; janela_inicio?: string | null; janela_fim?: string | null
+                             baixa?: string | null }[] }[] }
   codigos: { contratos_com_baixa: number; sem_baixa: number
              lista: { codigo: number; descricao: string; natureza: string | null; n: number
                       pelo_afline: number
@@ -80,8 +88,11 @@ interface DadosVT {
   /** 217: equipe de VT = 4+ contratos no dia, ou de manutenção com qualquer número. */
   equipes_vt?: { minimo: number; equipes: number; por_manutencao: number; vt: number
                  sem_equipe: number
+                 /** 244: no período, `equipes` é equipe-dia; esta é quantas equipes diferentes */
+                 equipes_distintas?: number
                  fora: { equipe_id: string; codigo: string | null; nome: string | null; n: number
-                         itens: { visita_id: string; contrato: string | null }[] }[] }
+                         dias?: number
+                         itens: { visita_id: string; contrato: string | null; dia?: string }[] }[] }
   /** 217: janela × área; `total_janela`/`total_area` marcam as linhas de total. */
   janelas?: { janela: string | null; area: string | null; total_janela: boolean; total_area: boolean
               vt: number; vt_eq: number; equipes: number }[]
@@ -92,12 +103,21 @@ interface DadosVT {
   /** 241: cada O.S. que o card do TEC1 conta, com a classe dela. */
   tec1_lista?: ItemTec1[]
 }
+interface DadosCertidao {
+  finalizados: number; regular: number; com_falha: number; sem_validacao: number
+  tecnicos: { tecnico_id: string | null; tecnico: string | null; equipe: string | null
+              finalizados: number; regular: number; com_falha: number; sem_validacao: number
+              itens: { visita_id: string; contrato: string | null; dia: string
+                       classe: 'COM_FALHA' | 'SEM_VALIDACAO'; equipe: string | null }[] }[]
+}
 interface ItemLog {
+  dia?: string
   visita_id: string; contrato: string | null; log: number; situacao: string
   central: boolean; equipe: string | null; tecnico: string | null
 }
 type ClasseTec1 = 'PADRAO' | 'SEM_PADRAO' | 'EXPURGADA'
 interface ItemTec1 {
+  dia?: string
   visita_id: string; os_id: string; contrato: string | null; numero_os: string | null
   /** nulo = em aberto: não entra no TEC1 ainda */
   classe: ClasseTec1 | null
@@ -121,6 +141,8 @@ const fmtMeta = (x: number) => x.toLocaleString('pt-BR', { maximumFractionDigits
 
 /** Os contratos do dia, para as listas mostrarem LOG e endereço sem repetir o dado. */
 const ContratosCtx = createContext<Record<string, InfoContrato>>({})
+/** 244: o período tem mais de um dia — as listas mostram a data embaixo do contrato. */
+const VariosDiasCtx = createContext(false)
 
 // Cores CHEIAS que têm de ser as mesmas nos dois temas vão por variável
 // fixa (`--st-*`, que o tema claro não redefine) — nunca por classe
@@ -147,8 +169,14 @@ const curta = (iso: string) => new Date(iso + 'T12:00')
   .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
 export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
-  const [diaLocal, setDiaLocal] = useState(() => isoLocal(new Date()))
-  const dia = diaProp ?? diaLocal
+  // 244 (D-356): "pode mostrar o acumulativo, ou seja do dia 01 a hoje, porém por padrão
+  // ele deixa setado início e fim hoje" (Emanuel, 10/11)
+  const hoje = isoLocal(new Date())
+  const [deLocal, setDeLocal] = useState(hoje)
+  const [ateLocal, setAteLocal] = useState(hoje)
+  const de = diaProp ?? deLocal
+  const ate = diaProp ?? (ateLocal < deLocal ? deLocal : ateLocal)
+  const inicioMes = hoje.slice(0, 8) + '01'
   const [d, setD] = useState<DadosVT | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -163,7 +191,7 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
   useEffect(() => {
     let vivo = true
     setCarregando(true); setErro(null)
-    supabase.rpc('dashboard_visita_tecnica', { p_dia: dia, ...(areas.length ? { p_areas: areas } : {}) })
+    supabase.rpc('dashboard_visita_tecnica', { p_dia: de, p_ate: ate, ...(areas.length ? { p_areas: areas } : {}) })
       .then(({ data, error }) => {
       if (!vivo) return
       if (error) setErro(error.message)
@@ -175,7 +203,7 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
       setCarregando(false)
     })
     return () => { vivo = false }
-  }, [dia, versao, areas])
+  }, [de, ate, versao, areas])
 
   return (
     <section aria-labelledby="dvt-titulo" className="space-y-3">
@@ -184,17 +212,34 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-graf-700 pb-2 pt-3">
         <span aria-hidden className="h-5 w-1 rounded-sm" style={{ background: 'var(--color-af-600)' }} />
         <h2 id="dvt-titulo" className="text-base font-semibold tracking-tight">Visita Técnica</h2>
-        {diaProp != null && <span className="tabular text-xs text-graf-400">{dataBR(dia)}</span>}
+        {diaProp != null && <span className="tabular text-xs text-graf-400">{dataBR(de)}</span>}
         {diaProp == null && (
-          <input type="date" value={diaLocal} onChange={e => e.target.value && setDiaLocal(e.target.value)}
-            aria-label="Dia da visita técnica"
-            className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1 text-xs" />
+          <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Período">
+            <input type="date" value={deLocal} max={hoje}
+              onChange={e => { const v = e.target.value; if (!v) return; setDeLocal(v); if (v > ateLocal) setAteLocal(v) }}
+              aria-label="Início do período"
+              className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1" />
+            <span className="text-graf-400">a</span>
+            <input type="date" value={ate} min={deLocal}
+              onChange={e => e.target.value && setAteLocal(e.target.value)}
+              aria-label="Fim do período"
+              className="tabular rounded-md border border-graf-700 bg-graf-900 px-2 py-1" />
+            {([['Hoje', hoje, hoje], ['Mês até hoje', inicioMes, hoje]] as const).map(([r, a, b]) => {
+              const on = deLocal === a && ate === b
+              return (
+                <button key={r} type="button" aria-pressed={on}
+                  onClick={() => { setDeLocal(a); setAteLocal(b) }}
+                  className={`rounded-md px-2 py-1 ${on ? 'bg-af-600 font-semibold text-white'
+                    : 'border border-graf-700 text-graf-300 hover:border-af-600'}`}>{r}</button>
+              )
+            })}
+          </div>
         )}
         <SelecaoMultipla rotulo="Área" todos="Toda área" plural="áreas"
           opcoes={opcoesArea} valor={areas} onChange={setAreas}
           className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1 text-xs outline-none focus:border-af-500" />
         <div className="ml-auto flex items-center gap-3">
-          <Link to={`/controle/servicos?de=${dia}&ate=${dia}&grupo=${encodeURIComponent('VISITA TECNICA')}`}
+          <Link to={`/controle/servicos?de=${de}&ate=${ate}&grupo=${encodeURIComponent('VISITA TECNICA')}`}
             className="text-[11px] text-af-400 underline-offset-2 hover:underline">
             ver as VT em Serviços
           </Link>
@@ -216,8 +261,8 @@ export default function DashboardVT({ dia: diaProp }: { dia?: string }) {
         <div className="card-controle">
           {areas.length
             ? <Vazio titulo="Nenhuma visita técnica nas áreas escolhidas"
-                descricao="Neste dia, as áreas marcadas no filtro não têm contrato de VISITA TECNICA." />
-            : <Vazio titulo="Nenhuma visita técnica neste dia"
+                descricao="No período, as áreas marcadas no filtro não têm contrato de VISITA TECNICA." />
+            : <Vazio titulo="Nenhuma visita técnica no período"
                 descricao="Nenhum contrato do grupo VISITA TECNICA na cidade ativa." />}
         </div>
       )}
@@ -234,26 +279,31 @@ function Conteudo({ d }: { d: DadosVT }) {
   const naMeta = medidasTec1 > 0 && (d.tec1.padrao * 100) / medidasTec1 >= META_TEC1
   const pLog = pct(d.log.log3, d.log.base)
   const pAt5 = pct(d.log.log0, d.log.base)
+  // 244: no período, AT1 = VT do período ÷ base; projetada = VT ÷ dias × dias do mês ÷ base
+  const dias = Math.max(1, d.dias_periodo ?? 1)
+  const variosDias = dias > 1
   const pAt1 = d.at1.base ? pct(d.at1.vt_com_base, d.at1.base, 2) : null
-  const pAt1Proj = d.at1.base ? pct(d.at1.vt_com_base * d.dias_mes, d.at1.base, 2) : null
+  const pAt1Proj = d.at1.base ? pct((d.at1.vt_com_base / dias) * d.dias_mes, d.at1.base, 2) : null
   // 217: as metas em número, para a cor; nulo = sem denominador, sem cor
   const vLog = d.log.base ? (d.log.log3 * 100) / d.log.base : null
   const vAt5 = d.log.base ? (d.log.log0 * 100) / d.log.base : null
-  const vAt1Proj = d.at1.base ? (d.at1.vt_com_base * d.dias_mes * 100) / d.at1.base : null
+  const vAt1Proj = d.at1.base ? ((d.at1.vt_com_base / dias) * d.dias_mes * 100) / d.at1.base : null
   const corMeta = (ok: boolean | null) => ok == null ? undefined : ok ? COR.executado : COR.atencao
   const okLog = vLog == null ? null : vLog <= META_LOG
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
   // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
-  const [ver, setVer] = useState<'LOG' | 'TEC1' | 'MEDIA' | null>(null)
+  type Card = 'LOG' | 'TEC1' | 'MEDIA' | 'AT1'
+  const [ver, setVer] = useState<Card | null>(null)
   const logAlto = d.log_lista ?? []
-  const alternar = (k: 'LOG' | 'TEC1' | 'MEDIA') => setVer(v => v === k ? null : k)
+  const alternar = (k: Card) => setVer(v => v === k ? null : k)
   // 242: a média por equipe de VT virou o quinto card da régua
   const ev = d.equipes_vt
   const media = ev && ev.equipes ? (ev.vt / ev.equipes).toFixed(1).replace('.', ',') : null
 
   return (
     <ContratosCtx.Provider value={d.contratos ?? {}}>
+    <VariosDiasCtx.Provider value={variosDias}>
       {/* ===== 1. o julgamento: os cinco números, cada um abre a sua lista ===== */}
       <section className="card-controle sobe overflow-hidden" aria-label="Indicadores da visita técnica">
         <div className="regua">
@@ -319,11 +369,16 @@ function Conteudo({ d }: { d: DadosVT }) {
           <Indicador rotulo="AT1 projetada" valor={pAt1Proj ?? 'sem base'} sufixo={pAt1Proj ? '%' : undefined}
             cor={corMeta(okAt1)}
             meta={d.at1.base ? `meta ≤ ${fmtMeta(META_AT1)}% no mês` : undefined} atingiu={okAt1}
-            dica={`VT do dia × ${d.dias_mes} dias ÷ base de clientes das áreas`}
+            dica={variosDias
+              ? `VT do período ÷ ${dias} dias × ${d.dias_mes} dias ÷ base de clientes das áreas`
+              : `VT do dia × ${d.dias_mes} dias ÷ base de clientes das áreas`}
+            aoClicar={() => alternar('AT1')} aberto={ver === 'AT1'} chamada="ver por área"
             segundo={pAt1 && (
-              <span className="tabular text-base font-semibold text-graf-300" title="VT do dia ÷ base">
+              <span className="tabular text-base font-semibold text-graf-300"
+                title={variosDias ? 'VT do período ÷ base' : 'VT do dia ÷ base'}>
                 {pAt1}<span className="text-xs text-graf-400">%</span>
-                <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-graf-400">no dia</span>
+                <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-graf-400">
+                  {variosDias ? 'no período' : 'no dia'}</span>
               </span>
             )}
             barra={vAt1Proj != null && (
@@ -331,8 +386,9 @@ function Conteudo({ d }: { d: DadosVT }) {
               <BarraMeta valor={(vAt1Proj * 50) / META_AT1} meta={50} cor={okAt1 ? COR.executado : COR.atencao} />
             )}
             apoio={d.at1.base ? <>
-              <span className="tabular">{n0(d.at1.vt_com_base)}</span> VT ÷{' '}
-              <span className="tabular">{n0(d.at1.base)}</span> clientes · {d.dias_mes} dias
+              <span className="tabular">{n0(d.at1.vt_com_base)}</span> VT
+              {variosDias && <> em <span className="tabular">{dias}</span> dias</>} ÷{' '}
+              <span className="tabular">{n0(d.at1.base)}</span> clientes · mês de {d.dias_mes} dias
               {d.at1.vt_sem_base > 0 && (
                 <span className="block text-amber-300" title="VT em área sem base cadastrada não entra no AT1">
                   <span className="tabular">{n0(d.at1.vt_sem_base)}</span> VT em área sem base
@@ -346,15 +402,22 @@ function Conteudo({ d }: { d: DadosVT }) {
 
           {/* 242: "Média por equipe de VT" deixa de ser painel e vira card */}
           {ev && (
-            <Indicador rotulo="VT por equipe" valor={media}
-              dica={`Equipe de VT: ${ev.minimo} ou mais VT no dia; manutenção conta sempre.`}
+            <Indicador rotulo={variosDias ? 'VT por equipe/dia' : 'VT por equipe'} valor={media}
+              dica={`Equipe de VT: ${ev.minimo} ou mais VT no dia; manutenção conta sempre.${variosDias
+                ? ' No período, a média é por equipe-dia: cada dia em que a equipe fez o mínimo.' : ''}`}
               aoClicar={() => alternar('MEDIA')} aberto={ver === 'MEDIA'} chamada="ver as equipes"
               barra={d.volume > 0 && (
                 <BarraMeta valor={(ev.vt * 100) / d.volume} cor="var(--st-execucao)" />
               )}
               apoio={<>
                 <span className="tabular">{n0(ev.vt)}</span> VT em{' '}
-                <span className="tabular">{n0(ev.equipes)}</span> equipe(s) de {ev.minimo}+
+                {variosDias ? <>
+                  <span className="tabular">{n0(ev.equipes)}</span> equipe-dia
+                  {ev.equipes_distintas != null && <> (<span className="tabular">{n0(ev.equipes_distintas)}</span> equipes)</>}
+                  {' '}de {ev.minimo}+
+                </> : <>
+                  <span className="tabular">{n0(ev.equipes)}</span> equipe(s) de {ev.minimo}+
+                </>}
                 {ev.por_manutencao > 0 && (
                   <span className="block" title={`Equipe de manutenção com menos de ${ev.minimo} VT, que conta assim mesmo`}>
                     <span className="tabular">{ev.por_manutencao}</span> de manutenção com menos de {ev.minimo}
@@ -370,7 +433,7 @@ function Conteudo({ d }: { d: DadosVT }) {
         </div>
         <p className="border-t border-graf-800 px-4 py-1.5 text-[11px] text-graf-400"
            title="Auditar e Cancelado pela central não entram nos ofensores nem no AT1; o Cancelado pela central entra no LOG e no AT5">
-          <span className="tabular font-semibold text-graf-300">{n0(d.total)}</span> VT no dia ·{' '}
+          <span className="tabular font-semibold text-graf-300">{n0(d.total)}</span> VT {variosDias ? 'no período' : 'no dia'} ·{' '}
           <span className="tabular font-semibold text-graf-300">{n0(d.volume)}</span> na conta
           {(d.auditar + d.cancelado_central) > 0 && <>
             {' '}· fora da conta:{' '}
@@ -394,13 +457,22 @@ function Conteudo({ d }: { d: DadosVT }) {
             <ListaEquipesVT e={ev} equipes={d.equipes} aoFechar={() => setVer(null)} />
           </div>
         )}
+        {ver === 'AT1' && (
+          <div className="px-4 pb-3">
+            <Detalhe titulo="AT1 por área" contagem={`${d.areas.filter(a => a.vt > 0 || a.clientes != null).length} área(s)`}
+              aoFechar={() => setVer(null)}>
+              <At1Tabela d={d} />
+            </Detalhe>
+          </div>
+        )}
       </section>
 
       {/* ===== 2. a carga: onde o dia pesa ===== */}
-      <Faixa titulo="Carga do dia" sub="onde estão as VT, por janela e área" />
+      <Faixa titulo={variosDias ? 'Carga do período' : 'Carga do dia'}
+        sub="onde estão as VT, por janela e área · a certidão do que foi finalizado" />
       <div className="sobe sobe-1 grid gap-3 lg:grid-cols-3">
-        {d.janelas && <JanelaPorArea celulas={d.janelas} className="lg:col-span-2" />}
-        <At1PorArea d={d} />
+        {d.janelas && <JanelaPorArea celulas={d.janelas} variosDias={variosDias} className="lg:col-span-2" />}
+        {d.certidao && <CertidaoVT c={d.certidao} />}
       </div>
 
       {/* ===== 3. o resultado: situação → código → sub-falha, nessa ordem ===== */}
@@ -418,6 +490,7 @@ function Conteudo({ d }: { d: DadosVT }) {
         <RevisitaOfensor r={d.revisita} volume={d.volume} />
         <NodeOfensor n={d.nodes} volume={d.volume} />
       </div>
+    </VariosDiasCtx.Provider>
     </ContratosCtx.Provider>
   )
 }
@@ -476,13 +549,14 @@ function ListaEquipesVT({ e, equipes, aoFechar }: {
                 className={`rounded px-2 py-0.5 text-xs ${aberta === f.equipe_id
                   ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
                 {rot(f)} <span className="tabular">{f.n}</span>
+                {!!f.dias && f.dias > 1 && <span className="text-[10px] opacity-80"> · {f.dias} dias</span>}
               </button>
             ))}
           </div>
         )}
       </div>
       {sel && (
-        <TabelaItens linhas={sel.itens.map(i => ({ id: i.visita_id, contrato: i.contrato, cols: [] }))} />
+        <TabelaItens linhas={sel.itens.map(i => ({ id: i.visita_id, contrato: i.contrato, dia: i.dia, cols: [] }))} />
       )}
     </Detalhe>
   )
@@ -493,23 +567,27 @@ type CelulaJA = NonNullable<DadosVT['janelas']>[number]
 const mediaJA = (c?: { vt_eq: number; equipes: number }) =>
   c && c.equipes ? (c.vt_eq / c.equipes).toFixed(1).replace('.', ',') : null
 
+// 244: "o gráfico (...) tá bem alto, dá pra melhorar" (Emanuel, 10/11) — a célula
+// passou a ter UMA linha (VT e a média lado a lado), metade da altura.
 function CelulaJanela({ c, total, max }: { c?: CelulaJA; total?: boolean; max: number }) {
-  if (!c || c.vt === 0) return <td className="px-2 py-1.5 text-center text-graf-600">·</td>
+  if (!c || c.vt === 0) return <td className="px-2 py-1 text-center text-graf-600">·</td>
   const m = mediaJA(c)
   // A intensidade diz onde está o volume; o número continua escrito.
   const fundo = total ? undefined
     : `color-mix(in srgb, var(--st-execucao) ${Math.round(8 + (c.vt / max) * 32)}%, transparent)`
   return (
-    <td className={`rounded-sm px-2 py-1.5 text-center ${total ? 'bg-graf-900' : ''}`}
+    <td className={`whitespace-nowrap rounded-sm px-2 py-1 text-center ${total ? 'bg-graf-900' : ''}`}
       style={fundo ? { background: fundo } : undefined}
       title={`${c.vt} VT · ${c.vt_eq} de equipe de VT, em ${c.equipes} equipe(s)`}>
-      <span className={`tabular block leading-tight ${total ? 'font-bold' : 'font-semibold'} text-graf-100`}>{c.vt}</span>
-      <span className="tabular block text-[10px] leading-tight text-graf-300">{m ? `${m}/eq` : '—'}</span>
+      <span className={`tabular ${total ? 'font-bold' : 'font-semibold'} text-graf-100`}>{c.vt}</span>
+      <span className="tabular ml-1.5 text-[10px] text-graf-300">{m ? `${m}/eq` : '—'}</span>
     </td>
   )
 }
 
-function JanelaPorArea({ celulas, className = '' }: { celulas: CelulaJA[]; className?: string }) {
+function JanelaPorArea({ celulas, className = '', variosDias = false }: {
+  celulas: CelulaJA[]; className?: string; variosDias?: boolean
+}) {
   // A ordem das janelas vem do banco (pela hora); as áreas em ordem
   // alfabética, "sem área" por último.
   const janelas = [...new Set(celulas.filter(c => !c.total_area && c.janela != null).map(c => c.janela!))]
@@ -522,13 +600,15 @@ function JanelaPorArea({ celulas, className = '' }: { celulas: CelulaJA[]; class
 
   return (
     <Painel className={className} titulo="VT por janela e área"
-      dica="Em cada célula: as VT e a média por equipe de VT com contrato ali."
-      tabela={<TabelaSimples colunas={['Janela', 'Área', 'VT', 'VT de equipe de VT', 'Equipes de VT', 'Média por equipe']}
+      dica={variosDias
+        ? 'Em cada célula: as VT do período e a média por equipe-dia de VT com contrato ali.'
+        : 'Em cada célula: as VT e a média por equipe de VT com contrato ali.'}
+      tabela={<TabelaSimples colunas={['Janela', 'Área', 'VT', 'VT de equipe de VT', variosDias ? 'Equipe-dia de VT' : 'Equipes de VT', 'Média por equipe']}
         linhas={celulas.map(c => [
           c.total_area ? 'Total' : c.janela ?? '—', c.total_janela ? 'Total' : c.area ?? '—',
           c.vt, c.vt_eq, c.equipes, mediaJA(c) ?? '—'])} />}>
       {janelas.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com ida neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com ida no período.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-separate border-spacing-[2px] text-xs">
@@ -542,13 +622,13 @@ function JanelaPorArea({ celulas, className = '' }: { celulas: CelulaJA[]; class
             <tbody>
               {janelas.map(j => (
                 <tr key={j}>
-                  <th scope="row" className="tabular whitespace-nowrap px-2 py-1.5 text-left font-medium text-graf-200">{j}</th>
+                  <th scope="row" className="tabular whitespace-nowrap px-2 py-1 text-left font-medium text-graf-200">{j}</th>
                   {areas.map(a => <CelulaJanela key={a} c={mapa.get(chave(j, a))} max={max} />)}
                   <CelulaJanela c={mapa.get(chave(j, null))} total max={max} />
                 </tr>
               ))}
               <tr>
-                <th scope="row" className="px-2 py-1.5 text-left font-semibold text-graf-300">Total</th>
+                <th scope="row" className="px-2 py-1 text-left font-semibold text-graf-300">Total</th>
                 {areas.map(a => <CelulaJanela key={a} c={mapa.get(chave(null, a))} total max={max} />)}
                 <CelulaJanela c={mapa.get(chave(null, null))} total max={max} />
               </tr>
@@ -694,7 +774,7 @@ function SituacaoPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes']; m
         linhas={equipes.map(e => [rot(e), e.tecnico ?? '—', v(e, 'concluidos'), v(e, 'abertos'),
                                   v(e, 'reagendados'), v(e, 'cancelados'), e.total])} />}>
       {equipes.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT na conta neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT na conta no período.</p>
       ) : (
         <>
           <ul className="space-y-1.5">
@@ -776,7 +856,7 @@ function CodigosOfensores({ c }: { c: DadosVT['codigos'] }) {
       </>}>
       {lista.length === 0 ? (
         <p className="py-6 text-center text-sm text-graf-400">
-          {filtro === 'IMPRODUTIVA' ? 'Nenhum código improdutivo neste dia.' : 'Nenhum contrato com código de baixa ainda.'}
+          {filtro === 'IMPRODUTIVA' ? 'Nenhum código improdutivo no período.' : 'Nenhum contrato com código de baixa ainda.'}
         </p>
       ) : (
         <>
@@ -842,7 +922,7 @@ function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number
       tabela={<TabelaSimples colunas={['Equipe do serviço anterior', 'Técnico', 'Revisitas']}
         linhas={r.tecnicos.map(t => [t.equipe ?? '—', quem(t), t.n])} />}>
       {r.tecnicos.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma revisita neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma revisita no período.</p>
       ) : (
         <BarrasHorizontais rotuloLargo cor={COR.atencao}
           dados={r.tecnicos.slice(0, 10).map(t => ({ rotulo: nome(t), sub: quem(t), valor: t.n }))}
@@ -886,7 +966,7 @@ function NodeOfensor({ n, volume }: { n: DadosVT['nodes']; volume: number }) {
         linhas={n.lista.map(x => [x.node, x.n, x.nao_executados, x.log3])} />}
       nota={n.sem_node > 0 && <><span className="tabular">{n.sem_node}</span> VT sem node na planilha.</>}>
       {n.lista.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com node neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com node no período.</p>
       ) : (
         <BarrasHorizontais parte totalRef={volume} cor="var(--st-deslocamento)"
           dados={n.lista.slice(0, 10).map(x => ({
@@ -897,7 +977,22 @@ function NodeOfensor({ n, volume }: { n: DadosVT['nodes']; volume: number }) {
       )}
       {sel && (
         <Detalhe titulo={`Node ${sel.node}`} contagem={`${sel.n} VT`} aoFechar={() => setAberto(null)}>
-          <TabelaItens linhas={sel.itens.map(i => ({ id: i.visita_id, contrato: i.contrato, cols: [] }))} />
+          {/* 243 (D-355): "mostrar a janela e codigo de baixa a situação do contrato" (Emanuel, 10/11) */}
+          {/* Situação e código numa coluna só (como na janela do LOG): o card é estreito,
+              e em seis colunas a situação sumia na rolagem lateral. */}
+          <TabelaItens cabecalho={['Janela', 'Situação · cód. de baixa']}
+            linhas={sel.itens.map(i => ({
+              id: i.visita_id, contrato: i.contrato,
+              cols: [
+                <span className="tabular whitespace-nowrap">
+                  {i.janela_inicio ? `${i.janela_inicio.slice(0, 5)}–${i.janela_fim?.slice(0, 5) ?? '?'}` : 'sem janela'}
+                </span>,
+                <span className="block min-w-28">
+                  <span className="text-graf-200">{i.situacao ? situacaoRotulo(i.situacao) : '—'}</span>
+                  <span className="block text-[10px] text-graf-400">{i.baixa ?? 'sem código'}</span>
+                </span>,
+              ],
+            }))} />
         </Detalhe>
       )}
     </Painel>
@@ -905,22 +1000,28 @@ function NodeOfensor({ n, volume }: { n: DadosVT['nodes']; volume: number }) {
 }
 
 // ============================================================= AT1 área --
-function At1PorArea({ d }: { d: DadosVT }) {
+/**
+ * O AT1 por área (244, D-356): era painel próprio; agora abre pelo card do AT1,
+ * para o lado do VT por janela e área ficar com a certidão. No período, a
+ * projetada é VT ÷ dias × dias do mês ÷ base — a mesma conta do card.
+ */
+function At1Tabela({ d }: { d: DadosVT }) {
   // Área sem VT e sem base não diz nada hoje: fica fora da lista, não da conta.
   const areas = d.areas.filter(a => a.vt > 0 || a.clientes != null)
-  const lin = (a: DadosVT['areas'][number]) => ({
-    real: a.clientes ? pct(a.vt, a.clientes, 2) : null,
-    proj: a.clientes ? pct(a.vt * d.dias_mes, a.clientes, 2) : null,
-  })
+  const dias = Math.max(1, d.dias_periodo ?? 1)
+  const projV = (a: DadosVT['areas'][number]) =>
+    a.clientes ? ((a.vt / dias) * d.dias_mes * 100) / a.clientes : null
   return (
-    <Painel titulo="AT1 por área"
-      dica={`Projetada = VT do dia × ${d.dias_mes} dias ÷ base.`}
-      extra={<Link to="/controle/configuracoes?aba=clientes"
-        className="text-[11px] text-af-400 underline-offset-2 hover:underline">base de clientes</Link>}>
+    <div>
+      <p className="flex flex-wrap items-center gap-x-3 border-b border-graf-800 px-3 py-1.5 text-[11px] text-graf-400">
+        Projetada = VT {dias > 1 ? `÷ ${dias} dias` : 'do dia'} × {d.dias_mes} dias ÷ base.
+        <Link to="/controle/configuracoes?aba=clientes"
+          className="ml-auto text-af-400 underline-offset-2 hover:underline">base de clientes</Link>
+      </p>
       {areas.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma área com VT ou base cadastrada.</p>
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhuma área com VT ou base cadastrada.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto px-1">
           <table className="w-full text-xs">
             <thead className="border-b border-graf-700 text-left text-[10px] uppercase tracking-wide text-graf-400">
               <tr>
@@ -933,7 +1034,8 @@ function At1PorArea({ d }: { d: DadosVT }) {
             </thead>
             <tbody>
               {areas.map(a => {
-                const x = lin(a)
+                const real = a.clientes ? pct(a.vt, a.clientes, 2) : null
+                const pv = projV(a)
                 return (
                   <tr key={a.area_id} className="border-b border-graf-800/60">
                     <td className="px-2 py-1.5 text-graf-200" title={a.codigo}>{a.rotulo}</td>
@@ -941,11 +1043,11 @@ function At1PorArea({ d }: { d: DadosVT }) {
                       {a.clientes != null ? n0(a.clientes) : <span className="text-amber-300">sem base</span>}
                     </td>
                     <td className="tabular px-2 py-1.5 text-right font-semibold">{a.vt}</td>
-                    <td className="tabular px-2 py-1.5 text-right">{x.real ? `${x.real}%` : <span className="text-graf-400">—</span>}</td>
+                    <td className="tabular px-2 py-1.5 text-right">{real ? `${real}%` : <span className="text-graf-400">—</span>}</td>
                     {/* 217: a projetada da área contra a mesma meta do card */}
-                    <td className={`tabular px-2 py-1.5 text-right ${a.clientes == null ? ''
-                      : (a.vt * d.dias_mes * 100) / a.clientes <= META_AT1 ? 'text-emerald-300' : 'text-amber-300'}`}>
-                      {x.proj ? `${x.proj}%` : <span className="text-graf-400">—</span>}
+                    <td className={`tabular px-2 py-1.5 text-right ${pv == null ? ''
+                      : pv <= META_AT1 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                      {pv != null ? `${pv.toFixed(2).replace('.', ',')}%` : <span className="text-graf-400">—</span>}
                     </td>
                   </tr>
                 )
@@ -954,7 +1056,7 @@ function At1PorArea({ d }: { d: DadosVT }) {
           </table>
         </div>
       )}
-    </Painel>
+    </div>
   )
 }
 
@@ -990,12 +1092,13 @@ function Detalhe({ titulo, contagem, aoFechar, children }: {
 function TabelaItens({ cabecalho = [], linhas, agruparRua = true }: {
   /** as colunas DEPOIS de Contrato, LOG e Endereço */
   cabecalho?: string[]
-  linhas: { id: string; contrato: string | null; cols: ReactNode[] }[]
+  linhas: { id: string; contrato: string | null; cols: ReactNode[]; dia?: string | null }[]
   /** 241: falso na lista por O.S. (TEC1) — duas O.S. do mesmo contrato não são
    *  "dois na mesma rua", e a ordem da lista é a da classe. */
   agruparRua?: boolean
 }) {
   const info = useContext(ContratosCtx)
+  const variosDias = useContext(VariosDiasCtx)
   const { ordenadas, porRua, ruasRepetidas } = useMemo(() => {
     const porRua = new Map<string, number>()
     if (!agruparRua) return { ordenadas: linhas, porRua, ruasRepetidas: 0 }
@@ -1045,6 +1148,7 @@ function TabelaItens({ cabecalho = [], linhas, agruparRua = true }: {
                     className="tabular text-af-400 underline underline-offset-2">
                     {l.contrato ?? 'sem contrato'}
                   </LinkContrato>
+                  {variosDias && l.dia && <span className="tabular block text-[10px] text-graf-400">{curta(l.dia)}</span>}
                 </td>
                 <td className="px-3 py-1.5"><SeloLog valor={c?.log} /></td>
                 <td className="min-w-48 px-3 py-1.5 text-graf-200">
@@ -1116,12 +1220,12 @@ function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => v
   return (
     <Detalhe titulo="LOG acima de 1" contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
       {itens.length === 0 ? (
-        <p className="px-3 py-4 text-xs text-graf-400">Nenhum contrato de VT com LOG acima de 1 neste dia.</p>
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhum contrato de VT com LOG acima de 1 no período.</p>
       ) : (<>
         <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
         <TabelaItens cabecalho={['Situação', 'Equipe · técnico']}
           linhas={lista.map(i => ({
-            id: i.visita_id, contrato: i.contrato,
+            id: i.visita_id, contrato: i.contrato, dia: i.dia,
             cols: [
               <>{situacaoRotulo(i.situacao)}
                 {i.central && <span className="block text-[10px] text-graf-400">cancelado pela central</span>}</>,
@@ -1142,7 +1246,7 @@ const horaDe = (iso: string | null) => iso
 const CAB_TEC1 = ['O.S.', 'Janela', 'Fim', 'TEC1', 'Equipe · técnico']
 /** As linhas da tabela de O.S. do TEC1 — a do card e a do gráfico por equipe. */
 const linhasTec1 = (lista: ItemTec1[]) => lista.map(i => ({
-  id: i.visita_id, contrato: i.contrato,
+  id: i.visita_id, contrato: i.contrato, dia: i.dia,
   cols: [
     <>{i.numero_os ?? '—'}
       {i.baixa && <span className="block text-[10px] text-graf-400">{i.baixa}</span>}</>,
@@ -1176,7 +1280,7 @@ function ListaTec1({ itens, aoFechar }: { itens: ItemTec1[]; aoFechar: () => voi
   return (
     <Detalhe titulo="TEC1 por O.S." contagem={`${lista.length} O.S.`} aoFechar={aoFechar}>
       {itens.length === 0 ? (
-        <p className="px-3 py-4 text-xs text-graf-400">Nenhuma O.S. de VT neste dia.</p>
+        <p className="px-3 py-4 text-xs text-graf-400">Nenhuma O.S. de VT no período.</p>
       ) : (<>
         <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
         <TabelaItens agruparRua={false} cabecalho={CAB_TEC1} linhas={linhasTec1(lista)} />
@@ -1207,7 +1311,7 @@ function SubFalhaOfensora({ s }: { s: NonNullable<DadosVT['sub_falhas']> }) {
           <span className="tabular">{s.contratos_com_codigo}</span> contrato(s) com código não têm sub-falha.</>}
       </>}>
       {s.lista.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma sub-falha lançada neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma sub-falha lançada no período.</p>
       ) : (
         <BarrasHorizontais rotuloLargo parte totalRef={s.contratos_com_codigo} cor="var(--st-impedimento)"
           dados={s.lista.slice(0, LIMITE).map(x => ({ rotulo: x.sub_falha, valor: x.n }))}
@@ -1300,7 +1404,7 @@ function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
         } : undefined}>
         {perdidas.length === 0 ? (
           <p className="text-xs text-graf-300">
-            <span style={{ color: COR.executado }} aria-hidden>✓ </span>Nenhuma O.S. perdeu o prazo neste dia.
+            <span style={{ color: COR.executado }} aria-hidden>✓ </span>Nenhuma O.S. perdeu o prazo no período.
           </p>
         ) : (<>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-graf-200">
@@ -1331,7 +1435,7 @@ function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
       </div>
 
       {equipes.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma O.S. de VT neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma O.S. de VT no período.</p>
       ) : (<>
         <ul className="space-y-1.5">
           {vis.map(e => {
@@ -1381,6 +1485,126 @@ function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
         <Detalhe titulo={`${rot(sel)}${sel.tecnico ? ` · ${sel.tecnico}` : ''}`}
           contagem={`${sel.itens.length} O.S.`} aoFechar={() => setAberta(null)}>
           <TabelaItens agruparRua={false} cabecalho={CAB_TEC1} linhas={linhasTec1(sel.itens)} />
+        </Detalhe>
+      )}
+    </Painel>
+  )
+}
+
+// =================================================== 244: certidão --
+/**
+ * A Certidão de Atendimento no painel de VT (244, D-356).
+ *
+ * > "quero saber se estão validando e não validando e % de validado, e
+ * >  depois validado com falha quem está errando" — Emanuel, 10/11
+ *
+ * A régua é a da 235 (D-344), num lugar só no banco (`classe_certidao`): base =
+ * O.S. FINALIZADA no portal; validado = com falha + sem falha (a cor da CLARO).
+ * Primeiro o julgamento (% validado e a faixa das três classes); depois QUEM:
+ * os técnicos por "com falha" ou por "sem validação", e o clique abre os
+ * contratos.
+ */
+function CertidaoVT({ c }: { c: DadosCertidao }) {
+  const [modo, setModo] = useState<'COM_FALHA' | 'SEM_VALIDACAO'>('COM_FALHA')
+  const [aberto, setAberto] = useState<string | null>(null)
+  const validados = c.regular + c.com_falha
+  const pVal = pct(validados, c.finalizados)
+  const campo = modo === 'COM_FALHA' ? 'com_falha' : 'sem_validacao'
+  const chave = (t: DadosCertidao['tecnicos'][number]) => t.tecnico_id ?? 'sem'
+  const nome = (t: DadosCertidao['tecnicos'][number]) => t.tecnico ?? 'Sem técnico'
+  const lista = c.tecnicos.filter(t => t[campo] > 0)
+    .sort((a, b) => b[campo] - a[campo] || nome(a).localeCompare(nome(b)))
+  const sel = lista.find(t => chave(t) === aberto) ?? null
+  const fatias = [
+    { k: 'regular', rotulo: 'Validado sem falha', n: c.regular, cor: COR.executado },
+    { k: 'com_falha', rotulo: 'Validado com falha', n: c.com_falha, cor: COR.naoExecutado },
+    { k: 'sem_validacao', rotulo: 'Sem validação', n: c.sem_validacao, cor: COR.atencao },
+  ]
+
+  return (
+    <Painel titulo="Certidão de atendimento"
+      dica="Validação do Portal Técnico da Claro, sobre as O.S. finalizadas no portal. Validado = com e sem falha."
+      extra={<span className="tabular text-xs text-graf-400">{n0(c.finalizados)} finalizada(s)</span>}
+      tabela={<TabelaSimples colunas={['Técnico', 'Equipe', 'Finalizadas', 'Sem falha', 'Com falha', 'Sem validação', '% validado']}
+        linhas={c.tecnicos.map(t => [nome(t), t.equipe ?? '—', t.finalizados, t.regular, t.com_falha,
+          t.sem_validacao, `${pct(t.regular + t.com_falha, t.finalizados) ?? '—'}%`])} />}>
+      {c.finalizados === 0 ? (
+        <p className="py-6 text-center text-sm text-graf-400">
+          Nenhuma O.S. de VT finalizada no portal no período.
+        </p>
+      ) : (<>
+        {/* o julgamento */}
+        <div className="flex items-baseline gap-2">
+          <span className="tabular text-3xl font-bold leading-none">{pVal}</span>
+          <span className="text-base font-semibold text-graf-400">%</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-graf-300">validado</span>
+        </div>
+        <p className="mt-1 text-[11px] text-graf-400">
+          <span className="tabular font-semibold text-graf-300">{n0(validados)}</span> de{' '}
+          <span className="tabular">{n0(c.finalizados)}</span> finalizadas ·{' '}
+          <span className="tabular font-semibold text-graf-300">{n0(c.sem_validacao)}</span> sem validação
+        </p>
+        <div className="mt-2 flex h-2.5 overflow-hidden rounded-sm bg-graf-800" aria-hidden>
+          {fatias.map(f => f.n > 0 && (
+            <span key={f.k} style={{ width: `${(f.n * 100) / c.finalizados}%`, background: f.cor }} />
+          ))}
+        </div>
+        <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-graf-300">
+          {fatias.map(f => (
+            <li key={f.k} className="flex items-center gap-1">
+              <span aria-hidden className="h-2 w-2 rounded-sm" style={{ background: f.cor }} />
+              {f.rotulo} <span className="tabular font-semibold">{f.n}</span>
+              <span className="tabular text-graf-400">({pct(f.n, c.finalizados, 0)}%)</span>
+            </li>
+          ))}
+        </ul>
+
+        {/* quem */}
+        <div className="mt-3 flex items-center gap-2 border-t border-graf-800 pt-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-graf-200">Quem</span>
+          <div className="ml-auto flex rounded-md bg-graf-900 p-0.5" role="group" aria-label="Qual lista">
+            {([['COM_FALHA', 'Com falha', c.com_falha], ['SEM_VALIDACAO', 'Sem validação', c.sem_validacao]] as const)
+              .map(([k, r, n]) => (
+                <button key={k} type="button" aria-pressed={modo === k}
+                  onClick={() => { setModo(k); setAberto(null) }}
+                  className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                    modo === k ? 'bg-af-600 text-white' : 'text-graf-300 hover:bg-graf-800'}`}>
+                  {r} <span className="tabular opacity-80">{n}</span>
+                </button>
+              ))}
+          </div>
+        </div>
+        <div className="mt-2">
+          {lista.length === 0 ? (
+            <p className="py-3 text-center text-xs text-graf-400">
+              {modo === 'COM_FALHA' ? 'Ninguém validou com falha no período.' : 'Toda O.S. finalizada foi validada.'}
+            </p>
+          ) : (
+            <BarrasHorizontais rotuloLargo cor={modo === 'COM_FALHA' ? COR.naoExecutado : COR.atencao}
+              dados={lista.slice(0, 8).map(t => ({
+                rotulo: nome(t), sub: t.equipe ? `equipe ${t.equipe} · ${t.finalizados} finalizada(s)` : `${t.finalizados} finalizada(s)`,
+                valor: t[campo],
+              }))}
+              aoClicar={r => {
+                const t = lista.find(x => nome(x) === r)
+                setAberto(a => (t && a !== chave(t) ? chave(t) : null))
+              }}
+              selecionado={sel ? nome(sel) : null} />
+          )}
+          {lista.length > 8 && (
+            <p className="mt-1 text-[11px] text-graf-400">Os 8 maiores; os outros {lista.length - 8} em "Ver tabela".</p>
+          )}
+        </div>
+      </>)}
+      {sel && (
+        <Detalhe titulo={nome(sel)} contagem={`${sel[campo]} contrato(s)`} aoFechar={() => setAberto(null)}>
+          <TabelaItens cabecalho={['Certidão']}
+            linhas={sel.itens.filter(i => i.classe === modo).map(i => ({
+              id: i.visita_id, contrato: i.contrato, dia: i.dia,
+              cols: [i.classe === 'COM_FALHA'
+                ? <span style={{ color: COR.naoExecutado }}>com falha</span>
+                : <span className="text-amber-300">sem validação</span>],
+            }))} />
         </Detalhe>
       )}
     </Painel>

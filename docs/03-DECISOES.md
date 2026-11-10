@@ -13397,3 +13397,37 @@ baixa ofensor logo ao lado e subfalha ao lado também"*) e **Ofensores** (TEC1 p
   card, gráfico e lista batem. Conferido em 05/11: 10 O.S. perdidas em 8 contratos.
 
 As chaves antigas de `equipes` (executados…) ficam na RPC: o site publicado as lia até ser republicado.
+
+### D-355 · Node ofensor mostra janela, situação e código de baixa (243 — 10/11/2026)
+
+*"node ofensor é bom mostrar a janela e codigo de baixa a situação do contrato"* (Emanuel, 10/11). Os contratos
+do node ganham janela e, numa coluna só, a situação com o código embaixo — em seis colunas, no card estreito, a
+situação sumia na rolagem lateral. O código é o mesmo `cod_contrato` do código ofensor (TOA; sem baixa no TOA, o
+da AFLINE).
+
+### D-356 · Dashboard VT por período, certidão de atendimento e "Dashboard INST" (244 — 10/11/2026)
+
+*"nessa mesma tela o sistema pode mostrar o acumulativo, ou seja do dia 01 a hoje, porém por padrão ele deixa
+setado início e fim hoje"* (Emanuel, 10/11). Início e fim no topo, os dois em hoje ao abrir, com os atalhos
+**Hoje** e **Mês até hoje**. A RPC ganhou `p_ate` (`p_dia` é o início; o nome ficou pelo site publicado) e a
+versão de 2 parâmetros saiu, para a chamada não ficar ambígua. No período:
+- a **equipe de VT é decidida por dia** (3+ naquele dia, ou manutenção) e a média é **VT ÷ equipe-dia** — no dia
+  só, equipe-dia = equipe e nada muda (conferido: chaves antigas idênticas em 10/11 e 05/11);
+- o **AT1 projetado** = VT do período ÷ dias × dias do mês ÷ base (mês de 01 a 10/11: 719 VT ÷ 10 × 30 ÷ 82.587 =
+  2,61%);
+- as listas mostram a data embaixo do contrato.
+Medido como authenticated: mês até hoje em 434 ms (~800 KB de resposta).
+
+*"adicione um gráfico da certidão de atendimento também (...) quero saber se estão validando e não validando e %
+de validado, e depois validado com falha quem está errando"*. Ao lado do VT por janela e área: **% validado**, a
+faixa sem falha / com falha / sem validação, e **Quem** (com falha ou sem validação, por técnico; o clique abre os
+contratos). A régua da 235 (D-344) virou uma função só, `classe_certidao()`, que `certidao_atendimento` também
+usa (saída idêntica, 54 linhas de 01 a 10/11). No painel, a base é `conta` (sem Auditar e sem cancelado pela
+central) e "sem técnico" aparece — a tela Indicadores o deixa fora; os totais podem diferir por isso.
+Para abrir espaço, o **AT1 por área** deixou de ser painel e abre pelo card do AT1 (como os outros cards).
+
+*"o gráfico (...) tá bem alto, dá pra melhorar"*: a célula do VT por janela e área tem uma linha só (VT e média
+lado a lado) — metade da altura.
+
+*"em cima o dashboard — vamos colocar Dashboard INST, renomear"*: o item do menu (e o caminho no topo) é
+**Dashboard INST**; a rota continua `/controle`.
