@@ -121,6 +121,18 @@ interface ItemRev30 {
   equipe: string | null; tecnico: string | null
   anterior_id: string; anterior_data: string; anterior_situacao: string; dias: number
   anterior_equipe: string | null; anterior_tecnico: string | null; anterior_baixa: string | null
+  /** 252 (D-366): a validação de sinal da VT anterior, como o Portal Técnico mostrou
+   *  (rótulo e cor da CLARO). Nulo = o portal não foi lido para ela. */
+  anterior_sinal?: { validacao: string | null; cor: string | null; status_os: string | null
+                     inicial: string | null; classe: string | null } | null
+}
+
+/** 252: a chave do filtro de validação — o rótulo da CLARO; sem leitura à parte. */
+const chaveSinal = (i: ItemRev30) => i.anterior_sinal?.validacao?.trim() || (i.anterior_sinal ? 'Sem rótulo' : 'SEM_LEITURA')
+/** A cor do portal (green/red/yellow) nas cores fixas do painel. */
+const corSinal = (c: string | null | undefined) => {
+  const k = (c ?? '').toLowerCase()
+  return k === 'green' ? COR.executado : k === 'red' ? COR.naoExecutado : k === 'yellow' ? COR.atencao : undefined
 }
 interface ItemLog {
   dia?: string
@@ -335,6 +347,8 @@ function Conteudo({ d }: { d: DadosVT }) {
   const r30 = d.revisita30
   const pRev30 = r30 ? pct(r30.n, r30.base) : null
   const r30Mesmo = r30 ? r30.lista.filter(i => i.anterior_tecnico && i.anterior_tecnico === i.tecnico).length : 0
+  // 252 (D-366): a anterior foi validada em vermelho no portal (o vermelho é da CLARO)
+  const r30Irreg = r30 ? r30.lista.filter(i => (i.anterior_sinal?.cor ?? '').toLowerCase() === 'red').length : 0
   const [ver, setVer] = useState<Card | null>(null)
   const logAlto = d.log_lista ?? []
   const alternar = (k: Card) => setVer(v => v === k ? null : k)
@@ -410,6 +424,11 @@ function Conteudo({ d }: { d: DadosVT }) {
                 {r30Mesmo > 0 && (
                   <span className="block" title="A VT anterior foi feita pelo mesmo técnico da VT de agora">
                     <span className="tabular font-semibold text-amber-300">{n0(r30Mesmo)}</span> com o mesmo técnico
+                  </span>
+                )}
+                {r30Irreg > 0 && (
+                  <span className="block" title="A VT anterior teve a validação de sinal em vermelho no Portal Técnico">
+                    <span className="tabular font-semibold" style={{ color: COR.naoExecutado }}>{n0(r30Irreg)}</span> com a anterior irregular
                   </span>
                 )}
               </>} />
@@ -1249,14 +1268,17 @@ const quem = (equipe: string | null, tecnico: string | null) => (
 )
 
 /** Botões de filtro de uma lista: "Todos" + um por valor, com a contagem. */
-function Chips<K extends string | number>({ opcoes, valor, aoEscolher, total }: {
+function Chips<K extends string | number>({ opcoes, valor, aoEscolher, total, rotulo }: {
   opcoes: { k: K; rotulo: ReactNode; n: number }[]
   valor: K | null; aoEscolher: (k: K | null) => void; total: number
+  /** 252: nome da fileira, quando a lista tem mais de uma */
+  rotulo?: string
 }) {
   const cls = (on: boolean) => `inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs ${on
     ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b border-graf-800 px-3 py-2">
+      {rotulo && <span className="mr-1 w-36 shrink-0 text-[10px] font-medium uppercase tracking-wide text-graf-400">{rotulo}</span>}
       <button type="button" onClick={() => aoEscolher(null)} aria-pressed={valor == null} className={cls(valor == null)}>
         Todos <span className="tabular opacity-80">{total}</span>
       </button>
@@ -1313,6 +1335,8 @@ function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => v
  */
 function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: () => void }) {
   const [so, setSo] = useState<string | null>(null)
+  // 252 (D-366): o segundo filtro — a validação de sinal da anterior
+  const [soSinal, setSoSinal] = useState<string | null>(null)
   const mesmo = (i: ItemRev30) => !!i.anterior_tecnico && i.anterior_tecnico === i.tecnico
   const opcoes = useMemo(() => {
     const m = new Map<string, number>()
@@ -1322,16 +1346,28 @@ function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: ()
     const nm = itens.filter(mesmo).length
     return nm ? [...sits, { k: 'MESMO', rotulo: <>mesmo técnico</>, n: nm }] : sits
   }, [itens])
-  const lista = so == null ? itens
-    : so === 'MESMO' ? itens.filter(mesmo) : itens.filter(i => i.anterior_situacao === so)
+  const opcoesSinal = useMemo(() => {
+    const m = new Map<string, { n: number; cor: string | null }>()
+    for (const i of itens) {
+      const k = chaveSinal(i), x = m.get(k)
+      m.set(k, { n: (x?.n ?? 0) + 1, cor: x?.cor ?? i.anterior_sinal?.cor ?? null })
+    }
+    return [...m.entries()].sort((a, b) => (a[0] === 'SEM_LEITURA' ? 1 : 0) - (b[0] === 'SEM_LEITURA' ? 1 : 0) || b[1].n - a[1].n)
+      .map(([k, x]) => ({ k, n: x.n, rotulo: k === 'SEM_LEITURA' ? <>sem leitura do portal</>
+        : <><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: corSinal(x.cor) ?? 'var(--color-graf-500)' }} />{k}</> }))
+  }, [itens])
+  const lista = (so == null ? itens
+    : so === 'MESMO' ? itens.filter(mesmo) : itens.filter(i => i.anterior_situacao === so))
+    .filter(i => soSinal == null || chaveSinal(i) === soSinal)
   const haDias = (n: number) => n === 0 ? 'no mesmo dia' : n === 1 ? 'há 1 dia' : `há ${n} dias`
   return (
     <Detalhe titulo="Revisita 30 D · VT que voltou de VT" contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
       {itens.length === 0 ? (
         <p className="px-3 py-4 text-xs text-graf-400">Nenhuma VT voltou de outra VT em 30 dias no período.</p>
       ) : (<>
-        <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
-        <TabelaItens cabecalho={['Veio da VT de', 'Como a anterior fechou', 'Quem fez a anterior', 'Agora']}
+        <Chips rotulo="Situação da anterior" opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
+        <Chips rotulo="Validação da anterior" opcoes={opcoesSinal} valor={soSinal} aoEscolher={setSoSinal} total={itens.length} />
+        <TabelaItens cabecalho={['Veio da VT de', 'Como a anterior fechou', 'Validação de sinal da anterior', 'Quem fez a anterior', 'Agora']}
           linhas={lista.map(i => ({
             id: i.visita_id, contrato: i.contrato, dia: i.dia,
             cols: [
@@ -1343,6 +1379,24 @@ function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: ()
               </span>,
               <>{situacaoRotulo(i.anterior_situacao)}
                 {i.anterior_baixa && <span className="block text-[10px] text-graf-400">{i.anterior_baixa}</span>}</>,
+              // 252 (D-366): o rótulo e a cor são os do Portal Técnico (D-330), não uma faixa nossa
+              i.anterior_sinal ? (
+                <span className="whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5 font-medium"
+                    style={{ color: corSinal(i.anterior_sinal.cor) }}>
+                    <span aria-hidden className="inline-block h-2 w-2 rounded-full"
+                      style={{ background: corSinal(i.anterior_sinal.cor) ?? 'var(--color-graf-500)' }} />
+                    {i.anterior_sinal.validacao ?? 'sem rótulo'}
+                  </span>
+                  {i.anterior_sinal.status_os && i.anterior_sinal.status_os.toLowerCase() !== 'finalizada' && (
+                    <span className="block text-[10px] text-graf-400"
+                      title="Situação da O.S. no portal na última leitura">O.S. {i.anterior_sinal.status_os.toLowerCase()} no portal</span>
+                  )}
+                  {i.anterior_sinal.inicial && (
+                    <span className="block text-[10px] text-graf-400" title="Diagnóstico inicial (antes)">antes: {i.anterior_sinal.inicial}</span>
+                  )}
+                </span>
+              ) : <span className="text-graf-400" title="O Portal Técnico não foi lido para esta VT (a leitura começou em 06/11)">sem leitura do portal</span>,
               <>{quem(i.anterior_equipe, i.anterior_tecnico)}
                 {mesmo(i) && (
                   <span className="mt-0.5 inline-block rounded bg-amber-900/40 px-1.5 py-px text-[10px] font-semibold

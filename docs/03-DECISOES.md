@@ -13593,3 +13593,17 @@ que falta, não defeito do filtro.
 de 1" mostra os códigos das O.S. com baixa do TOA; sem nenhuma, os da AFLINE — a regra do código ofensor. Sem baixa,
 "sem baixa".
 
+### D-366 · Revisita 30 D: a validação de sinal da VT anterior (252 — 10/11/2026)
+
+*"na opção revisita quero saber se o contrato anterior foi baixado com a validação de sinais regular, irregular ou
+não fez, ficou pendente"* (Emanuel, 10/11).
+
+- Cada revisita da lista traz o que o **Portal Técnico** mostrou da VT ANTERIOR: o rótulo da validação ("Nível
+  Regular", "Nível Irregular", "Pendente", "Erro na Coleta") com a **cor da CLARO** (D-330 — faixa nossa seria regra
+  inventada), a situação da O.S. no portal quando não é Finalizada ("O.S. despachada no portal": a leitura foi antes
+  de finalizar) e o diagnóstico inicial.
+- **Sem linha em `sinal_claro` = "sem leitura do portal"**, nunca "não fez": o portal só passou a ser lido em 06/11.
+  No mês, 98 das 127 revisitas têm a anterior sem leitura; das lidas, 12 irregulares, 3 regulares, 14 pendentes.
+- Segunda fileira de filtro na lista ("Validação da anterior") e, no card, "N com a anterior irregular" (vermelho do
+  portal).
+
