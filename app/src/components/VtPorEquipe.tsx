@@ -160,30 +160,47 @@ function calcularVt<L extends LinhaConta>(linhas: L[], etns: PeriodoEtn[], p: {
  *   que leva a média à meta da linha nos dias que faltam.
  * As equipes do fim do mês saem da mesma fórmula da planilha (SOMA 1 ÷ 21).
  */
+type EstadoDia = 'PLANO' | 'EDITADO' | 'APAGADO' | 'ESCALA'
+
 function projetarVt(c: ReturnType<typeof calcularVt<LinhaVt>>, p: {
   dias: string[]; ate: string; diasEquipe: number
   planoDe: (login: string, etn: boolean) => number | null
+  /** 249: o dia escrito à mão — undefined = sem edição; null = apagado */
+  diaDe: (login: string, etn: boolean, dia: string) => number | null | undefined
   padrao: number; padraoEtn: number
 }) {
   const futuros = p.dias.filter(d => d > p.ate)
   const rows = c.rows.map(r => {
     const proprio = p.planoDe(r.login, r.etn)
     const plano = proprio ?? (r.etn ? p.padraoEtn : p.padrao)
-    const diasFut = futuros.filter(d => r.dentro(d) && !r.esc.has(d))
-    const nFut = plano > 0 ? diasFut.length : 0
+    const valores = new Map<string, number>()
+    const estado = new Map<string, EstadoDia>()
+    for (const d of futuros) {
+      if (!r.dentro(d)) continue
+      const ed = p.diaDe(r.login, r.etn, d)
+      // a folga é a de verdade: se existir, vale ela (a edição por VALOR já a tira)
+      if (r.esc.has(d)) estado.set(d, 'ESCALA')
+      else if (ed === null) estado.set(d, 'APAGADO')
+      else if (ed !== undefined) { estado.set(d, 'EDITADO'); valores.set(d, ed) }
+      else { estado.set(d, 'PLANO'); valores.set(d, plano) }
+    }
+    const trabalhados = [...valores].filter(([, v]) => v > 0)
+    const nFut = trabalhados.length
+    const somaFut = trabalhados.reduce((s, [, v]) => s + v, 0)
     const diasP = r.nDias + nFut
-    const totalP = r.total + plano * nFut
+    const totalP = r.total + somaFut
     const mediaP = diasP ? totalP / diasP : null
-    const precisa = diasFut.length ? (r.meta * (r.nDias + diasFut.length) - r.total) / diasFut.length : null
+    const precisa = nFut ? (r.meta * (r.nDias + nFut) - r.total) / nFut : null
     return {
-      ...r, plano, planoProprio: proprio != null, fut: new Set(diasFut), nFut,
+      ...r, plano, planoProprio: proprio != null, valores, estado,
+      fut: new Set(trabalhados.map(([d]) => d)), nFut,
       diasP, totalP, mediaP, seP: mediaP != null && mediaP >= r.meta, precisa,
     }
   })
   const soma1 = rows.filter(r => r.seP).reduce((s, r) => s + r.diasP, 0)
   const soma0 = rows.filter(r => !r.seP).reduce((s, r) => s + r.diasP, 0)
   const porDia = p.dias.map(d => {
-    const v = rows.map(r => r.vt.get(d) ?? (r.fut.has(d) && r.plano > 0 ? r.plano : undefined))
+    const v = rows.map(r => r.vt.get(d) ?? (r.fut.has(d) ? r.valores.get(d) : undefined))
       .filter((x): x is number => x != null)
     return { total: v.reduce((s, x) => s + x, 0), media: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null }
   })
@@ -217,6 +234,11 @@ export function VtPorEquipe() {
   const [padrao, setPadrao] = useState(6)
   const [padraoEtn, setPadraoEtn] = useState(3)
   const [editandoPlano, setEditandoPlano] = useState<string | null>(null)
+  // 249 (D-361): o dia escrito à mão e a seleção arrastada com o mouse
+  const [diasEditados, setDiasEditados] = useState<Map<string, number | null>>(new Map())
+  const [sel, setSel] = useState<{ a: [number, number]; b: [number, number] } | null>(null)
+  const arrastando = useRef(false)
+  const [aplicando, setAplicando] = useState(false)
 
   const dias = useMemo(() => {
     const [a, m] = mes.split('-').map(Number)
@@ -238,10 +260,15 @@ export function VtPorEquipe() {
         .lte('de', fim).or(`ate.is.null,ate.gte.${ini}`).order('de'),
       // 248: o plano do mês (RLS: só a cidade ativa) e os padrões
       supabase.from('vt_plano').select('login, etn, vt_dia').eq('mes', ini),
+      // 249: o dia escrito à mão na projeção (RLS: só a cidade ativa)
+      supabase.from('vt_projecao_dia').select('login, etn, dia, vt').gte('dia', ini).lte('dia', fim),
       supabase.rpc('ler_parametro', { p_chave: 'vt_plano_padrao' }),
       supabase.rpc('ler_parametro', { p_chave: 'vt_plano_padrao_etn' }),
-    ]).then(([l, m, d, me, e, pl, pp, pe]) => {
+    ]).then(([l, m, d, me, e, pl, pd, pp, pe]) => {
       if (!vivo) return
+      if (pd.error) setErro(pd.error.message)
+      else setDiasEditados(new Map(((pd.data ?? []) as { login: string; etn: boolean; dia: string; vt: number | null }[])
+        .map(x => [`${x.login}|${x.etn}|${x.dia}`, x.vt == null ? null : Number(x.vt)])))
       if (pl.error) setErro(pl.error.message)
       else setPlanos(((pl.data ?? []) as { login: string; etn: boolean; vt_dia: number }[])
         .map(x => ({ ...x, vt_dia: Number(x.vt_dia) })))
@@ -285,9 +312,64 @@ export function VtPorEquipe() {
   const proj = useMemo(() => projetarVt(calc, {
     dias, ate, diasEquipe, padrao, padraoEtn,
     planoDe: (login, etn) => planos.find(x => x.login === login && x.etn === etn)?.vt_dia ?? null,
-  }), [calc, dias, ate, diasEquipe, padrao, padraoEtn, planos])
+    diaDe: (login, etn, dia) => {
+      const k = `${login}|${etn}|${dia}`
+      return diasEditados.has(k) ? diasEditados.get(k)! : undefined
+    },
+  }), [calc, dias, ate, diasEquipe, padrao, padraoEtn, planos, diasEditados])
   const projetando = visao === 'PROJ'
   const projPorChave = useMemo(() => new Map(proj.rows.map(r => [r.chave, r])), [proj])
+
+  /** As células da seleção: retângulo linhas × dias, só dia futuro e só da linha. */
+  const selecionadas = useMemo(() => {
+    if (!sel || !projetando) return [] as { r: typeof proj.rows[number]; d: string }[]
+    const [r0, r1] = [Math.min(sel.a[0], sel.b[0]), Math.max(sel.a[0], sel.b[0])]
+    const [c0, c1] = [Math.min(sel.a[1], sel.b[1]), Math.max(sel.a[1], sel.b[1])]
+    const out: { r: typeof proj.rows[number]; d: string }[] = []
+    for (let i = r0; i <= r1; i++) {
+      const r = proj.rows[i]
+      if (!r) continue
+      for (let j = c0; j <= c1; j++) {
+        const d = dias[j]
+        if (d > ate && r.dentro(d)) out.push({ r, d })
+      }
+    }
+    return out
+  }, [sel, projetando, proj, dias, ate])
+  const chaveSel = useMemo(() => new Set(selecionadas.map(x => `${x.r.chave}|${x.d}`)), [selecionadas])
+
+  const aplicar = useCallback(async (acao: 'VALOR' | 'ESCALA' | 'APAGAR' | 'PADRAO', extra?: { vt?: number; codigo?: string }) => {
+    if (!selecionadas.length || aplicando) return
+    setAplicando(true)
+    const itens = selecionadas.map(({ r, d }) => ({ login: r.login, etn: r.etn, dia: d, acao, ...extra }))
+    const { error } = await supabase.rpc('editar_projecao_vt', { p_itens: itens })
+    setAplicando(false)
+    if (error) { setErro(error.message); return }
+    setErro(null); setSel(null); setVersao(v => v + 1)
+  }, [selecionadas, aplicando])
+
+  const valorSel = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const solta = () => { arrastando.current = false }
+    window.addEventListener('mouseup', solta)
+    return () => window.removeEventListener('mouseup', solta)
+  }, [])
+  useEffect(() => {
+    if (!sel) return
+    const tecla = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement
+      const noCampo = alvo?.tagName === 'INPUT' || alvo?.tagName === 'TEXTAREA'
+      if (e.key === 'Escape') { setSel(null); return }
+      if (noCampo) return
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); aplicar('APAGAR') }
+      else if (/^[0-9]$/.test(e.key) && valorSel.current) {
+        e.preventDefault(); valorSel.current.value = e.key; valorSel.current.focus()
+      }
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [sel, aplicar])
+  useEffect(() => { if (!projetando) setSel(null) }, [projetando])
 
   const salvarPlano = useCallback(async (login: string, etn: boolean, valor: string) => {
     setEditandoPlano(null)
@@ -358,7 +440,7 @@ export function VtPorEquipe() {
             ? <>O período vai até o último dia do mês: não há dias para projetar. Escolha um "até" antes do fim do mês (ex.: <strong>Até ontem</strong>).</>
             : <>Real de <strong>{dm(de)}</strong> a <strong>{dm(ate)}</strong>; projeção de <strong>{dm(proj.futuros[0])}</strong> a <strong>{dm(proj.futuros[proj.futuros.length - 1])}</strong> —
               cada dia sem escala vale o <strong>plano</strong> da linha (padrão {n1(padrao)}; ETN {n1(padraoEtn)}).
-              Marque folgas futuras na célula; ajuste o plano na coluna Plano.</>}
+              Arraste sobre os dias para mudar volume, folga ou apagar; o plano da linha muda na coluna Plano.</>}
         </p>
       )}
 
@@ -430,6 +512,53 @@ export function VtPorEquipe() {
           )}
         </div>
 
+        {projetando && podeMarcar && (
+          <div className="sticky top-0 z-20 mt-3 flex min-h-10 flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
+            style={{ borderColor: `${COR_PROJ}66`, background: 'var(--color-graf-950)' }}
+            role="toolbar" aria-label="Editar a projeção">
+            {selecionadas.length === 0 ? (
+              <span className="text-graf-400">
+                Arraste com o mouse sobre os dias da projeção para selecionar (Shift + clique estende) · Delete apaga · digite um número para o volume
+              </span>
+            ) : (<>
+              <span className="font-semibold text-graf-100">
+                <span className="tabular">{selecionadas.length}</span> dia(s) selecionado(s)
+              </span>
+              <form className="flex items-center gap-1" onSubmit={e => {
+                e.preventDefault()
+                const t = (valorSel.current?.value ?? '').trim().replace(',', '.')
+                const n = Number(t)
+                if (t === '' || isNaN(n) || n < 0 || n > 30) { setErro('O volume tem de ser um número entre 0 e 30.'); return }
+                aplicar('VALOR', { vt: n })
+              }}>
+                <label htmlFor="vt-sel" className="text-graf-400">VT/dia</label>
+                <input id="vt-sel" ref={valorSel} type="text" inputMode="decimal" placeholder="6"
+                  className="tabular w-14 rounded border border-graf-600 bg-graf-900 px-1.5 py-0.5 text-right" />
+                <button type="submit" disabled={aplicando}
+                  className="rounded px-2 py-0.5 font-semibold text-white disabled:opacity-50" style={{ background: COR_PROJ }}>
+                  Aplicar
+                </button>
+              </form>
+              <span className="text-graf-600" aria-hidden>|</span>
+              {ESCALAS.map(e => (
+                <button key={e.c} type="button" disabled={aplicando} onClick={() => aplicar('ESCALA', { codigo: e.c })}
+                  title={`Marcar ${e.r}`} className="rounded px-1 py-0.5 hover:bg-graf-800 disabled:opacity-50">
+                  <SeloEscala codigo={e.c} />
+                </button>
+              ))}
+              <span className="text-graf-600" aria-hidden>|</span>
+              <button type="button" disabled={aplicando} onClick={() => aplicar('APAGAR')}
+                title="O dia fica vazio e não conta (tira a folga também)"
+                className="rounded border border-graf-700 px-2 py-0.5 text-graf-200 hover:border-af-600 disabled:opacity-50">Apagar</button>
+              <button type="button" disabled={aplicando} onClick={() => aplicar('PADRAO')}
+                title="Volta ao plano da linha (a folga, se houver, fica)"
+                className="rounded border border-graf-700 px-2 py-0.5 text-graf-200 hover:border-af-600 disabled:opacity-50">Plano padrão</button>
+              <button type="button" onClick={() => setSel(null)}
+                className="ml-auto text-graf-400 hover:text-graf-100">Cancelar (Esc)</button>
+            </>)}
+          </div>
+        )}
+
         {carregando ? (
           <CarregandoBloco className="py-12" />
         ) : calc.rows.length === 0 ? (
@@ -497,16 +626,35 @@ export function VtPorEquipe() {
                       }
                       const pr = projPorChave.get(l.chave)
                       if (projetando && d > ate && pr) {
+                        const est = pr.estado.get(d)
+                        const val = pr.valores.get(d)
                         const e = l.esc.get(d)
-                        const planejado = pr.fut.has(d) && pr.plano > 0
+                        const ri = calc.rows.indexOf(l), di = dias.indexOf(d)
+                        const marcado = chaveSel.has(`${l.chave}|${d}`)
+                        const estilo: React.CSSProperties =
+                          est === 'EDITADO' ? { background: `${COR_PROJ}2e`, color: COR_PROJ_TEXTO, fontWeight: 700 }
+                          : est === 'PLANO' ? { boxShadow: `inset 0 0 0 1px ${COR_PROJ}88`, color: COR_PROJ_TEXTO, fontStyle: 'italic' }
+                          : est === 'APAGADO' ? { boxShadow: 'inset 0 0 0 1px var(--color-graf-700)' }
+                          : {}
                         return (
-                          <td key={d} className={`border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}>
+                          <td key={d} className={`select-none border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}>
                             <button type="button" disabled={!podeMarcar}
-                              onClick={ev => setMenu({ login: l.login, dia: d, r: ev.currentTarget.getBoundingClientRect() })}
-                              title={e ? `Escala: ${e}` : planejado ? `Planejado: ${n2(pr.plano)} VT${podeMarcar ? ' · clique para marcar folga' : ''}` : 'Plano 0: o dia não conta'}
-                              className={`tabular w-full rounded px-0.5 py-0.5 ${podeMarcar ? 'hover:ring-1 hover:ring-graf-500' : 'cursor-default'}`}
-                              style={planejado && !e ? { boxShadow: `inset 0 0 0 1px ${COR_PROJ}88`, color: COR_PROJ_TEXTO, fontStyle: 'italic' } : undefined}>
-                              {e ? <SeloEscala codigo={e} /> : planejado ? n2(pr.plano) : <span className="text-graf-700">·</span>}
+                              onMouseDown={ev => {
+                                if (ev.button !== 0) return
+                                ev.preventDefault()
+                                arrastando.current = true
+                                setSel(s => ev.shiftKey && s ? { a: s.a, b: [ri, di] } : { a: [ri, di], b: [ri, di] })
+                              }}
+                              onMouseEnter={() => { if (arrastando.current) setSel(s => s && { a: s.a, b: [ri, di] }) }}
+                              title={est === 'ESCALA' ? `Escala: ${e}` : est === 'EDITADO' ? `Escrito à mão: ${n2(val ?? 0)} VT`
+                                : est === 'APAGADO' ? 'Apagado: o dia não conta' : `Plano: ${n2(pr.plano)} VT`}
+                              className={`tabular w-full rounded px-0.5 py-0.5 ${podeMarcar ? 'cursor-cell' : 'cursor-default'} ${
+                                marcado ? 'outline outline-2 outline-af-500' : ''}`}
+                              style={marcado ? { ...estilo, background: 'color-mix(in srgb, var(--color-af-500) 22%, transparent)' } : estilo}>
+                              {est === 'ESCALA' && e ? <SeloEscala codigo={e} />
+                                : est === 'APAGADO' ? <span className="text-graf-600">&nbsp;</span>
+                                : val != null && (val > 0 || est === 'EDITADO') ? n2(val)
+                                : <span className="text-graf-700">·</span>}
                             </button>
                           </td>
                         )

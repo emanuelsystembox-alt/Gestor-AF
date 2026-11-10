@@ -13518,3 +13518,27 @@ sugere o volume que ele precisa fazer por dia, para atingir o objetivo"* (Emanue
   (a tabela não tem coluna de origem).
 - Conferido à mão: JHONILSON, 6 dias reais (30,71) e 16 a trabalhar com plano 6 → 126,71 ÷ 22 = 5,76; precisa
   (5,7 × 22 − 30,71) ÷ 16 = 5,92/dia.
+
+### D-361 · VT por equipe: a projeção editável como planilha — arrastar, volume, folga, apagar (249 — 10/11/2026)
+
+*"o certo é o sistema deixar editar os dias o volume, deixar editar todas as folgas, o usuário também pode arrastar
+com o mouse até onde pode apagar tudo e fazer manual (...) isso no projetado, tem que dar liberdade para o usuário
+mexer para melhorar o resultado"* · *"ele não consegue tirar folga e colocar a baixa"* (Emanuel, 10/11).
+
+- Na visão Projetada, os dias futuros são uma **grade selecionável**: arrastar com o mouse seleciona o retângulo
+  técnicos × dias (Shift + clique estende). A barra em cima da tabela aplica à seleção inteira, numa chamada:
+  **VT/dia** (o volume escrito; tira a folga do dia — é o "tirar folga e colocar"), **F / FE / FALTA / ATES.**
+  (a folga; tira o volume escrito), **Apagar** (o dia fica vazio e não conta; tira a folga) e **Plano padrão**
+  (volta ao plano da linha; a folga fica). Teclado: número digita o volume, Delete apaga, Esc cancela.
+- O volume escrito mora em `vt_projecao_dia` (por login, dia e linha normal/ETN; `vt` nulo = apagado; sem linha =
+  plano). A **folga é a de verdade** (`vt_escala`) — a mesma da visão real; se um dia tiver folga e volume, vale a
+  folga. Tudo por `editar_projecao_vt(itens)`, numa transação, só a gestão, na cidade ativa, até 3.000 células.
+- A conta da projeção passa a somar dia a dia: DIAS = reais + dias com volume > 0; PRECISA/DIA divide pelos dias
+  que de fato vão ser trabalhados.
+- Visual: plano = tracejado em itálico; escrito à mão = cheio, em negrito; apagado = vazio com borda; seleção =
+  contorno vermelho.
+
+Testado sem gravar: RPC numa transação desfeita (VALOR tira a folga, ESCALA tira o volume, PADRAO volta ao plano,
+faixa 0–30 recusada; a escala real ficou intacta); na tela, arrasto real com o mouse (3 × 3 = 9 células), "7" +
+Enter e Delete conferidos pelo que seria enviado, com a gravação travada; e as edições fingidas na leitura (DANILO:
+12 = 8, 14 apagado → 22 dias, 135,57 = 37,57 + 6 × 15 + 8). `vt_projecao_dia` segue vazia.
