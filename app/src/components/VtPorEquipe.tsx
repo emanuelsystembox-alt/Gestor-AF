@@ -79,8 +79,11 @@ const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 
 /** O tom de um valor do dia: contra o limite (a meta arredondada para cima).
  *  Compara o que a tela MOSTRA (2 casas): "6,00" é amarelo, "5,99" vermelho. */
-function tomDoDia(v: number, limite: number) {
+function tomDoDia(v: number, limite: number, etn = false) {
   const r = Math.round(v * 100) / 100
+  // D-362: no ETN não há faixa amarela — 3 ou mais É a meta dele, e é verde
+  // ("considerar o ETN como três pra ficar verde e contar positivo", Emanuel, 10/11)
+  if (etn) return r >= limite ? TOM.bom : TOM.ruim
   return r > limite ? TOM.bom : r === limite ? TOM.meio : TOM.ruim
 }
 
@@ -498,7 +501,7 @@ export function VtPorEquipe() {
               </span>
             ))}
             <span className="flex items-center gap-1">
-              <SeloEtn /> meta {n1(metaEtn)} ({Math.ceil(metaEtn)} no dia)
+              <SeloEtn /> meta {n1(metaEtn)} ({Math.ceil(metaEtn)} ou mais no dia = verde)
             </span>
           </div>
           {calc.semPonto > 0 && (
@@ -671,7 +674,7 @@ export function VtPorEquipe() {
                       const v = l.vt.get(d)
                       const e = l.esc.get(d)
                       const clicavel = podeMarcar && d <= hoje
-                      const tom = v != null ? tomDoDia(v, l.limiteDia) : null
+                      const tom = v != null ? tomDoDia(v, l.limiteDia, l.etn) : null
                       return (
                         <td key={d} className={`border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}>
                           <button type="button" disabled={!clicavel}
@@ -737,7 +740,9 @@ export function VtPorEquipe() {
                               : (
                                 <span className="rounded px-1.5 py-0.5 font-semibold"
                                   title={`${pr.fut.size} dia(s) de trabalho até o fim do mês`}
-                                  style={pr.precisa <= pr.plano
+                                  // D-362: verde quando a PROJEÇÃO (plano + dias escritos) fecha na meta —
+                                  // comparar com o plano pintava de vermelho quem tinha dias escritos acima dele
+                                  style={pr.seP
                                     ? { background: TOM.bom.fundo, color: TOM.bom.texto }
                                     : { background: TOM.ruim.fundo, color: TOM.ruim.texto }}>
                                   {n2(pr.precisa)}

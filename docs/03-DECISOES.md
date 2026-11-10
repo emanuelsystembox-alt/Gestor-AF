@@ -13542,3 +13542,16 @@ Testado sem gravar: RPC numa transação desfeita (VALOR tira a folga, ESCALA ti
 faixa 0–30 recusada; a escala real ficou intacta); na tela, arrasto real com o mouse (3 × 3 = 9 células), "7" +
 Enter e Delete conferidos pelo que seria enviado, com a gravação travada; e as edições fingidas na leitura (DANILO:
 12 = 8, 14 apagado → 22 dias, 135,57 = 37,57 + 6 × 15 + 8). `vt_projecao_dia` segue vazia.
+
+### D-362 · VT por equipe: no ETN, 3 é verde; o "Precisa/dia" pinta pelo que a projeção fecha (10/11/2026)
+
+*"faltou só considerar o ETN como três pra ficar verde e contar positivo"* · *"ele ainda consta vermelho"*
+(Emanuel, 10/11).
+
+- **Cor do dia na linha ETN**: 3 ou mais = verde, abaixo = vermelho — sem a faixa amarela da planilha (que no
+  técnico normal pinta o "igual a 6"). O 3 é a meta dele, logo é positivo. O técnico normal segue a planilha.
+- **Precisa/dia**: a cor era "precisa ≤ plano". Com dias escritos acima do plano (o ELIECER tinha 5,00 em dois dias)
+  ele fechava na meta (3,28) e o Precisa/dia (3,06 contra plano 3) ficava vermelho. Agora a cor é a da projeção:
+  verde quando a linha fecha o mês na meta (o SE projetado), vermelho quando não.
+- Não mudou: na visão Real com "Mês todo", o dia de HOJE entra pela metade e pode pôr a linha no vermelho (o
+  ELIECER: 4,00 ontem + 1,00 hoje = 2,50). "Até ontem" mostra o dia fechado.
