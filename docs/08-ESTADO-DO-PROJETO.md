@@ -431,6 +431,28 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 10/11/2026 — Dashboard VT e VT por equipe (241–249; D-353 a D-362)
+
+Feito e publicado: ver HANDOFF.md (10/11). Baterias 33/33 e 29/29 depois de 241, 245, 247, 248 e 249.
+
+### Verificação que ninguém fez ainda
+- **Gravação real pela tela** do ETN, do plano e da grade da projeção — testadas só com a gravação travada no
+  navegador e em transação desfeita no banco (o único `vt_plano` é o do Emanuel, pelo site).
+- Período do Dashboard VT atravessando dois meses (o AT1 projeta pelos dias do mês do FIM).
+- Leitor de tela nas telas novas; o Dashboard VT com uma área só filtrada.
+
+### Depende do Emanuel
+- **Equipe de VT**: a exceção da manutenção (conta com qualquer número de VT) continua — tirar?
+- **LOG e AT5** continuam contando o cancelado pela central (216) — tirar também, como na situação por equipe?
+- **Cor do ETN**: 3 ou mais = verde (D-362) — confirmado pelo pedido; o corte do técnico normal segue o 6 da planilha.
+- **Janela do LOG**: revisita "em qualquer situação" inclui Auditar e cancelado pela central — manter?
+- **Certidão no Dashboard VT** conta "sem técnico"; a de Indicadores não — alinhar?
+- **Agregado por cidade**: usar os códigos do relatório (MAO, SLZ) em vez dos nossos (MAN, SLS)? O bloco do dia do
+  relatório dizia "08/11" com os números do dia 09/11 — qual é a convenção?
+- **Escala da planilha × sistema**: 4 dias divergem e ficou o do sistema (LEONARDO 01 F×FE, WILLIAM 02 F×FE,
+  JHONILSON 01–02 F×FALTA).
+- **Agregado projetado** por cidade (hoje a projeção é só da cidade ativa).
+
 ## Pendente em 09/11/2026 — indicadores, transferência por dia e o lote de 18 pedidos (233–238, 240; D-343 a D-352)
 
 Feito e publicado: ver HANDOFF.md (09/11). Baterias 33/33 e 29/29 depois de 234, 236, 237 e 238.

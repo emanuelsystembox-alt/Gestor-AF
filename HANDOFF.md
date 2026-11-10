@@ -1,5 +1,26 @@
 # Passagem de bastão — leia isto primeiro
 
+> **10/11/2026 — Dashboard VT remodelado e o VT por equipe com ETN, agregado e projeção** (D-353 a D-362;
+> migrations 241 a 249; site publicado e conferido no ar; baterias 33/33 e 29/29):
+> - **Janela do LOG** (Dashboard): "Anterior aqui" só 30 dias; revisita NESSA tela vale em qualquer situação
+>   da anterior (`anteriores_dos_contratos(ids, true)`); a revisita oficial (REV D-10, painéis) continua a de
+>   anterior concluída — `revisita_dos_contratos` virou a mesma função com o interruptor desligado, saída
+>   conferida idêntica em 8.272 visitas (241).
+> - **Dashboard VT** remodelado em faixas (Julgamento · Carga · Resultado · Ofensores): 5 cards clicáveis
+>   (TEC1 por O.S., LOG acima de 1, AT1 por área, VT por equipe), equipe de VT = 3+ VT no dia, situação por
+>   equipe (Concluído/Aberto/Reagendado/Cancelado), sub-falha ofensora, TEC1 por equipe com as O.S. perdidas
+>   à vista, certidão de atendimento ao lado do janela × área, node com janela/situação/código, **período**
+>   (Hoje / Mês até hoje — equipe-dia no acumulado) e **filtro de bucket** (242–246). Menu "Dashboard" virou
+>   **Dashboard INST**.
+> - **VT por equipe** (Indicadores): **ETN** é período do login (`vt_etn`, meta 3, linha própria; 245);
+>   cores da planilha; **período dentro do mês**; **agregado por cidade** no formato do relatório da operação
+>   — bate com o relatório colado (MAN 2,57 (3,24), SLS 1,14 (3,86)) — com Copiar para o WhatsApp (247);
+>   visão **Projetada**: plano por login (padrão 6, ETN 3), "Precisa/dia" e o fechamento do mês (248), e a
+>   grade editável como planilha — arrastar, volume, folga, apagar (`vt_projecao_dia`, 249).
+> - **Dado carregado a pedido:** a escala de novembro da planilha *VT POR EQP MNS NOVEMBRO* (109 dias em
+>   Manaus, só onde não havia marca; autor = admin@afline.com.br).
+> - **Perguntas em aberto** em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente em 10/11/2026".
+
 > **09/11/2026 — indicadores, transferência por dia e a manutenção em lote do site** (D-343 a D-352;
 > migrations 233 a 238 e 240; site publicado e conferido no ar):
 > - **Indicadores:** Primeira WO voltou (35 s → 0,3 s, 233); **VT por equipe** refeito pela planilha da
