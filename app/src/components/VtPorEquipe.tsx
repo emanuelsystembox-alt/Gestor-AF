@@ -60,6 +60,9 @@ const TOM = {
   ruim: { fundo: '#ffc7ce', texto: '#9c0006' },
 }
 const COR_ETN = '#6d28d9'
+/** A projeção: azul-petróleo, longe do verde/amarelo/vermelho das notas. */
+const COR_PROJ = '#0e7490'
+const COR_PROJ_TEXTO = '#0891b2'
 
 interface LinhaVt {
   login: string; nome: string | null; equipe: string | null
@@ -132,11 +135,64 @@ function calcularVt<L extends LinhaConta>(linhas: L[], etns: PeriodoEtn[], p: {
     return { total: v.reduce((s, x) => s + x, 0), media: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null }
   })
   return {
-    rows, soma1, soma0, geral: soma1 + soma0, realizadas,
+    rows, soma1, soma0, geral: soma1 + soma0, realizadas, noPeriodo,
     /** GERAL ÷ 21 — o número entre parênteses do relatório da operação */
     soma10: (soma1 + soma0) / p.diasEquipe,
     projetadas: proj(realizadas), projetadas10: proj((soma1 + soma0) / p.diasEquipe),
     porDia, nEtn: rows.filter(r => r.etn).length,
+  }
+}
+
+/**
+ * A visão PROJETADA (248, D-360).
+ *
+ * > "se ele produzir nos dias que eu acho que ele vai trabalhar, e fizer a
+ * >  quantidade que eu disse que ele vai fazer, fechar tanto (...) o normal é
+ * >  6 vt (...) o sistema mesmo sugere o volume que ele precisa fazer por dia,
+ * >  para atingir o objetivo" — Emanuel, 10/11
+ *
+ * Sobre as linhas REAIS (`calcularVt`, o período escolhido), cada dia DEPOIS do
+ * período, até o fim do mês, que é da linha e não tem escala (F, FE, FALTA,
+ * ATES.) é um dia trabalhado com o PLANO da linha (o gravado em `vt_plano`; sem
+ * ele, o padrão: 6, ou 3 no ETN). Plano 0 = não conta o dia. Daí:
+ *   DIAS = reais + planejados · MÉDIA = (total real + plano × planejados) ÷ DIAS
+ *   PRECISA/DIA = (meta × DIAS − total real) ÷ planejados — o volume por dia
+ *   que leva a média à meta da linha nos dias que faltam.
+ * As equipes do fim do mês saem da mesma fórmula da planilha (SOMA 1 ÷ 21).
+ */
+function projetarVt(c: ReturnType<typeof calcularVt<LinhaVt>>, p: {
+  dias: string[]; ate: string; diasEquipe: number
+  planoDe: (login: string, etn: boolean) => number | null
+  padrao: number; padraoEtn: number
+}) {
+  const futuros = p.dias.filter(d => d > p.ate)
+  const rows = c.rows.map(r => {
+    const proprio = p.planoDe(r.login, r.etn)
+    const plano = proprio ?? (r.etn ? p.padraoEtn : p.padrao)
+    const diasFut = futuros.filter(d => r.dentro(d) && !r.esc.has(d))
+    const nFut = plano > 0 ? diasFut.length : 0
+    const diasP = r.nDias + nFut
+    const totalP = r.total + plano * nFut
+    const mediaP = diasP ? totalP / diasP : null
+    const precisa = diasFut.length ? (r.meta * (r.nDias + diasFut.length) - r.total) / diasFut.length : null
+    return {
+      ...r, plano, planoProprio: proprio != null, fut: new Set(diasFut), nFut,
+      diasP, totalP, mediaP, seP: mediaP != null && mediaP >= r.meta, precisa,
+    }
+  })
+  const soma1 = rows.filter(r => r.seP).reduce((s, r) => s + r.diasP, 0)
+  const soma0 = rows.filter(r => !r.seP).reduce((s, r) => s + r.diasP, 0)
+  const porDia = p.dias.map(d => {
+    const v = rows.map(r => r.vt.get(d) ?? (r.fut.has(d) && r.plano > 0 ? r.plano : undefined))
+      .filter((x): x is number => x != null)
+    return { total: v.reduce((s, x) => s + x, 0), media: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null }
+  })
+  return {
+    rows, soma1, soma0, geral: soma1 + soma0, futuros,
+    realizadas: soma1 / p.diasEquipe, soma10: (soma1 + soma0) / p.diasEquipe,
+    planejados: rows.reduce((s, r) => s + r.nFut, 0),
+    abaixo: rows.filter(r => r.diasP > 0 && !r.seP).length,
+    porDia,
   }
 }
 
@@ -155,6 +211,12 @@ export function VtPorEquipe() {
   const [versao, setVersao] = useState(0)
   const [menu, setMenu] = useState<{ login: string; dia: string; r: DOMRect } | null>(null)
   const [menuEtn, setMenuEtn] = useState<{ login: string; nome: string; r: DOMRect } | null>(null)
+  // 248 (D-360): as duas visões — a real (a de sempre) e a projetada até o fim do mês
+  const [visao, setVisao] = useState<'REAL' | 'PROJ'>('REAL')
+  const [planos, setPlanos] = useState<{ login: string; etn: boolean; vt_dia: number }[]>([])
+  const [padrao, setPadrao] = useState(6)
+  const [padraoEtn, setPadraoEtn] = useState(3)
+  const [editandoPlano, setEditandoPlano] = useState<string | null>(null)
 
   const dias = useMemo(() => {
     const [a, m] = mes.split('-').map(Number)
@@ -174,8 +236,17 @@ export function VtPorEquipe() {
       // os períodos ETN que tocam o mês (RLS: só a cidade ativa)
       supabase.from('vt_etn').select('id, login, de, ate')
         .lte('de', fim).or(`ate.is.null,ate.gte.${ini}`).order('de'),
-    ]).then(([l, m, d, me, e]) => {
+      // 248: o plano do mês (RLS: só a cidade ativa) e os padrões
+      supabase.from('vt_plano').select('login, etn, vt_dia').eq('mes', ini),
+      supabase.rpc('ler_parametro', { p_chave: 'vt_plano_padrao' }),
+      supabase.rpc('ler_parametro', { p_chave: 'vt_plano_padrao_etn' }),
+    ]).then(([l, m, d, me, e, pl, pp, pe]) => {
       if (!vivo) return
+      if (pl.error) setErro(pl.error.message)
+      else setPlanos(((pl.data ?? []) as { login: string; etn: boolean; vt_dia: number }[])
+        .map(x => ({ ...x, vt_dia: Number(x.vt_dia) })))
+      if (pp.data != null && !isNaN(Number(pp.data))) setPadrao(Number(pp.data))
+      if (pe.data != null && !isNaN(Number(pe.data))) setPadraoEtn(Number(pe.data))
       if (l.error) setErro(l.error.message)
       else setLinhas((l.data ?? []) as LinhaVt[])
       if (e.error) setErro(e.error.message)
@@ -210,6 +281,23 @@ export function VtPorEquipe() {
     semPonto: linhas.reduce((s, r) => s + r.sem_ponto, 0),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [linhas, etns, meta, metaEtn, diasEquipe, de, ate, dias, corridos])
+
+  const proj = useMemo(() => projetarVt(calc, {
+    dias, ate, diasEquipe, padrao, padraoEtn,
+    planoDe: (login, etn) => planos.find(x => x.login === login && x.etn === etn)?.vt_dia ?? null,
+  }), [calc, dias, ate, diasEquipe, padrao, padraoEtn, planos])
+  const projetando = visao === 'PROJ'
+  const projPorChave = useMemo(() => new Map(proj.rows.map(r => [r.chave, r])), [proj])
+
+  const salvarPlano = useCallback(async (login: string, etn: boolean, valor: string) => {
+    setEditandoPlano(null)
+    const t = valor.trim().replace(',', '.')
+    const n = t === '' ? null : Number(t)
+    if (n != null && (isNaN(n) || n < 0 || n > 30)) { setErro('O plano tem de ser um número entre 0 e 30.'); return }
+    const { error } = await supabase.rpc('definir_plano_vt', { p_login: login, p_mes: `${mes}-01`, p_etn: etn, p_vt_dia: n })
+    if (error) setErro(error.message)
+    else { setErro(null); setVersao(v => v + 1) }
+  }, [mes])
 
   const marcar = useCallback(async (login: string, dia: string, codigo: string | null) => {
     setMenu(null)
@@ -254,7 +342,25 @@ export function VtPorEquipe() {
           title="Por login do TOA e dia: soma dos pontos da 1ª O.S. de cada atividade finalizada ÷ 35, nos buckets de VT">
           Buckets de VT · {nomeMes} · {corridos} dia(s) corrido(s) de {dias.length}
         </span>
+        <div className="ml-auto flex rounded-md bg-graf-900 p-0.5 ring-1 ring-graf-700" role="group" aria-label="Visão">
+          {([['REAL', 'Real'], ['PROJ', 'Projetada']] as const).map(([k, r]) => (
+            <button key={k} type="button" aria-pressed={visao === k} onClick={() => setVisao(k)}
+              className={`rounded px-3 py-1 text-xs font-semibold ${visao === k
+                ? (k === 'PROJ' ? 'text-white' : 'bg-af-600 text-white') : 'text-graf-300 hover:bg-graf-800'}`}
+              style={visao === k && k === 'PROJ' ? { background: COR_PROJ } : undefined}>{r}</button>
+          ))}
+        </div>
       </div>
+      {projetando && (
+        <p className="rounded-md border px-3 py-2 text-xs text-graf-200"
+          style={{ borderColor: `${COR_PROJ}66`, background: `${COR_PROJ}14` }}>
+          {proj.futuros.length === 0
+            ? <>O período vai até o último dia do mês: não há dias para projetar. Escolha um "até" antes do fim do mês (ex.: <strong>Até ontem</strong>).</>
+            : <>Real de <strong>{dm(de)}</strong> a <strong>{dm(ate)}</strong>; projeção de <strong>{dm(proj.futuros[0])}</strong> a <strong>{dm(proj.futuros[proj.futuros.length - 1])}</strong> —
+              cada dia sem escala vale o <strong>plano</strong> da linha (padrão {n1(padrao)}; ETN {n1(padraoEtn)}).
+              Marque folgas futuras na célula; ajuste o plano na coluna Plano.</>}
+        </p>
+      )}
 
       {erro && <p className="text-sm text-af-400">{erro}</p>}
 
@@ -262,14 +368,21 @@ export function VtPorEquipe() {
         meta={meta} metaEtn={metaEtn} diasEquipe={diasEquipe} versao={versao} />
 
       <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
+        {(projetando ? [
+          { r: 'Equipes no fim do mês', v: n2(proj.realizadas), t: `Projetado: SOMA 1 ÷ ${diasEquipe}`, cor: COR_PROJ },
+          { r: '(SOMA 1 + 0) no fim do mês', v: n2(proj.soma10), t: `Projetado: GERAL ÷ ${diasEquipe}`, cor: COR_PROJ },
+          { r: 'Abaixo da meta no fim', v: String(proj.abaixo), t: 'Linhas que, com o plano, fecham o mês abaixo da meta', cor: TOM.ruim.texto },
+          { r: 'SOMA 1 projetada', v: String(proj.soma1), t: 'Dias (reais + planejados) de quem fecha na meta', cor: TOM.bom.texto, fundo: TOM.bom.fundo },
+          { r: 'SOMA 0 projetada', v: String(proj.soma0), t: 'Dias (reais + planejados) de quem fecha abaixo da meta', cor: TOM.ruim.texto, fundo: TOM.ruim.fundo },
+          { r: 'Dias planejados', v: String(proj.planejados), t: 'Dias trabalhados que a projeção acrescenta até o fim do mês', cor: 'var(--color-graf-500)' },
+        ] : [
           { r: 'Equipes realizadas', v: n2(calc.realizadas), t: `SOMA 1 ÷ ${diasEquipe}`, cor: 'var(--st-execucao)' },
           { r: 'Equipes projetadas', v: n2(calc.projetadas), t: `Realizadas ÷ ${corridos} dias corridos × ${dias.length} dias do mês`, cor: 'var(--st-execucao)' },
           { r: 'Projetadas (SOMA 1 + 0)', v: n2(calc.projetadas10), t: `GERAL ÷ ${diasEquipe} ÷ dias corridos × dias do mês`, cor: 'var(--st-deslocamento)' },
           { r: 'SOMA 1', v: String(calc.soma1), t: 'Dias trabalhados de quem bateu a meta da linha (5,7; ETN 3)', cor: TOM.bom.texto, fundo: TOM.bom.fundo },
           { r: 'SOMA 0', v: String(calc.soma0), t: 'Dias trabalhados de quem não bateu a meta da linha', cor: TOM.ruim.texto, fundo: TOM.ruim.fundo },
           { r: 'Geral', v: String(calc.geral), t: 'SOMA 1 + SOMA 0', cor: 'var(--color-graf-500)' },
-        ].map(c => (
+        ] as { r: string; v: string; t: string; cor: string; fundo?: string }[]).map(c => (
           <div key={c.r} className="card-controle relative overflow-hidden p-3 pl-4" title={c.t}>
             <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ background: c.fundo ?? c.cor }} />
             <p className="text-[10px] uppercase tracking-wide text-graf-400">{c.r}</p>
@@ -333,7 +446,7 @@ export function VtPorEquipe() {
                     const dt = new Date(d + 'T12:00')
                     const fds = dt.getDay() === 0 || dt.getDay() === 6
                     const eHoje = d === hoje
-                    const fora = d < de || d > ate
+                    const fora = d < de || (d > ate && !projetando)
                     return (
                       <th key={d} className={`min-w-[2.9rem] border-b px-0.5 py-1 text-center font-medium ${
                         eHoje ? 'border-af-500 text-af-400' : 'border-graf-800'} ${fds ? 'bg-graf-900/70 text-graf-300' : ''} ${fora ? 'opacity-40' : ''}`}
@@ -349,6 +462,10 @@ export function VtPorEquipe() {
                   <th className="border-b border-graf-800 px-2 py-1.5 text-right font-medium">Total</th>
                   <th className="border-b border-graf-800 px-2 py-1.5 text-right font-medium">Média</th>
                   <th className="border-b border-graf-800 px-2 py-1.5 text-center font-medium" title={`Média ≥ meta da linha (${n1(meta)}; ETN ${n1(metaEtn)})`}>SE</th>
+                  {projetando && <>
+                    <th className="border-b border-graf-800 px-2 py-1.5 text-right font-medium" title={`VT por dia que se espera nos dias que faltam (padrão ${n1(padrao)}; ETN ${n1(padraoEtn)}). Clique para mudar.`}>Plano</th>
+                    <th className="border-b border-graf-800 px-2 py-1.5 text-right font-medium" title="VT por dia que leva a média à meta da linha nos dias que faltam">Precisa/dia</th>
+                  </>}
                 </tr>
               </thead>
               <tbody>
@@ -375,6 +492,22 @@ export function VtPorEquipe() {
                           <td key={d} className={`border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}
                             title={l.etn ? 'Dia na linha normal deste login' : 'Dia na linha ETN deste login'}>
                             <span className="text-[10px] text-graf-600">⋯</span>
+                          </td>
+                        )
+                      }
+                      const pr = projPorChave.get(l.chave)
+                      if (projetando && d > ate && pr) {
+                        const e = l.esc.get(d)
+                        const planejado = pr.fut.has(d) && pr.plano > 0
+                        return (
+                          <td key={d} className={`border-b border-graf-800/60 px-0.5 py-1 text-center ${fds ? 'bg-graf-900/70' : ''}`}>
+                            <button type="button" disabled={!podeMarcar}
+                              onClick={ev => setMenu({ login: l.login, dia: d, r: ev.currentTarget.getBoundingClientRect() })}
+                              title={e ? `Escala: ${e}` : planejado ? `Planejado: ${n2(pr.plano)} VT${podeMarcar ? ' · clique para marcar folga' : ''}` : 'Plano 0: o dia não conta'}
+                              className={`tabular w-full rounded px-0.5 py-0.5 ${podeMarcar ? 'hover:ring-1 hover:ring-graf-500' : 'cursor-default'}`}
+                              style={planejado && !e ? { boxShadow: `inset 0 0 0 1px ${COR_PROJ}88`, color: COR_PROJ_TEXTO, fontStyle: 'italic' } : undefined}>
+                              {e ? <SeloEscala codigo={e} /> : planejado ? n2(pr.plano) : <span className="text-graf-700">·</span>}
+                            </button>
                           </td>
                         )
                       }
@@ -407,39 +540,82 @@ export function VtPorEquipe() {
                         </td>
                       )
                     })}
-                    <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{l.nDias}</td>
-                    <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{n2(l.total)}</td>
-                    <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right">
-                      {l.media == null ? <span className="text-graf-400">—</span> : (
-                        <span className="rounded px-1.5 py-0.5 font-semibold"
-                          style={{ background: l.se ? TOM.bom.fundo : TOM.ruim.fundo, color: l.se ? TOM.bom.texto : TOM.ruim.texto }}>
-                          {n2(l.media)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="border-b border-graf-800/60 px-2 py-1 text-center">
-                      {l.media == null ? <span className="text-graf-400">—</span> : (
-                        <span className="tabular rounded px-1.5 py-0.5 font-semibold text-white"
-                          title={`Meta da linha: ${n1(l.meta)}`}
-                          style={{ background: l.se ? '#059669' : '#dc2626' }}>{l.se ? 1 : 0}</span>
-                      )}
-                    </td>
+                    {(() => {
+                      const pr = projPorChave.get(l.chave)
+                      const x = projetando && pr
+                        ? { dias: pr.diasP, total: pr.totalP, media: pr.mediaP, se: pr.seP }
+                        : { dias: l.nDias, total: l.total, media: l.media, se: l.se }
+                      return <>
+                        <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300"
+                          title={projetando && pr ? `${l.nDias} reais + ${pr.nFut} planejados` : undefined}>{x.dias}</td>
+                        <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right text-graf-300">{n2(x.total)}</td>
+                        <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right">
+                          {x.media == null ? <span className="text-graf-400">—</span> : (
+                            <span className="rounded px-1.5 py-0.5 font-semibold"
+                              style={{ background: x.se ? TOM.bom.fundo : TOM.ruim.fundo, color: x.se ? TOM.bom.texto : TOM.ruim.texto }}>
+                              {n2(x.media)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="border-b border-graf-800/60 px-2 py-1 text-center">
+                          {x.media == null ? <span className="text-graf-400">—</span> : (
+                            <span className="tabular rounded px-1.5 py-0.5 font-semibold text-white"
+                              title={`Meta da linha: ${n1(l.meta)}`}
+                              style={{ background: x.se ? '#059669' : '#dc2626' }}>{x.se ? 1 : 0}</span>
+                          )}
+                        </td>
+                        {projetando && pr && <>
+                          <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right">
+                            {editandoPlano === l.chave ? (
+                              <input autoFocus type="text" inputMode="decimal" defaultValue={pr.planoProprio ? String(pr.plano).replace('.', ',') : ''}
+                                placeholder={n1(l.etn ? padraoEtn : padrao)} aria-label={`Plano de ${l.nome ?? l.login}`}
+                                onKeyDown={ev => {
+                                  if (ev.key === 'Enter') salvarPlano(l.login, l.etn, ev.currentTarget.value)
+                                  if (ev.key === 'Escape') setEditandoPlano(null)
+                                }}
+                                onBlur={ev => salvarPlano(l.login, l.etn, ev.currentTarget.value)}
+                                className="tabular w-14 rounded border border-graf-600 bg-graf-950 px-1 py-0.5 text-right" />
+                            ) : (
+                              <button type="button" disabled={!podeMarcar} onClick={() => setEditandoPlano(l.chave)}
+                                title={pr.planoProprio ? 'Plano definido para este login — clique para mudar (vazio volta ao padrão)' : 'Padrão — clique para definir o plano deste login'}
+                                className={`rounded px-1.5 py-0.5 ${podeMarcar ? 'hover:ring-1 hover:ring-graf-500' : 'cursor-default'} ${pr.planoProprio ? 'font-semibold text-graf-100' : 'text-graf-400'}`}>
+                                {n2(pr.plano)}
+                              </button>
+                            )}
+                          </td>
+                          <td className="tabular border-b border-graf-800/60 px-2 py-1 text-right">
+                            {pr.precisa == null ? <span className="text-graf-400" title="Sem dia de trabalho até o fim do mês">—</span>
+                              : pr.precisa <= 0 ? <span className="font-semibold" style={{ color: TOM.bom.texto }} title="A média já fica na meta mesmo sem produzir mais">garantido</span>
+                              : (
+                                <span className="rounded px-1.5 py-0.5 font-semibold"
+                                  title={`${pr.fut.size} dia(s) de trabalho até o fim do mês`}
+                                  style={pr.precisa <= pr.plano
+                                    ? { background: TOM.bom.fundo, color: TOM.bom.texto }
+                                    : { background: TOM.ruim.fundo, color: TOM.ruim.texto }}>
+                                  {n2(pr.precisa)}
+                                </span>
+                              )}
+                          </td>
+                        </>}
+                      </>
+                    })()}
                   </tr>
                 ))}
               </tbody>
               <tfoot className="text-graf-300">
                 <tr>
                   <td className="sticky left-0 z-10 border-t border-graf-700 bg-graf-950 px-2 py-1 font-medium">Total de pontos</td>
-                  {calc.porDia.map((p, i) => (
-                    <td key={dias[i]} className="tabular border-t border-graf-700 px-0.5 py-1 text-center font-semibold text-graf-200">
+                  {(projetando ? proj.porDia : calc.porDia).map((p, i) => (
+                    <td key={dias[i]} className="tabular border-t border-graf-700 px-0.5 py-1 text-center font-semibold text-graf-200"
+                      style={projetando && dias[i] > ate ? { color: COR_PROJ_TEXTO, fontStyle: 'italic' } : undefined}>
                       {p.total ? n2(p.total) : ''}
                     </td>
                   ))}
-                  <td colSpan={4} className="border-t border-graf-700" />
+                  <td colSpan={projetando ? 6 : 4} className="border-t border-graf-700" />
                 </tr>
                 <tr>
                   <td className="sticky left-0 z-10 bg-graf-950 px-2 py-1 font-medium">Média</td>
-                  {calc.porDia.map((p, i) => {
+                  {(projetando ? proj.porDia : calc.porDia).map((p, i) => {
                     const m = p.media == null ? null : Math.round(p.media * 100) / 100
                     const tom = m == null ? null : tomDoDia(m, limiteNormal)
                     return (
@@ -452,7 +628,7 @@ export function VtPorEquipe() {
                       </td>
                     )
                   })}
-                  <td colSpan={4} />
+                  <td colSpan={projetando ? 6 : 4} />
                 </tr>
               </tfoot>
             </table>

@@ -13491,3 +13491,30 @@ filtro, a resposta é idêntica à de antes (fora as duas chaves novas).
   conferida idêntica. Na tela, a conta é `calcularVt`, a mesma para a tabela e o agregado.
 - **Duas casas** nos valores do dia, no total e no rodapé, como a planilha; a cor do dia compara o valor de duas
   casas com o corte.
+
+### D-360 · VT por equipe: a visão Projetada, o plano por login e a escala da planilha (248 — 10/11/2026)
+
+*"é bom fazermos uma visão de projeção, ou seja, se ele produzir nos dias que eu acho que ele vai trabalhar, e
+fizer a quantidade que eu disse que ele vai fazer, fechar tanto (...) queria que você já aplicasse as folgas deles
+(...) tem que ter duas visões, a real que é a de agora e a projetada (...) o normal é 6 vt (...) o sistema mesmo
+sugere o volume que ele precisa fazer por dia, para atingir o objetivo"* (Emanuel, 10/11).
+
+- **Duas visões**, Real e Projetada, na mesma tabela. A real é a de sempre (o período escolhido). A projetada
+  acrescenta os dias **depois do período** até o fim do mês: dia da linha **sem escala** = dia trabalhado com o
+  **plano** da linha. Por isso a projeção pede um "até" antes do fim do mês (o atalho **Até ontem** é o natural).
+- **Plano** = VT por dia esperado, por login e linha (normal / ETN) no mês, em `vt_plano`; sem plano gravado vale o
+  padrão — `vt_plano_padrao` = **6** ("o normal é 6 vt") e `vt_plano_padrao_etn` = **3** (a meta do ETN). Plano 0 =
+  o dia não conta. Edita-se clicando na coluna Plano (vazio volta ao padrão); grava só a gestão, pela RPC.
+- **Precisa/dia** = (meta × (dias reais + dias que faltam) − total real) ÷ dias que faltam: o volume diário que
+  leva a média à meta da linha. Verde se o plano cobre, vermelho se não; "garantido" se já fecha na meta sem
+  produzir mais.
+- Os cards da projetada são o **fechamento do mês**: equipes (SOMA 1 ÷ 21), (SOMA 1 + 0) ÷ 21, linhas abaixo da
+  meta, SOMA 1/0 projetadas e os dias planejados. Folga futura se marca na célula (agora clicável também no futuro,
+  na projetada).
+- **A escala da planilha foi carregada** em Manaus (*VT POR EQP MNS NOVEMBRO.xlsx*, aba ESCALA): **109 dias** de
+  F/FE/FALTA/ATES. — só onde o sistema não tinha marca; o que já estava marcado ficou, mesmo diferente da
+  planilha (LEONARDO 01 F × FE; WILLIAM 02 F × FE; JHONILSON 01 e 02 F × FALTA). O "ETN" da escala não entrou: o
+  período ETN do ELIECER já existe. Autor gravado: o login admin@afline.com.br, a pedido do Emanuel nesta sessão
+  (a tabela não tem coluna de origem).
+- Conferido à mão: JHONILSON, 6 dias reais (30,71) e 16 a trabalhar com plano 6 → 126,71 ÷ 22 = 5,76; precisa
+  (5,7 × 22 − 30,71) ÷ 16 = 5,92/dia.
