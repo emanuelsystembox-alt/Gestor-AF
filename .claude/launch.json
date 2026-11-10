@@ -12,6 +12,23 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "afline-build",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "app",
+        "exec",
+        "--",
+        "vite",
+        "preview",
+        "app",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
+      "port": 5173
     }
   ]
 }

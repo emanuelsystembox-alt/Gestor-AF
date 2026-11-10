@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { isoLocal, reais } from '../lib/formato'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 
 /**
  * Miscelânea — o que não tem série, tem quantidade (fase 2, D-154; 089, D-165).
@@ -332,7 +332,7 @@ export function Miscelanea({ podeMexer }: { podeMexer: boolean }) {
       </div>
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : filtrados.length === 0 ? (
         <Vazio titulo={saldos.length === 0 ? 'Nenhum item de miscelânea' : 'Nada com esse filtro'} />
       ) : (

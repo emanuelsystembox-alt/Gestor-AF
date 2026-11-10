@@ -74,7 +74,12 @@ linha. Ver D-081.
 
 **CTE com função de conjunto referenciada uma vez é *inline*** — e a
 função passa a ser reexecutada por linha do join. Use
-`with x as materialized (...)`.
+`with x as materialized (...)`. **Dentro de função SQL com parâmetro o plano é GENÉRICO, e
+o CTE inline vira laço:** `primeira_wo_dia` levava 35 s (o corpo solto,
+com as datas escritas, 0,4 s) porque o CTE do turno era refeito por
+técnico-dia, loops=373. Para achar: `prepare` com `$1…` +
+`set local plan_cache_mode = force_generic_plan` + `explain analyze execute`.
+Ver D-343 (233).
 
 **Assinatura com default não convive com a versão antiga.** `baixar_os`
 de 5 e de 7 parâmetros ao mesmo tempo deixa a chamada de 5 argumentos
@@ -554,6 +559,11 @@ Baixar ficou quebrado do momento da migration até o deploy (minutos). Parâmetr
 default não quebra ninguém; RETORNO novo quebra. Quando a mudança de retorno for inevitável:
 tela pronta e compilada ANTES, migration e deploy em seguida, sem nada no meio — ou crie a
 função nova com outro nome e derrube a antiga depois do deploy. Ver D-260.
+
+**A página não rola: o `<main>` estica até o pé da janela.** Medir "o que vem depois" de um
+elemento pelo `document.scrollHeight` devolve sempre a altura da janela, e a conta vira a altura do
+próprio elemento — a tabela de Serviços ficava presa em 275 px, recolhida ou não. Meça pelo
+CONTEÚDO da página (`main.firstElementChild`), que termina onde termina o que está escrito. Ver D-352.
 
 **Bundle dividido engana a conferência de deploy.** As telas moram em
 `Servicos-*.js`, `VisitaDetalhe-*.js` — olhar só o `index.js` dá falso

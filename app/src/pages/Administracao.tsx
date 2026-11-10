@@ -13,7 +13,7 @@ import { useAuth } from '../lib/auth'
 import { useCidades } from '../lib/cidade'
 import { Shell } from '../components/Shell'
 import { ExpurgoPontuacao } from '../components/ExpurgoPontuacao'
-import { Alerta, Avatar, Vazio } from '../components/ui'
+import { Alerta, Avatar, Vazio, CarregandoBloco } from '../components/ui'
 import { ImportarCadastro } from '../components/ImportarCadastro'
 
 /**
@@ -966,7 +966,7 @@ O login TOA dele deixa de rotear para a equipe própria `
         </div>
 
         {carregando ? (
-          <p className="py-12 text-center text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-12" />
         ) : aba === 'usuarios' ? (
           <section className="space-y-4">
             <div className="card-controle p-4">

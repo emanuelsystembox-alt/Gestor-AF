@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { lerPlanilha, type Leitura } from '../lib/planilha'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 
 /**
  * Importação das sub-falhas da CLARO (D-027).
@@ -288,7 +288,7 @@ export default function SubFalhas() {
           <h2 className="mb-3 text-sm font-semibold">Conjuntos importados</h2>
 
           {carregando ? (
-            <p className="text-sm text-graf-400">Carregando…</p>
+            <CarregandoBloco className="py-4" />
           ) : resumo.length === 0 ? (
             <Vazio
               titulo="Nenhuma sub-falha importada"

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { useCidades } from '../lib/cidade'
-import { Alerta } from './ui'
+import { Alerta, CarregandoBloco } from './ui'
 
 /**
  * Os buckets do TOA da cidade ativa (103, D-180).
@@ -102,7 +102,7 @@ export function BucketsToa() {
       </div>
 
       {lista === null ? (
-        <p className="px-4 py-8 text-center text-sm text-graf-400">Carregando…</p>
+        <CarregandoBloco className="px-4 py-8" />
       ) : lista.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-graf-400">
           Nenhum bucket cadastrado nesta cidade — nenhum arquivo do TOA entra aqui até

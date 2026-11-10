@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
-import { Alerta, Avatar } from '../components/ui'
+import { Alerta, Avatar, CarregandoBloco } from '../components/ui'
 import { isoLocal, num2, pts, reais } from '../lib/formato'
 
 /**
@@ -280,7 +280,7 @@ export default function Produtividade() {
           </div>
 
           {carregando ? (
-            <p className="px-4 py-10 text-center text-sm text-graf-400">Carregando…</p>
+            <CarregandoBloco className="px-4 py-10" />
           ) : agrupadas.length === 0 ? (
             <p className="px-4 py-10 text-center text-sm text-graf-500">
               Nenhum contrato concluído no período.

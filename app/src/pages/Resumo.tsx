@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Metrica, Vazio } from '../components/ui'
+import { Alerta, Metrica, Vazio, CarregandoBloco } from '../components/ui'
 import { BarrasHorizontais, Painel, TabelaSimples } from '../components/graficos'
 import { LinkContrato } from '../components/LinkContrato'
 import { ROTULO_SINAL } from '../components/PainelCentral'
@@ -106,7 +106,7 @@ export default function ResumoDoDia() {
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
 
-        {r === undefined && <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>}
+        {r === undefined && <CarregandoBloco className="py-10" />}
         {r === null && !erro && (
           <Vazio titulo={dia === hoje ? 'O resumo de hoje sai às 18h' : 'Sem resumo neste dia'} />
         )}

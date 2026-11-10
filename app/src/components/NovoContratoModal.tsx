@@ -48,8 +48,18 @@ const campo = 'rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-
               'outline-none focus:border-af-500'
 
 
-/** As janelas que o TOA usa. Fora delas, o usuário digita à mão. */
-const PERIODOS = ['08:00-11:00', '08:00-12:00', '11:00-14:00', '12:00-15:00', '15:00-18:00']
+/**
+ * As janelas da cidade ativa saem do banco (`janelas_de_atendimento`, 240):
+ * 20+ contratos produtivos nos últimos 90 dias. A lista fixa antiga não
+ * tinha a mais usada (14:00–17:00). Esta aqui é só a reserva para quando a
+ * consulta falha ou a cidade ainda não tem histórico — as janelas que
+ * passaram do corte em Manaus ou São Luís em 09/11.
+ */
+const PERIODOS_RESERVA = [
+  '08:00-10:00', '08:00-11:00', '08:00-12:00', '10:00-12:00', '11:00-14:00',
+  '12:00-14:00', '12:00-15:00', '14:00-16:00', '14:00-17:00', '15:00-18:00',
+  '16:00-18:00', '17:00-20:00', '18:00-20:00',
+]
 
 export function NovoContratoModal({
   onFechar, onCriado,
@@ -66,6 +76,7 @@ export function NovoContratoModal({
   const [servicos, setServicos] = useState<TipoServico[]>([])
   const [equipes, setEquipes] = useState<Equipe[]>([])
   const [areas, setAreas] = useState<Area[]>([])
+  const [periodos, setPeriodos] = useState<string[]>(PERIODOS_RESERVA)
 
   // cliente
   const [busca, setBusca] = useState('')
@@ -98,6 +109,10 @@ export function NovoContratoModal({
       setServicos((b.data ?? []) as TipoServico[])
       setEquipes((c.data ?? []) as Equipe[])
       setAreas((d.data ?? []) as Area[])
+    })
+    supabase.rpc('janelas_de_atendimento').then(({ data, error }) => {
+      const j = (data ?? []) as { janela_inicio: string; janela_fim: string }[]
+      if (!error && j.length > 0) setPeriodos(j.map(x => `${x.janela_inicio}-${x.janela_fim}`))
     })
   }, [])
 
@@ -488,7 +503,7 @@ export function NovoContratoModal({
                     set('janela_inicio', a ?? ''); set('janela_fim', b ?? '')
                   }}>
                   <option value="">—</option>
-                  {PERIODOS.map(p => <option key={p} value={p}>{p.replace('-', ' – ')}</option>)}
+                  {periodos.map(p => <option key={p} value={p}>{p.replace('-', ' – ')}</option>)}
                 </select>
               </label>
               <label className="text-[11px] text-graf-400">

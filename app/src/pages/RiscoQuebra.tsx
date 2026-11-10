@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Metrica, Vazio } from '../components/ui'
+import { Alerta, Metrica, Vazio, CarregandoBloco } from '../components/ui'
 import { Painel, TabelaSimples } from '../components/graficos'
 import { LinkContrato } from '../components/LinkContrato'
 import { dataBR } from '../lib/formato'
@@ -148,7 +148,7 @@ export default function RiscoQuebra() {
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
-        {r === undefined && <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>}
+        {r === undefined && <CarregandoBloco className="py-10" />}
 
         {r && regua && !regua.suficiente && (
           <Alerta tipo="info">

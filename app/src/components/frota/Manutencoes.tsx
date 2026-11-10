@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { isoLocal, reais } from '../../lib/formato'
-import { Alerta, Vazio } from '../ui'
+import { Alerta, Vazio, CarregandoBloco } from '../ui'
 import { CAMPO, km, nomeVeiculo, traduzirErroFrota, type VeiculoPainel } from '../../lib/frota'
 
 /**
@@ -236,7 +236,7 @@ export function Manutencoes({ veiculos, podeMexer, aoMudar }: {
       )}
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : linhas.length === 0 ? (
         <Vazio titulo={soAbertas ? 'Nenhuma manutenção aberta' : 'Nenhuma manutenção lançada'} />
       ) : (

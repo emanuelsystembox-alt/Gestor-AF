@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { fetchComAtividade } from './atividade'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -24,6 +25,8 @@ export const supabase = createClient(url, key, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
   },
+  // D-347: todo pedido passa pelo contador que acende o fio do topo.
+  global: { fetch: fetchComAtividade },
 })
 
 /**
@@ -40,7 +43,7 @@ export function naCidade(baseId: string): typeof supabase {
   if (!c) {
     c = createClient(url, key, {
       accessToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
-      global: { headers: { 'x-afline-cidade': baseId } },
+      global: { headers: { 'x-afline-cidade': baseId }, fetch: fetchComAtividade },
     }) as unknown as typeof supabase
     clientesPorCidade.set(baseId, c)
   }

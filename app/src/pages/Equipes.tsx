@@ -5,7 +5,7 @@ import { lerPlanilha } from '../lib/planilha'
 import { dataBR, equipeRotulo, isoLocal, pts } from '../lib/formato'
 import { useDiaAnteriorComMovimento } from '../lib/dia'
 import { Shell } from '../components/Shell'
-import { Alerta, Avatar, Vazio } from '../components/ui'
+import { Alerta, Avatar, Vazio, CarregandoBloco } from '../components/ui'
 import { MenuContrato, type AcaoContrato } from '../components/MenuContrato'
 import { FaixaJornada, FaixaPeriodos, SituacaoComPontos } from '../components/telemetria'
 // O contrato aparece aqui do MESMO jeito que na tela de Serviços: uma
@@ -364,10 +364,11 @@ export default function Equipes() {
   const [supervisoresSel, setSupervisoresSel] = useState<string[]>([])
   /** As equipes marcadas, pelo `equipe_id` — o código se repete (SEM-LOGIN por base). */
   const [equipesSel, setEquipesSel] = useState<string[]>([])
-  // Ligado por padrao: 89 equipes na tela, 7 com servico no dia. Quem
-  // nao tem contrato nao tem o que ser olhado -- e as 82 linhas vazias
-  // empurravam as 7 que importam para fora da primeira tela.
-  const [soAtivas, setSoAtivas] = useState(true)
+  // Sempre ligado: 89 equipes na tela, 7 com servico no dia. Quem nao tem
+  // contrato nao tem o que ser olhado -- e as 82 linhas vazias empurravam as
+  // 7 que importam para fora da primeira tela. A caixa que desligava saiu
+  // ("deixe selecionado, porém tire essa opção" -- Emanuel, 09/11).
+  const soAtivas = true
   const [agrupar, setAgrupar] = useState<'nenhum' | 'supervisor' | 'area'>('nenhum')
 
   /*
@@ -783,12 +784,35 @@ export default function Equipes() {
       return [e.codigo, e.nome, e.supervisor, e.area, e.login_toa]
         .some(x => x?.toLowerCase().includes(t))
     })
-  }, [painelVisto, busca, areasSel, supervisoresSel, equipesSel, soAtivas, filtrando, contratosDia,
+  }, [painelVisto, busca, areasSel, supervisoresSel, equipesSel, filtrando, contratosDia,
       passamPorEquipe, foraPorEquipe])
 
+  /*
+   * ┌─ a ordem da lista: pelo NÚMERO da equipe, crescente ─────────────┐
+   * │ > "Mostrar as equipes em ordem crescente, não do maior volume    │
+   * │ >  para o menor volume." — Emanuel, 09/11                        │
+   * │                                                                  │
+   * │ 1º "Sem login definido" (SEM-LOGIN): é a que pede ação — login   │
+   * │    sem cadastro esperando alguém dizer de quem é (D-079).        │
+   * │ 2º código numérico, pelo VALOR (001 < 002 < 136; "45" = "045").  │
+   * │ 3º o resto (C.O.P, SUP. …), em ordem alfabética.                 │
+   * │ Empate (mesmo número escrito diferente) desempata pelo nome.     │
+   * └──────────────────────────────────────────────────────────────────┘
+   */
   const grupos = useMemo(() => {
-    const ordenadas = [...eqFiltradas].sort((a, b) =>
-      b.visitas - a.visitas || a.codigo.localeCompare(b.codigo))
+    const faixa = (c: string) => c === 'SEM-LOGIN' ? 0 : /^\d+$/.test(c.trim()) ? 1 : 2
+    const ordenadas = [...eqFiltradas].sort((a, b) => {
+      const fa = faixa(a.codigo), fb = faixa(b.codigo)
+      if (fa !== fb) return fa - fb
+      if (fa === 1) {
+        const d = Number(a.codigo.trim()) - Number(b.codigo.trim())
+        if (d !== 0) return d
+      } else {
+        const d = a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true })
+        if (d !== 0) return d
+      }
+      return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR')
+    })
     if (agrupar === 'nenhum') return [{ titulo: '', itens: ordenadas }]
     const m = new Map<string, EquipePainel[]>()
     for (const e of ordenadas) {
@@ -986,11 +1010,6 @@ export default function Equipes() {
                 <option value="supervisor">Agrupar por supervisor</option>
                 <option value="area">Agrupar por área</option>
               </select>
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
-                <input type="checkbox" checked={soAtivas}
-                  onChange={e => setSoAtivas(e.target.checked)} className="accent-af-600" />
-                Só com serviço no dia
-              </label>
 
               {/* ---- a segunda linha escolhe CONTRATO, não equipe ---- */}
               <div className="flex basis-full flex-wrap items-center gap-2 border-t
@@ -1141,7 +1160,7 @@ export default function Equipes() {
 
         {/* ====== conteúdo ====== */}
         {carregando ? (
-          <p className="py-12 text-center text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-12" />
         ) : aba === 'equipes' ? (
           eqFiltradas.length === 0 ? (
             <div className="card-controle">
@@ -1158,13 +1177,6 @@ export default function Equipes() {
                   : 'Ajuste a busca ou os filtros.'}
                 acao={
                   <div className="flex flex-wrap items-center justify-center gap-2">
-                    {diaSemMovimento && soAtivas && painel.length > 0 && (
-                      <button onClick={() => setSoAtivas(false)}
-                        className="rounded-lg border border-graf-700 px-4 py-2 text-sm
-                                   text-graf-300 hover:border-af-600 hover:text-af-400">
-                        ver as {painel.length} equipes cadastradas
-                      </button>
-                    )}
                     {/* O atalho existe; a troca de dia é decisão de quem olha. */}
                     {outroDia && (
                       <button onClick={() => setData(outroDia)}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { isoLocal, reais } from '../../lib/formato'
-import { Alerta, Metrica, Vazio } from '../ui'
+import { Alerta, Metrica, Vazio, CarregandoBloco } from '../ui'
 import {
   CAMPO, EXCECAO, nomeVeiculo, num, type TecnicoOpcao, type VeiculoPainel,
 } from '../../lib/frota'
@@ -119,7 +119,7 @@ export function Consumo({ veiculos, tecnicos }: { veiculos: VeiculoPainel[]; tec
       </div>
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : consumo.length === 0 ? (
         <Vazio titulo="Nenhum abastecimento no período"
           descricao="O consumo aparece quando houver pelo menos dois abastecimentos do mesmo carro com odômetro." />

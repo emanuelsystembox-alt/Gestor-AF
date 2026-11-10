@@ -13202,3 +13202,143 @@ contrato, a cada 4 h. "Já lido" = memória do navegador OU nível no banco (`si
 232, só leitura, mesma trava de `registrar_sinal_claro`). Teto continua 30 por rodada: fila grande se resolve
 encurtando o intervalo, não aumentando o lote. **Recusado:** revisão automática do dia anterior ("não
 preciso disso, não habilite" — Emanuel); outro dia só pelo Iniciar com o dia escolhido.
+
+### D-343 · VT por equipe pela planilha da operação, do mês, só nos buckets de VT (233, 234 — 09/11/2026)
+
+*"atualizar o indicador VT por equipe, pegando as regras conforme esta na planilha, e precisa bater com os
+numeros atualizado até o dia da planilha (...) opção de colocar os F em cima das caixinhas para quando for
+folga"* (Emanuel, 09/11). *"é baseado no TOA (...) somente desse mês"* e *"é voltado apenas para bucket de VT"*.
+Substitui a régua do código de baixa da 161c (executado × não executado).
+
+**A regra, lida das fórmulas de "VT POR EQP MNS NOVEMBRO.xlsx":** valor do dia = soma dos pontos ÷ 35, por
+login do TOA e dia; pontos por tipo de O.S. = a aba DADOS (`vt_ponto`: 48 = 35, 226 = 140, 61 = 15, 212 = 0…;
+as combinações dela são a soma dos tipos). DIAS = dias com valor; MÉDIA = total ÷ DIAS; SE = média ≥ 5,7;
+SOMA 1/SOMA 0 = os DIAS de quem passa/não passa; EQUIPES REALIZADAS = SOMA 1 ÷ 21; projetadas = realizadas ÷
+dias corridos × dias do mês. As réguas são parâmetros (`vt_pontos_por_vt`, `vt_meta_media`, `vt_dias_equipe`).
+
+**Quais atividades contam foi DERIVADO do dado** (a aba TOA não veio no arquivo): cruzando o banco com a
+planilha, login a login, de 01 a 06/11, fecha **72 de 72** células com: atividade **finalizada no TOA**
+(concluída ou não concluída — `finalizado_toa`), **só a 1ª O.S.** da atividade, pelo **login do TOA** da linha.
+Recusadas: só concluída (62/72), código de sucesso (53/72), todas as O.S. (66/72 — a O.S. 181 de 2ª posição
+nunca entrou na planilha, embora a DADOS diga "62 + 181 = 55"), técnico responsável no lugar do login (70/72).
+A célula do Z562599 em 02/11 está digitada à mão como 5 na planilha (a fórmula dá 4); o banco dá 5.
+
+Setembro e outubro vieram da carga do ngestor sem login nem bucket do TOA: a tela abre no mês e não vai antes de
+11/2026. **Escala** (F, FE, FALTA, ATES.) marcada pela gestão clicando na célula (`marcar_escala_vt`, autor pelo
+servidor); dia com VT mostra o número, como a planilha. **Diferença declarada:** a planilha tinha "DIAS = 30"
+digitado no lugar dos dias corridos; aqui são os dias do mês até hoje. Medido como authenticated: 59 ms.
+
+**233 — a Primeira WO estourava o tempo** ("canceling statement due to statement timeout"): 35 s para 3.897
+contratos. O corpo solto levava 0,4 s; dentro da função o plano é genérico e o CTE do turno era refeito por
+técnico-dia (loops=373). `materialized` → 0,32 s, mesmos números. A armadilha do CTE inline (traps.md), de novo.
+**E o período dos Indicadores nasce no dia 1º do mês vigente** (*"inicio do mês até a data atual, não pode
+começar do mês passado"*), não mais nos últimos 14 dias. O item Indicadores ganhou a bolinha de função nova,
+que agora pisca suave (parada para quem pede menos movimento ao sistema).
+
+### D-344 · Certidão de Atendimento, o terceiro indicador (235 — 09/11/2026)
+
+*"olhar os niveis de sinais que o nosso sistema ja faz (...) o % padrão, ou seja, validando (...) validado com
+falha e validado sem falha que é o regular (...) a nota de cada técnico por dia, deve ter grafico semanal do
+mês, e o dia a dia do técnico. % sem validação"* (Emanuel, 09/11).
+
+Base = O.S. **finalizada no portal** (a régua do "sem validação" da D-332). A validação é classificada pela cor
+da CLARO (D-330): verde = validado sem falha; vermelho (Nível Irregular, Erro na Coleta) = com falha; amarelo =
+sem validação. **Nota = % padrão = validados (com e sem falha) ÷ finalizados**, por técnico e dia; as
+porcentagens e as semanas (domingo a sábado) somam contagens, nunca média de porcentagens. O técnico é o
+responsável pelo contrato. O sinal só existe desde 06/11. **Em aberto, perguntar ao Emanuel:** se a nota é mesmo
+o % padrão (ou o % sem falha), se "Erro na Coleta" é falha, e se há meta.
+
+### D-345 · Transferir o contrato para outro dia, pelo site (236 — 09/11/2026)
+
+*"quando eu quiser transferir um contrato de um dia para outro o sistema deve permitir, tem opção de escolher
+data, isso para o site, falta habilitar."* (Emanuel, 09/11). O painel Transferir ganhou o campo **Dia** (nasce
+no dia do contrato) e a equipe passou a ser opcional ("— a mesma —"): troca a equipe, o dia, ou os dois.
+`transferir_visita` ganhou `p_data` (com padrão — o site antigo, a Rota e a sugestão de redistribuição chamam
+com 3 argumentos e continuam valendo); a assinatura de 3 caiu na mesma transação (traps.md) e a nova nasceu com
+a ACL fechada. **O dia governa a hora (D-166):** `inicio` e `fim` andam o mesmo número de dias. **A atividade do
+TOA é única por dia (D-169):** se o mesmo contrato do TOA já está no dia de destino, recusa com o recado.
+Só o dia muda: equipe e técnico ficam; equipe nova sai sem técnico, como sempre. O histórico guarda o dia no
+de/para do TRANSFERENCIA. Testado numa transação desfeita (09/11 16:00 → 10/11 16:00); baterias 33/33 e 29/29.
+A importação do dia novo cairia na D-191 (Desatribuído) — resolvido na D-346.
+
+### D-346 · Contrato levado de dia à mão: a importação do outro dia não mexe nele (237 — 09/11/2026)
+
+*"por se tratar de ser manual, quando importar no outro dia, não deve acontecer nada com o contrato"* (Emanuel,
+09/11). O contrato levado para outro dia (D-345) continuava "visto" pelo arquivo do bucket do dia antigo, e a
+importação do dia novo, sem a atividade na planilha, o tomava por "sumiu do TOA": Na entrada → Desatribuído
+(800, D-191); em andamento → acusado. **Provado numa transação desfeita** com a importação real de 09/11 do
+MAN-AFLINE: sem a guarda, o contrato levado de 08 para 09/11 foi desatribuído; com ela, 0 desatribuídos e
+continua Na entrada. `visita.dia_movido_em` marca o contrato cujo dia uma PESSOA mudou — pelo Transferir **ou**
+pelo Editar cadastro — e as duas regras do "sumiu" de `desatribuir_ausentes` pulam quem tem a marca. Se o TOA
+trouxer a mesma atividade naquele dia, a importação atualiza como sempre (é o TOA afirmando; o índice único por
+dia não deixa nascer um segundo contrato). Nenhum contrato tinha sido movido de dia antes: nada a preencher.
+Baterias 33/33 e 29/29; nenhuma das três funções aberta ao anon.
+
+### D-347 · Leveza padronizada: o fio de atividade, o carregando único e as transições (09/11/2026)
+
+*"adicionar transições e efeitos de carregamento mais suaves e visuais para o usuário sentir leveza em cada
+transição de página e carregamento de dados, padronize tudo"* (Emanuel, 09/11). **O fio no topo acende em
+qualquer tela enquanto houver pedido ao banco** (`lib/atividade.ts`: o cliente do Supabase passa por
+`global.fetch`; `/auth/v1/` não conta), só depois de 150 ms e some em fade. **`CarregandoBloco`** (ui.tsx) é o
+carregando de dentro da tela: substituiu o "Carregando…" solto em 32 arquivos (o campo — Campo.tsx, Visita.tsx —
+ficou de fora, tema próprio). O cartão (`card-controle`) entra em fade; botão, link, campo e linha de tabela
+mudam de cor em 150 ms (`:where`, peso zero). Só opacidade/cor — nada de transform, que viraria referencial de
+`fixed` (D-169). Quem pede menos movimento ao sistema fica sem animação (regra global).
+
+### D-348 · Pós-atendimento vê o cancelado pela central, filtros novos e "Refazer cabeamento" (238 — 09/11/2026)
+
+`qualidade_fila` tirava de propósito o cancelado pela central (148, D-228); agora só o Desatribuído (800) fica
+fora, e o cancelado pela central entra marcado (`cancelado_pela_central()` ou `cancelado_central_em`, a mesma
+regra de `origemCancelada()`). Em Manaus, 7 dias: 1.936 → 2.084 linhas. Filtros novos: ouvidoria (planilha ou
+marcador OUVIDORIA), marcadores, supervisor (D-134), área. Desfecho **REFAZER_CABEAMENTO** (CHECK ampliado,
+`qualidade_conclusivo`); conta como **Problema**, igual a "Serviço com falha" — escolha a confirmar com o
+Emanuel. Baterias 33/33 e 29/29. **Em aberto:** o desfecho mora provisório em `Qualidade.tsx` (`CONTA_COMO`); o
+lugar certo é `DESFECHOS` em `lib/qualidade.ts`.
+
+### D-349 · Serviços e Equipes: ordem das colunas, compacta com o código, filtros, REV D-10 para o WhatsApp (09/11/2026)
+
+Ordem das colunas (Serviços e Equipes, a mesma tabela): Contrato, LOG, Janela, Equipe, Grupo, Endereço, Área,
+Situação, Ordens de serviço, Data · baixa, abrir. **Compacta** mostra só o NÚMERO do código de baixa (TOA cheio,
+AFLINE vazado — D-109/D-042), a frase fica na dica. Filtros em blocos, com "Só ouvidoria", "Só REV D-10" e
+"Ocultar jornada" juntos; **recolher os filtros** (lembrado no navegador), recolhido mostra a busca e o resumo
+do que está ligado. Com **Só REV D-10**: "Copiar N para o WhatsApp" — texto (não imagem) com contrato, equipe,
+técnico, janela, situação e baixa, **sem nada do assinante** (LGPD); só copia, nada sai do sistema. **Equipes:**
+ordem crescente pelo código (Sem login definido no topo, códigos não numéricos no fim); "Só com serviço no dia"
+fica sempre ligado e a caixa saiu (e o atalho "ver as N equipes cadastradas" da tela vazia, que desligava o filtro).
+
+### D-350 · Importação de vários arquivos e as janelas reais na Nova O.S. (240 — 09/11/2026)
+
+**Importar TOA:** dia e botão no alto, detalhes por arquivo abaixo, textos enxutos (os avisos que evitam erro
+ficam, curtos). **Vários arquivos de uma vez:** cada um é uma importação própria, em sequência, pelo mesmo
+caminho de sempre (`importarLinhasToa`, fila da cidade, reconciliação), com o dia escolhido; arquivo de outra
+cidade fica de fora sozinho, sem derrubar os outros; dois arquivos do mesmo bucket na lista só avisam. Saiu um
+texto errado ("contrato que já existia muda para DD/MM" — contradizia a D-169). **Nova O.S.:** o Período vem de
+`janelas_de_atendimento()` (240, cidade ativa, 90 dias, produtivas, ≥ 20 contratos) — faltava a 14:00–17:00, a
+mais usada (3.055 em Manaus); lista de reserva no código se a função falhar.
+
+### D-351 · A página do contrato: anexos com girar/apagar, editar cliente × serviço, telefones, resposta num lugar (09/11/2026)
+
+**Anexos:** miniatura com a foto inteira (`object-contain`), visualizador com girar (só na tela, guardado no
+navegador — a evidência não é regravada) e **Apagar só para o autor** (D-204: Storage e depois
+`apagar_evidencia`); o "Anexar foto ou vídeo" mudou da aba Responder para a aba Anexos. **"Editar cliente/
+endereço" e "Editar serviço"** separados (mesma `atualizar_visita_manual`, cada um manda só os seus campos; o
+dia mudado por "Editar serviço" também marca `dia_movido_em`, D-346). **Telefones** viraram lista com editar e
+remover (são do TOA: a importação pode reescrever enquanto o contrato não estiver protegido). **Responder** só
+na aba Responder — saiu o bloco repetido do Detalhe. **Em aberto:** o melhor contato do técnico
+(`contato_cliente`) não tem caminho para remover; grupo de serviço editado à mão pode voltar pelo gatilho da O.S.
+
+### D-352 · Aviso de versão nova e a tabela de Serviços que ganha a tela ao recolher (09/11/2026)
+
+*"toda vez que tiver um update o sistema deve mostrar uma mensagem flutuante no canto superior direito
+informando que é para o usuário apertar CONTROL + SHIFT + R (...) ou ele pode clicar em ignorar"* (Emanuel,
+09/11). O build publica `versao.json` com o mesmo carimbo de `__VERSAO__` (plugin em `vite.config.ts`;
+`_headers` sem cache); `AvisoAtualizacao` (no Shell) confere a cada 3 min e quando a aba volta ao foco, e mostra
+o aviso com Ctrl + Shift + R e **Ignorar** — que vale só para aquela versão (localStorage). No servidor local não
+aparece. **Só funciona a partir da segunda publicação com ele:** quem está com a versão anterior aberta não tem o
+aviso ainda.
+
+*"quando encolher o sistema deve ganhar mais tela (...) escolher a tela serve justamente para isso"*. O quadro da
+tabela de Serviços tinha altura fixa (`100vh − 21rem`); agora mede o que sobra: do topo dele ao pé da janela,
+menos o que vem depois (paginação e rodapé, medidos pelo conteúdo da página — o `<main>` estica até o pé da
+janela, e medir pelo documento dava a própria altura do quadro). Medido a 1600×950: aberto 571 px (5
+contratos), recolhido 701 px (6), sobra embaixo ≤ 1 px.

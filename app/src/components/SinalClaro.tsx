@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { CarregandoBloco } from './ui'
 
 /**
  * O sinal do contrato, lido do Portal Técnico da Claro (222, 223; D-330, D-331).
@@ -289,7 +290,7 @@ function Tipo({ tipo, antes, depois, depoisVazio }: {
 }
 
 export function SinalClaro({ sinal }: { sinal: Sinal | null | undefined }) {
-  if (sinal === undefined) return <p className="text-sm text-graf-400">Carregando…</p>
+  if (sinal === undefined) return <CarregandoBloco className="py-4" />
   if (sinal === null) return (
     <section className="card-controle p-4">
       <p className="text-sm text-graf-300">Este contrato ainda não foi lido do portal da Claro.</p>

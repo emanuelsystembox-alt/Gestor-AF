@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 import { Painel, TabelaSimples } from '../components/graficos'
 import { LinkContrato } from '../components/LinkContrato'
 import { diaMes, isoLocal } from '../lib/formato'
@@ -176,7 +176,7 @@ export default function AuditoriaDaBaixa() {
               aria-label="Buscar contrato ou técnico" className={`ml-auto w-52 ${sel}`} />
           </div>
 
-          {a === undefined && !invalido && <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>}
+          {a === undefined && !invalido && <CarregandoBloco className="py-10" />}
           {a && fila.length === 0 && (
             <Vazio titulo={a.fila.length === 0 ? 'Nada suspeito no período' : 'Nenhum contrato neste filtro'} />
           )}

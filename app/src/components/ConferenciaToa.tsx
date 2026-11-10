@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { dataBR, diaMes, isoLocal } from '../lib/formato'
 import { LinkContrato } from './LinkContrato'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 
 /**
  * Conferência TOA — o estoque conferido pelo que o TOA diz (182, D-262).
@@ -265,7 +265,7 @@ export function ConferenciaToa({ podeTratar }: { podeTratar: boolean }) {
       )}
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : !dados ? null : lista.length === 0 ? (
         <Vazio titulo={fSituacao === 'ABERTAS' ? 'Nenhuma divergência aberta' : 'Nenhuma divergência tratada'}
           descricao={fSituacao === 'ABERTAS' && dados.contratos.nao_conferidos

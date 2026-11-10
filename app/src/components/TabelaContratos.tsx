@@ -317,6 +317,49 @@ export function corBaixaAfline(natureza: string | null | undefined): string {
 }
 
 /**
+ * A baixa na visão COMPACTA: só o número do código (09/11).
+ *
+ * > "quando usar o modo compacto, o sistema deve ainda assim preservar o
+ * >  código de baixa, não precisa da frase (...) apenas o número do código
+ * >  de baixa para o usuário lembrar" — Emanuel
+ *
+ * A mesma FORMA da Detalhada (D-109): cheia = TOA, vazada = AFLINE — as duas
+ * baixas lado a lado, porque a diferença tem de aparecer (D-042). Código
+ * repetido entre as O.S. da visita sai uma vez só; a frase de cada O.S. fica
+ * no mouse. Sem baixa nenhuma, não desenha: o "sem baixa" está na Detalhada.
+ */
+function BaixaCurta({ oss }: { oss: OSDupla[] }) {
+  const toa = new Map<number, string | null>()
+  const afline = new Map<number, string | null>()
+  for (const o of oss) {
+    if (o.codigo_baixa) toa.set(o.codigo_baixa.codigo, o.codigo_baixa.natureza)
+    if (o.baixa_afline) afline.set(o.baixa_afline.codigo, o.baixa_afline.natureza)
+  }
+  if (!toa.size && !afline.size) return null
+  const dica = [...oss].sort((a, b) => a.sequencia - b.sequencia).map(o => [
+    `O.S. ${o.numero_os ?? '—'}`,
+    o.codigo_baixa ? `TOA ${o.codigo_baixa.codigo} · ${o.codigo_baixa.descricao}` : 'sem baixa do TOA',
+    o.baixa_afline
+      ? `AFLINE ${o.baixa_afline.codigo} · ${o.baixa_afline.descricao}${o.sub_falha ? ` › ${o.sub_falha.nome}` : ''}`
+      : null,
+  ].filter(Boolean).join(' — ')).join('\n')
+  return (
+    <span title={dica} className="inline-flex items-center gap-1">
+      {[...toa].map(([c, nat]) => (
+        <span key={`t${c}`} className={`tabular rounded px-1 py-px text-[10px] font-semibold ${corBaixa(nat)}`}>
+          {c}
+        </span>
+      ))}
+      {[...afline].map(([c, nat]) => (
+        <span key={`a${c}`} className={`tabular rounded px-1 py-px text-[10px] font-semibold ring-1 ${corBaixaAfline(nat)}`}>
+          {c}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/**
  * O selo "onde baixou" (096): a distância entre o técnico na baixa e a casa
  * do cliente. Verde dentro do raio, vermelho fora. De onde veio a posição e
  * a precisão do GPS ficam no texto do mouse (191).
@@ -472,7 +515,7 @@ interface Props {
   pontos?: Map<string, PontoVisita>
   porIndicador?: Map<string, { nome: string }>
   /** Colunas de contexto. Dentro de uma equipe, equipe e data são ruído. */
-  colunas?: { equipe?: boolean; area?: boolean; data?: boolean }
+  colunas?: { equipe?: boolean; area?: boolean; log?: boolean; data?: boolean }
   aoAbrir?: (v: ContratoLinha) => void
   aoMenuContexto?: (v: ContratoLinha, e: React.MouseEvent) => void
   /** Última célula — cada tela tem as suas ações. */
@@ -490,7 +533,7 @@ export function TabelaContratos({
   colunas, aoAbrir, aoMenuContexto, renderAcoes, carregando, vazio,
   selecionados, aoSelecionar, aoSelecionarTodos,
 }: Props) {
-  const mostra = { equipe: true, area: true, data: true, ...(colunas ?? {}) }
+  const mostra = { equipe: true, area: true, log: true, data: true, ...(colunas ?? {}) }
   // 174 (D-261): prédio, casa e o vai-e-volta, como o TOA — Serviços e Equipes
   const sinais = useSinaisDasVisitas(linhas.map(l => l.id))
   // 190: só quem está a caminho ou executando — o resto não muda de lugar
@@ -502,7 +545,9 @@ export function TabelaContratos({
   const temSelecao = !!(selecionados && aoSelecionar)
   const todosMarcados = temSelecao && linhas.length > 0
     && linhas.every(l => selecionados!.has(l.id))
-  const nCols = 5 + (mostra.equipe ? 1 : 0) + (mostra.area ? 2 : 0)
+  // Fixas: Contrato, Janela, Grupo, Endereço, Situação e O.S. (eram 5 na
+  // conta, e a linha de "carregando"/vazio saía uma coluna mais curta).
+  const nCols = 6 + (mostra.equipe ? 1 : 0) + (mostra.area ? 1 : 0) + (mostra.log ? 1 : 0)
                   + (mostra.data ? 1 : 0) + (renderAcoes ? 1 : 0)
                   + (temSelecao ? 1 : 0)
 
@@ -561,9 +606,17 @@ export function TabelaContratos({
           {/* 06/11: piso de largura no Contrato (número + ícones + segmento +
               marcadores) e na Situação (o sinal Antes/Depois) — sem ele a tabela
               espremia as duas e os selos empilhavam um por linha. */}
+          {/* ┌─ 09/11 · a ordem das colunas (Emanuel) ─────────────────────┐
+              │ Contrato, Log, Janela, Equipe, Grupo, Endereço, Área,        │
+              │ Situação, Ordens de serviço, Data · baixa e o "abrir" por    │
+              │ último. Vale para Serviços e Equipes (o componente é um só). │
+              │ As células no corpo seguem a MESMA ordem — mudar aqui sem    │
+              │ mudar lá desalinha o cabeçalho calado.                       │
+              └──────────────────────────────────────────────────────────────┘ */}
           <th className={`px-3 py-2 font-medium ${detalhada ? 'min-w-[15rem]' : ''}`}>Contrato</th>
-          <th className="px-3 py-2 font-medium">Janela</th>
-          <th className={`px-3 py-2 font-medium ${detalhada ? 'min-w-[15.5rem]' : ''}`}>Situação</th>
+          {mostra.log && <th className="w-16 whitespace-nowrap px-3 py-2 font-medium">LOG</th>}
+          <th className="whitespace-nowrap px-3 py-2 font-medium">Janela</th>
+          {mostra.equipe && <th className="px-3 py-2 font-medium">Equipe</th>}
           {/* ┌─ 145 · a largura e disputada, e quem perdia era a O.S. ──┐
               │ "esta com quebra de texto, talvez reduza a coluna grupo   │
               │  pra ficar mais ajustado" (Emanuel, 26/10). Grupo estava  │
@@ -575,18 +628,15 @@ export function TabelaContratos({
               └───────────────────────────────────────────────────────────┘ */}
           <th className={`px-3 py-2 font-medium ${detalhada ? 'w-36' : ''}`}>Grupo</th>
           <th className={`px-3 py-2 font-medium ${detalhada ? 'w-56' : ''}`}>Endereço</th>
-          {mostra.equipe && <th className="px-3 py-2 font-medium">Equipe</th>}
           {/* 06/11: Área e LOG em colunas próprias -- "divida AREA | LOG (...)
-              pra não ficar tudo junto" (Emanuel). Antes (145) o selo ia ao lado
-              do código da área, na mesma célula. */}
-          {mostra.area && (
-            <>
-              <th className={`px-3 py-2 font-medium ${detalhada ? 'w-20' : ''}`}>Área</th>
-              <th className={`px-3 py-2 font-medium ${detalhada ? 'w-20' : ''}`}>LOG</th>
-            </>
-          )}
-          <th className={`px-3 py-2 font-medium ${detalhada ? 'w-[28rem]' : 'text-center'}`}>
-            {detalhada ? 'Ordens de serviço' : 'O.S.'}
+              pra não ficar tudo junto" (Emanuel). 09/11: o LOG foi para perto
+              do contrato; a Área ficou depois do endereço. */}
+          {mostra.area && <th className="w-20 px-3 py-2 font-medium">Área</th>}
+          {/* A Situação depois do endereço: piso de largura (o sinal Antes/Depois
+              mora nela — sem piso a tabela a espreme, ver traps.md). */}
+          <th className={`px-3 py-2 font-medium ${detalhada ? 'min-w-[15.5rem]' : 'min-w-[9rem]'}`}>Situação</th>
+          <th className={`px-3 py-2 font-medium ${detalhada ? 'w-[28rem]' : 'whitespace-nowrap'}`}>
+            {detalhada ? 'Ordens de serviço' : 'O.S. · baixa'}
           </th>
           {/* "Data e baixa": a celula tem duas coisas -- a data agendada
               e a hora em que o contrato foi encerrado, com a procedencia. */}
@@ -661,6 +711,7 @@ export function TabelaContratos({
                     className="accent-af-600" />
                 </td>
               )}
+
               <td className="tabular whitespace-nowrap px-3 py-2 align-top">
                 {jornada && !v.contrato ? (
                   <>
@@ -749,6 +800,18 @@ export function TabelaContratos({
                 })()}
               </td>
 
+              {/* 144: o LOG do TOA (Emanuel, 26/10); 06/11: coluna própria; 09/11:
+                  logo depois do contrato. Jornada não é contrato e não tem LOG — ali
+                  o selo seria um "?" em toda linha, sem informar. */}
+              {mostra.log && (
+                <td className="whitespace-nowrap px-3 py-2 align-top text-xs">
+                  {!jornada && (
+                    <SeloLog valor={v.contador_log}
+                      titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
+                  )}
+                </td>
+              )}
+
               <td className="tabular whitespace-nowrap px-3 py-2 align-top text-graf-300">
                 {v.janela_inicio
                   ? <>
@@ -775,6 +838,83 @@ export function TabelaContratos({
                     encerrou={v.finalizado_toa ? hora(v.fim) : null} tec1={v.tec1} />
                 )}
               </td>
+
+              {mostra.equipe && (
+                <td className="whitespace-nowrap px-3 py-2 align-top text-graf-300">
+                  {/* 09/11: teto de largura — a Equipe veio para o começo da linha,
+                      e um nome longo de equipe empurraria todas as outras colunas
+                      (whitespace-nowrap não encolhe, D-225). O nome inteiro no mouse. */}
+                  {v.equipe
+                    ? <div className="max-w-48 truncate" title={equipeRotulo(v.equipe.codigo, v.equipe.nome)}>
+                        {equipeRotulo(v.equipe.codigo, v.equipe.nome)}
+                      </div>
+                    : <span className="text-af-400/70">sem equipe</span>}
+                  {/* 145: "em equipe adicione o nome do tecnico tambem
+                      (...) e bom saber quem e o 33" (Emanuel, 26/10). A
+                      matricula sozinha nao diz quem e ninguem. */}
+                  {v.tecnico && (
+                    /* A matrícula fica só na dica: ela é o próprio login do
+                       TOA, já visível na célula, e escrita aqui roubava
+                       metade do nome por truncagem. O nome é o que ele
+                       pediu — "é bom saber quem é o 33". */
+                    <div className="max-w-44 truncate text-[11px] text-graf-400"
+                         title={`${v.tecnico.nome} · matrícula ${v.tecnico.matricula}`}>
+                      {v.tecnico.nome}
+                    </div>
+                  )}
+                  {/* O supervisor mostrado é o DECLARADO do técnico deste
+                      contrato. Só cai no nome da planilha quando ninguém
+                      declarou — e aí sai marcado, para não passar por
+                      alguém desta casa (D-135). */}
+                  {detalhada && (v.tecnico?.supervisor || v.equipe?.supervisor_nome) && (
+                    v.tecnico?.supervisor ? (
+                      <div className="max-w-40 truncate text-[10px] text-graf-400"
+                           title={`Supervisor: ${v.tecnico.supervisor.nome}`}>
+                        {v.tecnico.supervisor.nome}
+                      </div>
+                    ) : (
+                      <div className="max-w-40 truncate text-[10px] text-graf-600"
+                           title={`${v.equipe!.supervisor_nome} — nome vindo da planilha de equipes; ninguém desta casa foi declarado supervisor deste técnico`}>
+                        {v.equipe!.supervisor_nome} · da planilha
+                      </div>
+                    )
+                  )}
+                </td>
+              )}
+
+              <td className={`px-3 py-2 align-top text-xs ${detalhada ? '' : 'whitespace-nowrap'}`}>
+                {v.tipo_servico?.nome
+                  ?? (jornada ? <span className="text-graf-400">Jornada</span>
+                              : <span className="text-graf-600">—</span>)}
+                {/* 109, D-188: GPON vem da skill PON do TOA (e dos outros
+                    sinais). Sem etiqueta não quer dizer HFC. */}
+                {v.tecnologia === 'GPON' && (
+                  <span title="Contrato GPON — skill PON, workzone GPON, tipo INST GPON, produto PON ou migração, na linha do TOA"
+                    className="ml-1.5 inline-block rounded bg-sky-900/40 px-1.5 py-0.5 align-middle
+                               text-[9px] font-semibold uppercase tracking-wide text-sky-300">GPON</span>
+                )}
+                <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
+                  ? 'italic text-graf-600' : 'text-graf-500'}`}>
+                  {v.tipo_atividade?.nome}
+                </div>
+              </td>
+
+              <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-56' : 'max-w-72 truncate'}`}
+                  title={v.logradouro ?? ''}>
+                <div className={detalhada ? '' : 'truncate'}>
+                  {v.logradouro ?? <span className="text-graf-600">—</span>}
+                  {detalhada && v.complemento && (
+                    <span className="text-graf-400">, {v.complemento}</span>
+                  )}
+                </div>
+                {v.bairro && <div className="text-xs text-graf-500">{v.bairro}</div>}
+              </td>
+
+              {mostra.area && (
+                <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-graf-400">
+                  {v.area?.apelido ?? '—'}
+                </td>
+              )}
 
               <td className="px-3 py-2 align-top">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -891,95 +1031,16 @@ export function TabelaContratos({
                 )}
               </td>
 
-              <td className={`px-3 py-2 align-top text-xs ${detalhada ? '' : 'whitespace-nowrap'}`}>
-                {v.tipo_servico?.nome
-                  ?? (jornada ? <span className="text-graf-400">Jornada</span>
-                              : <span className="text-graf-600">—</span>)}
-                {/* 109, D-188: GPON vem da skill PON do TOA (e dos outros
-                    sinais). Sem etiqueta não quer dizer HFC. */}
-                {v.tecnologia === 'GPON' && (
-                  <span title="Contrato GPON — skill PON, workzone GPON, tipo INST GPON, produto PON ou migração, na linha do TOA"
-                    className="ml-1.5 inline-block rounded bg-sky-900/40 px-1.5 py-0.5 align-middle
-                               text-[9px] font-semibold uppercase tracking-wide text-sky-300">GPON</span>
-                )}
-                <div className={`text-[10px] ${v.tipo_atividade?.natureza === 'JORNADA'
-                  ? 'italic text-graf-600' : 'text-graf-500'}`}>
-                  {v.tipo_atividade?.nome}
-                </div>
-              </td>
-
-              <td className={`px-3 py-2 align-top ${detalhada ? 'max-w-56' : 'max-w-72 truncate'}`}
-                  title={v.logradouro ?? ''}>
-                <div className={detalhada ? '' : 'truncate'}>
-                  {v.logradouro ?? <span className="text-graf-600">—</span>}
-                  {detalhada && v.complemento && (
-                    <span className="text-graf-400">, {v.complemento}</span>
-                  )}
-                </div>
-                {v.bairro && <div className="text-xs text-graf-500">{v.bairro}</div>}
-              </td>
-
-              {mostra.equipe && (
-                <td className="whitespace-nowrap px-3 py-2 align-top text-graf-300">
-                  {v.equipe
-                    ? equipeRotulo(v.equipe.codigo, v.equipe.nome)
-                    : <span className="text-af-400/70">sem equipe</span>}
-                  {/* 145: "em equipe adicione o nome do tecnico tambem
-                      (...) e bom saber quem e o 33" (Emanuel, 26/10). A
-                      matricula sozinha nao diz quem e ninguem. */}
-                  {v.tecnico && (
-                    /* A matrícula fica só na dica: ela é o próprio login do
-                       TOA, já visível na célula, e escrita aqui roubava
-                       metade do nome por truncagem. O nome é o que ele
-                       pediu — "é bom saber quem é o 33". */
-                    <div className="max-w-44 truncate text-[11px] text-graf-400"
-                         title={`${v.tecnico.nome} · matrícula ${v.tecnico.matricula}`}>
-                      {v.tecnico.nome}
-                    </div>
-                  )}
-                  {/* O supervisor mostrado é o DECLARADO do técnico deste
-                      contrato. Só cai no nome da planilha quando ninguém
-                      declarou — e aí sai marcado, para não passar por
-                      alguém desta casa (D-135). */}
-                  {detalhada && (v.tecnico?.supervisor || v.equipe?.supervisor_nome) && (
-                    v.tecnico?.supervisor ? (
-                      <div className="max-w-40 truncate text-[10px] text-graf-400"
-                           title={`Supervisor: ${v.tecnico.supervisor.nome}`}>
-                        {v.tecnico.supervisor.nome}
-                      </div>
-                    ) : (
-                      <div className="max-w-40 truncate text-[10px] text-graf-600"
-                           title={`${v.equipe!.supervisor_nome} — nome vindo da planilha de equipes; ninguém desta casa foi declarado supervisor deste técnico`}>
-                        {v.equipe!.supervisor_nome} · da planilha
-                      </div>
-                    )
-                  )}
-                </td>
-              )}
-
-              {mostra.area && (
-                <>
-                <td className="px-3 py-2 align-top text-xs text-graf-400">
-                  <span className="whitespace-nowrap">{v.area?.apelido ?? '—'}</span>
-                </td>
-                {/* 144: o LOG do TOA (Emanuel, 26/10); 06/11: coluna própria.
-                    Jornada não é contrato e não tem LOG — ali o selo seria um
-                    "?" em toda linha, sem informar. */}
-                <td className="px-3 py-2 align-top text-xs">
-                  {!jornada && (
-                    <SeloLog valor={v.contador_log}
-                      titulo={v.tipo_servico?.nome ? `Grupo: ${v.tipo_servico.nome}.` : undefined} />
-                  )}
-                </td>
-                </>
-              )}
-
               {/* A coluna que o COP mais pediu: a O.S. e a baixa sem abrir nada */}
-              <td className={`px-3 py-2 align-top ${detalhada ? 'min-w-[26rem]' : 'tabular text-center'}`}>
+              <td className={`px-3 py-2 align-top ${detalhada ? 'min-w-[26rem]' : 'whitespace-nowrap'}`}>
                 {!detalhada ? (
                   v.ordem_servico.length > 0
-                    ? <span className="rounded bg-graf-800 px-1.5 py-0.5 text-xs">
-                        {v.ordem_servico.length}</span>
+                    ? <div className="flex items-center gap-1.5">
+                        <span title={`${v.ordem_servico.length} O.S. nesta visita`}
+                          className="tabular rounded bg-graf-800 px-1.5 py-0.5 text-xs text-graf-200">
+                          {v.ordem_servico.length}</span>
+                        <BaixaCurta oss={v.ordem_servico} />
+                      </div>
                     : <span className="text-graf-600">—</span>
                 ) : v.ordem_servico.length === 0 ? (
                   <span className="text-[11px] text-graf-600">—</span>

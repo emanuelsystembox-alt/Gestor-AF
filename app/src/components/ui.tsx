@@ -1,5 +1,6 @@
-import { useId, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { ouvirAtividade } from '../lib/atividade'
 
 /**
  * A marca da AFLINE, redesenhada em vetor a partir da arte oficial.
@@ -173,6 +174,40 @@ export function Carregando({ texto = 'Carregando…' }: { texto?: string }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** O "carregando" de dentro de uma tela (D-347): o mesmo círculo do
+ *  `Carregando`, sem ocupar a tela inteira, e só depois de ~200 ms — o que
+ *  chega rápido não pisca nada. É o padrão no lugar do "Carregando…" solto. */
+export function CarregandoBloco({ texto = 'Carregando…', className = 'py-12' }: {
+  texto?: string; className?: string
+}) {
+  return (
+    <div className={`aparece-tarde flex flex-col items-center gap-2.5 ${className}`} role="status">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-graf-700 border-t-af-500" />
+      <p className="text-xs text-graf-400">{texto}</p>
+    </div>
+  )
+}
+
+/** O fio fino no topo enquanto QUALQUER pedido ao banco está em andamento
+ *  (D-347, `lib/atividade.ts`). Acende só se a espera passar de 150 ms e
+ *  some em fade — a tela não pisca a cada clique rápido. */
+export function BarraAtividade() {
+  const [ligada, setLigada] = useState(false)
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    const pare = ouvirAtividade(n => {
+      clearTimeout(t)
+      if (n > 0) t = setTimeout(() => setLigada(true), 150)
+      else setLigada(false)
+    })
+    return () => { clearTimeout(t); pare() }
+  }, [])
+  return (
+    <div aria-hidden className={`barra-carregando pointer-events-none fixed inset-x-0 top-0 z-[70]
+                     transition-opacity duration-300 ${ligada ? 'opacity-100' : 'opacity-0'}`} />
   )
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 
 /**
  * Sub-falhas, por código de baixa — dentro de Configurações.
@@ -220,7 +220,7 @@ export function EditorSubFalhas() {
   const previaOutros = lerCodigos(novoOutros)
 
   if (carregando && conjunto === undefined) {
-    return <p className="py-12 text-center text-graf-400">Carregando…</p>
+    return <CarregandoBloco className="py-12" />
   }
 
   if (!conjunto) {

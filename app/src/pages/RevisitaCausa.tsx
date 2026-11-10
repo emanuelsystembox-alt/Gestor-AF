@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Metrica } from '../components/ui'
+import { Alerta, Metrica, CarregandoBloco } from '../components/ui'
 import { BarrasHorizontais, Painel, TabelaSimples } from '../components/graficos'
 import { LinkContrato } from '../components/LinkContrato'
 import { dataBR, diaMes, isoLocal } from '../lib/formato'
@@ -174,7 +174,7 @@ export default function RevisitaCausa() {
           </Alerta>
         )}
 
-        {carregando && !r && <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>}
+        {carregando && !r && <CarregandoBloco className="py-10" />}
 
         {r && geral && cob && (<>
           <div className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${carregando ? 'opacity-60' : ''}`}>

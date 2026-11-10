@@ -9,6 +9,9 @@ import { supabase } from '../lib/supabase'
  * >  anexar foto igual ao técnico anexa (...) em cima da caixa de resposta
  * >  ao técnico" — Emanuel, 03/11
  *
+ * Em 09/11 mudou de lugar: mora na aba Anexos, em cima da galeria —
+ * "usamos para adicionar outras evidências após responder o pendente".
+ *
  * O mesmo caminho do aplicativo (`campo/src/lib/midia.ts`): o arquivo sobe
  * para o bucket `evidencia` em `<visita>/<nome>`, e `registrar_evidencia`
  * grava a linha. Quem pode é decidido no BANCO (`pode_anexar_na_visita`, a

@@ -7,7 +7,7 @@ import {
   type VisitaLinha, type PontoVisita, type Indicador,
 } from '../lib/relatorio'
 import { Shell } from '../components/Shell'
-import { Alerta } from '../components/ui'
+import { Alerta, CarregandoBloco } from '../components/ui'
 import { isoLocal } from '../lib/formato'
 import { useAuth } from '../lib/auth'
 import { carregarCidades, type Cidade } from '../lib/cidade'
@@ -587,7 +587,7 @@ export default function Relatorios() {
             </button>
           </div>
           {historico === null ? (
-            <p className="px-4 py-8 text-center text-sm text-graf-400">Carregando…</p>
+            <CarregandoBloco className="px-4 py-8" />
           ) : historico.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-graf-400">Nenhum download ainda.</p>
           ) : (

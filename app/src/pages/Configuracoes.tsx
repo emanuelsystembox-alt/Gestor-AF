@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, SITUACOES } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 import { EditorSubFalhas } from '../components/EditorSubFalhas'
 import { BucketsToa } from '../components/BucketsToa'
 import { DashboardVTBaseClientes } from '../components/DashboardVTBaseClientes'
@@ -449,7 +449,7 @@ export default function Configuracoes() {
             </p>
           </section>
         ) : carregando ? (
-          <p className="py-12 text-center text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-12" />
         ) : aba === 'status' ? (
           <section className="card-controle overflow-hidden">
             <div className="border-b border-graf-800 px-4 py-3">

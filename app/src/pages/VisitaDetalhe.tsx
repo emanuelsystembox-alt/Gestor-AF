@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase, SITUACAO_INFO, type Situacao } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
 import { rotuloEvento, transicaoEvento } from '../lib/eventos'
 import { Alerta, Esqueleto, Pill } from '../components/ui'
@@ -8,6 +9,7 @@ import { EquipamentoToa, contagemToa, useEquipamentoToa } from '../components/Eq
 import { SinalClaro, useSinalClaro } from '../components/SinalClaro'
 import { SeloOuvidoria, SeloSegmento } from '../components/MarcasCliente'
 import { ResponderTecnico, UltimasAtualizacoes } from '../components/ResponderTecnico'
+import { Lixeira } from '../components/ContratoModal'
 import { AnexarEvidencia } from '../components/AnexarEvidencia'
 import { carregarProvas, type Prova } from '../lib/prova'
 import { carregarLocais, type LocalBaixa } from '../lib/localBaixa'
@@ -51,6 +53,8 @@ interface Evidencia {
   envio_lat: number | null
   envio_lng: number | null
   envio_precisao_m: number | null
+  /** Quem enviou — o único que apaga (127, D-204). Carimbado pelo servidor. */
+  usuario_id: string | null
 }
 interface Det {
   id: string; toa_atividade_id: string | null; wo_numero: string | null
@@ -155,6 +159,26 @@ function localDaEvidencia(
   }
 }
 
+/*
+ * ┌─ girar a foto é só na TELA ───────────────────────────────────────┐
+ * │ > "ao clicar em anexo o sistema deve dar opção de apagar foto,    │
+ * │ >  rotacionar foto, anexar foto, enquadrar foto para ficar dentro │
+ * │ >  do quadrado" — Emanuel, 09/11                                  │
+ * │                                                                     │
+ * │ Evidência é prova: o arquivo no bucket não é regravado. O giro é   │
+ * │ CSS, lembrado só neste navegador (localStorage), por evidência.    │
+ * │ Outro computador vê a foto como ela foi enviada.                   │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+const CHAVE_GIRO = 'pulsoline.giro-evidencia'
+function lerGiros(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(CHAVE_GIRO) ?? '{}') as Record<string, number> }
+  catch { return {} }
+}
+function gravarGiros(g: Record<string, number>) {
+  try { localStorage.setItem(CHAVE_GIRO, JSON.stringify(g)) } catch { /* sem armazenamento: vale só nesta tela */ }
+}
+
 function Campo({ r, v, destaque }: { r: string; v: React.ReactNode; destaque?: boolean }) {
   return (
     <div>
@@ -189,6 +213,10 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
   // Esc volta para onde a pessoa estava. Na janela do contrato o Esc já
   // fechava; abrir a página cheia e ficar preso nela quebrava o hábito.
   // Não intercepta quem está digitando — Esc dentro de campo tem dono.
+  // Com a foto ampliada aberta, o Esc fecha a foto, não a página.
+  const [ampliada, setAmpliada] = useState<Evidencia | null>(null)
+  const ampliadaAberta = useRef(false)
+  ampliadaAberta.current = !!ampliada
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
@@ -197,6 +225,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
         alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' ||
         alvo.tagName === 'SELECT' || alvo.isContentEditable)
       if (digitando) return
+      if (ampliadaAberta.current) { setAmpliada(null); return }
       navegar(-1)
     }
     window.addEventListener('keydown', esc)
@@ -220,8 +249,46 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
    * └───────────────────────────────────────────────────────────────────┘
    */
   const [urls, setUrls] = useState<Record<string, string>>({})
-  /** A evidência aberta em tela cheia. */
-  const [ampliada, setAmpliada] = useState<Evidencia | null>(null)
+  /** Quem está logado: o botão Apagar só aparece para o autor da evidência. */
+  const { perfil } = useAuth()
+  /** O giro de cada foto, em graus (0, 90, 180, 270) — só na tela. */
+  const [giros, setGiros] = useState<Record<string, number>>(lerGiros)
+  function girar(idEv: string, passo: 90 | -90) {
+    setGiros(g => {
+      const novo = { ...g, [idEv]: (((g[idEv] ?? 0) + passo) % 360 + 360) % 360 }
+      if (novo[idEv] === 0) delete novo[idEv]
+      gravarGiros(novo)
+      return novo
+    })
+  }
+  /** Apagar: dois cliques (o segundo confirma), porque não se desfaz. */
+  const [confirmarApagar, setConfirmarApagar] = useState(false)
+  const [apagando, setApagando] = useState(false)
+  const [erroApagar, setErroApagar] = useState<string | null>(null)
+  useEffect(() => { setConfirmarApagar(false); setErroApagar(null) }, [ampliada?.id])
+
+  /*
+   * D-204: quem enviou apaga de verdade. A mesma ordem do aplicativo
+   * (`campo/src/lib/midia.ts`): primeiro o ARQUIVO, pela API do Storage
+   * (policy `evidencia_arquivo_apagar`), depois a linha, por
+   * `apagar_evidencia` — que recusa enquanto o arquivo existir e grava no
+   * histórico que a foto saiu. Quem não pode, o banco recusa: a policy não
+   * apaga o arquivo e a RPC devolve o recado.
+   */
+  async function apagar(a: Evidencia) {
+    setApagando(true); setErroApagar(null)
+    const { error: eArq } = await supabase.storage.from('evidencia').remove([a.arquivo_path])
+    if (eArq) { setErroApagar(eArq.message); setApagando(false); return }
+    const { error } = await supabase.rpc('apagar_evidencia', { p_evidencia: a.id })
+    setApagando(false)
+    if (error) { setErroApagar(error.message); return }
+    setGiros(g => {
+      if (!(a.id in g)) return g
+      const novo = { ...g }; delete novo[a.id]; gravarGiros(novo); return novo
+    })
+    setAmpliada(null)
+    carregar()
+  }
 
   useEffect(() => {
     const caminhos = anexos.map(a => a.arquivo_path)
@@ -267,7 +334,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
       supabase.from('evidencia')
         .select(`id, tipo, arquivo_path, tamanho_bytes, lat, lng, capturada_em, criado_em,
                  midia, mime, duracao_seg, precisao_m, observacao, login, origem, da_galeria,
-                 envio_lat, envio_lng, envio_precisao_m,
+                 envio_lat, envio_lng, envio_precisao_m, usuario_id,
                  tecnico:tecnico_id ( nome, matricula )`)
         .eq('visita_id', id!).order('criado_em'),
       supabase.from('equipe').select('id, codigo, nome').order('codigo'),
@@ -430,7 +497,7 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
   ]
 
   /** O que a aba Responder e a aba Anexos mostram: a mesma grade. */
-  const grade = (lista: Evidencia[], colunas = 'sm:grid-cols-2 lg:grid-cols-4') => (
+  const grade = (lista: Evidencia[], colunas = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5') => (
     <div className={`grid gap-3 ${colunas}`}>
       {lista.map(a => {
         const url = urls[a.arquivo_path]
@@ -441,12 +508,14 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
             className="group overflow-hidden rounded-lg border border-graf-800
                        bg-graf-900 text-left transition hover:border-graf-600"
           >
-            <div className="relative flex h-36 items-center justify-center
+            {/* Enquadrada: o quadrado mostra a foto INTEIRA (contain), sem
+                cortar a borda — num quadrado, girar 90° também cabe. */}
+            <div className="relative flex aspect-square items-center justify-center
                             overflow-hidden bg-graf-950">
               {url && !ehVideo && (
                 <img src={url} alt={a.tipo} loading="lazy"
-                     className="h-full w-full object-cover transition
-                                group-hover:scale-105" />
+                     style={giros[a.id] ? { transform: `rotate(${giros[a.id]}deg)` } : undefined}
+                     className="h-full w-full object-contain transition-transform" />
               )}
               {url && ehVideo && <span className="text-2xl text-graf-400">▶</span>}
               {!url && <span className="text-[11px] text-graf-600">carregando…</span>}
@@ -787,14 +856,10 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                 do + O.S. (MarcadoresDoContrato), como lista que abre. */}
             </div>
 
-            {/* ---------- responder ao técnico / mudar status ---------- */}
-            {/* A tela cheia disso é a aba Responder: lá a conversa, as fotos
-                e o histórico ficam do lado (133). Aqui fica o atalho. */}
-            <ResponderTecnico
-              visita={{ id: v.id, situacao: v.situacao,
-                        tecnico_responsavel_id: v.tecnico_responsavel_id,
-                        tecnico: v.tecnico }}
-              eventos={eventos} aoMudar={carregar} />
+            {/* O "Responder no contrato" que ficava aqui saiu: era o mesmo
+                formulário da aba Responder — "tem resposta embaixo, resposta
+                em cima" (Emanuel, 09/11). Responder é só na aba Responder,
+                que acende a bolinha laranja quando há ticket do campo. */}
 
             {/* 155: a seção "Transferir para outra equipe" saiu daqui.
                 O painel de ações no topo já traz Transferir, com o mesmo
@@ -820,8 +885,10 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
         {aba === 'responder' && (
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-3">
-              {/* "em cima da caixa de resposta ao técnico" (Emanuel, 03/11) */}
-              <AnexarEvidencia visitaId={v.id} aoEnviar={carregar} />
+              {/* O "Anexar foto ou vídeo" saiu daqui para a aba Anexos:
+                  > "deveria estar em 'Anexos', principalmente porque usamos para
+                  >  adicionar outras evidências após responder o pendente"
+                  > — Emanuel, 09/11 (em 03/11 tinha pedido aqui em cima). */}
               <section className={`card-controle p-4 ${temPedidoDeAjuda ? 'ring-1 ring-orange-500/60' : ''}`}>
                 <ResponderTecnico semMoldura
                   visita={{ id: v.id, situacao: v.situacao,
@@ -853,21 +920,20 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                 <div className="mb-2 flex flex-wrap items-baseline gap-2">
                   <h2 className="text-sm font-semibold">Fotos e vídeos</h2>
                   <span className="tabular text-[11px] text-graf-400">{anexos.length}</span>
-                  {anexos.length > 0 && (
-                    <button onClick={() => setAba('anexos')}
-                      className="ml-auto text-[11px] text-af-400 underline underline-offset-2">
-                      ver na aba Anexos
-                    </button>
-                  )}
+                  {/* 09/11: anexar mora na aba Anexos agora — o atalho leva lá. */}
+                  <button onClick={() => setAba('anexos')}
+                    className="ml-auto text-[11px] text-af-400 underline underline-offset-2">
+                    anexar ou ver na aba Anexos
+                  </button>
                 </div>
                 {anexos.length === 0 ? (
                   <p className="py-6 text-center text-sm text-graf-400">
                     Nenhuma evidência anexada nesta visita.
                   </p>
-                ) : grade(anexos.slice(-8), 'grid-cols-2')}
-                {anexos.length > 8 && (
+                ) : grade(anexos.slice(-9), 'grid-cols-3')}
+                {anexos.length > 9 && (
                   <p className="mt-2 text-[11px] text-graf-500">
-                    Mostrando as 8 mais recentes de {anexos.length}.
+                    Mostrando as 9 mais recentes de {anexos.length}.
                   </p>
                 )}
               </section>
@@ -982,14 +1048,19 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
             que a foto existia e não conseguia olhar. Meia
             funcionalidade — servia para o técnico cumprir, não para a
             AFLINE provar nada para a CLARO. */}
+        {/* 09/11: o anexar mora aqui, em cima da galeria; clicar na foto abre
+            o visualizador com girar e apagar. */}
         {aba === 'anexos' && (
-          <section className="card-controle p-4">
-            {anexos.length === 0 ? (
-              <p className="py-10 text-center text-sm text-graf-500">
-                Nenhuma evidência anexada nesta visita.
-              </p>
-            ) : grade(anexos)}
-          </section>
+          <div className="space-y-3">
+            <AnexarEvidencia visitaId={v.id} aoEnviar={carregar} />
+            <section className="card-controle p-4">
+              {anexos.length === 0 ? (
+                <p className="py-10 text-center text-sm text-graf-500">
+                  Nenhuma evidência anexada nesta visita.
+                </p>
+              ) : grade(anexos)}
+            </section>
+          </div>
         )}
 
         {/* ================= EQUIPAMENTO ================= */}
@@ -1018,9 +1089,18 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                 {ampliada.midia === 'VIDEO' ? (
                   <video src={urls[ampliada.arquivo_path]} controls autoPlay
                          className="max-h-[80vh] w-full rounded-lg bg-black" />
-                ) : (
+                ) : (giros[ampliada.id] ?? 0) % 180 === 0 ? (
                   <img src={urls[ampliada.arquivo_path]} alt={ampliada.tipo}
+                       style={giros[ampliada.id] ? { transform: `rotate(${giros[ampliada.id]}deg)` } : undefined}
                        className="max-h-[85vh] rounded-lg object-contain" />
+                ) : (
+                  // Deitada (90°/270°): dentro de um quadrado, para a foto
+                  // girada não vazar para fora da tela.
+                  <div className="flex aspect-square w-full max-w-[80vh] items-center justify-center">
+                    <img src={urls[ampliada.arquivo_path]} alt={ampliada.tipo}
+                         style={{ transform: `rotate(${giros[ampliada.id]}deg)` }}
+                         className="max-h-full max-w-full rounded-lg object-contain" />
+                  </div>
                 )}
               </div>
 
@@ -1119,13 +1199,68 @@ export default function VisitaDetalhe({ emJanela = false }: { emJanela?: boolean
                   </div>
                 </dl>
 
+                {/* ---- girar (só na tela) ---- */}
+                {ampliada.midia !== 'VIDEO' && (
+                  <div className="mt-4 flex items-center gap-1.5">
+                    <button onClick={() => girar(ampliada.id, -90)}
+                      title="Girar para a esquerda (só na tela; o arquivo não muda)"
+                      aria-label="Girar para a esquerda"
+                      className="flex-1 rounded-md border border-graf-700 py-1.5 text-xs
+                                 text-graf-200 hover:bg-graf-800">
+                      ↺ Girar
+                    </button>
+                    <button onClick={() => girar(ampliada.id, 90)}
+                      title="Girar para a direita (só na tela; o arquivo não muda)"
+                      aria-label="Girar para a direita"
+                      className="flex-1 rounded-md border border-graf-700 py-1.5 text-xs
+                                 text-graf-200 hover:bg-graf-800">
+                      Girar ↻
+                    </button>
+                  </div>
+                )}
+
                 {urls[ampliada.arquivo_path] && (
                   <a href={urls[ampliada.arquivo_path]} target="_blank"
                      rel="noopener noreferrer"
-                     className="mt-4 block rounded-md border border-graf-700 py-2
+                     className="mt-2 block rounded-md border border-graf-700 py-2
                                 text-center text-xs font-semibold hover:bg-graf-800">
                     Abrir original
                   </a>
+                )}
+
+                {/* ---- apagar: só quem enviou (D-204) ----
+                    O botão é só para o autor; quem decide é o banco (policy do
+                    Storage + `apagar_evidencia`). */}
+                {!!ampliada.usuario_id && ampliada.usuario_id === perfil?.id && (
+                  <div className="mt-2">
+                    {!confirmarApagar ? (
+                      <button onClick={() => setConfirmarApagar(true)}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-md
+                                   border border-af-800 py-2 text-xs font-semibold text-af-300
+                                   hover:border-af-600">
+                        <Lixeira /> Apagar {ampliada.midia === 'VIDEO' ? 'vídeo' : 'foto'}
+                      </button>
+                    ) : (
+                      <div className="rounded-md border border-af-700/60 bg-af-900/15 p-2">
+                        <p className="text-[11px] text-af-200">
+                          Apaga o arquivo de verdade. Não se desfaz.
+                        </p>
+                        <div className="mt-1.5 flex gap-1.5">
+                          <button onClick={() => setConfirmarApagar(false)} disabled={apagando}
+                            className="flex-1 rounded-md border border-graf-700 py-1.5 text-xs
+                                       text-graf-300 hover:bg-graf-800 disabled:opacity-50">
+                            Manter
+                          </button>
+                          <button onClick={() => apagar(ampliada)} disabled={apagando}
+                            className="flex-1 rounded-md bg-af-600 py-1.5 text-xs font-semibold
+                                       text-white hover:bg-af-500 disabled:opacity-50">
+                            {apagando ? 'Apagando…' : 'Apagar de vez'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {erroApagar && <p className="mt-1.5 text-[11px] text-af-400">{erroApagar}</p>}
+                  </div>
                 )}
               </aside>
             </div>

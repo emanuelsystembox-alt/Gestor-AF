@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 import { BarrasHorizontais, Painel, TabelaSimples } from '../components/graficos'
 import { dataBR, isoLocal } from '../lib/formato'
 
@@ -155,7 +155,7 @@ export default function Humor() {
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {linhas == null ? (
-          <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-10" />
         ) : (<>
           <div className="grid gap-4 lg:grid-cols-2">
             <Painel titulo="Como as equipes estão"

@@ -5,12 +5,53 @@ import { Alerta, Vazio } from '../components/ui'
 import { isoLocal, equipeRotulo } from '../lib/formato'
 import { useAuth } from '../lib/auth'
 import {
-  DESFECHOS, DESFECHO_POR_CHAVE, TRIAGEM, naTriagem, ehProblema,
+  DESFECHOS as DESFECHOS_LIB, TRIAGEM, naTriagem as naTriagemLib, ehProblema as ehProblemaLib,
   SITUACAO_CONTRATO, linkWhatsApp, formataTel, pct, num1, num2,
-  COR_AGUARDANDO, CANAL, estagioDe, podeAguardar, haQuanto,
-  type Triagem, type Estagio,
+  COR_AGUARDANDO, CANAL, estagioDe, podeAguardar as podeAguardarLib, haQuanto,
+  type Desfecho, type Triagem, type Estagio,
 } from '../lib/qualidade'
 import { LinkContrato } from '../components/LinkContrato'
+
+/*
+ * ┌─ 238: o décimo desfecho, REFAZER CABEAMENTO ─────────────────────────┐
+ * │ Mora aqui e não em `lib/qualidade.ts` só porque esta entrega não     │
+ * │ podia mexer na lib — o lugar dele é lá, ao lado do SERVICO_FALHA.    │
+ * │ Conta como o SERVICO_FALHA em tudo (conclusivo, contatado, PROBLEMA),│
+ * │ igual ao `qualidade_conclusivo` do banco (238): as contas da lib     │
+ * │ recebem o desfecho "equivalente" em vez de uma segunda cópia da      │
+ * │ regra.                                                                │
+ * └───────────────────────────────────────────────────────────────────────┘
+ */
+const REFAZER_CABEAMENTO: Desfecho = {
+  v: 'REFAZER_CABEAMENTO', r: 'Refazer cabeamento', cor: '#dc2626',
+  conclusivo: true, contatado: true,
+  quando: 'O cabeamento precisa ser refeito. Conta como problema, como o serviço com falha.',
+}
+const CONTA_COMO: Record<string, string> = { REFAZER_CABEAMENTO: 'SERVICO_FALHA' }
+const equivalente = (d: string | null) => (d && CONTA_COMO[d]) ?? d
+
+const DESFECHOS: Desfecho[] = DESFECHOS_LIB.flatMap(d =>
+  d.v === 'SERVICO_FALHA' ? [d, REFAZER_CABEAMENTO] : [d])
+const DESFECHO_POR_CHAVE: Record<string, Desfecho> =
+  Object.fromEntries(DESFECHOS.map(d => [d.v, d]))
+const ehProblema = (d: string | null) => ehProblemaLib(equivalente(d))
+const podeAguardar = (d: string | null) => podeAguardarLib(equivalente(d))
+const naTriagem = (l: { desfecho: string | null; aguardando_em: string | null }, t: Triagem) =>
+  naTriagemLib({ ...l, desfecho: equivalente(l.desfecho) }, t)
+
+/** 238: o cancelado pela central entra na fila e tem etiqueta própria,
+ *  como nas etiquetas de Serviços (`origemCancelada`). */
+const SITUACOES: Record<string, string> = {
+  CONCLUIDA: SITUACAO_CONTRATO.CONCLUIDA,
+  CANCELADA: SITUACAO_CONTRATO.CANCELADA,
+  CANCELADO_CENTRAL: 'Cancelado pela central',
+  REAGENDAMENTO: SITUACAO_CONTRATO.REAGENDAMENTO,
+}
+const situacaoDe = (l: { situacao_contrato: string; cancelado_central: boolean }) =>
+  l.cancelado_central ? 'CANCELADO_CENTRAL' : l.situacao_contrato
+
+/** Os "sem" dos filtros: valor que nenhum nome real terá. */
+const SEM = '__sem__'
 
 /**
  * A central de QUALIDADE (147, reescrita na 148/149).
@@ -22,7 +63,7 @@ import { LinkContrato } from '../components/LinkContrato'
  * >  ativando" — Emanuel, 26/10, com a central dele aberta na tela
  *
  * ┌─ duas abas, dois públicos ────────────────────────────────────────┐
- * │ LIGAÇÕES DO DIA é do analista: a fila, os cinco filtros e o       │
+ * │ LIGAÇÕES DO DIA é do analista: a fila, os filtros e o             │
  * │ registro. Ele passa o dia inteiro aqui, então o filtro roda no    │
  * │ cliente — são ~300 linhas, e ida ao servidor a cada clique        │
  * │ custaria mais do que a consulta inteira.                          │
@@ -57,6 +98,10 @@ interface Linha {
   tentativas: number; registrado_em: string | null; analista: string | null
   /** 213: o "aguardando cliente" ABERTO — nulo quando não há. */
   aguardando_em: string | null; aguardando_canal: string | null; aguardando_por: string | null
+  /** 238: cancelado pela central (TOA ou marca do COP); ouvidoria da planilha
+   *  ou do marcador; supervisor na ordem da D-134; nomes dos marcadores. */
+  cancelado_central: boolean; ouvidoria: boolean; supervisor: string | null
+  marcadores: string[]
 }
 
 interface Indicadores {
@@ -160,6 +205,10 @@ function AbaFila({ de, ate, podeRegistrar }: {
   const [fBaixa, setFBaixa] = useState('TODOS')
   const [fJanela, setFJanela] = useState('TODAS')
   const [fLog, setFLog] = useState('TODOS')
+  const [fOuvidoria, setFOuvidoria] = useState('TODOS')
+  const [fMarcador, setFMarcador] = useState('TODOS')
+  const [fSupervisor, setFSupervisor] = useState('TODOS')
+  const [fArea, setFArea] = useState('TODAS')
 
   const recarregar = useCallback(() => {
     let vivo = true
@@ -190,6 +239,15 @@ function AbaFila({ de, ate, podeRegistrar }: {
       .map(l => [l.baixa_codigo!, `${l.baixa_codigo} · ${l.baixa_descricao ?? ''}`]))]
       .sort((a, b) => a[0] - b[0]),
     janelas: [...new Set(linhas.map(l => l.janela).filter(Boolean) as string[])].sort(),
+    marcadores: [...new Set(linhas.flatMap(l => l.marcadores ?? []))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    supervisores: [...new Set(linhas.map(l => l.supervisor).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    areas: [...new Set(linhas.map(l => l.area).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    semMarcador: linhas.some(l => !l.marcadores?.length),
+    semSupervisor: linhas.some(l => !l.supervisor),
+    semArea: linhas.some(l => !l.area),
   }), [linhas])
 
   const filtradas = useMemo(() => {
@@ -197,7 +255,13 @@ function AbaFila({ de, ate, podeRegistrar }: {
     return linhas.filter(l => {
       if (!naTriagem(l, triagem)) return false
       if (fGrupo !== 'TODOS' && l.grupo !== fGrupo) return false
-      if (fSituacao !== 'TODAS' && l.situacao_contrato !== fSituacao) return false
+      if (fSituacao !== 'TODAS' && situacaoDe(l) !== fSituacao) return false
+      if (fOuvidoria === 'SIM' && !l.ouvidoria) return false
+      if (fOuvidoria === 'NAO' && l.ouvidoria) return false
+      if (fMarcador !== 'TODOS' && (fMarcador === SEM
+        ? (l.marcadores?.length ?? 0) > 0 : !(l.marcadores ?? []).includes(fMarcador))) return false
+      if (fSupervisor !== 'TODOS' && (l.supervisor ?? SEM) !== fSupervisor) return false
+      if (fArea !== 'TODAS' && (l.area ?? SEM) !== fArea) return false
       if (fBaixa !== 'TODOS' && String(l.baixa_codigo ?? '') !== fBaixa) return false
       if (fJanela !== 'TODAS' && l.janela !== fJanela) return false
       if (fLog !== 'TODOS') {
@@ -209,10 +273,11 @@ function AbaFila({ de, ate, podeRegistrar }: {
       }
       if (!q) return true
       return [l.contrato, l.cliente_nome, l.endereco, l.bairro, l.tecnico,
-              l.equipe, l.telefone, l.operacao]
+              l.equipe, l.telefone, l.operacao, l.supervisor]
         .some(x => (x ?? '').toLowerCase().includes(q))
     })
-  }, [linhas, triagem, busca, fGrupo, fSituacao, fBaixa, fJanela, fLog])
+  }, [linhas, triagem, busca, fGrupo, fSituacao, fBaixa, fJanela, fLog,
+      fOuvidoria, fMarcador, fSupervisor, fArea])
 
   const contagem = useMemo(() => Object.fromEntries(
     TRIAGEM.map(t => [t.v, linhas.filter(l => naTriagem(l, t.v)).length]),
@@ -220,10 +285,13 @@ function AbaFila({ de, ate, podeRegistrar }: {
 
   const avaliados = linhas.filter(l => l.desfecho != null).length
   const temFiltro = fGrupo !== 'TODOS' || fSituacao !== 'TODAS' || fBaixa !== 'TODOS'
-    || fJanela !== 'TODAS' || fLog !== 'TODOS' || busca.trim() !== ''
+    || fJanela !== 'TODAS' || fLog !== 'TODOS' || fOuvidoria !== 'TODOS'
+    || fMarcador !== 'TODOS' || fSupervisor !== 'TODOS' || fArea !== 'TODAS'
+    || busca.trim() !== ''
   const limpar = () => {
     setFGrupo('TODOS'); setFSituacao('TODAS'); setFBaixa('TODOS')
-    setFJanela('TODAS'); setFLog('TODOS'); setBusca('')
+    setFJanela('TODAS'); setFLog('TODOS'); setFOuvidoria('TODOS')
+    setFMarcador('TODOS'); setFSupervisor('TODOS'); setFArea('TODAS'); setBusca('')
   }
 
   return (<>
@@ -263,10 +331,10 @@ function AbaFila({ de, ate, podeRegistrar }: {
       </div>
     </div>
 
-    {/* ---------- os cinco filtros ---------- */}
+    {/* ---------- os filtros ---------- */}
     <div className="card-controle space-y-2 p-3">
       <input value={busca} onChange={e => setBusca(e.target.value)}
-        placeholder="Contrato, cliente, endereço, equipe, técnico ou telefone"
+        placeholder="Contrato, cliente, endereço, equipe, técnico, supervisor ou telefone"
         className="w-full rounded-md border border-graf-700 bg-graf-900 px-3 py-2 text-sm" />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -279,7 +347,7 @@ function AbaFila({ de, ate, podeRegistrar }: {
         <select value={fSituacao} onChange={e => setFSituacao(e.target.value)}
           aria-label="Filtrar por situação do contrato" className={sel}>
           <option value="TODAS">Situação</option>
-          {Object.entries(SITUACAO_CONTRATO).map(([v, r]) => (
+          {Object.entries(SITUACOES).map(([v, r]) => (
             <option key={v} value={v}>{r}</option>))}
         </select>
 
@@ -303,6 +371,35 @@ function AbaFila({ de, ate, podeRegistrar }: {
           <option value="1-2">LOG 1 ou 2</option>
           <option value="3+">LOG 3 ou mais — reincidente</option>
           <option value="SEM">Sem LOG na planilha</option>
+        </select>
+
+        <select value={fOuvidoria} onChange={e => setFOuvidoria(e.target.value)}
+          aria-label="Filtrar por ouvidoria"
+          title="Caso crítico da planilha do TOA ou marcador OUVIDORIA" className={sel}>
+          <option value="TODOS">Ouvidoria</option>
+          <option value="SIM">Com ouvidoria</option>
+          <option value="NAO">Sem ouvidoria</option>
+        </select>
+
+        <select value={fMarcador} onChange={e => setFMarcador(e.target.value)}
+          aria-label="Filtrar por marcador" className={`${sel} max-w-56`}>
+          <option value="TODOS">Marcador</option>
+          {opcoes.marcadores.map(m => <option key={m} value={m}>{m}</option>)}
+          {opcoes.semMarcador && <option value={SEM}>Sem marcador</option>}
+        </select>
+
+        <select value={fSupervisor} onChange={e => setFSupervisor(e.target.value)}
+          aria-label="Filtrar por supervisor" className={`${sel} max-w-56`}>
+          <option value="TODOS">Supervisor</option>
+          {opcoes.supervisores.map(s => <option key={s} value={s}>{s}</option>)}
+          {opcoes.semSupervisor && <option value={SEM}>Sem supervisor</option>}
+        </select>
+
+        <select value={fArea} onChange={e => setFArea(e.target.value)}
+          aria-label="Filtrar por área" className={`${sel} max-w-56`}>
+          <option value="TODAS">Área</option>
+          {opcoes.areas.map(a => <option key={a} value={a}>{a}</option>)}
+          {opcoes.semArea && <option value={SEM}>Sem área</option>}
         </select>
 
         {temFiltro && (
@@ -390,8 +487,17 @@ function LinhaFila({ l, agora, aberto, podeRegistrar, aoAbrir, aoSalvar, aoMudar
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-medium">{l.grupo ?? '—'}</span>
           <span className="rounded bg-graf-800 px-1.5 py-0.5 text-[10px] text-graf-300">
-            {SITUACAO_CONTRATO[l.situacao_contrato] ?? l.situacao_contrato}
+            {SITUACOES[situacaoDe(l)] ?? l.situacao_contrato}
           </span>
+          {l.ouvidoria && (
+            // o mesmo selo de TabelaContratos: preto (200), com o aro que o
+            // impede de sumir no cartão escuro
+            <span title="Caso crítico de ouvidoria"
+              className="rounded bg-black px-1.5 py-0.5 text-[10px] font-semibold uppercase
+                         tracking-wide text-white ring-1 ring-graf-400">
+              OUVIDORIA
+            </span>
+          )}
           {l.tem_improdutiva && (
             <span title="Teve O.S. improdutiva" className="text-[11px] text-amber-400">▲</span>
           )}

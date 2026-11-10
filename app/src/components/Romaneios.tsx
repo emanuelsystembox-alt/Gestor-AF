@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 import { imprimirTermo, rotuloAceite } from '../lib/termo'
 import { useAuth } from '../lib/auth'
 
@@ -1077,7 +1077,7 @@ export function Romaneios({ podeMexer, tipo }: {
 
       {/* ---------- a lista ---------- */}
       {!aberto && (carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : lista.length === 0 ? (
         <Vazio titulo="Nenhum romaneio ainda"
           descricao={podeMexer

@@ -13,3 +13,8 @@
   Strict-Transport-Security: max-age=31536000
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+
+# D-352: a versão no ar, que o site aberto consulta para avisar que há atualização.
+# Sem cache, senão o aviso chegaria atrasado (ou nunca).
+/versao.json
+  Cache-Control: no-store

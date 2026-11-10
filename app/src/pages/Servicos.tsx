@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, EM_ABERTO, SITUACAO_INFO } from '../lib/supabase'
 import { useMudancasAoVivo } from '../lib/tempoReal'
@@ -66,6 +66,67 @@ function supervisorDo(v: V): string | null {
 
 interface Indicador { id: string; nome: string; meta: number; peso: number; ordem: number }
 type V = ContratoLinha
+
+/** Onde o navegador guarda "filtros recolhidos" (09/11). */
+const CHAVE_RECOLHIDO = 'servicos.filtros.recolhidos'
+function lerRecolhido(): boolean {
+  try { return localStorage.getItem(CHAVE_RECOLHIDO) === '1' } catch { return false }
+}
+
+/**
+ * ┌─ 09/11 · o REV D-10 pronto para o grupo do WhatsApp ───────────────┐
+ * │ > "ao selecionar revisita 10 dias, o sistema deve mostrar uma      │
+ * │ >  opção de mostrar print dos contratos: com quem está, o técnico, │
+ * │ >  código de baixa, janela — algo rápido de mandar no grupo"       │
+ * │ >  — Emanuel                                                       │
+ * │                                                                     │
+ * │ É TEXTO copiado, não imagem e não envio: nada sai daqui sozinho, a  │
+ * │ pessoa cola onde quiser. LGPD: nada do assinante — nem nome, nem    │
+ * │ iniciais, nem telefone, nem endereço. Só o que é da operação.       │
+ * │ O *negrito* é o do próprio WhatsApp.                                │
+ * └─────────────────────────────────────────────────────────────────────┘
+ */
+function textoParaWhatsApp(vs: V[], de: string, ate: string): string {
+  const periodo = de === ate ? dataBR(de) : `${dataBR(de)} a ${dataBR(ate)}`
+  // Mais de um dia na lista: cada bloco diz o seu.
+  const variosDias = new Set(vs.map(v => v.data_agendada)).size > 1
+  const codigos = (xs: ({ codigo: number; descricao: string } | null)[]) =>
+    [...new Set(xs.filter((x): x is { codigo: number; descricao: string } => !!x)
+      .map(x => `${x.codigo} · ${x.descricao}`))]
+  const blocos = vs.map(v => {
+    const toa = codigos(v.ordem_servico.map(o => o.codigo_baixa))
+    const afline = codigos(v.ordem_servico.map(o => o.baixa_afline))
+    return [
+      `*Contrato ${v.contrato ?? '—'}*`,
+      ...(variosDias ? [`Data: ${dataBR(v.data_agendada)}`] : []),
+      `Equipe: ${v.equipe ? equipeRotulo(v.equipe.codigo, v.equipe.nome) : 'sem equipe'}`,
+      `Técnico: ${v.tecnico?.nome ?? 'sem técnico'}`,
+      `Janela: ${janelaDe(v) ?? (v.janela_imediata ? 'Imediata' : 'sem janela')}`,
+      `Situação: ${infoSituacaoDeTela(situacaoDeTela(v)).label}`,
+      `Baixa TOA: ${toa.length ? toa.join(' / ') : 'sem baixa'}`,
+      ...(afline.length ? [`Baixa AFLINE: ${afline.join(' / ')}`] : []),
+    ].join('\n')
+  })
+  return [`*REV D-10 · ${periodo}* — ${vs.length} contrato${vs.length === 1 ? '' : 's'}`, ...blocos]
+    .join('\n\n')
+}
+
+/** Copia para a área de transferência. O `execCommand` é o plano B de quando
+ *  o navegador recusa a API nova (permissão, foco fora da página). */
+async function copiarTexto(texto: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(texto); return true } catch { /* tenta o plano B */ }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = texto
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'; ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch { return false }
+}
 
 /** Teto da busca em massa: o in.(…) vai na URL, e 500 contratos já são ~5 KB. */
 const MAX_MASSA = 500
@@ -204,6 +265,44 @@ export default function Servicos() {
   // só para saber por que a visita não fechou.
   const [densidade, setDensidade] = useState<'detalhada' | 'compacta'>('detalhada')
   const detalhada = densidade === 'detalhada'
+
+  // 09/11: "opção de recolher o menu de filtros da tela Serviços para ampliar
+  // um pouco mais a tela" (Emanuel). A escolha é da pessoa e fica no navegador
+  // dela — sem armazenamento (aba anônima), vale só nesta visita.
+  const [recolhido, setRecolhido] = useState(lerRecolhido)
+
+  // ┌─ o quadro ocupa o que SOBRA da janela ─────────────────────────────┐
+  // │ "quando encolher o sistema deve ganhar mais tela (...) escolher a  │
+  // │  tela serve justamente para isso" (Emanuel, 09/11). A altura era   │
+  // │ fixa (100vh − 21rem, pensada com a barra de filtros aberta), e     │
+  // │ recolher só abria um buraco embaixo. Agora: do topo do quadro até  │
+  // │ o pé da janela, menos o que vem depois dele (paginação, rodapé).   │
+  // │ Nenhuma das duas medidas depende da altura do quadro — não há laço.│
+  // └─────────────────────────────────────────────────────────────────────┘
+  const quadroRef = useRef<HTMLDivElement>(null)
+  const [alturaQuadro, setAlturaQuadro] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const medir = () => {
+      const q = quadroRef.current
+      if (!q) return
+      // O que vem depois: do pé do quadro ao pé do CONTEÚDO da página (o
+      // bloco dentro do <main>). Não o documento — o <main> estica até o pé
+      // da janela, e a medida pelo documento virava a altura do próprio quadro.
+      const r = q.getBoundingClientRect()
+      const pagina = q.closest('main')?.firstElementChild
+      const depois = pagina ? pagina.getBoundingClientRect().bottom - r.bottom : 60
+      setAlturaQuadro(Math.max(260, Math.floor(window.innerHeight - r.top - depois)))
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    const main = document.querySelector('main')
+    if (main) ro.observe(main)
+    window.addEventListener('resize', medir)
+    return () => { ro.disconnect(); window.removeEventListener('resize', medir) }
+  }, [recolhido])
+  useEffect(() => {
+    try { localStorage.setItem(CHAVE_RECOLHIDO, recolhido ? '1' : '0') } catch { /* sem armazenamento */ }
+  }, [recolhido])
 
   // Marcadores (indicadores de qualidade) — o analista aponta no contrato
   // qual foi cumprido. Catálogo vem de `indicador_qualidade` (025).
@@ -607,10 +706,47 @@ export default function Servicos() {
   })), [contagem])
 
   const abertas = semSituacao.filter(v => EM_ABERTO.includes(v.situacao)).length
-  const filtrando = [situacoes, areas, supervisores, equipes, grupos, origens, resultados,
-    culpas, tecnologias, buckets, segmentos, logs, janelas, marcadores]
-    .filter(l => l.length > 0).length
-    + [soOuvidoria, soRevD10, busca.trim() !== ''].filter(Boolean).length
+  // O nome de cada filtro ligado: a conta do "limpar N" e o resumo da barra
+  // recolhida saem da mesma lista — recolher não pode esconder que há filtro.
+  const conta = (n: number, nome: string) => (n > 1 ? `${nome} (${n})` : nome)
+  const filtrosLigados: string[] = [
+    situacoes.length
+      ? situacoes.map(s => (s === 'ABERTAS' ? 'Em aberto' : infoSituacaoDeTela(s).label)).join(' + ')
+      : null,
+    grupos.length ? conta(grupos.length, 'Grupo') : null,
+    tecnologias.length ? conta(tecnologias.length, 'Tecnologia') : null,
+    janelas.length ? conta(janelas.length, 'Janela') : null,
+    buckets.length ? conta(buckets.length, 'Bucket') : null,
+    areas.length ? conta(areas.length, 'Área') : null,
+    supervisores.length ? conta(supervisores.length, 'Supervisor') : null,
+    equipes.length ? conta(equipes.length, 'Equipe') : null,
+    resultados.length ? conta(resultados.length, 'Resultado') : null,
+    culpas.length ? conta(culpas.length, 'Responsável') : null,
+    origens.length ? conta(origens.length, 'Origem') : null,
+    logs.length ? conta(logs.length, 'LOG') : null,
+    marcadores.length ? conta(marcadores.length, 'Marcador') : null,
+    segmentos.length ? conta(segmentos.length, 'Segmento') : null,
+    soOuvidoria ? 'Ouvidoria' : null,
+    soRevD10 ? 'REV D-10' : null,
+    busca.trim() ? 'Busca' : null,
+  ].filter((x): x is string => !!x)
+  const filtrando = filtrosLigados.length
+
+  // 09/11: o REV D-10 para o WhatsApp. Lê `visiveis` (o filtro inteiro, não só a
+  // página) e confere o marcador de novo: no histórico de um contrato a lista
+  // não passa pelos filtros (D-283).
+  const revParaCopiar = useMemo(
+    () => (soRevD10 ? visiveis.filter(temRevD10) : []), [soRevD10, visiveis])
+  const [copiado, setCopiado] = useState<'ok' | 'erro' | null>(null)
+  useEffect(() => {
+    if (!copiado) return
+    const id = setTimeout(() => setCopiado(null), 2500)
+    return () => clearTimeout(id)
+  }, [copiado])
+  async function copiarParaWhatsApp() {
+    if (!revParaCopiar.length) return
+    setCopiado(await copiarTexto(textoParaWhatsApp(revParaCopiar, de, ate)) ? 'ok' : 'erro')
+  }
 
   function limpar() {
     setSituacoes([]); setAreas([]); setSupervisores([]); setEquipes([])
@@ -696,7 +832,7 @@ export default function Servicos() {
         {erro && <Alerta tipo="erro">Não consegui carregar: {erro}</Alerta>}
 
         {/* ====== filtros ====== */}
-        <section className="card-controle sobe space-y-2 p-3">
+        <section className={`card-controle sobe space-y-2 ${recolhido ? 'px-3 py-2' : 'p-3'}`}>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-72 flex-1">
               <input ref={buscaRef} value={busca} onChange={e => setBusca(e.target.value)}
@@ -714,6 +850,21 @@ export default function Servicos() {
                 </kbd>
               )}
             </div>
+            {/* Recolhido: o resumo do que está ligado — esconder a barra não pode
+                esconder que há filtro (09/11). */}
+            {recolhido && filtrando > 0 && (
+              <span title={filtrosLigados.join(' · ')}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-af-900/30 px-2 py-1
+                           text-[11px] text-af-300 ring-1 ring-af-700/40">
+                <span className="tabular font-semibold">
+                  {filtrando} filtro{filtrando === 1 ? '' : 's'}
+                </span>
+                <span className="max-w-64 truncate text-graf-200">{filtrosLigados.join(' · ')}</span>
+                <button onClick={limpar} className="underline underline-offset-2 hover:text-af-200">
+                  limpar
+                </button>
+              </span>
+            )}
             {/* 162: a lista de contratos em massa tem caixa própria. */}
             <button onClick={() => setMassaAberta(a => !a)} aria-expanded={massaAberta}
               className={`rounded-md border px-3 py-1.5 text-xs hover:border-af-600 hover:text-af-400 ${
@@ -724,6 +875,41 @@ export default function Servicos() {
               className="rounded-md border border-graf-700 px-3 py-1.5 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400 disabled:opacity-40">
               Exportar {visiveis.length} linhas
+            </button>
+            {/* 09/11: com o REV D-10 ligado, o texto pronto para o grupo. */}
+            {soRevD10 && (
+              <button onClick={copiarParaWhatsApp} disabled={revParaCopiar.length === 0}
+                aria-live="polite"
+                title="Copia contrato, equipe, técnico, janela, situação e código de baixa de cada REV D-10 — sem nome, telefone ou endereço do cliente"
+                className={`rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-40 ${
+                  copiado === 'ok' ? 'border-emerald-600 text-emerald-400'
+                  : copiado === 'erro' ? 'border-af-600 text-af-400'
+                  : 'border-graf-700 text-graf-300 hover:border-af-600 hover:text-af-400'}`}>
+                {copiado === 'ok' ? `✓ Copiado (${revParaCopiar.length})`
+                  : copiado === 'erro' ? 'Não consegui copiar'
+                  : `Copiar ${revParaCopiar.length} para o WhatsApp`}
+              </button>
+            )}
+            {/* Detalhada/Compacta subiu para cá: vale com a barra recolhida também. */}
+            <div className="flex rounded-md bg-graf-900 p-0.5">
+              {(['detalhada', 'compacta'] as const).map(d => (
+                <button key={d} onClick={() => setDensidade(d)}
+                  title={d === 'detalhada'
+                    ? 'Mostra O.S. e código de baixa na própria linha'
+                    : 'Uma linha por visita: o número da baixa, sem a frase'}
+                  className={`rounded px-2 py-1 text-[11px] font-medium transition ${
+                    densidade === d ? 'bg-af-600 text-white' : 'text-graf-400 hover:text-graf-200'}`}>
+                  {d === 'detalhada' ? 'Detalhada' : 'Compacta'}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setRecolhido(r => !r)}
+              aria-expanded={!recolhido} aria-controls="filtros-servicos"
+              title={recolhido ? 'Mostrar os filtros' : 'Recolher os filtros e ganhar espaço para a lista'}
+              className="inline-flex items-center gap-1 rounded-md border border-graf-700 px-2.5 py-1.5
+                         text-xs text-graf-300 hover:border-af-600 hover:text-af-400">
+              <span aria-hidden className={`inline-block transition-transform ${recolhido ? '' : 'rotate-180'}`}>▾</span>
+              {recolhido ? 'Filtros' : 'Recolher'}
             </button>
           </div>
 
@@ -769,63 +955,66 @@ export default function Servicos() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
+          {!recolhido && (<>
+          {/* ┌─ 09/11 · a ordem dos filtros ──────────────────────────────┐
+              │ "Só ouvidoria e Só REV D-10 deveriam ficar juntos" (Emanuel)│
+              │ — estavam separados pelo "Todo LOG". Agora em blocos: o     │
+              │ serviço · onde e quem · o resultado · as marcas do contrato │
+              │ e, por último, as caixas de marcar, juntas num quadro só.   │
+              └─────────────────────────────────────────────────────────────┘ */}
+          <div id="filtros-servicos" className="flex flex-wrap items-center gap-2">
             {/* 05/11: todo filtro de lista aceita mais de uma opção (SelecaoMultipla) */}
+            {/* o serviço */}
             <SelecaoMultipla rotulo="Grupo de serviço" todos="Todo grupo de serviço" plural="grupos"
               opcoes={op.grupos} valor={grupos} onChange={setGrupos} className={sel} />
             <SelecaoMultipla rotulo="Tecnologia" todos="Toda tecnologia" plural="tecnologias"
               opcoes={op.tecnologias} valor={tecnologias} onChange={setTecnologias} className={sel} />
+            <SelecaoMultipla rotulo="Janela" todos="Toda janela" plural="janelas"
+              opcoes={opCliente.janelas} valor={janelas} onChange={setJanelas} className={sel} />
+            {/* onde e quem */}
+            <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
+              valor={buckets} onChange={setBuckets} className={sel} />
             <SelecaoMultipla rotulo="Área" todos="Toda área" plural="áreas"
               opcoes={op.areas} valor={areas} onChange={setAreas} className={sel} />
             <SelecaoMultipla rotulo="Supervisor" todos="Todo supervisor" plural="supervisores"
               opcoes={op.supers} valor={supervisores} onChange={setSupervisores} className={sel} />
             <SelecaoMultipla rotulo="Equipe" todos="Toda equipe" plural="equipes"
               opcoes={op.equipes} valor={equipes} onChange={setEquipes} className={sel} />
-            <SelecaoMultipla rotulo="Janela" todos="Toda janela" plural="janelas"
-              opcoes={opCliente.janelas} valor={janelas} onChange={setJanelas} className={sel} />
-            <SelecaoMultipla rotulo="Marcador" todos="Todo marcador" plural="marcadores"
-              opcoes={opCliente.marcadores} valor={marcadores} onChange={setMarcadores} className={sel} />
+            {/* o resultado */}
             <SelecaoMultipla rotulo="Resultado" todos="Qualquer resultado" plural="resultados"
               opcoes={OPCOES_RESULTADO} valor={resultados}
               onChange={v => setResultados(v as FiltroContrato['resultados'])} className={sel} />
             <SelecaoMultipla rotulo="Responsável pela improdutiva" todos="Qualquer responsável"
               plural="responsáveis" opcoes={OPCOES_CULPA} valor={culpas} onChange={setCulpas}
               className={sel} />
-            <SeletorBuckets opcoes={opBuckets.buckets} semBucket={opBuckets.semBucket}
-              valor={buckets} onChange={setBuckets} className={sel} />
-            <SelecaoMultipla rotulo="Segmentação do cliente" todos="Todo segmento" plural="segmentos"
-              opcoes={opCliente.segmentos} valor={segmentos} onChange={setSegmentos} className={sel} />
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
-              <input type="checkbox" checked={soOuvidoria} className="accent-af-600"
-                onChange={e => setSoOuvidoria(e.target.checked)} />
-              Só ouvidoria <span className="tabular text-graf-400">({opCliente.ouvidorias})</span>
-            </label>
-            {/* D-290: o LOG do TOA (retornos na agenda) e o REV D-10; 05/11: até "7 ou mais" */}
-            <SelecaoMultipla rotulo="LOG do TOA" todos="Todo LOG" plural="LOGs"
-              opcoes={opCliente.logs} valor={logs} onChange={setLogs} className={sel} />
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
-              <input type="checkbox" checked={soRevD10} className="accent-af-600"
-                onChange={e => setSoRevD10(e.target.checked)} />
-              Só REV D-10 <span className="tabular text-graf-400">({opCliente.revD10})</span>
-            </label>
             <SelecaoMultipla rotulo="Origem" todos="Toda origem" plural="origens"
               opcoes={OPCOES_ORIGEM} valor={origens} onChange={setOrigens} className={sel} />
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
-              <input type="checkbox" checked={soProdutivas}
-                onChange={e => setSoProdutivas(e.target.checked)} className="accent-af-600" />
-              Ocultar jornada
-            </label>
-            <div className="flex rounded-md bg-graf-900 p-0.5">
-              {(['detalhada', 'compacta'] as const).map(d => (
-                <button key={d} onClick={() => setDensidade(d)}
-                  title={d === 'detalhada'
-                    ? 'Mostra O.S. e código de baixa na própria linha'
-                    : 'Uma linha por visita, só o essencial'}
-                  className={`rounded px-2 py-1 text-[11px] font-medium transition ${
-                    densidade === d ? 'bg-af-600 text-white' : 'text-graf-400 hover:text-graf-200'}`}>
-                  {d === 'detalhada' ? 'Detalhada' : 'Compacta'}
-                </button>
-              ))}
+            {/* as marcas do contrato — D-290: o LOG do TOA; 05/11: até "7 ou mais" */}
+            <SelecaoMultipla rotulo="LOG do TOA" todos="Todo LOG" plural="LOGs"
+              opcoes={opCliente.logs} valor={logs} onChange={setLogs} className={sel} />
+            <SelecaoMultipla rotulo="Marcador" todos="Todo marcador" plural="marcadores"
+              opcoes={opCliente.marcadores} valor={marcadores} onChange={setMarcadores} className={sel} />
+            <SelecaoMultipla rotulo="Segmentação do cliente" todos="Todo segmento" plural="segmentos"
+              opcoes={opCliente.segmentos} valor={segmentos} onChange={setSegmentos} className={sel} />
+            {/* as caixas de marcar, juntas */}
+            <div role="group" aria-label="Recortes rápidos"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-graf-700
+                         px-2.5 py-1.5">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                <input type="checkbox" checked={soOuvidoria} className="accent-af-600"
+                  onChange={e => setSoOuvidoria(e.target.checked)} />
+                Só ouvidoria <span className="tabular text-graf-400">({opCliente.ouvidorias})</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                <input type="checkbox" checked={soRevD10} className="accent-af-600"
+                  onChange={e => setSoRevD10(e.target.checked)} />
+                Só REV D-10 <span className="tabular text-graf-400">({opCliente.revD10})</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-graf-300">
+                <input type="checkbox" checked={soProdutivas}
+                  onChange={e => setSoProdutivas(e.target.checked)} className="accent-af-600" />
+                Ocultar jornada
+              </label>
             </div>
             {filtrando > 0 && (
               <button onClick={limpar}
@@ -877,6 +1066,7 @@ export default function Servicos() {
               })}
             </div>
           </div>
+          </>)}
         </section>
 
         {/* Quando a busca vira histórico de contrato, a tela precisa
@@ -1000,7 +1190,8 @@ export default function Servicos() {
           {/* O quadro rola por dentro e o cabecalho fica: na segunda
               tela de 265 linhas, a coluna do meio sem cabecalho e um
               numero sem nome. */}
-          <div className="quadro">
+          <div className="quadro" ref={quadroRef}
+            style={alturaQuadro ? { ['--quadro-altura' as string]: `${alturaQuadro}px` } : undefined}>
             {/* A caixa do cabeçalho marca O QUE SE VÊ — a página. Antes
                 ela marcava o filtro inteiro, e com 1.400 linhas invisíveis
                 isso é um botão de apagar em lote apontado para o escuro.

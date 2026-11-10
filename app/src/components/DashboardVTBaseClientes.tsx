@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { isoLocal } from '../lib/formato'
-import { Alerta } from './ui'
+import { Alerta, CarregandoBloco } from './ui'
 
 /**
  * Base de clientes por área (212) — o denominador do AT1 do Dashboard VT.
@@ -131,7 +131,7 @@ export function DashboardVTBaseClientes() {
       {ok && <div className="px-4 pt-3"><Alerta tipo="ok">{ok}</Alerta></div>}
 
       {carregando ? (
-        <p className="py-10 text-center text-sm text-graf-400">Carregando…</p>
+        <CarregandoBloco className="py-10" />
       ) : areas.length === 0 ? (
         <p className="py-10 text-center text-sm text-graf-400">Nenhuma área de trabalho nesta cidade.</p>
       ) : (

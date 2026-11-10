@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTema } from '../lib/tema'
 import { supabase, SITUACOES, SITUACAO_INFO, type Situacao } from '../lib/supabase'
-import { Avatar, Logo, Marca } from './ui'
+import { Avatar, BarraAtividade, Logo, Marca } from './ui'
 import { Icone, type NomeIcone } from './icones'
 import { useCentral, type Sinal } from '../lib/central'
 import { PainelCentral } from './PainelCentral'
 import { ChatControle } from './ChatControle'
+import { AvisoAtualizacao } from './AvisoAtualizacao'
 import { useCidades, trocarCidade } from '../lib/cidade'
 
 interface Item {
@@ -72,7 +73,9 @@ const OPERACAO: Modulo = {
     { para: '/controle/monitor', rotulo: 'Monitoramento', icone: 'monitor', busca: 'gps rastro trilha localizacao tecnico mapa proximos' },
     { para: '/controle/produtividade', rotulo: 'Meta técnica', icone: 'produtividade', busca: 'produtividade pontos comissao' },
     // 140: indicadores da operação — o primeiro é a Primeira WO.
-    { para: '/controle/indicadores', rotulo: 'Indicadores', icone: 'indicadores', busca: 'primeira wo chegada atraso indicador' },
+    // 234/235: VT pela planilha e Certidão de Atendimento — novidade (09/11).
+    { para: '/controle/indicadores', rotulo: 'Indicadores', icone: 'indicadores',
+      busca: 'primeira wo chegada atraso indicador vt equipe certidao atendimento sinal validacao', novo: true },
     { para: '/controle/relatorios', rotulo: 'Relatórios', icone: 'relatorios', permissao: 'relatorios.ver' },
     { para: '/controle/importar', rotulo: 'Importar TOA', icone: 'importar', busca: 'planilha importacao rota', permissao: 'importacao.ver' },
     // 111: o robô que importa sozinho, de 5 em 5 minutos a de hora em hora.
@@ -178,7 +181,7 @@ const COR_NOVO = 'var(--st-deslocamento)'
 function PontoNovo() {
   return (
     <span title="Função nova" className="inline-flex shrink-0 items-center">
-      <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: COR_NOVO }} />
+      <span aria-hidden className="ponto-novo h-2 w-2 rounded-full" style={{ background: COR_NOVO }} />
       <span className="sr-only">Função nova</span>
     </span>
   )
@@ -473,7 +476,7 @@ function Grupo({ modulo, recolhido, fechado, alternar, contagens, aoNavegar }: {
                   )}
                 </>}
                 {recolhido && i.novo && (
-                  <span aria-hidden className="absolute left-2 top-1 h-1.5 w-1.5 rounded-full"
+                  <span aria-hidden className="ponto-novo absolute left-2 top-1 h-1.5 w-1.5 rounded-full"
                     style={{ background: COR_NOVO }} />
                 )}
                 {recolhido && n != null && n > 0 && (
@@ -926,6 +929,8 @@ export function Shell({ children, acoes }: { children: ReactNode; acoes?: ReactN
             montar um <main> novo — e ele entra suave (só no primeiro
             desenho; recarregar dados não anima nada). */}
         <main className="pagina-entra min-w-0 flex-1">{children}</main>
+        <BarraAtividade />
+        <AvisoAtualizacao />
         <ChatControle />
       </div>
     </div>

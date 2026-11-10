@@ -80,6 +80,8 @@ interface Visita {
   rota_fixada_motivo: string | null
   tipo_atividade: { nome: string } | null
   tipo_servico: { nome: string } | null
+  /** O grupo de serviço editável no "Editar serviço". */
+  tipo_servico_id: string | null
   area: { codigo: string; apelido: string | null } | null
   equipe: { id: string; codigo: string; nome: string; supervisor_nome: string | null } | null
   tecnico: { nome: string; matricula: string } | null
@@ -100,7 +102,7 @@ const SELECT = `
   data_agendada, janela_inicio, janela_fim, situacao, inicio, fim,
   bloqueado_em, origem, rota_fixada_em, rota_fixada_motivo,
   tipo_atividade:tipo_atividade_id ( nome ),
-  tipo_servico:tipo_servico_id ( nome ),
+  tipo_servico:tipo_servico_id ( nome ), tipo_servico_id,
   area:area_id ( codigo, apelido ),
   equipe:equipe_id ( id, codigo, nome, supervisor_nome ),
   tecnico:tecnico_responsavel_id ( nome, matricula ),
@@ -132,6 +134,17 @@ function corBaixa(n: string | null | undefined) {
   if (n === 'SUCESSO') return 'bg-emerald-900/40 text-emerald-300 ring-emerald-700/40'
   if (n === 'IMPRODUTIVA') return 'bg-af-900/40 text-af-300 ring-af-700/40'
   return 'bg-graf-800 text-graf-400 ring-graf-700'
+}
+
+/** O ícone de lixeira (remover telefone, apagar evidência). SVG à mão,
+ *  na cor do texto — sem biblioteca de ícone. */
+export function Lixeira({ className = 'h-3.5 w-3.5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+    </svg>
+  )
 }
 
 function Dado({ r, v, largo }: { r: string; v: React.ReactNode; largo?: boolean }) {
@@ -196,7 +209,8 @@ export function ContratoModal({
   const [ok, setOk] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [acao, setAcao] = useState<
-    'baixar' | 'transferir' | 'excluir' | 'editar' | 'status' | 'nova_os' | null>(
+    'baixar' | 'transferir' | 'excluir' | 'editar_cliente' | 'editar_servico'
+    | 'status' | 'nova_os' | null>(
     acaoInicial && acaoInicial !== 'marcadores' ? acaoInicial : null)
 
   // Baixa — uma linha por O.S., todas de uma vez.
@@ -213,11 +227,17 @@ export function ContratoModal({
   // transferência
   const [destino, setDestino] = useState('')
   const [motivoT, setMotivoT] = useState('')
+  const [diaT, setDiaT] = useState('')
   // exclusão
   const [motivoE, setMotivoE] = useState('')
   const [confirmaE, setConfirmaE] = useState('')
   // edição do cadastro — o que o sistema atual não deixa fazer
   const [ed, setEd] = useState<Record<string, string>>({})
+  // Os telefones viraram lista: cada um se edita ou sai (lixeira).
+  const [tels, setTels] = useState<string[]>([])
+  const [novoTel, setNovoTel] = useState('')
+  // O grupo de serviço do "Editar serviço" — carregado só quando abre.
+  const [grupos, setGrupos] = useState<{ id: string; nome: string }[]>([])
   // mudar status (o antigo "Voltar")
   const [situacaoAlvo, setSituacaoAlvo] = useState<Situacao | ''>('')
   const [motivoV, setMotivoV] = useState('')
@@ -258,22 +278,55 @@ export function ContratoModal({
         (data ?? []) as { id: string; codigo: number; descricao: string }[]))
   }, [acao, tiposOS.length])
 
-  /** Abre a edição já preenchida com o que está gravado. */
-  function abrirEdicao() {
+  /*
+   * ┌─ editar cliente ≠ editar serviço ─────────────────────────────────┐
+   * │ > "O sistema deve diferenciar entre editar serviço e editar       │
+   * │ >  endereço/cliente" — Emanuel, 09/11                             │
+   * │                                                                     │
+   * │ Era um formulário só, com cliente, endereço e agendamento juntos.  │
+   * │ Agora são dois blocos, na MESMA RPC (`atualizar_visita_manual`),   │
+   * │ e cada um manda só as chaves dele: a RPC só toca o que veio, então │
+   * │ salvar o endereço não regrava a janela, e vice-versa.             │
+   * └─────────────────────────────────────────────────────────────────────┘
+   */
+  function abrirEdicao(qual: 'editar_cliente' | 'editar_servico') {
     if (!v) return
-    setEd({
-      contrato: v.contrato ?? '', wo_numero: v.wo_numero ?? '',
-      cliente_nome: v.cliente_nome ?? '', tipo_pessoa: v.tipo_pessoa ?? '',
-      tipo_residencia: v.tipo_residencia ?? '',
-      telefones: (v.telefones ?? []).join(', '),
-      logradouro: v.logradouro ?? '', complemento: v.complemento ?? '',
-      bairro: v.bairro ?? '', cidade: v.cidade ?? '', uf: v.uf ?? '',
-      cep: v.cep ?? '', node: v.node ?? '',
-      data_agendada: v.data_agendada,
-      janela_inicio: hhmm(v.janela_inicio) ?? '', janela_fim: hhmm(v.janela_fim) ?? '',
-    })
-    setAcao(acao === 'editar' ? null : 'editar')
+    if (qual === 'editar_cliente') {
+      setEd({
+        cliente_nome: v.cliente_nome ?? '', tipo_pessoa: v.tipo_pessoa ?? '',
+        tipo_residencia: v.tipo_residencia ?? '',
+        logradouro: v.logradouro ?? '', complemento: v.complemento ?? '',
+        bairro: v.bairro ?? '', cidade: v.cidade ?? '', uf: v.uf ?? '',
+        cep: v.cep ?? '', node: v.node ?? '',
+      })
+      setTels([...(v.telefones ?? [])]); setNovoTel('')
+    } else {
+      setEd({
+        contrato: v.contrato ?? '', wo_numero: v.wo_numero ?? '',
+        tipo_servico_id: v.tipo_servico_id ?? '',
+        data_agendada: v.data_agendada,
+        janela_inicio: hhmm(v.janela_inicio) ?? '', janela_fim: hhmm(v.janela_fim) ?? '',
+      })
+    }
+    setAcao(acao === qual ? null : qual)
   }
+
+  /** Os telefones como vão para o banco: sem espaço sobrando, sem linha vazia. */
+  const telsLimpos = () => {
+    const extra = novoTel.trim()
+    return [...tels, ...(extra ? [extra] : [])].map(t => t.trim()).filter(Boolean)
+  }
+  /** Só manda `telefones` se a lista mudou — a RPC REESCREVE quando a chave vem. */
+  const telsMudaram = () => {
+    const a = telsLimpos(), b = v?.telefones ?? []
+    return a.length !== b.length || a.some((t, i) => t !== b[i])
+  }
+
+  useEffect(() => {
+    if (acao !== 'editar_servico' || grupos.length) return
+    supabase.from('tipo_servico').select('id, nome').eq('ativo', true).order('nome')
+      .then(({ data }) => setGrupos((data ?? []) as { id: string; nome: string }[]))
+  }, [acao, grupos.length])
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar() }
@@ -373,10 +426,17 @@ export function ContratoModal({
                 ★ {pts(pontos.pontos_claro)}
               </span>
             )}
-            <button onClick={abrirEdicao} disabled={!v}
+            <button onClick={() => abrirEdicao('editar_cliente')} disabled={!v}
+              aria-pressed={acao === 'editar_cliente'}
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
                          hover:border-af-600 hover:text-af-400 disabled:opacity-40">
-              Editar
+              Editar cliente/endereço
+            </button>
+            <button onClick={() => abrirEdicao('editar_servico')} disabled={!v}
+              aria-pressed={acao === 'editar_servico'}
+              className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
+                         hover:border-af-600 hover:text-af-400 disabled:opacity-40">
+              Editar serviço
             </button>
             <button onClick={() => setAcao(acao === 'nova_os' ? null : 'nova_os')}
               className="rounded-md border border-graf-700 px-2.5 py-1 text-xs text-graf-300
@@ -727,11 +787,18 @@ export function ContratoModal({
                 </span>
               </p>
               <div className="flex flex-wrap items-end gap-2">
+                {/* 236 (D-345): "transferir um contrato de um dia para outro"
+                    (Emanuel, 09/11). Troca a equipe, o dia, ou os dois. */}
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Dia</span>
+                  <input type="date" value={diaT || v.data_agendada}
+                    onChange={e => setDiaT(e.target.value)} className={`${campo} w-40`} />
+                </label>
                 <label className="text-[11px] text-graf-400">
                   <span className="mb-1 block">Equipe destino</span>
                   <select value={destino} onChange={e => setDestino(e.target.value)}
                     className={`${campo} w-56`}>
-                    <option value="">— escolha —</option>
+                    <option value="">— a mesma —</option>
                     {equipes.filter(e => e.codigo !== v.equipe?.codigo).map(e => (
                       <option key={e.id} value={e.id}>{equipeRotulo(e.codigo, e.nome)}</option>
                     ))}
@@ -742,10 +809,17 @@ export function ContratoModal({
                   <input value={motivoT} onChange={e => setMotivoT(e.target.value)}
                     placeholder="Por que está transferindo?" className={`${campo} w-full`} />
                 </label>
-                <button disabled={ocupado || !destino}
-                  onClick={() => comAviso(() => supabase.rpc('transferir_visita', {
-                    p_visita: id, p_equipe: destino, p_motivo: motivoT || null,
-                  }), 'Contrato transferido.')}
+                <button disabled={ocupado || (!destino && (!diaT || diaT === v.data_agendada))}
+                  onClick={() => {
+                    const outroDia = !!diaT && diaT !== v.data_agendada
+                    comAviso(() => supabase.rpc('transferir_visita', {
+                      p_visita: id, p_equipe: destino || null, p_motivo: motivoT || null,
+                      ...(outroDia ? { p_data: diaT } : {}),
+                    }), outroDia
+                      ? `Contrato levado para ${new Date(diaT + 'T12:00').toLocaleDateString('pt-BR')}.`
+                      : 'Contrato transferido.')
+                    setDiaT('')
+                  }}
                   className="rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
                              hover:bg-af-500 disabled:opacity-50">
                   Transferir
@@ -754,20 +828,19 @@ export function ContratoModal({
             </div>
           )}
 
-          {acao === 'editar' && v && (
+          {acao === 'editar_cliente' && v && (
             <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
               <p className="mb-2 text-xs font-medium">
-                Editar cadastro
+                Editar cliente/endereço
                 <span className="ml-2 font-normal text-graf-500">
-                  cliente, endereço e agendamento — a diferença fica no histórico.
+                  a diferença fica no histórico.
                   {v.origem === 'TOA' && ' A próxima importação do TOA pode sobrescrever'
                     + ' estes campos enquanto o contrato não estiver bloqueado (D-006).'}
                 </span>
               </p>
               <div className="grid gap-2 sm:grid-cols-4">
                 {([
-                  ['contrato', 'Contrato'], ['wo_numero', 'WO'],
-                  ['cliente_nome', 'Nome do cliente'], ['telefones', 'Telefones (vírgula)'],
+                  ['cliente_nome', 'Nome do cliente'],
                   ['logradouro', 'Endereço'], ['complemento', 'Complemento'],
                   ['bairro', 'Bairro'], ['cep', 'CEP'],
                   ['cidade', 'Cidade'], ['uf', 'UF'], ['node', 'Node'],
@@ -801,6 +874,74 @@ export function ContratoModal({
                     <option value="OUTRO">Outro</option>
                   </select>
                 </label>
+
+                {/* Telefones em lista: cada um se corrige na própria linha ou
+                    sai pela lixeira. São os do TOA (`visita.telefones`); o
+                    melhor contato do técnico mora em `contato_cliente`. */}
+                <div className="sm:col-span-4">
+                  <span className="mb-1 block text-[11px] text-graf-400">Telefones</span>
+                  {tels.length === 0 && (
+                    <p className="mb-1 text-[11px] text-graf-400">nenhum telefone</p>
+                  )}
+                  <ul className="space-y-1">
+                    {tels.map((t, i) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <input value={t} aria-label={`Telefone ${i + 1}`}
+                          onChange={e => setTels(tels.map((x, j) => j === i ? e.target.value : x))}
+                          className={`${campo} tabular w-52`} />
+                        <button type="button" onClick={() => setTels(tels.filter((_, j) => j !== i))}
+                          title="Remover este telefone" aria-label={`Remover o telefone ${t}`}
+                          className="rounded-md border border-graf-700 p-1.5 text-graf-400
+                                     hover:border-af-600 hover:text-af-400">
+                          <Lixeira />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <input value={novoTel} onChange={e => setNovoTel(e.target.value)}
+                      aria-label="Novo telefone" placeholder="novo telefone"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && novoTel.trim()) {
+                          setTels([...tels, novoTel.trim()]); setNovoTel('')
+                        }
+                      }}
+                      className={`${campo} tabular w-52`} />
+                    <button type="button" disabled={!novoTel.trim()}
+                      onClick={() => { setTels([...tels, novoTel.trim()]); setNovoTel('') }}
+                      className="rounded-md border border-graf-700 px-2.5 py-1.5 text-xs text-graf-300
+                                 hover:border-af-600 hover:text-af-400 disabled:opacity-40">
+                      + Adicionar
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button disabled={ocupado}
+                onClick={() => comAviso(() => supabase.rpc('atualizar_visita_manual', {
+                  p_visita: id,
+                  p_dados: {
+                    ...ed,
+                    ...(telsMudaram() ? { telefones: telsLimpos() } : {}),
+                  },
+                }).then(r => { if (!r.error) setNovoTel(''); return r }), 'Cliente e endereço atualizados.')}
+                className="mt-3 rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
+                           hover:bg-af-500 disabled:opacity-50">
+                Salvar cliente/endereço
+              </button>
+            </div>
+          )}
+
+          {acao === 'editar_servico' && v && (
+            <div className="rounded-lg border border-graf-700 bg-graf-900 p-3">
+              <p className="mb-2 text-xs font-medium">
+                Editar serviço
+                <span className="ml-2 font-normal text-graf-500">
+                  a diferença fica no histórico.
+                  {v.origem === 'TOA' && ' A próxima importação do TOA pode sobrescrever'
+                    + ' estes campos enquanto o contrato não estiver bloqueado (D-006).'}
+                </span>
+              </p>
+              <div className="grid gap-2 sm:grid-cols-4">
                 <label className="text-[11px] text-graf-400">
                   <span className="mb-1 block">Data agendada</span>
                   <input type="date" value={ed.data_agendada ?? ''} className={`${campo} w-full`}
@@ -816,20 +957,35 @@ export function ContratoModal({
                   <input type="time" value={ed.janela_fim ?? ''} className={`${campo} w-full`}
                     onChange={e => setEd({ ...ed, janela_fim: e.target.value })} />
                 </label>
+                <label className="text-[11px] text-graf-400">
+                  <span className="mb-1 block">Grupo de serviço</span>
+                  <select value={ed.tipo_servico_id ?? ''} className={`${campo} w-full`}
+                    onChange={e => setEd({ ...ed, tipo_servico_id: e.target.value })}>
+                    {/* Sem grupo hoje: a opção vazia não APAGA nada (a RPC
+                        mantém o que está gravado quando vem vazio). */}
+                    {!v.tipo_servico_id && <option value="">—</option>}
+                    {/* O grupo gravado continua na lista mesmo se foi desligado. */}
+                    {v.tipo_servico_id && !grupos.some(g => g.id === v.tipo_servico_id) && (
+                      <option value={v.tipo_servico_id}>{v.tipo_servico?.nome ?? 'atual'}</option>
+                    )}
+                    {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                  </select>
+                </label>
+                {([['contrato', 'Contrato'], ['wo_numero', 'WO']] as const).map(([k, rot]) => (
+                  <label key={k} className="text-[11px] text-graf-400">
+                    <span className="mb-1 block">{rot}</span>
+                    <input value={ed[k] ?? ''} className={`${campo} w-full`}
+                      onChange={e => setEd({ ...ed, [k]: e.target.value })} />
+                  </label>
+                ))}
               </div>
               <button disabled={ocupado}
                 onClick={() => comAviso(() => supabase.rpc('atualizar_visita_manual', {
-                  p_visita: id,
-                  p_dados: {
-                    ...ed,
-                    telefones: ed.telefones
-                      ? ed.telefones.split(',').map(t => t.trim()).filter(Boolean)
-                      : undefined,
-                  },
-                }), 'Cadastro atualizado.')}
+                  p_visita: id, p_dados: ed,
+                }), 'Serviço atualizado.')}
                 className="mt-3 rounded-md bg-af-600 px-4 py-1.5 text-xs font-medium text-white
                            hover:bg-af-500 disabled:opacity-50">
-                Salvar cadastro
+                Salvar serviço
               </button>
             </div>
           )}

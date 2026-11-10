@@ -431,6 +431,34 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 09/11/2026 — indicadores, transferência por dia e o lote de 18 pedidos (233–238, 240; D-343 a D-352)
+
+Feito e publicado: ver HANDOFF.md (09/11). Baterias 33/33 e 29/29 depois de 234, 236, 237 e 238.
+
+### Verificação que ninguém fez ainda
+- Importar planilha de verdade pela tela nova (vários arquivos), apagar uma evidência de verdade, salvar
+  "Editar serviço"/"Editar cliente", copiar o REV D-10 para o WhatsApp, marcar escala do VT pela tela.
+- Tema escuro das telas novas (Certidão, VT, Pós-atendimento, Serviços recolhido).
+- O aviso de versão nova aparecendo para quem está com o site aberto (só a partir da próxima publicação).
+- VT por equipe de São Luís contra planilha (só Manaus foi comparado, 72/72).
+
+### Depende do Emanuel
+- **Certidão:** a nota é o % padrão (validado com ou sem falha) ou só o sem falha? "Erro na Coleta" é
+  falha? Tem meta?
+- **Pós-atendimento:** "Refazer cabeamento" conta como Problema? Cancelado pela central entra na Cobertura
+  do Painel? O filtro Ouvidoria junta planilha + marcador — certo? Desatribuído (800) continua fora?
+- **REV D-10 para o WhatsApp:** texto basta, ou imagem (biblioteca nova)? Trazer o técnico do serviço
+  anterior (`revisita_dos_contratos`)?
+- **Contrato:** telefone removido pode voltar pela importação (é do TOA) — ok? Giro da foto só no navegador
+  ou para todos (coluna nova)? Grupo de serviço editado à mão pode voltar pelo gatilho da O.S. — precisa
+  trava? Dia por "Editar serviço" e por "Transferir" — deixar os dois? Melhor contato do técnico: a central
+  pode remover? Se sim, vira "respondeu NÃO" ou "não perguntado"?
+- **Importação:** o corte de janelas (≥ 20 em 90 dias) serve? Dois arquivos do mesmo bucket: só avisar ou
+  impedir? Arquivo de outra cidade: importar na cidade do bucket (como a extensão) em vez de recusar?
+- **Equipes:** grupos de supervisor/área em ordem alfabética? Seletor "Equipe" em ordem numérica? Volta o
+  atalho "ver todas as equipes cadastradas" na tela vazia?
+- **TOA trazendo o contrato movido de dia** no dia novo: hoje atualiza normalmente (é o TOA afirmando).
+
 ## Pendente em 08/11/2026 — o bloqueio da Claro e a extensão 0.10 (232, D-342)
 
 Feito: extensão 0.10.2 (portal 9 s/pedido, 30 por rodada, pausa no bloqueio; abas Configuração e

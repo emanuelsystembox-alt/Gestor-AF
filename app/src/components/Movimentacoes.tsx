@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { isoLocal } from '../lib/formato'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 
 /**
  * Movimentações e pesquisa — o "Movimentações", o "Pesquisar Serial" e a
@@ -188,7 +188,7 @@ export function Movimentacoes() {
       </div>
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : lista.length === 0 ? (
         <Vazio titulo="Nenhuma movimentação no período" />
       ) : (

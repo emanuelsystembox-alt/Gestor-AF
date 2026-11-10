@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCentral } from '../lib/central'
 import { useAuth } from '../lib/auth'
+import { CarregandoBloco } from './ui'
 
 /**
  * A conversa com o técnico, EMBUTIDA na tela do contrato (133).
@@ -107,7 +108,7 @@ export function ConversaTecnico({ tecnicoId, nome, altura = 'h-80' }: {
       <div className={`${altura} min-h-0 space-y-1.5 overflow-y-auto rounded-lg border
                        border-graf-800 bg-graf-900/40 p-3`}>
         {carregando ? (
-          <p className="py-8 text-center text-sm text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-8" />
         ) : msgs.length === 0 ? (
           <p className="py-8 text-center text-sm text-graf-400">
             Nenhuma mensagem com {nome?.split(' ')[0] ?? 'este técnico'} ainda.

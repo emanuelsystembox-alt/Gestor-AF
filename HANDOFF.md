@@ -1,5 +1,23 @@
 # Passagem de bastão — leia isto primeiro
 
+> **09/11/2026 — indicadores, transferência por dia e a manutenção em lote do site** (D-343 a D-352;
+> migrations 233 a 238 e 240; site publicado e conferido no ar):
+> - **Indicadores:** Primeira WO voltou (35 s → 0,3 s, 233); **VT por equipe** refeito pela planilha da
+>   operação — 1ª O.S. de atividade finalizada no TOA ÷ 35, por login, só buckets de VT, do mês — e bate
+>   72/72 com a planilha (234); escala F/FE/FALTA/ATES. clicável. **Certidão de Atendimento** nova (235):
+>   % padrão = validados ÷ finalizados no portal da Claro. Período nasce no dia 1º do mês.
+> - **Transferir para outro dia** (236) e a importação do dia novo **não mexe** no contrato movido à mão
+>   (`visita.dia_movido_em`, 237 — provado numa transação desfeita contra a importação real).
+> - **Lote de 18 pedidos** feito por 5 agentes, cada um com arquivos próprios: pós-atendimento com o
+>   cancelado pela central, filtros e "Refazer cabeamento" (238); Serviços com nova ordem de colunas,
+>   compacta com o código, filtros recolhíveis (a tabela cresce de verdade) e "Copiar REV D-10 para o
+>   WhatsApp"; Equipes em ordem crescente; importação de vários arquivos; janelas reais na Nova O.S.
+>   (240); página do contrato com anexos girar/apagar, editar cliente × serviço, telefones em lista.
+> - **Leveza (D-347):** fio de atividade no topo em toda tela (`lib/atividade.ts`), `CarregandoBloco`
+>   único, cartões em fade. **Aviso de versão nova** (D-352): `versao.json` publicado pelo build, mensagem
+>   com Ctrl + Shift + R e Ignorar — só vale a partir da próxima publicação.
+> - **Perguntas em aberto** em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente em 09/11/2026".
+
 > **08/11/2026 — a Claro bloqueou a leitura do portal, e a extensão passou a pedir no ritmo de uma
 > pessoa** (D-342; migration 232; extensão 0.10.2 copiada para a VPS; site publicado):
 > - **O que aconteceu:** o FortiWeb da Claro bloqueou o IP do túnel ("Web Page Blocked", *Attack ID

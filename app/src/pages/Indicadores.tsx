@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Shell } from '../components/Shell'
-import { Alerta, Avatar } from '../components/ui'
+import { Alerta, Avatar, CarregandoBloco } from '../components/ui'
 import { isoLocal } from '../lib/formato'
 import { SeletorBuckets } from '../components/SeletorBuckets'
 import { VtPorEquipe } from '../components/VtPorEquipe'
+import { Certidao } from '../components/Certidao'
 import { LinkContrato } from '../components/LinkContrato'
 
 /**
@@ -86,9 +87,9 @@ function mediaHoras(horas: string[]): string {
 
 export default function Indicadores() {
   const hoje = isoLocal(new Date())
-  const [de, setDe] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 14); return isoLocal(d)
-  })
+  // "inicio do mês até a data atual, não pode começar do mês passado"
+  // (Emanuel, 09/11). Eram os últimos 14 dias.
+  const [de, setDe] = useState(() => hoje.slice(0, 8) + '01')
   const [ate, setAte] = useState(hoje)
   const [meta, setMeta] = useState('08:20')
   const [metaTarde, setMetaTarde] = useState('11:20')
@@ -107,7 +108,7 @@ export default function Indicadores() {
   const [equipesDisp, setEquipesDisp] = useState<string[]>([])
   const [bucketsDisp, setBucketsDisp] = useState<{ nome: string; qtd: number }[]>([])
   const [verGrade, setVerGrade] = useState(false)
-  const [indicador, setIndicador] = useState<'WO' | 'VT'>('WO')
+  const [indicador, setIndicador] = useState<'WO' | 'VT' | 'CERT'>('WO')
   const [grade, setGrade] = useState<NaGrade[]>([])
   const [carregandoGrade, setCarregandoGrade] = useState(false)
 
@@ -231,16 +232,28 @@ export default function Indicadores() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-semibold">Indicadores</h1>
-            <p className="mt-0.5 text-sm text-graf-400">
-              <strong className="text-graf-200">Primeira WO</strong> — que horas o técnico
-              chega no primeiro cliente do dia. Meta: até{' '}
-              <strong className="text-graf-200">{hhmm(meta)}</strong> de manhã e{' '}
-              <strong className="text-graf-200">{hhmm(metaTarde)}</strong> à tarde.
-            </p>
+            {indicador === 'VT' ? (
+              <p className="mt-0.5 text-sm text-graf-400">
+                <strong className="text-graf-200">VT por equipe</strong> — VT por login e dia,
+                pelos pontos da 1ª O.S. ÷ 35.
+              </p>
+            ) : indicador === 'CERT' ? (
+              <p className="mt-0.5 text-sm text-graf-400">
+                <strong className="text-graf-200">Certidão de Atendimento</strong> — a validação
+                do sinal no portal da Claro, sobre as O.S. finalizadas.
+              </p>
+            ) : (
+              <p className="mt-0.5 text-sm text-graf-400">
+                <strong className="text-graf-200">Primeira WO</strong> — que horas o técnico
+                chega no primeiro cliente do dia. Meta: até{' '}
+                <strong className="text-graf-200">{hhmm(meta)}</strong> de manhã e{' '}
+                <strong className="text-graf-200">{hhmm(metaTarde)}</strong> à tarde.
+              </p>
+            )}
             {/* 145: a classificação é derivada do dado, não cadastrada —
                 e quem lê precisa saber disso para não procurar onde
                 mudar. Só aparece quando existe alguém da tarde. */}
-            {nTarde > 0 ? (
+            {indicador !== 'WO' ? null : nTarde > 0 ? (
               <p className="mt-0.5 text-[11px] text-graf-400">
                 <strong className="text-graf-300">{nTarde}</strong> de {lista.length} no turno
                 da tarde — 3 dias ou mais, nos 30 anteriores, com a primeira janela
@@ -253,6 +266,9 @@ export default function Indicadores() {
               </p>
             )}
           </div>
+          {/* 234: o VT é do MÊS, só dos buckets de VT — tem o seletor
+              próprio, e estes filtros não valem para ele. */}
+          {indicador !== 'VT' && <>
           <label className="text-[11px] text-graf-400">
             De
             <input type="date" value={de} max={ate} onChange={e => setDe(e.target.value)}
@@ -271,13 +287,14 @@ export default function Indicadores() {
           </select>
           <SeletorBuckets opcoes={bucketsDisp} semBucket={0} valor={buckets} onChange={setBuckets}
             className="rounded-md border border-graf-700 bg-graf-900 px-2.5 py-1.5 text-xs" />
+          </>}
         </div>
 
         {/* A aba existia com um indicador só para o segundo não virar tela
             nova -- e o segundo chegou: VT por equipe (156f), "ao lado da
             primeira WO" (Emanuel, 30/10). Os filtros de cima valem para os dois. */}
         <div className="flex gap-1 border-b border-graf-800">
-          {([['WO', 'Primeira WO'], ['VT', 'VT por equipe']] as const).map(([k, r]) => (
+          {([['WO', 'Primeira WO'], ['VT', 'VT por equipe'], ['CERT', 'Certidão de Atendimento']] as const).map(([k, r]) => (
             <button key={k} onClick={() => setIndicador(k)} aria-pressed={indicador === k}
               className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${indicador === k
                 ? 'border-af-500 font-medium text-graf-100'
@@ -287,12 +304,14 @@ export default function Indicadores() {
           ))}
         </div>
 
-        {erro && <Alerta tipo="erro">{erro}</Alerta>}
+        {indicador === 'WO' && erro && <Alerta tipo="erro">{erro}</Alerta>}
 
         {indicador === 'VT' ? (
-          <VtPorEquipe de={de} ate={ate} equipe={equipe === 'TODAS' ? null : equipe} buckets={buckets} />
+          <VtPorEquipe />
+        ) : indicador === 'CERT' ? (
+          <Certidao de={de} ate={ate} equipe={equipe === 'TODAS' ? null : equipe} buckets={buckets} />
         ) : carregando ? (
-          <p className="py-12 text-center text-graf-400">Carregando…</p>
+          <CarregandoBloco className="py-12" />
         ) : dias.length === 0 ? (
           <Alerta tipo="info">
             Nenhuma primeira WO no período. Só entram contratos <strong>reais</strong>

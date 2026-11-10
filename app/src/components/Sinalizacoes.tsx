@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCentral } from '../lib/central'
-import { Alerta } from './ui'
+import { Alerta, CarregandoBloco } from './ui'
 
 /**
  * Sinalizações do campo (091) — o técnico diz, pelo aplicativo, que uma
@@ -117,7 +117,7 @@ export function Sinalizacoes({ podeMexer, assunto = 'FERRAMENTAL' }: {
       {ok && <div className="p-3"><Alerta tipo="ok">{ok}</Alerta></div>}
 
       {linhas == null ? (
-        <p className="px-4 py-8 text-center text-sm text-graf-400">Carregando…</p>
+        <CarregandoBloco className="px-4 py-8" />
       ) : linhas.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-graf-400">
           {filtro === 'ABERTA' ? 'Nenhuma sinalização aguardando resposta.' : 'Nenhuma sinalização ainda.'}

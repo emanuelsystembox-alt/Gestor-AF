@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Alerta } from './ui'
+import { Alerta, CarregandoBloco } from './ui'
 
 /**
  * As metas por skill, na Administração (092).
@@ -69,7 +69,7 @@ export function MetasPorSkill({ podeEditar }: { podeEditar: boolean }) {
       {ok && <div className="p-3"><Alerta tipo="ok">{ok}</Alerta></div>}
 
       {linhas == null ? (
-        <p className="px-4 py-8 text-center text-sm text-graf-400">Carregando…</p>
+        <CarregandoBloco className="px-4 py-8" />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

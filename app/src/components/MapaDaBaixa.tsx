@@ -7,6 +7,7 @@ import {
 } from '../lib/mapaGoogle'
 import { metrosEntre, textoDistancia, type LocalBaixa } from '../lib/localBaixa'
 import { idadeMin, type Aproximacao } from '../lib/aproximacao'
+import { CarregandoBloco } from './ui'
 
 /**
  * O mapa da baixa, numa janela (D-295).
@@ -300,7 +301,7 @@ export function MapaDaBaixa({ alvo, onFechar }: { alvo: AlvoMapa; onFechar: () =
         </div>
 
         {erro && <p className="px-5 py-4 text-sm text-af-400">Não consegui carregar: {erro}</p>}
-        {!dados && !erro && <p className="px-5 py-6 text-sm text-graf-400">Carregando…</p>}
+        {!dados && !erro && <CarregandoBloco className="px-5 py-6" />}
 
         {dados && (
           <div className="grid gap-0 lg:grid-cols-[1fr_20rem]">

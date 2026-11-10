@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { isoLocal, reais } from '../../lib/formato'
-import { Alerta, Vazio } from '../ui'
+import { Alerta, Vazio, CarregandoBloco } from '../ui'
 import {
   CAMPO, COMBUSTIVEL, EXCECAO, SITUACAO_ABASTECIMENTO, km, nomeVeiculo, num,
   traduzirErroFrota, type SituacaoAbastecimento, type TecnicoOpcao, type VeiculoPainel,
@@ -268,7 +268,7 @@ export function Abastecimentos({ veiculos, tecnicos, podeMexer }: {
       )}
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : linhas.length === 0 ? (
         <Vazio titulo="Nenhum abastecimento no período" />
       ) : (

@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Shell } from '../components/Shell'
-import { Alerta, Vazio } from '../components/ui'
+import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 import { Abastecimentos } from '../components/frota/Abastecimentos'
 import { Consumo } from '../components/frota/Consumo'
 import { Manutencoes } from '../components/frota/Manutencoes'
@@ -380,7 +380,7 @@ export default function Frota() {
 
           {/* ---- a lista ---- */}
           {carregando ? (
-            <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+            <CarregandoBloco className="py-12" />
           ) : lista.length === 0 ? (
             <Vazio titulo={veiculos.length === 0 ? 'Nenhum veículo cadastrado' : 'Nada com esse filtro'}
               descricao={veiculos.length === 0

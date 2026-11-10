@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { imprimirTermo } from '../lib/termo'
 import { isoLocal } from '../lib/formato'
-import { Alerta, Vazio } from './ui'
+import { Alerta, Vazio, CarregandoBloco } from './ui'
 
 /**
  * Cargas por técnico — o "Equipes / Alocações" do concorrente (089-F, D-165).
@@ -155,7 +155,7 @@ export function Cargas() {
       </div>
 
       {carregando ? (
-        <p className="py-12 text-center text-graf-400" role="status">Carregando…</p>
+        <CarregandoBloco className="py-12" />
       ) : lista.length === 0 ? (
         <Vazio titulo="Ninguém com carga"
           descricao="Quando o almoxarifado entregar peças ou material e o técnico confirmar, ele aparece aqui." />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { CarregandoBloco } from './ui'
 
 /**
  * O equipamento e a miscelânea que o TOA mostra para o contrato, lidos pela
@@ -72,7 +73,7 @@ export function EquipamentoToa({ itens, varridoEm, tipo }: {
       {/* Sem leitura do TOA: a frase de "ainda não lido" saiu a pedido do Emanuel
           (02/11). O sinal de "não sei" ficou na aba, que fica SEM número (não "0"). */}
       {!varridoEm ? null : itens === null ? (
-        <p className="mt-1 text-sm text-graf-400">Carregando…</p>
+        <CarregandoBloco className="mt-1" />
       ) : (
         <>
           {/* A linha "Lido do TOA em … não mexe no estoque" saiu a pedido do Emanuel (02/11). */}

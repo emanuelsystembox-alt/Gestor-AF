@@ -26,8 +26,19 @@ const VERSAO = {
   em: new Date().toISOString(),
 }
 
+// D-352: o build publica `versao.json` com o MESMO carimbo de `__VERSAO__`. O
+// site aberto compara os dois e, quando o do ar é outro, avisa para atualizar
+// (`AvisoAtualizacao`). O `_headers` serve esse arquivo sem cache.
+const versaoNoAr = {
+  name: 'versao-no-ar',
+  apply: 'build' as const,
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'versao.json', source: JSON.stringify({ em: VERSAO.em, numero: VERSAO.numero }) })
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), versaoNoAr],
   define: { __VERSAO__: JSON.stringify(VERSAO) },
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   // A porta continua sendo a 5173 no dia a dia -- e a que esta na

@@ -297,6 +297,27 @@ body {
 }
 .gaveta-entra { animation: gaveta-entra 240ms cubic-bezier(.32,.72,0,1) backwards; }
 
+/* ---------- Leveza padronizada (D-347) ----------
+   > "transições e efeitos de carregamento mais suaves e visuais para o
+   >  usuário sentir leveza (...) padronize tudo" — Emanuel, 09/11
+
+   · O cartão (`card-controle`) entra em fade quando monta: o dado que
+     chegou aparece, em vez de surgir. Só OPACIDADE — transform aqui faria
+     do cartão o referencial de todo `fixed` de dentro (D-169, 162).
+   · Tudo que se clica muda de cor em 150 ms (hover, foco, aba ativa).
+     `:where` tem peso zero: a classe da tela que já define `transition`
+     continua mandando.
+   · A linha de tabela acende o hover sem pulo.
+   Quem pede menos movimento ao sistema fica sem nada disso (regra global
+   no fim do arquivo). */
+.card-controle { animation: aparece 220ms ease-out backwards; }
+:where(button, a, input, select, textarea, [role="menuitem"]) {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+:where(tbody tr) { transition: background-color 120ms ease-out; }
+
 /* ---------- Etiqueta de situação ---------- */
 .pill {
   display: inline-flex; align-items: center; gap: 0.375rem;
@@ -410,6 +431,19 @@ body {
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-cor) 0%, transparent); }
 }
 .pill-vivo::before { animation: ping-ponto 2s ease-out infinite; }
+
+/* A bolinha de "função nova" no menu pisca SUAVE — "uma bolinha piscando
+   suave informando que ha atualização no menu" (Emanuel, 09/11). Só a
+   opacidade: mexer no tamanho empurraria o rótulo. Quem pediu ao sistema
+   menos movimento vê a bolinha parada. */
+@keyframes pisca-suave {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.ponto-novo { animation: pisca-suave 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ponto-novo { animation: none; }
+}
 
 /* ---------- Etiqueta que também é filtro ----------
    O filtro de situação pintava a etiqueta ativa de VERMELHO da marca —
