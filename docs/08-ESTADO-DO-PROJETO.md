@@ -431,6 +431,24 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 10/11/2026 (tarde) — Revisita 30 D, supervisor e pós-ativo (250–253; D-363 a D-367)
+
+Feito e publicado: ver HANDOFF.md (10/11, tarde). Nenhuma mudança de RLS, papel ou permissão.
+
+### Verificação que ninguém fez ainda
+- **Usuário sem `qualidade.ver`** em Serviços e no Dashboard VT: o selo do pós-ativo deve sumir (o RLS devolve
+  vazio, sem erro) — não testado com esse login.
+- **Custo dos dois embeds novos** (`pesquisa_qualidade`, `qualidade_aguardando`) na lista de Serviços — não medido.
+- Tema claro e celular do card Revisita 30 D, das colunas novas e do selo "Pós".
+
+### Depende do Emanuel
+- **Meta da Revisita 30 D**: o card não tem cor de meta porque nenhuma foi combinada.
+- **Mesmo dia**: a VT anterior criada antes no MESMO dia conta como revisita (o "até 30 dias" da oficial) — manter?
+- **Cobertura do sinal**: a leitura do portal começou em 06/11; até lá a anterior aparece "sem leitura do portal"
+  (98 de 127 no mês).
+- **Pós-ativo nas anteriores**: só 3 das 127 VT anteriores do mês tinham registro — o selo só vai dizer algo se a
+  Qualidade passar a ligar também nas VT.
+
 ## Pendente em 10/11/2026 — Dashboard VT e VT por equipe (241–249; D-353 a D-362)
 
 Feito e publicado: ver HANDOFF.md (10/11). Baterias 33/33 e 29/29 depois de 241, 245, 247, 248 e 249.

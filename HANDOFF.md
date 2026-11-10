@@ -1,5 +1,20 @@
 # Passagem de bastão — leia isto primeiro
 
+> **10/11/2026 (tarde) — Revisita 30 D, filtro de supervisor e o pós-ativo à vista** (D-363 a D-367;
+> migrations 250 a 253; site publicado e conferido no ar; nada de RLS/papel mexido — sem baterias):
+> - **Card Revisita 30 D** no Dashboard VT, ao lado do LOG: VT que voltou de VT do mesmo contrato em até 30
+>   dias ÷ VT na conta. A VT anterior Auditar ou cancelada pela central é **pulada** (vale a de antes); qualquer
+>   outra situação conta — *"Tudo menos Cancelada pela Central e Auditar"*. É uma TERCEIRA régua,
+>   `revisita_30d_vt()` — a oficial (`revisita_dos_contratos`, anterior concluída) não mudou (250).
+> - A lista do card mostra de qual VT voltou, há quantos dias, como fechou, a **validação de sinal** dela no
+>   Portal Técnico (rótulo e cor da CLARO; "sem leitura do portal" ≠ "não fez", 252), o **pós-ativo** dela com o
+>   que foi informado (253), quem fez e com quem está agora. Filtros por situação e por validação da anterior.
+> - **Filtro de supervisor** no Dashboard VT (D-134; 58 das 129 VT de 10/11 em "Sem supervisor" — cadastro que
+>   falta) e **código de baixa** na lista do LOG (250, 251).
+> - **Serviços:** selo discreto "Pós · <desfecho>" debaixo da janela, só quando o pós-ativo registrou algo; o
+>   clique abre a **Qualidade** no contrato (`?dia=&visita=&contrato=`). Componente único `SeloPosAtivo` (253).
+> - **Perguntas em aberto** em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente em 10/11/2026 (tarde)".
+
 > **10/11/2026 — Dashboard VT remodelado e o VT por equipe com ETN, agregado e projeção** (D-353 a D-362;
 > migrations 241 a 249; site publicado e conferido no ar; baterias 33/33 e 29/29):
 > - **Janela do LOG** (Dashboard): "Anterior aqui" só 30 dias; revisita NESSA tela vale em qualquer situação
