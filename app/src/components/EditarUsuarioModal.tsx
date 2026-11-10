@@ -418,6 +418,17 @@ export function EditarUsuarioModal({
     // de hoje em diante mudam para quem recebe o login.
     const login = f.login_toa.trim()
     const loginAntes = (usuario.tecnico?.matricula ?? '').trim()
+    // mesmo login: só operação e equipe do técnico
+    const atualizarTecnico = async () => {
+      const { error: ec } = await supabase.rpc('cadastrar_tecnico_avulso', {
+        p_matricula: login,
+        p_nome: f.nome.trim(),
+        p_equipe_id: f.equipe_id || null,
+        p_base_id: f.base_id || null,
+      })
+      if (ec) recados.push(`o técnico não foi atualizado: ${traduzir(ec.message)}`)
+      else recados.push('técnico atualizado')
+    }
     if (login.toUpperCase() !== loginAntes.toUpperCase()) {
       const { data, error: el } = await supabase.rpc('definir_login_toa_do_usuario', {
         p_usuario: usuario.id, p_login: login,
@@ -434,17 +445,13 @@ export function EditarUsuarioModal({
             + (r.aposentado ? '; o histórico dos dias anteriores ficou com quem tinha o login' : '')
             + (r.em_campo ? '; em campo, roteando para a equipe própria' : ''))
         }
+        // 254 (D-368): "igual" = a tela achou que o login mudou, mas o banco já tinha
+        // esse login neste acesso (a lista veio sem o técnico). Antes, a equipe
+        // escolhida se perdia calada aqui; agora segue o caminho do mesmo login.
+        else if (r.acao === 'igual') await atualizarTecnico()
       }
     } else if (login) {
-      // mesmo login: só operação e equipe do técnico
-      const { error: ec } = await supabase.rpc('cadastrar_tecnico_avulso', {
-        p_matricula: login,
-        p_nome: f.nome.trim(),
-        p_equipe_id: f.equipe_id || null,
-        p_base_id: f.base_id || null,
-      })
-      if (ec) recados.push(`o técnico não foi atualizado: ${traduzir(ec.message)}`)
-      else recados.push('técnico atualizado')
+      await atualizarTecnico()
     }
     if (login && f.skill) {
       const { error: es } = await supabase.rpc('definir_skill_tecnico',

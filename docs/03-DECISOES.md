@@ -13627,3 +13627,27 @@ saber da equipe atual com quem tá, e preciso saber na anterior se teve pós ati
 - As duas tabelas têm RLS por `qualidade.ver`: quem não tem a permissão não vê o selo (o embed vem vazio, sem erro).
   No mês, só 3 das 127 VT anteriores tinham pós-ativo registrado.
 
+### D-368 · A gestão lê o técnico sem equipe; o "mesmo login" grava a equipe (254 — 10/11/2026)
+
+*"não está gravando essa configuração dessa pessoa. não sei o que eu fiz de errado, mas ele é técnico e não criou
+o chaveamento de contratos na linha dele"* (Emanuel, 10/11 — LUIZ HENRIQUE, login Z705384).
+
+**O defeito, medido** (log da API, 21:51:13 e 21:51:46 UTC): a tela chamou `definir_login_toa_do_usuario`, o banco
+respondeu `{"acao": "igual"}` e a tela não chamou `cadastrar_tecnico_avulso` — a equipe 007 escolhida se perdeu
+calada. Por que "trocar login": `tecnico_leitura` só mostrava técnico com `equipe_id in equipes_legiveis()`; técnico
+SEM equipe só era visível para ele mesmo — nem o ADMIN o lia. O Editar abriu com o Login TOA vazio (o ponteiro
+`perfil.tecnico_id` estava lá, o embed veio nulo — a armadilha da D-232), a pessoa digitou o login e a tela achou
+que era troca. Sem equipe, a chave de roteamento não aparece e os contratos caíram em SEM-LOGIN (32 de 05/11 a
+10/11). Um ciclo: sem equipe → invisível → a equipe não grava. Eram 4 técnicos ativos assim.
+
+- **Banco (254):** quem vê a cidade inteira (`ve_cidade_inteira()`, a mesma régua de `equipes_legiveis()`) lê também
+  o técnico sem equipe da cidade. Só a policy de SELECT; a escrita não muda.
+- **Bateria:** `testar_policies` com 2 cenários novos (35): o controlador vê o técnico sem equipe da cidade; o
+  técnico não vê o de outro. O cenário do controlador FALHOU com a policy antiga (0 em vez de 1) antes do conserto.
+  35/35 e `testar_campo` 29/29 depois. A ACL de `testar_policies` continua só do dono.
+- **Tela:** resposta "igual" segue o caminho do mesmo login (`cadastrar_tecnico_avulso`) — a equipe não se perde
+  mais mesmo que a lista venha sem o técnico.
+- **Dado:** o cadastro do LUIZ foi salvo pela tela consertada (equipe 007 Manaus) e a chave de roteamento ligada
+  (vigente de 10/11; 4 contratos de hoje foram para a 007; os dias anteriores ficam em SEM-LOGIN — o passado tem
+  dono, D-301). Os 2 de hoje que ficaram são jornada (Na Base, Refeição).
+

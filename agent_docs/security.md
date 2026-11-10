@@ -28,8 +28,8 @@ custo por linha não compensava.
 ## As duas baterias — rode antes de commitar
 
 ```sql
-select * from testar_policies();   -- 26 cenários
-select * from testar_campo();      -- 27 cenários
+select * from testar_policies();   -- 35 cenários
+select * from testar_campo();      -- 29 cenários
 ```
 
 **As duas têm de passar inteiras.** A primeira prova o RLS; a segunda

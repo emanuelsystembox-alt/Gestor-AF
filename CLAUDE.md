@@ -72,7 +72,7 @@ npx wrangler pages deploy dist --project-name=gestor-af --branch=main --commit-d
 Depois de qualquer mudança em RLS, papel ou permissão:
 
 ```sql
-select * from testar_policies();   -- 33 cenários, todos têm que passar
+select * from testar_policies();   -- 35 cenários, todos têm que passar
 select * from testar_campo();      -- 29 cenários das travas do campo (e do antifraude)
 ```
 
@@ -97,8 +97,8 @@ campo/                APLICATIVO do técnico (Expo) — projeto Node separado
   src/telas/          Entrar · Agenda · Painel · Conversa · GeoRota · ConversaColega
                       Material · Abastecer · Visita · Captura · Romaneios · Transferir · Mural
   app.config.js       acrescenta a chave do Google Maps (Android) vinda do ambiente (D-210)
-docs/                 mapeamento, domínio, 367 decisões, mapa do concorrente
-supabase/migrations/  schema, em ordem (até a 253; 239 não existe)
+docs/                 mapeamento, domínio, 368 decisões, mapa do concorrente
+supabase/migrations/  schema, em ordem (até a 254; 239 não existe)
 supabase/dados/       dados de referência sem LGPD (catálogo de miscelânea)
 agent_docs/           o contexto profundo — ver abaixo
 ```
@@ -135,7 +135,7 @@ tarefa pedir.
 | `HANDOFF.md` | **comece por aqui** — passagem de bastão |
 | `docs/13-CONEXOES-E-CHAVES.md` | **MCPs, logins e chaves**: onde cada um mora e `conferir-conexoes.ps1` |
 | `docs/08-ESTADO-DO-PROJETO.md` | inventário: números, migrations, pendências |
-| `docs/03-DECISOES.md` | as 367 decisões, com o porquê de cada uma |
+| `docs/03-DECISOES.md` | as 368 decisões, com o porquê de cada uma |
 | `docs/10-APP-DO-TECNICO.md` | o aplicativo, e o concorrente tela a tela |
 | `docs/11-EXTENSAO-TOA.md` | a extensão do TOA: protocolo, regras e como acrescentar ação |
 | `docs/09-PUBLICAR.md` | o site no ar e como republicar |

@@ -475,6 +475,13 @@ sem login, fora da aba Usuários e fora do aplicativo do campo. É a mesma famí
 armadilha "trabalho de fundo dentro de uma tela para quando a pessoa sai dela". Ver
 D-233.
 
+**Policy que filtra por EQUIPE esconde quem ainda não tem equipe — e trava o cadastro em ciclo.**
+`tecnico_leitura` exigia `equipe_id in equipes_legiveis()`: técnico sem equipe era invisível até para o ADMIN. O
+Editar cadastro abria com o login vazio, a tela tomava o login digitado como "troca", o banco respondia "igual" e a
+equipe nunca gravava — logo o técnico seguia sem equipe, invisível (10/11, LUIZ HENRIQUE; 4 técnicos ativos assim).
+Quando a condição da policy é uma coluna que o próprio cadastro preenche, pergunte quem enxerga a linha ANTES de
+ela estar preenchida. Ver D-368.
+
 **Faixa verde de sucesso confirma o que a tela TENTOU, não o que o banco GRAVOU.**
 O Editar cadastro mandava `update perfil` sem a coluna `base_id` (a cidade só ia para
 `cadastrar_tecnico_avulso`, dentro de `if (login)`). O update voltava sem erro —
