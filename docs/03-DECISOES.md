@@ -13370,3 +13370,30 @@ viram botão que abre a lista embaixo da régua. LOG: os contratos com LOG 2+ no
 cancelado pela central entra, 216), com filtro por valor. TEC1: cada O.S. que o card conta, com a classe de
 `tec1_da_os` (a mesma chamada — card e lista batem: 101 O.S., 9 no prazo, 92 em aberto em 10/11), fora do prazo
 primeiro. O LOG continua sendo julgado pelo LOG 3+ (meta 1,4%); "acima de 1" é só a lista.
+
+### D-354 · Dashboard VT remodelado: cinco cards, faixas por pergunta, situação por equipe, sub-falha e TEC1 por equipe (242 — 10/11/2026)
+
+*"o fato é que temos que remodelar o dashboard para melhor"* (Emanuel, 10/11). A tela virou quatro faixas, cada
+uma com o título da pergunta que responde: **Julgamento** (os cinco cards), **Carga do dia** (VT por janela ×
+área — *"passa a ser o primeiro gráfico"* — ao lado do AT1 por área, as duas leituras por área juntas),
+**Resultado** (situação por equipe → código de baixa ofensor → sub-falha, lado a lado e nessa ordem: *"código de
+baixa ofensor logo ao lado e subfalha ao lado também"*) e **Ofensores** (TEC1 por equipe, revisita, node).
+
+- **Média por equipe de VT vira o 5º card** (*"transforme em um card igual o que está em cima"*), clicável: abre as
+  equipes que entram na média e as que ficam de fora (estas abrem os contratos).
+- **Equipe de VT = 3 ou mais VT no dia** (era 4, 217): *"vamos considerar técnico da VT aquele que tiver mínimo 3"*.
+  A exceção da manutenção (conta com qualquer número) **continua** — não foi pedido tirar; perguntar se for o caso.
+- **Situação por equipe** no lugar de "Executadas por equipe": *"vamos usar os status que temos, CANCELADO,
+  REAGENDADO, CONCLUÍDO, ABERTO"*. É a situação do contrato (aberto = não terminal), não mais a natureza do
+  código, que o painel ao lado já mostra. Auditar e cancelado pela central já estavam fora dessa conta (`conta`,
+  216); o rodapé da régua agora diz isso com essas palavras ("100 na conta · fora da conta: 7 Auditar, 8
+  cancelado pela central"). O LOG e o AT5 continuam contando o cancelado pela central (216) — não mudou.
+- **Sub-falha ofensora**, novo: contratos por sub-falha, sobre o mesmo `codos` do código ofensor; a nota diz
+  quantos contratos com código não têm sub-falha (20 de 27 em 10/11).
+- **TEC1 por equipe**, novo: *"adicione um gráfico de TEC1 também, e na o.s perdida o colaborador conseguirá
+  visualizar qual contrato"*. As O.S. perdidas ficam **à vista no topo**, um chip por contrato (duas O.S. do
+  mesmo contrato = um chip "2 O.S."), cada um abre o contrato. Barra por equipe: no prazo, fora, expurgada, em
+  aberto, e o % (no prazo ÷ medidas). A classe vem pronta do banco (`tec1_lista`); a tela só agrupa por equipe —
+  card, gráfico e lista batem. Conferido em 05/11: 10 O.S. perdidas em 8 contratos.
+
+As chaves antigas de `equipes` (executados…) ficam na RPC: o site publicado as lia até ser republicado.

@@ -26,9 +26,16 @@ import { SelecaoMultipla, type OpcaoMultipla } from './SelecaoMultipla'
  * │ de cada número (o que sai, o que fica, o corte do LOG, a base do   │
  * │ AT1) está no cabeçalho da migration 212 — mudar lá muda aqui.      │
  * │                                                                    │
- * │ Hierarquia: primeiro o JULGAMENTO (os quatro números da CLARO),    │
- * │ depois ONDE ESTÁ (equipe, código, revisita, node, área). Um        │
- * │ ofensor clicado abre os contratos — o contrato abre por cima.      │
+ * │ 242 (D-354), "temos que remodelar o dashboard para melhor"         │
+ * │ (Emanuel, 10/11). Quatro faixas, cada uma uma pergunta:            │
+ * │  JULGAMENTO  os cinco números (TEC1, LOG, AT5, AT1, VT por equipe);│
+ * │              cada card abre a sua lista embaixo da régua           │
+ * │  CARGA       onde o dia pesa: janela × área, e o AT1 da área       │
+ * │  RESULTADO   como terminou: situação por equipe → código → sub-    │
+ * │              falha, nessa ordem, lado a lado                       │
+ * │  OFENSORES   quem: TEC1 por equipe (com as O.S. perdidas à vista), │
+ * │              revisita e node                                       │
+ * │ Um ofensor clicado abre os contratos — o contrato abre por cima.   │
  * └────────────────────────────────────────────────────────────────────┘
  */
 
@@ -52,7 +59,13 @@ interface DadosVT {
            desde: string | null; vt: number }[]
   equipes: { equipe_id: string | null; codigo: string | null; nome: string | null; tecnico?: string | null
              executados: number; nao_executados: number; em_aberto: number
-             outros: number; total: number; equipe_vt?: boolean }[]
+             outros: number; total: number; equipe_vt?: boolean
+             /** 242: pela SITUAÇÃO do contrato */
+             concluidos?: number; reagendados?: number; cancelados?: number; abertos?: number }[]
+  /** 242: contratos por sub-falha (o mesmo universo do código ofensor) */
+  sub_falhas?: { contratos_com_codigo: number; sem_sub_falha: number
+                 lista: { sub_falha: string; n: number
+                          itens: { visita_id: string; contrato: string | null; codigo: string | null }[] }[] }
   revisita: { total: number
               tecnicos: { tecnico: string; equipe: string | null; nome_do_cadastro?: boolean; n: number; itens: ItemRev[] }[] }
   nodes: { distintos: number; sem_node: number
@@ -89,7 +102,8 @@ interface ItemTec1 {
   /** nulo = em aberto: não entra no TEC1 ainda */
   classe: ClasseTec1 | null
   janela_inicio: string | null; janela_fim: string | null; fim: string | null
-  situacao: string; equipe: string | null; tecnico: string | null; baixa: string | null
+  situacao: string; equipe_id?: string | null; equipe: string | null; tecnico: string | null
+  baixa: string | null
 }
 interface InfoContrato {
   log: number | null; endereco: string | null; complemento: string | null
@@ -231,13 +245,16 @@ function Conteudo({ d }: { d: DadosVT }) {
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
   // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
-  const [ver, setVer] = useState<'LOG' | 'TEC1' | null>(null)
+  const [ver, setVer] = useState<'LOG' | 'TEC1' | 'MEDIA' | null>(null)
   const logAlto = d.log_lista ?? []
-  const alternar = (k: 'LOG' | 'TEC1') => setVer(v => v === k ? null : k)
+  const alternar = (k: 'LOG' | 'TEC1' | 'MEDIA') => setVer(v => v === k ? null : k)
+  // 242: a média por equipe de VT virou o quinto card da régua
+  const ev = d.equipes_vt
+  const media = ev && ev.equipes ? (ev.vt / ev.equipes).toFixed(1).replace('.', ',') : null
 
   return (
     <ContratosCtx.Provider value={d.contratos ?? {}}>
-      {/* ===== 1. o julgamento: os quatro números, cada um contra a meta ===== */}
+      {/* ===== 1. o julgamento: os cinco números, cada um abre a sua lista ===== */}
       <section className="card-controle sobe overflow-hidden" aria-label="Indicadores da visita técnica">
         <div className="regua">
           <Indicador rotulo="TEC1" valor={pTec1} sufixo="%"
@@ -326,13 +343,41 @@ function Conteudo({ d }: { d: DadosVT }) {
               <Link to="/controle/configuracoes?aba=clientes"
                 className="text-af-400 underline underline-offset-2">cadastrar</Link>
             </>} />
+
+          {/* 242: "Média por equipe de VT" deixa de ser painel e vira card */}
+          {ev && (
+            <Indicador rotulo="VT por equipe" valor={media}
+              dica={`Equipe de VT: ${ev.minimo} ou mais VT no dia; manutenção conta sempre.`}
+              aoClicar={() => alternar('MEDIA')} aberto={ver === 'MEDIA'} chamada="ver as equipes"
+              barra={d.volume > 0 && (
+                <BarraMeta valor={(ev.vt * 100) / d.volume} cor="var(--st-execucao)" />
+              )}
+              apoio={<>
+                <span className="tabular">{n0(ev.vt)}</span> VT em{' '}
+                <span className="tabular">{n0(ev.equipes)}</span> equipe(s) de {ev.minimo}+
+                {ev.por_manutencao > 0 && (
+                  <span className="block" title={`Equipe de manutenção com menos de ${ev.minimo} VT, que conta assim mesmo`}>
+                    <span className="tabular">{ev.por_manutencao}</span> de manutenção com menos de {ev.minimo}
+                  </span>
+                )}
+                {ev.sem_equipe > 0 && (
+                  <span className="block text-amber-300">
+                    <span className="tabular">{ev.sem_equipe}</span> VT sem equipe ficam fora
+                  </span>
+                )}
+              </>} />
+          )}
         </div>
         <p className="border-t border-graf-800 px-4 py-1.5 text-[11px] text-graf-400"
            title="Auditar e Cancelado pela central não entram nos ofensores nem no AT1; o Cancelado pela central entra no LOG e no AT5">
           <span className="tabular font-semibold text-graf-300">{n0(d.total)}</span> VT no dia ·{' '}
-          <span className="tabular">{n0(d.volume)}</span> com ida
-          {d.auditar > 0 && <> · <span className="tabular">{n0(d.auditar)}</span> Auditar</>}
-          {d.cancelado_central > 0 && <> · <span className="tabular">{n0(d.cancelado_central)}</span> Cancelado pela central</>}
+          <span className="tabular font-semibold text-graf-300">{n0(d.volume)}</span> na conta
+          {(d.auditar + d.cancelado_central) > 0 && <>
+            {' '}· fora da conta:{' '}
+            {d.auditar > 0 && <><span className="tabular">{n0(d.auditar)}</span> Auditar</>}
+            {d.auditar > 0 && d.cancelado_central > 0 && ', '}
+            {d.cancelado_central > 0 && <><span className="tabular">{n0(d.cancelado_central)}</span> cancelado pela central</>}
+          </>}
         </p>
         {ver === 'LOG' && d.log_lista && (
           <div className="px-4 pb-3">
@@ -344,94 +389,102 @@ function Conteudo({ d }: { d: DadosVT }) {
             <ListaTec1 itens={d.tec1_lista} aoFechar={() => setVer(null)} />
           </div>
         )}
+        {ver === 'MEDIA' && ev && (
+          <div className="px-4 pb-3">
+            <ListaEquipesVT e={ev} equipes={d.equipes} aoFechar={() => setVer(null)} />
+          </div>
+        )}
       </section>
 
-      {/* ===== 2. a carga: média por equipe de VT, janela × área ===== */}
-      {d.equipes_vt && d.janelas && (
-        <div className="sobe sobe-1 grid gap-3 lg:grid-cols-3">
-          <MediaPorEquipe e={d.equipes_vt} />
-          <JanelaPorArea celulas={d.janelas} className="lg:col-span-2" />
-        </div>
-      )}
-
-      {/* ===== 3. onde está: equipe e código ===== */}
-      <div className="sobe sobe-2 grid gap-3 xl:grid-cols-2">
-        <ExecutadasPorEquipe equipes={d.equipes} minimo={d.equipes_vt?.minimo} />
-        <CodigosOfensores c={d.codigos} />
+      {/* ===== 2. a carga: onde o dia pesa ===== */}
+      <Faixa titulo="Carga do dia" sub="onde estão as VT, por janela e área" />
+      <div className="sobe sobe-1 grid gap-3 lg:grid-cols-3">
+        {d.janelas && <JanelaPorArea celulas={d.janelas} className="lg:col-span-2" />}
+        <At1PorArea d={d} />
       </div>
 
-      {/* ===== 4. quem e onde: revisita, node, área ===== */}
+      {/* ===== 3. o resultado: situação → código → sub-falha, nessa ordem ===== */}
+      <Faixa titulo="Resultado" sub="como terminou, e por quê" />
+      <div className="sobe sobe-2 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        <SituacaoPorEquipe equipes={d.equipes} minimo={d.equipes_vt?.minimo} />
+        <CodigosOfensores c={d.codigos} />
+        {d.sub_falhas && <SubFalhaOfensora s={d.sub_falhas} />}
+      </div>
+
+      {/* ===== 4. os ofensores: quem ===== */}
+      <Faixa titulo="Ofensores" sub="quem perdeu o prazo, quem gerou revisita, onde a rede pesou" />
       <div className="sobe sobe-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {d.tec1_lista && <Tec1PorEquipe itens={d.tec1_lista} />}
         <RevisitaOfensor r={d.revisita} volume={d.volume} />
         <NodeOfensor n={d.nodes} volume={d.volume} />
-        <At1PorArea d={d} />
       </div>
     </ContratosCtx.Provider>
   )
 }
 
-// ================================================= média por equipe VT --
-function MediaPorEquipe({ e }: { e: NonNullable<DadosVT['equipes_vt']> }) {
+// ============================================================ faixas --
+/** O título de uma faixa do painel: a pergunta que ela responde. */
+function Faixa({ titulo, sub }: { titulo: string; sub: string }) {
+  return (
+    <div className="flex items-baseline gap-3 pt-3">
+      <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-graf-200">{titulo}</h3>
+      <span className="hidden truncate text-[11px] text-graf-400 sm:inline">{sub}</span>
+      <span aria-hidden className="h-px min-w-6 flex-1 self-center bg-graf-800" />
+    </div>
+  )
+}
+
+// ================================================== equipes de VT (card) --
+/**
+ * A lista do card "VT por equipe" (242): quem entra na média e quem fica de
+ * fora por ter menos do mínimo — esta, clicável, abre os contratos.
+ */
+function ListaEquipesVT({ e, equipes, aoFechar }: {
+  e: NonNullable<DadosVT['equipes_vt']>; equipes: DadosVT['equipes']; aoFechar: () => void
+}) {
   const [aberta, setAberta] = useState<string | null>(null)
-  const [verFora, setVerFora] = useState(false)
-  const media = e.equipes ? (e.vt / e.equipes).toFixed(1).replace('.', ',') : null
-  const sel = e.fora.find(f => f.equipe_id === aberta) ?? null
   const rot = (f: { codigo: string | null; nome: string | null }) =>
     f.codigo ? equipeRotulo(f.codigo, f.nome) : 'Sem equipe'
+  const dentro = equipes.filter(q => q.equipe_vt && q.equipe_id)
+    .sort((a, b) => b.total - a.total || rot(a).localeCompare(rot(b)))
+  const sel = e.fora.find(f => f.equipe_id === aberta) ?? null
+  const media = e.equipes ? (e.vt / e.equipes).toFixed(1).replace('.', ',') : '—'
   return (
-    <Painel titulo="Média por equipe de VT"
-      dica={`Equipe de VT: ${e.minimo} ou mais VT no dia; manutenção conta sempre.`}>
-      <div className="flex items-baseline gap-2">
-        <span className="tabular text-4xl font-bold leading-none">{media ?? '—'}</span>
-        {media && <span className="text-sm text-graf-400">VT por equipe</span>}
+    <Detalhe titulo="Equipes de VT" contagem={`${e.equipes} equipe(s) · média ${media}`} aoFechar={aoFechar}>
+      <div className="grid gap-x-6 gap-y-0.5 px-3 py-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        {dentro.map(q => (
+          <div key={q.equipe_id} className="flex min-w-0 items-baseline gap-2 border-b border-graf-800/60 py-1">
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate font-medium text-graf-200">{rot(q)}</span>
+              {!!q.tecnico && <span className="block truncate text-[10px] text-graf-400">{q.tecnico}</span>}
+            </span>
+            <span className="tabular shrink-0 font-semibold">{q.total}</span>
+          </div>
+        ))}
       </div>
-      <p className="mt-2 text-xs text-graf-300">
-        <span className="tabular font-semibold">{n0(e.vt)}</span> VT em{' '}
-        <span className="tabular font-semibold">{n0(e.equipes)}</span> equipe(s)
-        {e.por_manutencao > 0 && (
-          <span className="text-graf-400" title={`Equipe de manutenção com menos de ${e.minimo} VT, que conta assim mesmo`}>
-            {' '}· <span className="tabular">{e.por_manutencao}</span> de manutenção com menos de {e.minimo}
-          </span>
-        )}
-      </p>
-      {e.sem_equipe > 0 && (
-        <p className="mt-1 text-[11px] text-amber-300">
-          <span className="tabular">{e.sem_equipe}</span> VT sem equipe ficam fora
+      <div className="border-t border-graf-800 px-3 py-2">
+        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-graf-400">
+          Fora da média · menos de {e.minimo} VT
         </p>
-      )}
-      <div className="mt-3 border-t border-graf-800 pt-2.5">
         {e.fora.length === 0 ? (
-          <p className="text-[11px] text-graf-400">Nenhuma equipe ficou de fora por ter menos de {e.minimo}.</p>
+          <p className="text-[11px] text-graf-400">Nenhuma equipe ficou de fora.</p>
         ) : (
-          <button type="button" onClick={() => { setVerFora(v => !v); setAberta(null) }} aria-expanded={verFora}
-            className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-graf-900">
-            <span className="tabular rounded bg-graf-800 px-1.5 py-0.5 font-semibold text-graf-100">{e.fora.length}</span>
-            <span className="text-graf-300">equipe(s) fora, com menos de {e.minimo} VT</span>
-            <span aria-hidden className="ml-auto text-graf-400">{verFora ? '▴' : '▾'}</span>
-          </button>
-        )}
-        {verFora && e.fora.length > 0 && (
-          <ul className="mt-1.5 space-y-0.5">
+          <div className="flex flex-wrap gap-1.5">
             {e.fora.map(f => (
-              <li key={f.equipe_id}>
-                <button type="button" onClick={() => setAberta(a => a === f.equipe_id ? null : f.equipe_id)}
-                  aria-expanded={aberta === f.equipe_id}
-                  className={`flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-graf-900 ${
-                    aberta === f.equipe_id ? 'bg-graf-900 ring-1 ring-graf-700' : ''}`}>
-                  <span className="truncate text-graf-200">{rot(f)}</span>
-                  <span className="tabular ml-auto text-graf-400">{f.n} VT</span>
-                </button>
-              </li>
+              <button key={f.equipe_id} type="button" aria-pressed={aberta === f.equipe_id}
+                onClick={() => setAberta(a => a === f.equipe_id ? null : f.equipe_id)}
+                className={`rounded px-2 py-0.5 text-xs ${aberta === f.equipe_id
+                  ? 'bg-af-600 font-semibold text-white' : 'bg-graf-800 text-graf-200 hover:bg-graf-700'}`}>
+                {rot(f)} <span className="tabular">{f.n}</span>
+              </button>
             ))}
-          </ul>
+          </div>
         )}
       </div>
       {sel && (
-        <Detalhe titulo={rot(sel)} contagem={`${sel.n} VT`} aoFechar={() => setAberta(null)}>
-          <TabelaItens linhas={sel.itens.map(i => ({ id: i.visita_id, contrato: i.contrato, cols: [] }))} />
-        </Detalhe>
+        <TabelaItens linhas={sel.itens.map(i => ({ id: i.visita_id, contrato: i.contrato, cols: [] }))} />
       )}
-    </Painel>
+    </Detalhe>
   )
 }
 
@@ -608,61 +661,65 @@ function FaixaLog({ porLog, base }: { porLog: { log: number; n: number }[]; base
   )
 }
 
-// ============================================== executadas por equipe --
-function ExecutadasPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes']; minimo?: number }) {
+// ============================================== situação por equipe --
+/**
+ * 242 (D-354): "vamos usar os status que temos, CANCELADO, REAGENDADO,
+ * CONCLUÍDO, ABERTO" (Emanuel, 10/11). É a SITUAÇÃO do contrato — não mais a
+ * natureza do código (executada/não executada), que o painel ao lado já mostra.
+ * Auditar e cancelado pela central não estão aqui (`conta`, 216).
+ */
+function SituacaoPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes']; minimo?: number }) {
   const [todas, setTodas] = useState(false)
   const LIMITE = 12
   const max = Math.max(1, ...equipes.map(e => e.total))
   const vis = todas ? equipes : equipes.slice(0, LIMITE)
-  const tot = equipes.reduce((s, e) => ({
-    exe: s.exe + e.executados, nao: s.nao + e.nao_executados,
-    abe: s.abe + e.em_aberto, out: s.out + e.outros,
-  }), { exe: 0, nao: 0, abe: 0, out: 0 })
-  const rot = (e: DadosVT['equipes'][number]) => e.codigo ? equipeRotulo(e.codigo, e.nome) : 'Sem equipe'
-  const series: { k: 'executados' | 'nao_executados' | 'em_aberto' | 'outros'; rotulo: string; cor: string; total: number }[] = [
-    { k: 'executados', rotulo: 'Executada', cor: COR.executado, total: tot.exe },
-    { k: 'nao_executados', rotulo: 'Não executada', cor: COR.naoExecutado, total: tot.nao },
-    { k: 'em_aberto', rotulo: 'Em aberto', cor: COR.aberto, total: tot.abe },
-    { k: 'outros', rotulo: 'Cancelada/reagendada', cor: COR.outro, total: tot.out },
+  type K = 'concluidos' | 'abertos' | 'reagendados' | 'cancelados'
+  const series: { k: K; rotulo: string; cor: string }[] = [
+    { k: 'concluidos', rotulo: 'Concluído', cor: 'var(--st-concluida)' },
+    { k: 'abertos', rotulo: 'Aberto', cor: 'var(--st-execucao)' },
+    { k: 'reagendados', rotulo: 'Reagendado', cor: 'var(--st-reagendamento)' },
+    { k: 'cancelados', rotulo: 'Cancelado', cor: 'var(--st-cancelada)' },
   ]
+  const v = (e: DadosVT['equipes'][number], k: K) => e[k] ?? 0
+  const tot = Object.fromEntries(series.map(s => [s.k, equipes.reduce((t, e) => t + v(e, s.k), 0)])) as Record<K, number>
+  const total = equipes.reduce((t, e) => t + e.total, 0)
+  const rot = (e: DadosVT['equipes'][number]) => e.codigo ? equipeRotulo(e.codigo, e.nome) : 'Sem equipe'
+  const min = minimo ?? 3
 
   return (
-    <Painel titulo="Executadas por equipe"
-      dica="Executada = código de sucesso; não executada = código improdutivo."
-      extra={<span className="tabular text-xs text-graf-400">
-        {n0(tot.exe)} de {n0(tot.exe + tot.nao + tot.abe + tot.out)}</span>}
-      tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'Executadas', 'Não executadas', 'Em aberto', 'Canc./reag.', 'Total']}
-        linhas={equipes.map(e => [rot(e), e.tecnico ?? '—', e.executados, e.nao_executados, e.em_aberto, e.outros, e.total])} />}>
+    <Painel titulo="Situação por equipe"
+      dica="A situação do contrato. Auditar e cancelado pela central ficam fora da conta."
+      extra={<span className="tabular text-xs text-graf-400">{n0(tot.concluidos)} de {n0(total)} concluídos</span>}
+      tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'Concluído', 'Aberto', 'Reagendado', 'Cancelado', 'Total']}
+        linhas={equipes.map(e => [rot(e), e.tecnico ?? '—', v(e, 'concluidos'), v(e, 'abertos'),
+                                  v(e, 'reagendados'), v(e, 'cancelados'), e.total])} />}>
       {equipes.length === 0 ? (
-        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT com ida neste dia.</p>
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT na conta neste dia.</p>
       ) : (
         <>
           <ul className="space-y-1.5">
             {vis.map(e => (
               <li key={e.equipe_id ?? 'sem'} className="flex items-center gap-2.5 text-sm"
-                title={series.map(s => `${s.rotulo}: ${e[s.k]}`).join('\n')}>
-                {/* 217: a equipe que não é "de VT" (menos do mínimo, sem manutenção)
-                    aparece, mas marcada — ela não entra na média por equipe. */}
-                <span className="flex w-28 shrink-0 items-center justify-end gap-1 text-right text-xs sm:w-40">
+                title={series.map(s => `${s.rotulo}: ${v(e, s.k)}`).join('\n')}>
+                <span className="flex w-28 shrink-0 items-center justify-end gap-1 text-right text-xs sm:w-36">
                   {e.equipe_vt === false && (
                     <span className="shrink-0 rounded bg-graf-800 px-1 text-[9px] font-semibold uppercase text-graf-300"
-                      title={`Menos de ${minimo ?? 4} VT no dia: fora da média por equipe de VT`}>
-                      &lt;{minimo ?? 4}
+                      title={`Menos de ${min} VT no dia: fora da média por equipe de VT`}>
+                      &lt;{min}
                     </span>
                   )}
-                  {/* D-329: a equipe em cima e o técnico embaixo (221) */}
                   <span className="min-w-0 leading-tight" title={e.tecnico ? `${rot(e)} — ${e.tecnico}` : rot(e)}>
                     <span className="block truncate font-semibold text-graf-200">{rot(e)}</span>
                     {!!e.tecnico && <span className="block truncate text-[11px] text-graf-400">{e.tecnico}</span>}
                   </span>
                 </span>
                 <div className="flex h-5 flex-1 overflow-hidden rounded-sm bg-graf-900">
-                  {series.map(s => e[s.k] > 0 && (
-                    <div key={s.k} style={{ width: `${(e[s.k] / max) * 100}%`, background: s.cor }} />
+                  {series.map(s => v(e, s.k) > 0 && (
+                    <div key={s.k} style={{ width: `${(v(e, s.k) / max) * 100}%`, background: s.cor }} />
                   ))}
                 </div>
-                <span className="tabular w-14 shrink-0 text-right text-xs">
-                  <span className="font-semibold">{e.executados}</span>
+                <span className="tabular w-12 shrink-0 text-right text-xs">
+                  <span className="font-semibold">{v(e, 'concluidos')}</span>
                   <span className="text-graf-400">/{e.total}</span>
                 </span>
               </li>
@@ -672,7 +729,7 @@ function ExecutadasPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes'];
             {series.map(s => (
               <span key={s.k} className="flex items-center gap-1.5 text-xs text-graf-300">
                 <span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: s.cor }} />
-                {s.rotulo} <span className="tabular font-semibold">{s.total}</span>
+                {s.rotulo} <span className="tabular font-semibold">{tot[s.k]}</span>
               </span>
             ))}
             {equipes.length > LIMITE && (
@@ -1082,6 +1139,29 @@ const TEC1_ROTULO: Record<ClasseTec1 | 'ABERTO', string> = {
 const horaDe = (iso: string | null) => iso
   ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'
 
+const CAB_TEC1 = ['O.S.', 'Janela', 'Fim', 'TEC1', 'Equipe · técnico']
+/** As linhas da tabela de O.S. do TEC1 — a do card e a do gráfico por equipe. */
+const linhasTec1 = (lista: ItemTec1[]) => lista.map(i => ({
+  id: i.visita_id, contrato: i.contrato,
+  cols: [
+    <>{i.numero_os ?? '—'}
+      {i.baixa && <span className="block text-[10px] text-graf-400">{i.baixa}</span>}</>,
+    <span className="tabular whitespace-nowrap">
+      {i.janela_inicio ? `${i.janela_inicio.slice(0, 5)}–${i.janela_fim?.slice(0, 5) ?? '?'}` : 'sem janela'}
+    </span>,
+    <span className="tabular">{horaDe(i.fim)}</span>,
+    <span className="whitespace-nowrap font-medium" style={{
+      color: i.classe === 'SEM_PADRAO' ? COR.naoExecutado
+        : i.classe === 'PADRAO' ? COR.executado : undefined }}>
+      {TEC1_ROTULO[i.classe ?? 'ABERTO']}
+      {i.classe == null && (
+        <span className="block text-[10px] font-normal text-graf-400">{situacaoRotulo(i.situacao)}</span>
+      )}
+    </span>,
+    quem(i.equipe, i.tecnico),
+  ],
+}))
+
 /**
  * As O.S. que o card do TEC1 conta (241, D-353), com a classe de
  * `tec1_da_os` — a mesma chamada do card, então card e lista batem. A
@@ -1099,28 +1179,210 @@ function ListaTec1({ itens, aoFechar }: { itens: ItemTec1[]; aoFechar: () => voi
         <p className="px-3 py-4 text-xs text-graf-400">Nenhuma O.S. de VT neste dia.</p>
       ) : (<>
         <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={itens.length} />
-        <TabelaItens agruparRua={false} cabecalho={['O.S.', 'Janela', 'Fim', 'TEC1', 'Equipe · técnico']}
-          linhas={lista.map(i => ({
-            id: i.visita_id, contrato: i.contrato,
-            cols: [
-              <>{i.numero_os ?? '—'}
-                {i.baixa && <span className="block text-[10px] text-graf-400">{i.baixa}</span>}</>,
-              <span className="tabular whitespace-nowrap">
-                {i.janela_inicio ? `${i.janela_inicio.slice(0, 5)}–${i.janela_fim?.slice(0, 5) ?? '?'}` : 'sem janela'}
-              </span>,
-              <span className="tabular">{horaDe(i.fim)}</span>,
-              <span className="whitespace-nowrap font-medium" style={{
-                color: i.classe === 'SEM_PADRAO' ? COR.atencao
-                  : i.classe === 'PADRAO' ? COR.executado : undefined }}>
-                {TEC1_ROTULO[i.classe ?? 'ABERTO']}
-                {i.classe == null && (
-                  <span className="block text-[10px] font-normal text-graf-400">{situacaoRotulo(i.situacao)}</span>
-                )}
-              </span>,
-              quem(i.equipe, i.tecnico),
-            ],
-          }))} />
+        <TabelaItens agruparRua={false} cabecalho={CAB_TEC1} linhas={linhasTec1(lista)} />
       </>)}
     </Detalhe>
+  )
+}
+
+// ==================================================== 242: sub-falha --
+/**
+ * A sub-falha ofensora (242, D-354) — "código de baixa ofensor logo ao lado e
+ * subfalha ao lado também" (Emanuel, 10/11). Por contrato: cada sub-falha que
+ * alguma O.S. dele tem. O universo é o do código ofensor (`codos`).
+ */
+function SubFalhaOfensora({ s }: { s: NonNullable<DadosVT['sub_falhas']> }) {
+  const [aberto, setAberto] = useState<string | null>(null)
+  const LIMITE = 12
+  const sel = s.lista.find(x => x.sub_falha === aberto) ?? null
+  const fora = s.lista.length - Math.min(s.lista.length, LIMITE)
+  return (
+    <Painel titulo="Sub-falha ofensora"
+      dica="O porquê do código: a sub-falha lançada na baixa, por contrato."
+      extra={<span className="tabular text-xs text-graf-400">{n0(s.lista.length)} sub-falha(s)</span>}
+      tabela={<TabelaSimples colunas={['Sub-falha', 'Contratos']} linhas={s.lista.map(x => [x.sub_falha, x.n])} />}
+      nota={(fora > 0 || s.sem_sub_falha > 0) && <>
+        {fora > 0 && <>As {LIMITE} maiores; outras <span className="tabular">{fora}</span> na tabela. </>}
+        {s.sem_sub_falha > 0 && <><span className="tabular">{s.sem_sub_falha}</span> de{' '}
+          <span className="tabular">{s.contratos_com_codigo}</span> contrato(s) com código não têm sub-falha.</>}
+      </>}>
+      {s.lista.length === 0 ? (
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma sub-falha lançada neste dia.</p>
+      ) : (
+        <BarrasHorizontais rotuloLargo parte totalRef={s.contratos_com_codigo} cor="var(--st-impedimento)"
+          dados={s.lista.slice(0, LIMITE).map(x => ({ rotulo: x.sub_falha, valor: x.n }))}
+          aoClicar={r => setAberto(a => (a === r ? null : r))}
+          selecionado={aberto} />
+      )}
+      {sel && (
+        <Detalhe titulo={sel.sub_falha} contagem={`${sel.n} contrato(s)`} aoFechar={() => setAberto(null)}>
+          <TabelaItens cabecalho={['Código de baixa']}
+            linhas={sel.itens.map(i => ({
+              id: i.visita_id, contrato: i.contrato,
+              cols: [i.codigo ?? <span className="text-graf-400">sem código</span>],
+            }))} />
+        </Detalhe>
+      )}
+    </Painel>
+  )
+}
+
+// ================================================ 242: TEC1 por equipe --
+interface Tec1Equipe {
+  chave: string; equipe: string | null; tecnico: string | null
+  padrao: number; sem: number; expurgada: number; aberto: number; itens: ItemTec1[]
+}
+
+/**
+ * O TEC1 por equipe (242, D-354) — "adicione um gráfico de TEC1 também, e na
+ * o.s perdida o colaborador conseguirá visualizar qual contrato" (Emanuel, 10/11).
+ *
+ * A classe de cada O.S. vem pronta do banco (`tec1_lista`, a mesma chamada de
+ * `tec1_da_os` do card): a tela só AGRUPA a lista por equipe, então card,
+ * gráfico e lista sempre batem. As O.S. perdidas ficam à vista no topo, com o
+ * contrato — não escondidas atrás de um clique.
+ */
+function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
+  const [aberta, setAberta] = useState<string | null>(null)
+  const [todas, setTodas] = useState(false)
+  const LIMITE = 10
+  const equipes = useMemo(() => {
+    const m = new Map<string, Tec1Equipe>()
+    for (const i of itens) {
+      const k = i.equipe_id ?? i.equipe ?? 'sem'
+      const t = m.get(k) ?? { chave: k, equipe: i.equipe, tecnico: i.tecnico,
+                              padrao: 0, sem: 0, expurgada: 0, aberto: 0, itens: [] }
+      if (i.classe === 'PADRAO') t.padrao++
+      else if (i.classe === 'SEM_PADRAO') t.sem++
+      else if (i.classe === 'EXPURGADA') t.expurgada++
+      else t.aberto++
+      if (!t.tecnico && i.tecnico) t.tecnico = i.tecnico
+      t.itens.push(i)
+      m.set(k, t)
+    }
+    // quem perdeu primeiro; depois quem tem mais O.S. medidas
+    return [...m.values()].sort((a, b) => b.sem - a.sem
+      || (b.padrao + b.sem) - (a.padrao + a.sem) || b.itens.length - a.itens.length
+      || (a.equipe ?? 'zz').localeCompare(b.equipe ?? 'zz'))
+  }, [itens])
+  const perdidas = useMemo(() => itens.filter(i => i.classe === 'SEM_PADRAO'), [itens])
+  // O chip é o CONTRATO: duas O.S. perdidas no mesmo contrato são um chip com "2 O.S.".
+  const perdidosPorContrato = useMemo(() => {
+    const m = new Map<string, ItemTec1[]>()
+    for (const i of perdidas) m.set(i.visita_id, [...(m.get(i.visita_id) ?? []), i])
+    return [...m.values()]
+  }, [perdidas])
+  const max = Math.max(1, ...equipes.map(e => e.itens.length))
+  const vis = todas ? equipes : equipes.slice(0, LIMITE)
+  const sel = equipes.find(e => e.chave === aberta) ?? null
+  const rot = (e: Tec1Equipe) => e.equipe ? `Equipe ${e.equipe}` : 'Sem equipe'
+  const pctE = (e: Tec1Equipe) => pct(e.padrao, e.padrao + e.sem, 0)
+  const series = [
+    { k: 'padrao', rotulo: 'No prazo', cor: COR.executado },
+    { k: 'sem', rotulo: 'Fora do prazo', cor: COR.naoExecutado },
+    { k: 'expurgada', rotulo: 'Expurgada', cor: 'var(--color-graf-500)' },
+    { k: 'aberto', rotulo: 'Em aberto', cor: 'var(--color-graf-700)' },
+  ] as const
+  const tot = (k: typeof series[number]['k']) => equipes.reduce((t, e) => t + e[k], 0)
+
+  return (
+    <Painel titulo="TEC1 por equipe"
+      dica="Por O.S., só do que o TOA encerrou. % = no prazo ÷ (no prazo + fora do prazo)."
+      extra={<span className="tabular text-xs text-graf-400">{n0(itens.length)} O.S.</span>}
+      tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'No prazo', 'Fora do prazo', 'Expurgada', 'Em aberto', 'TEC1']}
+        linhas={equipes.map(e => [rot(e), e.tecnico ?? '—', e.padrao, e.sem, e.expurgada, e.aberto,
+                                  pctE(e) ? `${pctE(e)}%` : '—'])} />}>
+      {/* As perdidas, com o contrato, antes do gráfico. */}
+      <div className="mb-3 rounded-md border border-graf-800 px-3 py-2"
+        style={perdidas.length ? {
+          borderColor: 'color-mix(in srgb, var(--st-conflito) 45%, transparent)',
+          background: 'color-mix(in srgb, var(--st-conflito) 6%, transparent)',
+        } : undefined}>
+        {perdidas.length === 0 ? (
+          <p className="text-xs text-graf-300">
+            <span style={{ color: COR.executado }} aria-hidden>✓ </span>Nenhuma O.S. perdeu o prazo neste dia.
+          </p>
+        ) : (<>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-graf-200">
+            O.S. perdidas · <span className="tabular" style={{ color: COR.naoExecutado }}>{perdidas.length}</span>
+            {perdidosPorContrato.length !== perdidas.length && (
+              <span className="font-normal normal-case tracking-normal text-graf-400">
+                {' '}em <span className="tabular">{perdidosPorContrato.length}</span> contratos</span>
+            )}
+          </p>
+          <ul className="flex flex-wrap gap-1.5">
+            {perdidosPorContrato.map(os => {
+              const i = os[0]
+              return (
+                <li key={i.visita_id}>
+                  <LinkContrato to={`/controle/visita/${i.visita_id}`}
+                    title={`O.S. ${os.map(o => o.numero_os ?? '?').join(', ')} · ${i.equipe ? `equipe ${i.equipe}` : 'sem equipe'}${i.tecnico ? ` · ${i.tecnico}` : ''}`}
+                    className="inline-flex items-baseline gap-1.5 rounded bg-graf-900 px-2 py-0.5 text-xs ring-1 ring-graf-700 hover:ring-af-500">
+                    <span className="tabular font-semibold text-graf-100">{i.contrato ?? 'sem contrato'}</span>
+                    <span className="text-[10px] text-graf-400">
+                      {i.equipe ? `eq ${i.equipe}` : 'sem equipe'}{os.length > 1 && ` · ${os.length} O.S.`}
+                    </span>
+                  </LinkContrato>
+                </li>
+              )
+            })}
+          </ul>
+        </>)}
+      </div>
+
+      {equipes.length === 0 ? (
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma O.S. de VT neste dia.</p>
+      ) : (<>
+        <ul className="space-y-1.5">
+          {vis.map(e => {
+            const p = pctE(e)
+            return (
+              <li key={e.chave}>
+                <button type="button" onClick={() => setAberta(a => a === e.chave ? null : e.chave)}
+                  aria-pressed={aberta === e.chave}
+                  title={series.map(s => `${s.rotulo}: ${e[s.k]}`).join('\n')}
+                  className={`flex w-full items-center gap-2.5 rounded px-1 text-left text-sm hover:bg-graf-900 ${
+                    aberta === e.chave ? 'bg-graf-900 ring-1 ring-graf-700' : ''}`}>
+                  <span className="w-24 shrink-0 text-right text-xs leading-tight sm:w-32">
+                    <span className="block truncate font-semibold text-graf-200">{rot(e)}</span>
+                    {!!e.tecnico && <span className="block truncate text-[11px] text-graf-400">{e.tecnico}</span>}
+                  </span>
+                  <span className="flex h-5 flex-1 overflow-hidden rounded-sm bg-graf-900">
+                    {series.map(s => e[s.k] > 0 && (
+                      <span key={s.k} style={{ width: `${(e[s.k] / max) * 100}%`, background: s.cor }} />
+                    ))}
+                  </span>
+                  <span className="tabular w-12 shrink-0 text-right text-xs font-semibold"
+                    style={{ color: p == null ? undefined : e.sem > 0 ? COR.atencao : COR.executado }}>
+                    {p != null ? `${p}%` : <span className="font-normal text-graf-400">—</span>}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+          {series.map(s => (
+            <span key={s.k} className="flex items-center gap-1.5 text-xs text-graf-300">
+              <span aria-hidden className="h-2.5 w-2.5 rounded-sm ring-1 ring-graf-600/40" style={{ background: s.cor }} />
+              {s.rotulo} <span className="tabular font-semibold">{tot(s.k)}</span>
+            </span>
+          ))}
+          {equipes.length > LIMITE && (
+            <button type="button" onClick={() => setTodas(t => !t)} aria-expanded={todas}
+              className="ml-auto text-[11px] text-af-400 underline-offset-2 hover:underline">
+              {todas ? 'mostrar menos' : `todas as ${equipes.length} equipes`}
+            </button>
+          )}
+        </div>
+      </>)}
+
+      {sel && (
+        <Detalhe titulo={`${rot(sel)}${sel.tecnico ? ` · ${sel.tecnico}` : ''}`}
+          contagem={`${sel.itens.length} O.S.`} aoFechar={() => setAberta(null)}>
+          <TabelaItens agruparRua={false} cabecalho={CAB_TEC1} linhas={linhasTec1(sel.itens)} />
+        </Detalhe>
+      )}
+    </Painel>
   )
 }
