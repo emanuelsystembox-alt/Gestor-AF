@@ -13678,3 +13678,25 @@ por isso "10h02" lá. Na nossa tela o horário sai no fuso de quem olha: em Mana
 portal é o mesmo, então a suspeita é o `inicio`/`fim` de São Luís estar gravado 1 h adiantado (hora local de
 UTC−3 lida como Manaus na importação). Não foi verificado nem mexido — conferir com uma atividade de São Luís de
 horário conhecido antes de mudar qualquer coisa.
+
+### D-370 · Dashboard VT: a causa da revisita 30 D na faixa Carga (só tela — 11/11/2026)
+
+*"nessa mesma fileira diminui mais o grafico do VT por janela e área, eu quero mais um grafico no meio deles pra
+saber a causa da revisita, qual código mais gerou a revisita, status que gerou a revisita, e se foi pendente,
+Regular, Irregurar, sem medição (...) e qual é a idade dessas revisitas conforme o filtro, volta em quanto tempo,
+1, 2 dias 3 dias"* (Emanuel, 11/11).
+
+- **Faixa Carga em 12 colunas (xl):** VT por janela e área 5 · **Causa da revisita 30 D** 4 · Certidão 3.
+- **As três análises são da VT ANTERIOR** — a que gerou a revisita: o código de baixa (TOA; sem ele, AFLINE — o
+  mesmo da lista), a situação em que fechou e a validação de sinal do Portal Técnico (rótulo e cor da CLARO,
+  D-330; **"Sem medição" = o portal não foi lido** para ela, a leitura começou em 06/11). Uma aba por análise;
+  cada aba mostra quem lidera. Código: os 6 maiores + "Outros N códigos"; "sem código" e "sem medição" vão por
+  último (regra 6).
+- **A idade vai dia a dia, de 0 (no mesmo dia) a 30** — sem faixa inventada. O vermelho até 7 dias é o mesmo corte
+  que a lista da Revisita 30 D já usava. Ao lado: quantas em até 7 dias e a mediana.
+- **Nada é recontado na tela:** o painel agrupa a lista que `dashboard_visita_tecnica` já devolve
+  (`revisita30.lista`, `revisita_30d_vt`, D-363), então segue área, bucket, supervisor e período.
+- **A barra clicada abre a lista da Revisita 30 D** embaixo da faixa, filtrada, com os filtros de situação e
+  validação de sempre.
+- Medido em Manaus (01–11/11, 139 revisitas): a anterior sem leitura do portal é a maior fatia do sinal (98); 15
+  sem código; idade de 0 a 30, com 94 em até 7 dias.

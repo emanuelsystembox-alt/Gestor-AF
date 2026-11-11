@@ -353,6 +353,8 @@ function Conteudo({ d }: { d: DadosVT }) {
   // 252 (D-366): a anterior foi validada em vermelho no portal (o vermelho é da CLARO)
   const r30Irreg = r30 ? r30.lista.filter(i => (i.anterior_sinal?.cor ?? '').toLowerCase() === 'red').length : 0
   const [ver, setVer] = useState<Card | null>(null)
+  // D-370: a barra clicada no painel da causa da revisita abre a lista embaixo
+  const [filtroRev, setFiltroRev] = useState<FiltroRev | null>(null)
   const logAlto = d.log_lista ?? []
   const alternar = (k: Card) => setVer(v => v === k ? null : k)
   // 242: a média por equipe de VT virou o quinto card da régua
@@ -558,11 +560,20 @@ function Conteudo({ d }: { d: DadosVT }) {
 
       {/* ===== 2. a carga: onde o dia pesa ===== */}
       <Faixa titulo={variosDias ? 'Carga do período' : 'Carga do dia'}
-        sub="onde estão as VT, por janela e área · a certidão do que foi finalizado" />
-      <div className="sobe sobe-1 grid gap-3 lg:grid-cols-3">
-        {d.janelas && <JanelaPorArea celulas={d.janelas} variosDias={variosDias} className="lg:col-span-2" />}
-        {d.certidao && <CertidaoVT c={d.certidao} />}
+        sub="onde estão as VT, por janela e área · de onde veio a revisita · a certidão do que foi finalizado" />
+      {/* D-370: "diminui mais o gráfico do VT por janela e área (...) eu quero mais um
+          gráfico no meio deles pra saber a causa da revisita" (Emanuel, 11/11) */}
+      <div className="sobe sobe-1 grid gap-3 lg:grid-cols-2 xl:grid-cols-12">
+        {d.janelas && <JanelaPorArea celulas={d.janelas} variosDias={variosDias}
+          className={r30 ? 'lg:col-span-2 xl:col-span-5' : 'lg:col-span-2 xl:col-span-8'} />}
+        {r30 && <CausaRevisita30 r={r30} filtro={filtroRev} aoFiltrar={setFiltroRev}
+          className="xl:col-span-4" />}
+        {d.certidao && <CertidaoVT c={d.certidao} className={r30 ? 'xl:col-span-3' : 'xl:col-span-4'} />}
       </div>
+      {filtroRev && r30 && (
+        <ListaRevisita30 itens={r30.lista.filter(i => passaFiltroRev(filtroRev, i))}
+          titulo={`Revisita 30 D · ${filtroRev.titulo}`} aoFechar={() => setFiltroRev(null)} />
+      )}
 
       {/* ===== 3. o resultado: situação → código → sub-falha, nessa ordem ===== */}
       <Faixa titulo="Resultado" sub="como terminou, e por quê" />
@@ -1331,12 +1342,192 @@ function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => v
   )
 }
 
+// ============================================= D-370: causa da revisita --
+/**
+ * De onde veio a Revisita 30 D (D-370) — o painel do meio da faixa Carga.
+ *
+ * > "quero mais um gráfico (...) pra saber a causa da revisita, qual código
+ * >  mais gerou a revisita, status que gerou a revisita, e se foi pendente,
+ * >  Regular, Irregular, sem medição (...) e qual é a idade dessas revisitas
+ * >  conforme o filtro, volta em quanto tempo, 1, 2 dias 3 dias"
+ * >  — Emanuel, 11/11
+ *
+ * Tudo é da VT ANTERIOR — a que gerou a revisita: o código de baixa (TOA; sem
+ * ele, AFLINE — o mesmo da lista), a situação em que ela fechou e a validação
+ * de sinal do Portal Técnico (rótulo e cor da CLARO, D-330; "Sem medição" = o
+ * portal não foi lido para ela). A idade é `dias`, da anterior até a VT de
+ * agora — a mesma conta da lista e do card; nada é recontado aqui, só
+ * agrupado da lista que o banco devolveu (`revisita_30d_vt`, D-363).
+ * A idade vai dia a dia (0 a 30), sem faixa inventada; o corte de 7 dias é o
+ * mesmo vermelho/âmbar que a lista já usa.
+ */
+type DimRev = 'CODIGO' | 'SITUACAO' | 'SINAL'
+interface FiltroRev { dim: DimRev | 'IDADE'; valor: string; titulo: string }
+const DIM_REV: { k: DimRev; rotulo: string }[] = [
+  { k: 'CODIGO', rotulo: 'Código' }, { k: 'SITUACAO', rotulo: 'Situação' }, { k: 'SINAL', rotulo: 'Sinal' },
+]
+const SEM_CODIGO = 'Sem código de baixa'
+const SEM_MEDICAO = 'Sem medição'
+/** quantos códigos aparecem antes de juntar o resto em "Outros" */
+const TOPO_CODIGOS = 6
+
+function valorDim(dim: DimRev, i: ItemRev30): string {
+  if (dim === 'CODIGO') return i.anterior_baixa ?? SEM_CODIGO
+  if (dim === 'SITUACAO') return situacaoRotulo(i.anterior_situacao)
+  const k = chaveSinal(i)
+  return k === 'SEM_LEITURA' ? SEM_MEDICAO : k
+}
+const OUTROS = (n: number) => `Outros ${n} códigos`
+
+function passaFiltroRev(f: FiltroRev, i: ItemRev30): boolean {
+  if (f.dim === 'IDADE') return String(i.dias) === f.valor
+  if (f.dim === 'CODIGO' && f.valor.startsWith('\u0000')) {
+    // "Outros": os códigos fora do topo (a lista vai no próprio valor)
+    return f.valor.slice(1).split('\u0000').includes(valorDim('CODIGO', i))
+  }
+  return valorDim(f.dim, i) === f.valor
+}
+
+const haDiasCurto = (n: number) => n === 0 ? 'no mesmo dia' : n === 1 ? '1 dia depois' : `${n} dias depois`
+
+function CausaRevisita30({ r, filtro, aoFiltrar, className = '' }: {
+  r: NonNullable<DadosVT['revisita30']>
+  filtro: FiltroRev | null; aoFiltrar: (f: FiltroRev | null) => void; className?: string
+}) {
+  const [dim, setDim] = useState<DimRev>('CODIGO')
+  const itens = r.lista
+
+  // as três contagens de uma vez: o botão de cada aba mostra quem lidera
+  const contagens = useMemo(() => {
+    const por = (d: DimRev) => {
+      const m = new Map<string, { n: number; cor?: string }>()
+      for (const i of itens) {
+        const k = valorDim(d, i), x = m.get(k)
+        m.set(k, { n: (x?.n ?? 0) + 1, cor: x?.cor ?? (d === 'SINAL' ? corSinal(i.anterior_sinal?.cor) : undefined) })
+      }
+      // o "não sei" vai por último, seja qual for o tamanho (regra 6)
+      const fim = (k: string) => (k === SEM_CODIGO || k === SEM_MEDICAO ? 1 : 0)
+      return [...m.entries()].sort((a, b) => fim(a[0]) - fim(b[0]) || b[1].n - a[1].n || a[0].localeCompare(b[0]))
+    }
+    return { CODIGO: por('CODIGO'), SITUACAO: por('SITUACAO'), SINAL: por('SINAL') }
+  }, [itens])
+
+  const idade = useMemo(() => {
+    const v = Array.from({ length: 31 }, () => 0)
+    for (const i of itens) if (i.dias >= 0 && i.dias <= 30) v[i.dias]++
+    const ord = itens.map(i => i.dias).sort((a, b) => a - b)
+    const mediana = ord.length ? ord[Math.floor((ord.length - 1) / 2)] : null
+    return { v, max: Math.max(1, ...v), ate7: ord.filter(x => x <= 7).length, mediana }
+  }, [itens])
+
+  // as barras da aba escolhida; no código, o resto vira "Outros N códigos"
+  const lista = contagens[dim]
+  const semCod = dim === 'CODIGO' ? lista.filter(([k]) => k === SEM_CODIGO) : []
+  const comCod = dim === 'CODIGO' ? lista.filter(([k]) => k !== SEM_CODIGO) : lista
+  const topo = dim === 'CODIGO' ? comCod.slice(0, TOPO_CODIGOS) : comCod
+  const resto = dim === 'CODIGO' ? comCod.slice(TOPO_CODIGOS) : []
+  const barras = [
+    ...topo.map(([k, x]) => ({ rotulo: k, valor: x.n, cor: x.cor })),
+    ...(resto.length ? [{ rotulo: OUTROS(resto.length), valor: resto.reduce((s, [, x]) => s + x.n, 0), cor: undefined }] : []),
+    ...semCod.map(([k, x]) => ({ rotulo: k, valor: x.n, cor: 'var(--color-graf-600)' })),
+  ]
+  const corPadrao = dim === 'SINAL' ? 'var(--color-graf-500)' : COR.atencao
+
+  const clicar = (rot: string) => {
+    if (rot === OUTROS(resto.length) && resto.length) {
+      const valor = '\u0000' + resto.map(([k]) => k).join('\u0000')
+      return aoFiltrar(filtro?.valor === valor ? null : { dim: 'CODIGO', valor, titulo: `outros ${resto.length} códigos da anterior` })
+    }
+    const rotDim = DIM_REV.find(x => x.k === dim)!.rotulo.toLowerCase()
+    aoFiltrar(filtro?.dim === dim && filtro.valor === rot ? null
+      : { dim, valor: rot, titulo: `${rotDim} da anterior: ${rot}` })
+  }
+  const selecionado = filtro && filtro.dim === dim
+    ? (filtro.valor.startsWith('\u0000') ? OUTROS(resto.length) : filtro.valor) : null
+
+  const lider = (d: DimRev) => contagens[d].find(([k]) => k !== SEM_CODIGO && k !== SEM_MEDICAO)
+
+  return (
+    <Painel className={className} titulo="Causa da revisita 30 D"
+      dica="Como fechou a VT anterior — a que gerou a revisita — e em quantos dias voltou."
+      extra={<span className="tabular text-xs text-graf-400">{n0(r.n)} revisita(s)</span>}
+      tabela={<TabelaSimples colunas={['Análise da anterior', 'Valor', 'Revisitas']}
+        linhas={[
+          ...DIM_REV.flatMap(x => contagens[x.k].map(([k, y]) => [x.rotulo, k, y.n] as (string | number)[])),
+          ...idade.v.flatMap((n, dia) => n ? [['Volta em', haDiasCurto(dia), n]] : []),
+        ]} />}>
+      {itens.length === 0 ? (
+        <p className="py-6 text-center text-sm text-graf-400">Nenhuma VT voltou de outra VT em 30 dias no período.</p>
+      ) : (<>
+        {/* as três análises: cada aba diz quem lidera, a barra abre os contratos */}
+        <div className="mb-2.5 grid grid-cols-3 gap-1" role="tablist" aria-label="Análise da VT anterior">
+          {DIM_REV.map(x => {
+            const on = dim === x.k, l = lider(x.k)
+            return (
+              <button key={x.k} type="button" role="tab" aria-selected={on} onClick={() => setDim(x.k)}
+                className={`min-w-0 rounded-md px-2 py-1 text-left ring-1 ${on
+                  ? 'bg-graf-800 ring-af-600' : 'ring-graf-800 hover:ring-graf-600'}`}>
+                <span className={`block text-[10px] font-semibold uppercase tracking-wide ${on ? 'text-graf-100' : 'text-graf-400'}`}>
+                  {x.rotulo}</span>
+                <span className="block truncate text-[11px] text-graf-300" title={l ? `${l[0]} · ${l[1].n}` : undefined}>
+                  {l ? <>{l[0]} <span className="tabular font-semibold text-graf-100">{l[1].n}</span></> : '—'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <BarrasHorizontais dados={barras} cor={corPadrao} parte totalRef={itens.length}
+          aoClicar={clicar} selecionado={selecionado} />
+
+        {/* a idade: dia a dia, de 0 (no mesmo dia) a 30 */}
+        <div className="mt-3 border-t border-graf-800 pt-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-graf-400">Volta em quantos dias</p>
+            <p className="text-[11px] text-graf-300">
+              <span className="tabular font-semibold" style={{ color: COR.naoExecutado }}>{n0(idade.ate7)}</span>
+              {' '}em até 7 dias
+              {idade.mediana != null && <> · mediana <span className="tabular font-semibold text-graf-100">{idade.mediana}</span> d</>}
+            </p>
+          </div>
+          <div className="mt-1.5 flex h-14 items-end gap-px" role="group" aria-label="Revisitas por dias até voltar">
+            {idade.v.map((n, dia) => {
+              const on = filtro?.dim === 'IDADE' && filtro.valor === String(dia)
+              return (
+                <button key={dia} type="button" disabled={n === 0} aria-pressed={on}
+                  title={`${haDiasCurto(dia)}: ${n} revisita(s)`}
+                  onClick={() => aoFiltrar(on ? null : { dim: 'IDADE', valor: String(dia), titulo: `voltou ${haDiasCurto(dia)}` })}
+                  className={`flex h-full min-w-0 flex-1 items-end rounded-t-sm ${n ? 'hover:bg-graf-800' : 'cursor-default'} ${on ? 'bg-graf-800 ring-1 ring-graf-600' : ''}`}>
+                  <span className="block w-full rounded-t-sm"
+                    style={{ height: n ? `${Math.max(8, (n / idade.max) * 100)}%` : 2,
+                             background: n ? (dia <= 7 ? COR.naoExecutado : COR.atencao) : 'var(--color-graf-800)' }} />
+                </button>
+              )
+            })}
+          </div>
+          {/* o eixo: só os dias que a pergunta pediu (1, 2, 3), a semana e o mês */}
+          <div className="tabular relative mt-0.5 h-3 text-[10px] text-graf-400">
+            {[0, 1, 2, 3, 7, 15, 30].map(dia => (
+              <span key={dia} className="absolute -translate-x-1/2"
+                style={{ left: `${((dia + 0.5) / 31) * 100}%` }}>{dia}</span>
+            ))}
+          </div>
+          <p className="mt-0.5 text-[10px] text-graf-400">0 = no mesmo dia · clique numa barra para ver os contratos</p>
+        </div>
+      </>)}
+    </Painel>
+  )
+}
+
 /**
  * A Revisita 30 D (250, D-363): cada VT que voltou de VT, com a VT de onde ela
  * veio — quando, há quantos dias, como fechou e quem fez. Os botões filtram pela
  * situação da ANTERIOR; "mesmo técnico" separa quem voltou na própria VT.
  */
-function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: () => void }) {
+function ListaRevisita30({ itens, aoFechar, titulo = 'Revisita 30 D · VT que voltou de VT' }: {
+  itens: ItemRev30[]; aoFechar: () => void
+  /** D-370: aberta pelo painel da causa, diz qual barra foi clicada */
+  titulo?: string
+}) {
   const [so, setSo] = useState<string | null>(null)
   // 252 (D-366): o segundo filtro — a validação de sinal da anterior
   const [soSinal, setSoSinal] = useState<string | null>(null)
@@ -1364,7 +1555,7 @@ function ListaRevisita30({ itens, aoFechar }: { itens: ItemRev30[]; aoFechar: ()
     .filter(i => soSinal == null || chaveSinal(i) === soSinal)
   const haDias = (n: number) => n === 0 ? 'no mesmo dia' : n === 1 ? 'há 1 dia' : `há ${n} dias`
   return (
-    <Detalhe titulo="Revisita 30 D · VT que voltou de VT" contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
+    <Detalhe titulo={titulo} contagem={`${lista.length} contrato(s)`} aoFechar={aoFechar}>
       {itens.length === 0 ? (
         <p className="px-3 py-4 text-xs text-graf-400">Nenhuma VT voltou de outra VT em 30 dias no período.</p>
       ) : (<>
@@ -1690,7 +1881,7 @@ function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
  * os técnicos por "com falha" ou por "sem validação", e o clique abre os
  * contratos.
  */
-function CertidaoVT({ c }: { c: DadosCertidao }) {
+function CertidaoVT({ c, className = '' }: { c: DadosCertidao; className?: string }) {
   const [modo, setModo] = useState<'COM_FALHA' | 'SEM_VALIDACAO'>('COM_FALHA')
   const [aberto, setAberto] = useState<string | null>(null)
   const validados = c.regular + c.com_falha
@@ -1708,7 +1899,7 @@ function CertidaoVT({ c }: { c: DadosCertidao }) {
   ]
 
   return (
-    <Painel titulo="Certidão de atendimento"
+    <Painel className={className} titulo="Certidão de atendimento"
       dica="Validação do Portal Técnico da Claro, sobre as O.S. finalizadas no portal. Validado = com e sem falha."
       extra={<span className="tabular text-xs text-graf-400">{n0(c.finalizados)} finalizada(s)</span>}
       tabela={<TabelaSimples colunas={['Técnico', 'Equipe', 'Finalizadas', 'Sem falha', 'Com falha', 'Sem validação', '% validado']}
