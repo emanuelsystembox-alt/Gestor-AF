@@ -117,7 +117,7 @@ interface DadosCertidao {
               itens: { visita_id: string; contrato: string | null; dia: string
                        classe: 'COM_FALHA' | 'SEM_VALIDACAO'; equipe: string | null }[] }[]
 }
-interface ItemRev30 {
+export interface ItemRev30 {
   visita_id: string; contrato: string | null; dia: string; situacao: string
   equipe: string | null; tecnico: string | null
   anterior_id: string; anterior_data: string; anterior_situacao: string; dias: number
@@ -133,7 +133,7 @@ interface ItemRev30 {
 /** 252: a chave do filtro de validação — o rótulo da CLARO; sem leitura à parte. */
 const chaveSinal = (i: ItemRev30) => i.anterior_sinal?.validacao?.trim() || (i.anterior_sinal ? 'Sem rótulo' : 'SEM_LEITURA')
 /** A cor do portal (green/red/yellow) nas cores fixas do painel. */
-const corSinal = (c: string | null | undefined) => {
+export const corSinal = (c: string | null | undefined) => {
   const k = (c ?? '').toLowerCase()
   return k === 'green' ? COR.executado : k === 'red' ? COR.naoExecutado : k === 'yellow' ? COR.atencao : undefined
 }
@@ -176,7 +176,7 @@ const VariosDiasCtx = createContext(false)
 // Cores CHEIAS que têm de ser as mesmas nos dois temas vão por variável
 // fixa (`--st-*`, que o tema claro não redefine) — nunca por classe
 // 700/300, que inverte no claro (D-303).
-const COR = {
+export const COR = {
   executado: 'var(--st-concluida)',
   naoExecutado: 'var(--st-conflito)',
   aberto: 'var(--st-execucao)',
@@ -1272,7 +1272,7 @@ function TabelaItens({ cabecalho = [], linhas, agruparRua = true }: {
 }
 
 // =============================================== 241: LOG alto e TEC1 --
-const situacaoRotulo = (s: string) =>
+export const situacaoRotulo = (s: string) =>
   SITUACAO_INFO[s as keyof typeof SITUACAO_INFO]?.label ?? s
 const quem = (equipe: string | null, tecnico: string | null) => (
   <>
@@ -1362,7 +1362,7 @@ function ListaLogAlto({ itens, aoFechar }: { itens: ItemLog[]; aoFechar: () => v
  * mesmo vermelho/âmbar que a lista já usa.
  */
 type DimRev = 'CODIGO' | 'SITUACAO' | 'SINAL'
-interface FiltroRev { dim: DimRev | 'IDADE'; valor: string; titulo: string }
+export interface FiltroRev { dim: DimRev | 'IDADE'; valor: string; titulo: string }
 const DIM_REV: { k: DimRev; rotulo: string }[] = [
   { k: 'CODIGO', rotulo: 'Código' }, { k: 'SITUACAO', rotulo: 'Situação' }, { k: 'SINAL', rotulo: 'Sinal' },
 ]
@@ -1379,7 +1379,7 @@ function valorDim(dim: DimRev, i: ItemRev30): string {
 }
 const OUTROS = (n: number) => `Outros ${n} códigos`
 
-function passaFiltroRev(f: FiltroRev, i: ItemRev30): boolean {
+export function passaFiltroRev(f: FiltroRev, i: ItemRev30): boolean {
   if (f.dim === 'IDADE') return String(i.dias) === f.valor
   if (f.dim === 'CODIGO' && f.valor.startsWith('\u0000')) {
     // "Outros": os códigos fora do topo (a lista vai no próprio valor)
@@ -1390,9 +1390,13 @@ function passaFiltroRev(f: FiltroRev, i: ItemRev30): boolean {
 
 const haDiasCurto = (n: number) => n === 0 ? 'no mesmo dia' : n === 1 ? '1 dia depois' : `${n} dias depois`
 
-function CausaRevisita30({ r, filtro, aoFiltrar, className = '' }: {
-  r: NonNullable<DadosVT['revisita30']>
+export function CausaRevisita30({ r, filtro, aoFiltrar, className = '',
+  titulo = 'Causa da revisita 30 D',
+  dica = 'Como fechou a VT anterior — a que gerou a revisita — e em quantos dias voltou.' }: {
+  /** a lista da revisita (D-363); D-371 usa o mesmo painel para VT e instalação */
+  r: { n: number; lista: ItemRev30[] }
   filtro: FiltroRev | null; aoFiltrar: (f: FiltroRev | null) => void; className?: string
+  titulo?: string; dica?: string
 }) {
   const [dim, setDim] = useState<DimRev>('CODIGO')
   const itens = r.lista
@@ -1448,8 +1452,7 @@ function CausaRevisita30({ r, filtro, aoFiltrar, className = '' }: {
   const lider = (d: DimRev) => contagens[d].find(([k]) => k !== SEM_CODIGO && k !== SEM_MEDICAO)
 
   return (
-    <Painel className={className} titulo="Causa da revisita 30 D"
-      dica="Como fechou a VT anterior — a que gerou a revisita — e em quantos dias voltou."
+    <Painel className={className} titulo={titulo} dica={dica}
       extra={<span className="tabular text-xs text-graf-400">{n0(r.n)} revisita(s)</span>}
       tabela={<TabelaSimples colunas={['Análise da anterior', 'Valor', 'Revisitas']}
         linhas={[

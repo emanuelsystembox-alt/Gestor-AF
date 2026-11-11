@@ -6,6 +6,7 @@ import { isoLocal } from '../lib/formato'
 import { SeletorBuckets } from '../components/SeletorBuckets'
 import { VtPorEquipe } from '../components/VtPorEquipe'
 import { Certidao } from '../components/Certidao'
+import { RevisitaTecnica } from '../components/RevisitaTecnica'
 import { LinkContrato } from '../components/LinkContrato'
 
 /**
@@ -108,7 +109,7 @@ export default function Indicadores() {
   const [equipesDisp, setEquipesDisp] = useState<string[]>([])
   const [bucketsDisp, setBucketsDisp] = useState<{ nome: string; qtd: number }[]>([])
   const [verGrade, setVerGrade] = useState(false)
-  const [indicador, setIndicador] = useState<'WO' | 'VT' | 'CERT'>('WO')
+  const [indicador, setIndicador] = useState<'WO' | 'VT' | 'CERT' | 'REV'>('WO')
   const [grade, setGrade] = useState<NaGrade[]>([])
   const [carregandoGrade, setCarregandoGrade] = useState(false)
 
@@ -237,6 +238,11 @@ export default function Indicadores() {
                 <strong className="text-graf-200">VT por equipe</strong> — VT por login e dia,
                 pelos pontos da 1ª O.S. ÷ 35.
               </p>
+            ) : indicador === 'REV' ? (
+              <p className="mt-0.5 text-sm text-graf-400">
+                <strong className="text-graf-200">Revisita Técnica</strong> — VT da VT, e instalação ou
+                Retorno que voltou como Retorno, em até 30 dias.
+              </p>
             ) : indicador === 'CERT' ? (
               <p className="mt-0.5 text-sm text-graf-400">
                 <strong className="text-graf-200">Certidão de Atendimento</strong> — a validação
@@ -268,7 +274,8 @@ export default function Indicadores() {
           </div>
           {/* 234: o VT é do MÊS, só dos buckets de VT — tem o seletor
               próprio, e estes filtros não valem para ele. */}
-          {indicador !== 'VT' && <>
+          {/* D-371: a Revisita Técnica também tem os filtros próprios (supervisor, bucket, área) */}
+          {indicador !== 'VT' && indicador !== 'REV' && <>
           <label className="text-[11px] text-graf-400">
             De
             <input type="date" value={de} max={ate} onChange={e => setDe(e.target.value)}
@@ -294,7 +301,7 @@ export default function Indicadores() {
             nova -- e o segundo chegou: VT por equipe (156f), "ao lado da
             primeira WO" (Emanuel, 30/10). Os filtros de cima valem para os dois. */}
         <div className="flex gap-1 border-b border-graf-800">
-          {([['WO', 'Primeira WO'], ['VT', 'VT por equipe'], ['CERT', 'Certidão de Atendimento']] as const).map(([k, r]) => (
+          {([['WO', 'Primeira WO'], ['VT', 'VT por equipe'], ['CERT', 'Certidão de Atendimento'], ['REV', 'Revisita Técnica']] as const).map(([k, r]) => (
             <button key={k} onClick={() => setIndicador(k)} aria-pressed={indicador === k}
               className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${indicador === k
                 ? 'border-af-500 font-medium text-graf-100'
@@ -308,6 +315,8 @@ export default function Indicadores() {
 
         {indicador === 'VT' ? (
           <VtPorEquipe />
+        ) : indicador === 'REV' ? (
+          <RevisitaTecnica />
         ) : indicador === 'CERT' ? (
           <Certidao de={de} ate={ate} equipe={equipe === 'TODAS' ? null : equipe} buckets={buckets} />
         ) : carregando ? (

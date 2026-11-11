@@ -13700,3 +13700,45 @@ Regular, Irregurar, sem medição (...) e qual é a idade dessas revisitas confo
   validação de sempre.
 - Medido em Manaus (01–11/11, 139 revisitas): a anterior sem leitura do portal é a maior fatia do sinal (98); 15
   sem código; idade de 0 a 30, com 94 em até 7 dias.
+
+### D-371 · Indicador REVISITA TÉCNICA, a quarta aba de Indicadores (256 — 11/11/2026)
+
+*"criar um outro indicador no Menu indicadores Chamado - REVISITA TÉCNICA (...) Revisita dividido pelo total que
+caiu na agenda tirando cancelado central (...) filtro de supervisor, buckets, área (...) o volume executado pelo
+técnico no mês, e as revisitas que voltarem em 30 dias são as que vão impactar a equipe (...) A revisita para
+instalação é: Grupo de serviços instalação para retorno, e retorno de retorno, e vt é vt da vt"* (Emanuel, 11/11).
+
+**Perguntado (11/11):** a anterior — *"Instalação concluída; VT qualquer"*; o total da cidade — só VT, Retorno e
+instalação; a base do técnico — os executados dele no período.
+
+**A regra do par não é escrita de novo:** VT ← VT é `revisita_30d_vt` (D-363: a anterior em qualquer situação,
+menos Auditar e cancelado pela central, que são pulados); Retorno ← Adesão, Migração GPON, Reinstalação, Mudança de
+endereço ou Retorno CONCLUÍDO é `revisita_dos_contratos` + `par_de_revisita` (D-245, D-285). A visita nova não conta
+se for Auditar ou cancelada pela central. Até 30 dias.
+
+**Duas réguas, cada uma com a sua data** (`indicador_revisita_tecnica`, INVOKER):
+- **Cidade** (cards, causas, idade, dia): pela data da REVISITA. Revisitas do período ÷ contratos VT/Retorno/
+  instalação do período, sem Auditar e sem cancelado pela central. VT ÷ VT; instalação = Retorno revisita ÷
+  instalação + Retorno. Os filtros valem para a revisita.
+- **Técnico e supervisor:** pela data do SERVIÇO dele — executados no período e quantos voltaram em até 30 dias,
+  **contando até hoje** (o número sobe enquanto a janela está aberta; a coluna "Ainda em 30 d" diz quantos ainda
+  podem voltar). Executado: instalação/Retorno concluído; VT concluída, reagendada ou cancelada (sem Auditar e sem
+  central), como a `revisita_do_tecnico` da manutenção (D-246). Só conta revisita cuja anterior está nessa base. Os
+  filtros valem para o serviço. O supervisor é o da D-134, e o supervisor ofensor é a soma dos técnicos dele.
+- **Histórico sem técnico** (set/out, carga do ngestor: 0 visitas com técnico): vale o técnico ATIVO da equipe
+  quando ela tem um só — "a equipe é a pessoa" (220, D-328); a tela marca "(cadastro)".
+- **Certidão ao lado do técnico:** a régua da 235/244 (`classe_certidao`), sobre os contratos dele no período.
+
+**Na tela:** seis cards (cidade, VT, instalação, código ofensor, supervisor ofensor, técnico ofensor); Causas da
+revisita (o mesmo painel da D-370: código, situação e sinal da anterior, e a idade dia a dia); Revisita por dia
+(da cidade, ou do técnico clicado); Supervisor ofensor; e a tabela por técnico (executados, revisitas, nota, ainda
+em 30 d, código ofensor, certidão), que abre os contratos dele. Filtro de família: Tudo · VT · Instalação. Sem
+meta combinada: nenhum número ganha cor de meta.
+
+**Medido** (Manaus, 01–11/11, como `authenticated`): 165 revisitas de 2.313 (7,1%) — VT 140/907 (15,4%),
+instalação 25/1.406 (1,8%); técnicos: 85 serviços que voltaram de 1.886 executados — a soma por técnico bate com a
+lista. 0,3 s no banco, ~2 s pela rede. **1.378 dos 1.886 executados são de técnico sem supervisor declarado** — o
+supervisor ofensor só fica útil com o cadastro (D-134) preenchido.
+
+**Em aberto:** na instalação, o código da anterior é quase sempre 409 INSTALAÇÃO EFETUADA (23 de 25) — não diz a
+causa. Perguntar ao Emanuel se o código ofensor da instalação deve ser o do próprio Retorno.
