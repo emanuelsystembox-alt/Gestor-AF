@@ -109,6 +109,27 @@ interface DadosVT {
   log_lista?: ItemLog[]
   /** 241: cada O.S. que o card do TEC1 conta, com a classe dela. */
   tec1_lista?: ItemTec1[]
+  /** 257 (D-372): a evidência do NOSSO app, só sobre o encerrado (D-296) */
+  evidencia?: { encerradas: number; com: number; sem: number; arquivos: number; abertas: number
+                lista_sem: { visita_id: string; contrato: string | null; dia: string; situacao: string
+                             equipe: string | null; tecnico: string | null }[] }
+  /** 257 (D-372): equipes em campo × atrasadas, pela régua 09:10 … 17:20 */
+  atraso?: { marcos: { k: number; hora: string }[]; em_campo: number; equipes_distintas: number
+             julgadas: number; atrasadas: number; atrasadas_agora: number; hoje_no_periodo: boolean
+             lista: ItemAtraso[] }
+}
+interface ItemAtraso {
+  equipe_id: string; codigo: string | null; nome: string | null; dia: string; tecnico: string | null
+  /** VT na agenda do dia inteiro da equipe (sem Auditar e sem cancelado pela central) */
+  agenda: number; baixados: number
+  /** marcos que já passaram e em quantos ela estava abaixo */
+  passados: number; atrasados: number
+  /** o primeiro marco em que ficou abaixo ("HH:MM") */
+  primeiro: string | null; maior_falta: number | null
+  /** só no dia de hoje: quantos devia no último marco que passou */
+  deve_agora: number | null; atrasada_agora: boolean
+  marcos: { k: number; deve: number; baixou: number }[] | null
+  itens: { visita_id: string; contrato: string | null; dia: string; baixa: string | null }[]
 }
 interface DadosCertidao {
   finalizados: number; regular: number; com_falha: number; sem_validacao: number
@@ -166,6 +187,9 @@ const META_TEC1 = 94
 const META_LOG = 1.4
 const META_AT5 = 80
 const META_AT1 = 2.4
+/** 257: o limiar da COR do card de evidência — o mesmo do Dashboard INST (155). Não é
+ *  meta de ninguém (nenhuma foto é obrigatória, D-115): a tela não escreve "meta". */
+const LIMIAR_EVIDENCIA = 90
 const fmtMeta = (x: number) => x.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
 /** Os contratos do dia, para as listas mostrarem LOG e endereço sem repetir o dado. */
@@ -345,7 +369,12 @@ function Conteudo({ d }: { d: DadosVT }) {
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
   // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
-  type Card = 'LOG' | 'REV30' | 'TEC1' | 'MEDIA' | 'AT1'
+  type Card = 'LOG' | 'REV30' | 'TEC1' | 'MEDIA' | 'AT1' | 'EVID' | 'ATRASO'
+  // 257 (D-372): evidência (só o encerrado) e equipes atrasadas
+  const evd = d.evidencia
+  const pEvid = evd ? pct(evd.com, evd.encerradas) : null
+  const atr = d.atraso
+  const marcoAgora = atr ? marcoAtual(atr.marcos) : null
   // 250 (D-363): a Revisita 30 D — VT que voltou de VT ÷ VT da conta
   const r30 = d.revisita30
   const pRev30 = r30 ? pct(r30.n, r30.base) : null
@@ -366,7 +395,7 @@ function Conteudo({ d }: { d: DadosVT }) {
     <VariosDiasCtx.Provider value={variosDias}>
       {/* ===== 1. o julgamento: os cinco números, cada um abre a sua lista ===== */}
       <section className="card-controle sobe overflow-hidden" aria-label="Indicadores da visita técnica">
-        <div className="regua">
+        <div className="regua-grade">
           <Indicador rotulo="TEC1" valor={pTec1} sufixo="%"
             cor={medidasTec1 === 0 ? undefined : corMeta(naMeta)}
             meta={`meta ≥ ${META_TEC1}%`} atingiu={medidasTec1 === 0 ? null : naMeta}
@@ -516,6 +545,58 @@ function Conteudo({ d }: { d: DadosVT }) {
                 )}
               </>} />
           )}
+
+          {/* 257 (D-372): "o card das evidencias o mesmo que tem no dashboard da instalação,
+              vamos levar para VT so de VT" (Emanuel, 11/11). A conta é a do INST (D-296). */}
+          {evd && (
+            <Indicador rotulo="Com evidência" valor={evd.encerradas ? pEvid : null} sufixo="%"
+              cor={!evd.encerradas ? undefined : evd.com === 0 ? 'var(--color-graf-500)'
+                : (evd.com * 100) / evd.encerradas >= LIMIAR_EVIDENCIA ? COR.executado : COR.atencao}
+              dica="VT encerradas com pelo menos uma foto ou vídeo do NOSSO aplicativo ÷ VT encerradas. Em aberto fica fora: a foto ainda pode vir."
+              aoClicar={evd.sem > 0 ? () => alternar('EVID') : undefined} aberto={ver === 'EVID'}
+              chamada="ver quem não registrou"
+              barra={evd.encerradas > 0 && (
+                <BarraMeta valor={(evd.com * 100) / evd.encerradas}
+                  cor={(evd.com * 100) / evd.encerradas >= LIMIAR_EVIDENCIA ? COR.executado : COR.atencao} />
+              )}
+              apoio={evd.encerradas === 0 ? <>nenhuma VT encerrada ainda</> : <>
+                <span className="tabular">{n0(evd.com)}</span> com ·{' '}
+                <span className="tabular">{n0(evd.sem)}</span> sem ·{' '}
+                <span className="tabular">{n0(evd.arquivos)}</span> arquivo(s)
+                {evd.abertas > 0 && (
+                  <span className="block" title="VT que ainda não encerrou fica fora da porcentagem: a foto ainda pode vir">
+                    <span className="tabular">{n0(evd.abertas)}</span> em aberto fora da conta
+                  </span>
+                )}
+              </>} />
+          )}
+
+          {/* 257 (D-372): "Equipes em campo, Vs equipes atrasadas" — a régua 09:10 … 17:20 */}
+          {atr && (
+            <Indicador rotulo="Equipes atrasadas" valor={atr.julgadas ? n0(atr.atrasadas) : null}
+              sufixo={`de ${n0(atr.em_campo)}`}
+              cor={atr.atrasadas > 0 ? COR.naoExecutado : atr.julgadas ? COR.executado : undefined}
+              dica={`Equipe de VT que, em algum marco do dia, tinha menos clientes baixados do que devia: ${
+                atr.marcos.map(m => `${m.hora} ${m.k}º`).join(' · ')}. Baixa = o TOA encerrou (concluído ou não), na hora do fim. A cobrança não passa da agenda da equipe.`}
+              aoClicar={atr.em_campo > 0 ? () => alternar('ATRASO') : undefined} aberto={ver === 'ATRASO'}
+              chamada="ver as equipes"
+              barra={atr.julgadas > 0 && (
+                <BarraMeta valor={(atr.atrasadas * 100) / atr.julgadas} cor={COR.naoExecutado} />
+              )}
+              apoio={<>
+                <span className="tabular">{n0(atr.em_campo)}</span> {variosDias ? 'equipe-dia' : 'equipe(s)'} de VT em campo
+                {variosDias && <> (<span className="tabular">{n0(atr.equipes_distintas)}</span> equipes)</>}
+                {atr.hoje_no_periodo && marcoAgora && (
+                  <span className="block" title={`Abaixo do marco das ${marcoAgora.hora} (${marcoAgora.k}º cliente) com o que baixaram até agora`}>
+                    <span className="tabular font-semibold" style={{ color: atr.atrasadas_agora ? COR.naoExecutado : undefined }}>
+                      {n0(atr.atrasadas_agora)}</span> atrasada(s) agora · marco {marcoAgora.hora}
+                  </span>
+                )}
+                {atr.julgadas === 0 && (
+                  <span className="block">o primeiro marco é às {atr.marcos[0]?.hora ?? '09:10'}</span>
+                )}
+              </>} />
+          )}
         </div>
         <p className="border-t border-graf-800 px-4 py-1.5 text-[11px] text-graf-400"
            title="Auditar e Cancelado pela central não entram nos ofensores nem no AT1; o Cancelado pela central entra no LOG e no AT5">
@@ -546,6 +627,23 @@ function Conteudo({ d }: { d: DadosVT }) {
         {ver === 'MEDIA' && ev && (
           <div className="px-4 pb-3">
             <ListaEquipesVT e={ev} equipes={d.equipes} aoFechar={() => setVer(null)} />
+          </div>
+        )}
+        {ver === 'EVID' && evd && (
+          <div className="px-4 pb-3">
+            <Detalhe titulo="VT encerradas sem evidência" contagem={`${evd.lista_sem.length} contrato(s)`}
+              aoFechar={() => setVer(null)}>
+              <TabelaItens cabecalho={['Situação', 'Equipe · técnico']}
+                linhas={evd.lista_sem.map(i => ({
+                  id: i.visita_id, contrato: i.contrato, dia: i.dia,
+                  cols: [situacaoRotulo(i.situacao), quem(i.equipe, i.tecnico)],
+                }))} />
+            </Detalhe>
+          </div>
+        )}
+        {ver === 'ATRASO' && atr && (
+          <div className="px-4 pb-3">
+            <ListaAtraso a={atr} aoFechar={() => setVer(null)} />
           </div>
         )}
         {ver === 'AT1' && (
@@ -592,6 +690,145 @@ function Conteudo({ d }: { d: DadosVT }) {
       </div>
     </VariosDiasCtx.Provider>
     </ContratosCtx.Provider>
+  )
+}
+
+// ================================================ 257: equipes atrasadas --
+/** A hora de Manaus agora ("HH:MM") — o fuso da régua é o do banco, não o do navegador. */
+const horaManaus = () => new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Manaus', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+}).format(new Date())
+/** O último marco que já passou hoje; nulo antes do primeiro. */
+function marcoAtual(marcos: { k: number; hora: string }[]) {
+  const agora = horaManaus()
+  return [...marcos].reverse().find(m => m.hora <= agora) ?? null
+}
+
+/**
+ * As equipes de VT contra a régua do Emanuel (257, D-372): uma linha por equipe-dia,
+ * com cada marco pintado — verde em dia, vermelho abaixo, apagado o que não passou.
+ * Clicar na equipe abre os contratos dela com a hora em que o TOA encerrou cada um.
+ */
+function ListaAtraso({ a, aoFechar }: { a: NonNullable<DadosVT['atraso']>; aoFechar: () => void }) {
+  type Filtro = 'AGORA' | 'ATRASOU' | 'EM_DIA'
+  const variosDias = useContext(VariosDiasCtx)
+  const [so, setSo] = useState<Filtro | null>(a.hoje_no_periodo && a.atrasadas_agora > 0 ? 'AGORA' : 'ATRASOU')
+  const [aberta, setAberta] = useState<string | null>(null)
+  const chave = (i: ItemAtraso) => `${i.equipe_id}|${i.dia}`
+  const passa = (f: Filtro | null, i: ItemAtraso) => f == null ? true
+    : f === 'AGORA' ? i.atrasada_agora : f === 'ATRASOU' ? i.atrasados > 0 : i.passados > 0 && i.atrasados === 0
+  const opcoes = ([
+    ...(a.hoje_no_periodo ? [['AGORA', 'Atrasadas agora'] as const] : []),
+    ['ATRASOU', 'Atrasaram'] as const, ['EM_DIA', 'Em dia'] as const,
+  ]).map(([k, rotulo]) => ({ k: k as Filtro, rotulo, n: a.lista.filter(i => passa(k as Filtro, i)).length }))
+  const lista = a.lista.filter(i => passa(so, i))
+  const rot = (i: ItemAtraso) => i.codigo ? equipeRotulo(i.codigo, i.nome) : 'Sem equipe'
+
+  return (
+    <Detalhe titulo="Equipes de VT na régua" aoFechar={aoFechar}
+      contagem={a.marcos.map(m => `${m.hora} ${m.k}º`).join(' · ')}>
+      <Chips opcoes={opcoes} valor={so} aoEscolher={setSo} total={a.lista.length} />
+      {lista.length === 0 ? (
+        <p className="px-3 py-4 text-center text-xs text-graf-400">Nenhuma equipe neste filtro.</p>
+      ) : (
+        <div className="max-h-96 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-graf-900 text-left text-[10px] uppercase tracking-wide text-graf-400">
+              <tr>
+                <th className="px-3 py-1.5 font-medium">Equipe · técnico</th>
+                <th className="px-3 py-1.5 text-right font-medium" title="Clientes baixados até agora ÷ VT na agenda do dia">Baixados</th>
+                <th className="px-3 py-1.5 font-medium">
+                  <span className="flex gap-0.5">
+                    {a.marcos.map(m => (
+                      <span key={m.k} className="tabular w-9 text-center normal-case tracking-normal">{m.hora}</span>
+                    ))}
+                  </span>
+                </th>
+                <th className="px-3 py-1.5 font-medium">Atrasou desde</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(i => {
+                const k = chave(i)
+                const porK = new Map((i.marcos ?? []).map(m => [m.k, m]))
+                return (
+                  <FragmentoAtraso key={k} aberta={aberta === k} colunas={4}
+                    aoAlternar={() => setAberta(x => x === k ? null : k)}
+                    itens={i.itens}
+                    celulas={<>
+                      <td className="px-3 py-1.5">
+                        <span className="block font-medium text-graf-200">{rot(i)}</span>
+                        <span className="block text-[10px] text-graf-400">
+                          {i.tecnico ?? 'sem técnico'}{variosDias && <> · {curta(i.dia)}</>}
+                        </span>
+                      </td>
+                      <td className="tabular px-3 py-1.5 text-right">
+                        <span className="font-semibold text-graf-100">{i.baixados}</span>
+                        <span className="text-graf-400">/{i.agenda}</span>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span className="flex gap-0.5">
+                          {a.marcos.map(m => {
+                            const x = porK.get(m.k)
+                            const atras = x ? x.baixou < x.deve : false
+                            return (
+                              <span key={m.k}
+                                title={x ? `${m.hora} · devia ${x.deve}, tinha ${x.baixou}` : `${m.hora} · ainda não chegou`}
+                                className={`tabular grid h-5 w-9 place-items-center rounded-sm text-[10px] font-semibold ${
+                                  x ? 'text-white' : 'bg-graf-800 text-graf-500'}`}
+                                style={x ? { background: atras ? COR.naoExecutado : COR.executado } : undefined}>
+                                {x ? `${x.baixou}/${x.deve}` : '·'}
+                              </span>
+                            )
+                          })}
+                        </span>
+                      </td>
+                      <td className="tabular px-3 py-1.5">
+                        {i.primeiro
+                          ? <span style={{ color: COR.naoExecutado }} className="font-semibold">{i.primeiro}</span>
+                          : <span className="text-graf-400">{i.passados ? 'em dia' : 'sem marco ainda'}</span>}
+                        {i.atrasada_agora && i.deve_agora != null && (
+                          <span className="block text-[10px] text-graf-400">agora: devia {i.deve_agora}</span>
+                        )}
+                      </td>
+                    </>} />
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Detalhe>
+  )
+}
+
+/** Uma linha da régua e, aberta, os contratos da equipe com a hora da baixa no TOA. */
+function FragmentoAtraso({ celulas, itens, aberta, aoAlternar, colunas }: {
+  celulas: ReactNode; itens: ItemAtraso['itens']; aberta: boolean; aoAlternar: () => void; colunas: number
+}) {
+  return (
+    <>
+      <tr onClick={aoAlternar} aria-expanded={aberta}
+        className={`cursor-pointer border-t border-graf-800/60 hover:bg-graf-900 ${aberta ? 'bg-graf-900' : ''}`}>
+        {celulas}
+      </tr>
+      {aberta && (
+        <tr className="bg-graf-900/60">
+          <td colSpan={colunas} className="px-3 py-2">
+            <div className="flex flex-wrap gap-1.5">
+              {itens.map(c => (
+                <span key={c.visita_id} className="inline-flex items-center gap-1.5 rounded bg-graf-800 px-2 py-0.5">
+                  <LinkContrato to={`/controle/visita/${c.visita_id}`}
+                    className="tabular text-af-400 underline underline-offset-2">{c.contrato ?? 'sem contrato'}</LinkContrato>
+                  <span className={`tabular text-[10px] ${c.baixa ? 'text-graf-200' : 'text-graf-400'}`}>
+                    {c.baixa ?? 'em aberto'}</span>
+                </span>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
@@ -699,7 +936,7 @@ function JanelaPorArea({ celulas, className = '', variosDias = false }: {
   const max = Math.max(1, ...celulas.filter(c => !c.total_area && !c.total_janela).map(c => c.vt))
 
   return (
-    <Painel className={className} titulo="VT por janela e área"
+    <Painel dicaLinhas={2} className={className} titulo="VT por janela e área"
       dica={variosDias
         ? 'Em cada célula: as VT do período e a média por equipe-dia de VT com contrato ali.'
         : 'Em cada célula: as VT e a média por equipe de VT com contrato ali.'}
@@ -867,7 +1104,7 @@ function SituacaoPorEquipe({ equipes, minimo }: { equipes: DadosVT['equipes']; m
   const min = minimo ?? 3
 
   return (
-    <Painel titulo="Situação por equipe"
+    <Painel dicaLinhas={2} titulo="Situação por equipe"
       dica="A situação do contrato. Auditar e cancelado pela central ficam fora da conta."
       extra={<span className="tabular text-xs text-graf-400">{n0(tot.concluidos)} de {n0(total)} concluídos</span>}
       tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'Concluído', 'Aberto', 'Reagendado', 'Cancelado', 'Total']}
@@ -937,7 +1174,7 @@ function CodigosOfensores({ c }: { c: DadosVT['codigos'] }) {
   const fora = lista.length - Math.min(lista.length, LIMITE)
 
   return (
-    <Painel titulo="Código de baixa ofensor"
+    <Painel dicaLinhas={2} titulo="Código de baixa ofensor"
       dica="Por contrato: o código do TOA; sem baixa no TOA, o da AFLINE."
       extra={
         <div className="flex rounded-md bg-graf-900 p-0.5" role="group" aria-label="Quais códigos">
@@ -1016,7 +1253,7 @@ function RevisitaOfensor({ r, volume }: { r: DadosVT['revisita']; volume: number
   const sel = r.tecnicos.find(t => chave(t) === aberto) ?? null
 
   return (
-    <Painel titulo="Revisita · técnico ofensor"
+    <Painel dicaLinhas={2} titulo="Revisita · técnico ofensor"
       dica="Quem fez o serviço anterior, concluído há até 30 dias."
       extra={<span className="tabular text-xs text-graf-400">{n0(r.total)} de {n0(volume)} VT</span>}
       tabela={<TabelaSimples colunas={['Equipe do serviço anterior', 'Técnico', 'Revisitas']}
@@ -1059,7 +1296,7 @@ function NodeOfensor({ n, volume }: { n: DadosVT['nodes']; volume: number }) {
   const [aberto, setAberto] = useState<string | null>(null)
   const sel = n.lista.find(x => x.node === aberto) ?? null
   return (
-    <Painel titulo="Node ofensor"
+    <Painel dicaLinhas={2} titulo="Node ofensor"
       dica="Onde a rede gerou mais visita técnica no dia."
       extra={<span className="tabular text-xs text-graf-400">{n0(n.distintos)} nodes</span>}
       tabela={<TabelaSimples colunas={['Node', 'VT', 'Não executadas', 'LOG 3+']}
@@ -1452,7 +1689,7 @@ export function CausaRevisita30({ r, filtro, aoFiltrar, className = '',
   const lider = (d: DimRev) => contagens[d].find(([k]) => k !== SEM_CODIGO && k !== SEM_MEDICAO)
 
   return (
-    <Painel className={className} titulo={titulo} dica={dica}
+    <Painel dicaLinhas={2} className={className} titulo={titulo} dica={dica}
       extra={<span className="tabular text-xs text-graf-400">{n0(r.n)} revisita(s)</span>}
       tabela={<TabelaSimples colunas={['Análise da anterior', 'Valor', 'Revisitas']}
         linhas={[
@@ -1681,7 +1918,7 @@ function SubFalhaOfensora({ s }: { s: NonNullable<DadosVT['sub_falhas']> }) {
   const sel = s.lista.find(x => x.sub_falha === aberto) ?? null
   const fora = s.lista.length - Math.min(s.lista.length, LIMITE)
   return (
-    <Painel titulo="Sub-falha ofensora"
+    <Painel dicaLinhas={2} titulo="Sub-falha ofensora"
       dica="O porquê do código: a sub-falha lançada na baixa, por contrato."
       extra={<span className="tabular text-xs text-graf-400">{n0(s.lista.length)} sub-falha(s)</span>}
       tabela={<TabelaSimples colunas={['Sub-falha', 'Contratos']} linhas={s.lista.map(x => [x.sub_falha, x.n])} />}
@@ -1770,7 +2007,7 @@ function Tec1PorEquipe({ itens }: { itens: ItemTec1[] }) {
   const tot = (k: typeof series[number]['k']) => equipes.reduce((t, e) => t + e[k], 0)
 
   return (
-    <Painel titulo="TEC1 por equipe"
+    <Painel dicaLinhas={2} titulo="TEC1 por equipe"
       dica="Por O.S., só do que o TOA encerrou. % = no prazo ÷ (no prazo + fora do prazo)."
       extra={<span className="tabular text-xs text-graf-400">{n0(itens.length)} O.S.</span>}
       tabela={<TabelaSimples colunas={['Equipe', 'Técnico', 'No prazo', 'Fora do prazo', 'Expurgada', 'Em aberto', 'TEC1']}
@@ -1902,7 +2139,7 @@ function CertidaoVT({ c, className = '' }: { c: DadosCertidao; className?: strin
   ]
 
   return (
-    <Painel className={className} titulo="Certidão de atendimento"
+    <Painel dicaLinhas={2} className={className} titulo="Certidão de atendimento"
       dica="Validação do Portal Técnico da Claro, sobre as O.S. finalizadas no portal. Validado = com e sem falha."
       extra={<span className="tabular text-xs text-graf-400">{n0(c.finalizados)} finalizada(s)</span>}
       tabela={<TabelaSimples colunas={['Técnico', 'Equipe', 'Finalizadas', 'Sem falha', 'Com falha', 'Sem validação', '% validado']}

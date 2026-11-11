@@ -675,6 +675,22 @@ body {
   .regua > *:nth-child(-n+2) { border-top: 0; }
 }
 
+/* ---------- A regua em GRADE (Dashboard VT, D-372) ----------
+   Com oito numeros, a `.regua` em flex espremia cada um em ~155px a 1500px
+   de tela e o apoio quebrava em quatro linhas. Em grade: duas fileiras de
+   quatro, e as oito lado a lado so em tela larga (1800px+). A divisoria e o
+   vao de 1px mostrando o fundo, entao ela fica certa na quebra de fileira.
+   Em `@layer components` para o hover do card (utilitario) continuar valendo. */
+@layer components {
+  .regua-grade {
+    display: grid; gap: 1px; background: var(--color-graf-800);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .regua-grade > * { background: var(--color-graf-850); padding: 0.75rem 1rem; }
+  @media (min-width: 768px) { .regua-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (min-width: 1800px) { .regua-grade { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+}
+
 /* ---------- Entrada escalonada ----------
    As seções da página entram de baixo, uma logo depois da outra. É
    curto (180ms) e só no primeiro desenho: quem trabalha aqui o dia

@@ -11,7 +11,7 @@ import { useId, useState, type ReactNode } from 'react'
    ============================================================ */
 
 export function Painel({
-  titulo, dica, extra, children, tabela, nota, className = '',
+  titulo, dica, extra, children, tabela, nota, className = '', dicaLinhas,
 }: {
   titulo: string
   /** Uma linha dizendo QUE PERGUNTA o quadro responde. O painel tinha
@@ -24,14 +24,24 @@ export function Painel({
   /** Rodape com a leitura em portugues — o porque, a ressalva, a fonte. */
   nota?: ReactNode
   className?: string
+  /** D-372: a dica ocupa SEMPRE estas linhas (corta o resto, inteira no mouse). Painéis
+   *  lado a lado com dicas de tamanhos diferentes começavam o gráfico em alturas
+   *  diferentes — no Dashboard VT, 419, 434 e 498 px na mesma fileira. */
+  dicaLinhas?: 2
 }) {
   const [verTabela, setVerTabela] = useState(false)
   return (
     <section className={`card-controle flex flex-col p-4 ${className}`}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold">{titulo}</h2>
-          {dica && <p className="mt-0.5 text-[11px] leading-snug text-graf-500">{dica}</p>}
+          <h2 title={dicaLinhas ? titulo : undefined}
+            className={`text-sm font-semibold ${dicaLinhas ? 'truncate' : ''}`}>{titulo}</h2>
+          {dica && (
+            <p title={dicaLinhas ? dica : undefined}
+              className={`mt-0.5 text-[11px] leading-snug text-graf-500 ${
+                dicaLinhas ? 'line-clamp-2 min-h-[2.75em]' : ''}`}>{dica}</p>
+          )}
+          {!dica && dicaLinhas && <p aria-hidden className="mt-0.5 min-h-[2.75em]" />}
         </div>
         <div className="flex shrink-0 items-center gap-3">
           {extra}

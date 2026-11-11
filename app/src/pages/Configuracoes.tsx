@@ -5,6 +5,7 @@ import { Alerta, Vazio, CarregandoBloco } from '../components/ui'
 import { EditorSubFalhas } from '../components/EditorSubFalhas'
 import { BucketsToa } from '../components/BucketsToa'
 import { DashboardVTBaseClientes } from '../components/DashboardVTBaseClientes'
+import { DashboardVTMarcos } from '../components/DashboardVTMarcos'
 import { CodigosDeBaixa, type CodigoBaixa } from '../components/CodigosDeBaixa'
 
 /**
@@ -387,7 +388,7 @@ export default function Configuracoes() {
              // 103: de qual cidade é cada arquivo do TOA (D-180).
              ['buckets', 'Buckets do TOA', null],
              // 212: o denominador do AT1 do Dashboard VT.
-             ['clientes', 'Base de clientes', null]] as const).map(
+             ['clientes', 'Dashboard VT', null]] as const).map(
             ([a, rot, n]) => (
               <button key={a} onClick={() => { setAba(a); setEditando(null) }}
                 className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
@@ -400,7 +401,7 @@ export default function Configuracoes() {
         {aba === 'subfalhas' ? (
           <EditorSubFalhas />
         ) : aba === 'clientes' ? (
-          <DashboardVTBaseClientes />
+          <><DashboardVTMarcos /><DashboardVTBaseClientes /></>
         ) : aba === 'buckets' ? (
           <BucketsToa />
         ) : aba === 'almox' ? (

@@ -13742,3 +13742,40 @@ supervisor ofensor só fica útil com o cadastro (D-134) preenchido.
 
 **Em aberto:** na instalação, o código da anterior é quase sempre 409 INSTALAÇÃO EFETUADA (23 de 25) — não diz a
 causa. Perguntar ao Emanuel se o código ofensor da instalação deve ser o do próprio Retorno.
+
+### D-372 · Dashboard VT: evidência, equipes atrasadas e a régua em Configurações (257, 258 — 11/11/2026)
+
+> "vamos adicionar 2 Cards, o card das evidencias o mesmo que tem no dasbhoard da instalação, vamos levar para VT
+> so de VT ok e vamos lançar outro card chamado Equipes em campo, Vs equipes atrasadas" — Emanuel, 11/11
+>
+> "la em configuração o sistema pode da opção de configurar as baixas da VT caso eu queira mudar o horário" — idem
+
+**Com evidência** (257): a conta do Dashboard INST (155, D-296), só sobre as VT da conta (sem Auditar e sem
+cancelado pela central). Encerradas com pelo menos uma foto/vídeo do NOSSO app ÷ encerradas; em aberto fica fora.
+Cor pelo mesmo limiar de 90% do INST, que não é meta (D-115). Clicar abre as VT encerradas sem evidência.
+
+**Equipes atrasadas** (257): a régua do Emanuel — 09:10 o 1º cliente baixado, 10:10 o 2º, 11:10 o 3º, 12:10 o 4º,
+13:10 o 5º, 15:20 o 6º, 16:20 o 7º, 17:20 o 8º. Respostas dele (11/11), entre opções:
+- **baixar** = qualquer encerramento no TOA (concluído ou não concluído), na hora do FIM — a hora do TEC1;
+  `fim` sozinho não vale (D-103);
+- **só equipe de VT** (3+ VT no dia ou manutenção, o card "VT por equipe"), com **teto na agenda**: quem tem 3 VT
+  às 15:30 deve 3. A agenda é o dia INTEIRO da equipe — o filtro de área não encolhe a cobrança;
+- **atrasada = em ALGUM marco** tinha menos baixados do que devia (recusado: "só como fechou o dia" e "só hoje").
+  Hoje, só os marcos que passaram; "atrasada agora" é quem está abaixo do último marco com o que baixou até agora.
+Card: atrasadas de N em campo (equipe-dia no período). A lista pinta cada marco (baixou/devia) e abre os contratos
+da equipe com a hora da baixa.
+
+**A régua mora em Configurações › Dashboard VT** (258): parâmetro `vt_marcos_baixa`, uma lista de "HH:MM" em que a
+posição é o Nº do cliente. Grava por `definir_marcos_vt` (`pode_configurar('editar')`), que recusa lista vazia,
+mais de 12 horas, formato errado e hora fora de ordem. **Sem vigência**: a régua nova julga também os dias que
+passaram (o parâmetro guarda quem trocou e quando). Se precisar de histórico, vira tabela — decisão em aberto.
+
+**Medido** (Manaus, como `authenticated`): 11/11 às 14h, 18 de 19 equipes de VT atrasaram (17 ainda atrasadas
+agora); 01–10/11, 133 de 134 equipe-dia atrasaram em algum marco. A primeira baixa sai às 09:47 na mediana
+(p25 09:26, p10 09:10): o marco das 09:10 sozinho já pega ~90%. É o dado, não defeito — mas vale o Emanuel ver se a
+régua é a que ele quer cobrar. Evidência 01–11/11: 388 de 827 encerradas (46,9%). Painel: ~0,12 s no dia,
+~0,7 s no mês, no banco.
+
+**Alinhamento** (só tela): o Painel ganhou `dicaLinhas` — título numa linha e dica em duas, sempre (inteiras no
+mouse). Na fileira Carga os gráficos começavam em 419, 434 e 498 px; agora todos na mesma linha. A régua do topo,
+com 8 números, virou grade: 2 fileiras de 4 até 1800 px, 8 lado a lado acima disso.

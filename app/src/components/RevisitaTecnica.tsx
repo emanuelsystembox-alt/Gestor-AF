@@ -236,7 +236,7 @@ function Conteudo({ d, familia }: { d: Dados; familia: Familia }) {
           dica="Como fechou a visita ANTERIOR — a que gerou a revisita — e em quantos dias voltou." />
         <RevisitaPorDia d={d} lista={lista} revTec={revTec} tecSel={tecnicos.find(t => t.tecnico_id === tecSel) ?? null}
           aoLimpar={() => setTecSel(null)} className="xl:col-span-4" />
-        <Painel className="xl:col-span-3" titulo="Supervisor ofensor"
+        <Painel dicaLinhas={2} className="xl:col-span-3" titulo="Supervisor ofensor"
           dica="Serviços dos técnicos dele que voltaram em até 30 dias."
           tabela={<TabelaSimples colunas={['Supervisor', 'Técnicos', 'Executados', 'Revisitas', '% revisita']}
             linhas={supervisores.map(s => [rotSup(s.s), s.tecs, s.exec, s.rev, `${pct(s.rev, s.exec) ?? '—'}%`])} />}>
@@ -299,7 +299,7 @@ function RevisitaPorDia({ d, lista, revTec, tecSel, aoLimpar, className = '' }: 
   const total = dias.reduce((s, x) => s + (conta.get(x) ?? 0), 0)
   const passo = Math.max(1, Math.ceil(dias.length / 10))
   return (
-    <Painel className={className} titulo={tecSel ? `Revisita por dia · ${tecSel.tecnico ?? 'técnico'}` : 'Revisita por dia'}
+    <Painel dicaLinhas={2} className={className} titulo={tecSel ? `Revisita por dia · ${tecSel.tecnico ?? 'técnico'}` : 'Revisita por dia'}
       dica={tecSel ? 'Os serviços dele que voltaram, no dia em que voltaram (até hoje).'
         : 'As revisitas da cidade, no dia em que caíram na agenda.'}
       extra={<span className="flex items-center gap-2 text-xs text-graf-400">
