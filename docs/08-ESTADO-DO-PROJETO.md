@@ -431,6 +431,35 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 11/11/2026 — sinal, Revisita Técnica e equipes atrasadas (255–258; D-369 a D-372)
+
+Feito e publicado: ver HANDOFF.md (11/11). Nenhuma mudança de RLS, papel ou permissão (`definir_marcos_vt` é
+nova, SECURITY DEFINER com `pode_configurar('editar')`; anon sem EXECUTE, técnico recusado — conferido).
+
+### Depende do Emanuel
+- **Código ofensor da instalação** (D-371): o código da instalação anterior é quase sempre 409 INSTALAÇÃO
+  EFETUADA (23 de 25 revisitas de 01–11/11) e não explica a volta. Usar o código de baixa do próprio Retorno?
+- **A régua das equipes atrasadas** (D-372): com 09:10 / 10:10 / … / 17:20, 133 de 134 equipe-dia de 01–10/11
+  atrasaram em algum marco (hoje, 18 de 19). A primeira baixa sai às 09:47 na mediana (p10 09:10). É a régua que
+  ele quer cobrar? Ela já pode ser mudada em Configurações › Dashboard VT.
+- **Vigência da régua** (258): trocar os horários rejulga também os dias que passaram. Se precisar de histórico
+  (como a meta da skill, D-167), o parâmetro vira tabela com vigência.
+- **Meta da Revisita Técnica** e do card Com evidência: nenhuma combinada — nenhum número ganha cor de meta
+  (a evidência usa só o limiar de cor de 90% do INST, que não é meta).
+
+### Ação na operação (não precisa de código)
+- **Supervisor no cadastro do técnico** (D-134): 1.378 dos 1.886 serviços executados de 01–11/11 são de técnico
+  sem supervisor declarado — o "supervisor ofensor" da Revisita Técnica fica quase vazio até isso ser preenchido.
+
+### Verificação que ninguém fez ainda
+- **Salvar a régua pela tela** (Configurações › Dashboard VT) — a RPC foi testada só numa transação desfeita, para
+  não mexer na régua de produção.
+- **São Luís** nos painéis novos (Revisita Técnica, cards de evidência e atraso) — só Manaus foi conferido.
+- **Celular e tema escuro** da régua em grade, da lista de equipes atrasadas e da Revisita Técnica.
+- **Fuso de São Luís:** a régua e o TEC1 usam o horário de Manaus (`America/Manaus`) para todas as cidades.
+  Ficou a suspeita, levantada em 11/11, de que o início/fim do TOA de São Luís esteja 1 h deslocado — não
+  investigado.
+
 ## Pendente em 10/11/2026 (tarde) — Revisita 30 D, supervisor e pós-ativo (250–253; D-363 a D-367)
 
 Feito e publicado: ver HANDOFF.md (10/11, tarde). Nenhuma mudança de RLS, papel ou permissão.

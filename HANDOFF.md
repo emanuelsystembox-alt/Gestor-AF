@@ -1,5 +1,18 @@
 # Passagem de bastão — leia isto primeiro
 
+> **11/11/2026 — hora do sinal, causa da revisita, indicador Revisita Técnica e equipes atrasadas** (D-369 a
+> D-372; migrations 255 a 258; site publicado e conferido no ar; nada de RLS/papel mexido — sem baterias):
+> - **Hora do sinal do portal Claro** (255): o `collectedDate` vem 3 h atrasado mesmo com `-03:00`;
+>   `hora_do_portal_claro()` corrige na gravação e as 1.186 leituras guardadas foram consertadas (D-369).
+> - **Dashboard VT, faixa Carga:** painel **Causa da revisita 30 D** — código, situação e sinal da VT anterior, e
+>   em quantos dias voltou (D-370).
+> - **Indicadores › Revisita Técnica** (256): cidade (VT ← VT; instalação → Retorno, Retorno → Retorno), causas,
+>   revisita por dia, supervisor ofensor e tabela por técnico com a Certidão ao lado (D-371).
+> - **Dashboard VT:** cards **Com evidência** (só VT, a conta do INST) e **Equipes atrasadas** pela régua 09:10 …
+>   17:20 (257); a régua é editável em **Configurações › Dashboard VT** (`vt_marcos_baixa`, 258). Gráficos lado a
+>   lado alinhados (`Painel dicaLinhas`) e a régua de 8 números em grade 4×2 (D-372).
+> - **Perguntas em aberto** em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente em 11/11/2026".
+
 > **10/11/2026 (tarde) — Revisita 30 D, filtro de supervisor e o pós-ativo à vista** (D-363 a D-367;
 > migrations 250 a 253; site publicado e conferido no ar; nada de RLS/papel mexido — sem baterias):
 > - **Card Revisita 30 D** no Dashboard VT, ao lado do LOG: VT que voltou de VT do mesmo contrato em até 30
