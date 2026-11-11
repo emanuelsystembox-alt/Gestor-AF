@@ -13651,3 +13651,30 @@ que era troca. Sem equipe, a chave de roteamento não aparece e os contratos ca�
   (vigente de 10/11; 4 contratos de hoje foram para a 007; os dias anteriores ficam em SEM-LOGIN — o passado tem
   dono, D-301). Os 2 de hoje que ficaram são jornada (Na Base, Refeição).
 
+
+### D-369 · A hora da coleta do sinal vem 3 h atrasada do portal da Claro (255 — 11/11/2026)
+
+*"os horário não estão se atualizando conforme o nosso sistema precisa corrigir na hora de mostrar os niveis de
+sinal"* (Emanuel, 11/11 — contrato 10896665: o portal mostra a Validação às 10h02; a aba Sinal mostrava "coleta
+06:02", antes de o técnico chegar — TOA 08:22–09:19, Manaus).
+
+**O defeito é da API do portal.** O `collectedDate` chega sempre como `…-03:00` (ex.: `2026-11-11T07:02:35.000-03:00`):
+é o relógio de Brasília (10:02) tomado como UTC e convertido para −03 de novo. A hora certa é o relógio UTC desse
+valor lido como America/Sao_Paulo (+3 h; o Brasil não tem horário de verão). A tela da Claro mostra o relógio UTC,
+por isso "10h02" lá. Na nossa tela o horário sai no fuso de quem olha: em Manaus, **09:02**.
+
+**Medido** (1.121 aparelhos da Validação × janela do TOA de contrato finalizado): cru, 0 dentro; com +3 h, Manaus
+576 de 580 dentro, mediana 12 min antes do fim, nenhum depois do fim.
+
+- **Banco (255):** `hora_do_portal_claro(text)` corrige só o formato observado (`-03:00`); outro formato passa como
+  veio. `registrar_sinal_claro` (recriada da versão VIVA) grava a coleta corrigida, em UTC (`+00:00`). Os 1.186
+  registros já lidos foram corrigidos (nenhum ficou no formato cru). Testado como `authenticated` (ADMIN), desfeito.
+- **Tela:** nada muda — web (`quando`) e app (`carimbo`) já formatam no fuso do aparelho.
+- **Se a Claro consertar a API**, o valor muda de forma (ou continua `-03:00` e passa a estar certo): a conta da
+  255 precisa ser revista. A conferência é a mesma: coleta da Validação × janela do TOA.
+- `updatedAt` (`portal_atualizado_em`) não é mostrado e não foi mexido.
+
+**Em aberto — São Luís:** lá o +3 h cai 1 h ANTES do início do TOA (498 de 541) e o +4 h encaixa (541 de 541). O
+portal é o mesmo, então a suspeita é o `inicio`/`fim` de São Luís estar gravado 1 h adiantado (hora local de
+UTC−3 lida como Manaus na importação). Não foi verificado nem mexido — conferir com uma atividade de São Luís de
+horário conhecido antes de mudar qualquer coisa.

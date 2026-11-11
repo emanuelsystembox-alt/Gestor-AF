@@ -782,3 +782,8 @@ requested has been blocked" (ícone `fgd_icon`, FortiGuard). Não é a Hostinger
 o da Claro e o nome é `fwebvirg-…elb` (FortiWeb na AWS). Antes de mudar máquina de lugar para "destravar" um
 site, teste do lugar novo com `curl --resolve` em cada IP **e leia o corpo do 500** — o código sozinho
 engana. Ver D-341.
+
+**Hora de API de terceiro com fuso no texto não quer dizer hora certa.** O `collectedDate` do portal da Claro vem
+`…-03:00` e mesmo assim está 3 h atrasado (o relógio de Brasília tomado como UTC e convertido de novo): a aba Sinal
+mostrou a Validação às 06:02, antes de o técnico chegar. Confira hora de fora contra um relógio nosso que se sabe
+certo — aqui, a janela do TOA (início..fim): cru, 0 de 1.121 dentro; +3 h, 576 de 580 em Manaus. Ver D-369.
