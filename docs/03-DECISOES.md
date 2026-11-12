@@ -13848,3 +13848,33 @@ tinham sido apontados). O primeiro dia inteiro medido é 13/11.
 **Medido** (Manaus, 12/11 às 18h07, como `authenticated`): 79 ms; TEC1 real 96,8% (442 O.S.), previsto 95,5%, 6
 contratos decidindo, 22 abertos sem caber até 18:00, fim previsto da operação 20:26. Cada cidade só vê a própria foto.
 **Não verificado:** o acerto (começa a ter dado amanhã); São Luís na tela; o fuso de São Luís (a fila usa Manaus).
+
+### D-375 · Risco de revisita na baixa — fase 2 do pacote preditivo (261 — 12/11/2026)
+
+Inteligência › Risco de revisita: os serviços CONCLUÍDOS no dia (VT, instalação, Retorno) com a faixa de risco de
+voltar em 30 dias e os motivos. O método é o do Risco de quebra (181): régua da própria cidade, serviços de D−121 a
+D−31 (janela de 30 dias fechada), fator aceito com 30+ serviços, piso de Wilson acima da taxa da cidade e razão 1,25+;
+fatores parentes (node/bairro; grupo/já é revisita) contam uma vez; ALTO = 2× a cidade. Quem voltou decidem
+`revisita_30d_vt` e `revisita_dos_contratos` — nenhuma regra de revisita reescrita. A régua é recalculada às 05h40
+(pg_cron `risco-de-revisita`, pela porta única `rodar_por_cidade`). Desenhada e medida por um agente em paralelo, a
+pedido do Emanuel; revisada e ajustada antes de aplicar.
+
+**Respostas do Emanuel (12/11), entre opções:**
+- **Só o concluído tem nota.** A VT reagendada ou cancelada volta "por construção" (27–37%) e enchia o ALTO; sai da
+  nota e da régua e aparece num quadro à parte, "Vai voltar".
+- **O Retorno é ALTO por ser Retorno**, e a tela escreve "Por ser Retorno" (volta 19,7% contra 7,6% da Adesão).
+- **Três faixas** como no Risco de quebra, embora o MÉDIO ainda não separe (≈1× a base); medir de novo em dezembro.
+- **Validação regular do sinal = selo verde "validado"**, fora da conta (só o que aumenta o risco pesa).
+- **Publicar já.**
+
+**Medido para trás** (régua de um dia, teste em período com 30 dias fechados, todos os serviços): ALTO revisitou
+32,8% contra 16,3% (VT, Manaus), 18,9% contra 9,2% (instalação, Manaus). Mas o ALTO era quase todo reagendada/
+cancelada/código improdutivo — por isso a resposta acima. Na VT concluída o ALTO é fino (3% dos serviços, 21% de
+revisita contra 12%). **O que mais promete ainda não tem como ser validado para trás:** em novembro, com a janela
+aberta, VT com validação regular voltou 1,3% contra 7,4% com falha e 7,5% sem leitura; LOG 2+ 17–19% contra 7%. A
+carga do ngestor não tem sinal, LOG, técnico nem início — esses fatores entram sozinhos quando novembro fechar 30 dias
+(~02/12). A instalação fica "sem histórico" até haver 300 instalações na janela (meados de dezembro).
+
+**Verificado:** ensaio desfeito em Manaus e São Luís (670 ms na 1ª leitura do dia, que calcula a régua; ~430 ms
+depois); anon não executa nenhuma das 7 funções e só `risco_revisita_do_dia` é de `authenticated`; baterias 35/35 e
+29/29; nenhuma tabela sem RLS. **Não verificado:** acerto nos dias de novembro (só a partir de dezembro).

@@ -93,6 +93,8 @@ const INTELIGENCIA: Modulo = {
     { para: '/controle/auditoria', rotulo: 'Auditoria da baixa', icone: 'administracao', busca: 'auditoria fraude suspeito baixa curta serial galeria longe endereco nota' },
     // 181: quem tem cara de quebrar hoje, antes de o técnico sair.
     { para: '/controle/risco-quebra', rotulo: 'Risco de quebra', icone: 'indicadores', busca: 'risco quebra improdutivo cliente ausente agendamento despacho' },
+    // 261 (D-375): quem tem cara de voltar, no dia da baixa.
+    { para: '/controle/risco-revisita', rotulo: 'Risco de revisita', icone: 'indicadores', busca: 'risco revisita voltar 30 dias vt retorno baixa sinal validacao' },
     // 180: a revisita agrupada pela causa provável.
     { para: '/controle/revisita', rotulo: 'Revisita por causa', icone: 'sincronismo', busca: 'revisita retorno vt modelo decoder emta equipamento tecnico area bairro taxa' },
   ],

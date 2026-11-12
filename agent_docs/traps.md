@@ -674,6 +674,12 @@ MDU` e `ID SGD`, com a ordem trocada): todas as linhas eram descartadas, caladas
 187 o banco completa o ID pela WO do contrato do dia — na LINHA, porque a reconciliação lê
 a linha. Contrato novo não entra sem o ID: chave inventada vira contrato em dobro. Ver D-276.
 
+**A carga do ngestor (jan–out) não serve para medir tudo.** Ela tem node, bairro, área, janela, equipe e código de
+baixa, mas **não tem** técnico (`tecnico_responsavel_id` nulo), Contador de log, início da execução, evidência, sinal
+nem bucket — e **não tem instalação nem Retorno de junho a outubro**, só VT. Qualquer taxa de instalação desse
+período, ou régua que dependa desses campos, sai errada ou vazia. Medido em 12/11 ao montar o risco de revisita
+(D-375).
+
 **Carga em massa por fora da importação tropeça nos gatilhos.** Na carga do
 ngestor (D-282): `janela_imediata` é coluna gerada; o gatilho da O.S.
 (`aplica_grupo_servico`) regrava o grupo da visita; o aviso de "dois em andamento"
