@@ -76,6 +76,8 @@ export interface Sinal {
   tipo: 'AJUDA' | 'TEC1' | 'RITMO' | 'QUEBROU' | 'MATERIAL' | 'ABASTECIMENTO' | 'CERCA' | 'GPS'
     | 'DOIS_ATIVOS' | 'SUMIU_TOA' | 'LOCAL' | 'ATRASO' | 'TEC1_RISCO' | 'RESUMO'
     | 'SEM_IMPORTACAO' | 'SEM_COMPUTADOR' | 'TOA_SESSAO' | 'EXECUCAO_LONGA'
+    /** 262 (D-376): sem equipe — só quem vê a cidade inteira recebe */
+    | 'NODE_DEGRADACAO'
   titulo: string; detalhe: string | null
   visita_id: string | null; tecnico_id: string | null
   criado_em: string; vigente: boolean; dispensado: boolean

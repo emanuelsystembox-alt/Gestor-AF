@@ -29,7 +29,7 @@ import {
 // 097: GPS anormal e cerca vêm logo depois do pedido de ajuda — são o
 // que o controle precisa ver primeiro.
 const ORDEM: Sinal['tipo'][] = ['AJUDA', 'TEC1_RISCO', 'ATRASO', 'SEM_IMPORTACAO', 'TOA_SESSAO',
-  'SEM_COMPUTADOR', 'GPS', 'CERCA', 'SUMIU_TOA', 'DOIS_ATIVOS', 'EXECUCAO_LONGA',
+  'SEM_COMPUTADOR', 'GPS', 'CERCA', 'NODE_DEGRADACAO', 'SUMIU_TOA', 'DOIS_ATIVOS', 'EXECUCAO_LONGA',
   'LOCAL', 'TEC1', 'RITMO', 'QUEBROU', 'MATERIAL', 'ABASTECIMENTO', 'RESUMO']
 export const ROTULO_SINAL: Record<Sinal['tipo'], string> = {
   AJUDA: 'Suporte técnico', TEC1: 'TEC1 / janela perdida', RITMO: 'Abaixo do ritmo',
@@ -46,6 +46,8 @@ export const ROTULO_SINAL: Record<Sinal['tipo'], string> = {
   // 178: o sincronismo e a execução longa.
   SEM_IMPORTACAO: 'Importação atrasada', SEM_COMPUTADOR: 'Bucket sem computador',
   TOA_SESSAO: 'Sessão do TOA caiu', EXECUCAO_LONGA: 'Execução longa',
+  // 262: indício de falha de rede da CLARO num node
+  NODE_DEGRADACAO: 'Node em degradação (rede)',
 }
 const COR: Record<Sinal['tipo'], string> = {
   AJUDA: 'bg-orange-500', TEC1: 'bg-amber-500', RITMO: 'bg-sky-500',
@@ -56,6 +58,7 @@ const COR: Record<Sinal['tipo'], string> = {
   RESUMO: 'bg-emerald-500',
   SEM_IMPORTACAO: 'bg-yellow-500', SEM_COMPUTADOR: 'bg-stone-400',
   TOA_SESSAO: 'bg-pink-500', EXECUCAO_LONGA: 'bg-teal-500',
+  NODE_DEGRADACAO: 'bg-lime-500',
 }
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -71,6 +74,7 @@ function destino(s: Sinal): string | null {
   if (s.tipo === 'SEM_IMPORTACAO' || s.tipo === 'SEM_COMPUTADOR' || s.tipo === 'TOA_SESSAO')
     return '/controle/sincronismo'
   if (s.tipo === 'ABASTECIMENTO') return '/frota'
+  if (s.tipo === 'NODE_DEGRADACAO') return '/controle/node-degradacao'
   // 097: GPS e cerca abrem o técnico no Monitoramento.
   if ((s.tipo === 'GPS' || s.tipo === 'CERCA') && s.tecnico_id) return `/controle/monitor?tecnico=${s.tecnico_id}`
   // 156: "abaixo do ritmo (...) quando eu clicar em cima, ele deve abrir

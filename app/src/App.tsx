@@ -40,6 +40,7 @@ const Auditoria = lazy(() => import('./pages/Auditoria'))
 const RiscoQuebra = lazy(() => import('./pages/RiscoQuebra'))
 const PrevisaoDia = lazy(() => import('./pages/PrevisaoDia'))
 const RiscoRevisita = lazy(() => import('./pages/RiscoRevisita'))
+const NodeDegradacao = lazy(() => import('./pages/NodeDegradacao'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -201,6 +202,8 @@ function Rotas() {
           <Protegida exige="GESTAO"><PrevisaoDia /></Protegida>} />
         <Route path="/controle/risco-revisita" element={
           <Protegida exige="GESTAO"><RiscoRevisita /></Protegida>} />
+        <Route path="/controle/node-degradacao" element={
+          <Protegida exige="GESTAO"><NodeDegradacao /></Protegida>} />
         <Route path="/controle/risco-quebra" element={
           <Protegida exige="GESTAO"><RiscoQuebra /></Protegida>} />
         <Route path="/controle/administracao" element={

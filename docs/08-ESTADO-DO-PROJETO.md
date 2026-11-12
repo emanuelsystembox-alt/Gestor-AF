@@ -431,6 +431,31 @@ falta o olho de quem usa.
 
 ---
 
+## Pendente em 12/11/2026 — pacote preditivo, fases 1, 2 e parte da 4 (259–262; D-373 a D-376)
+
+Feito e publicado: Previsão do dia + caixa-preta (260), Risco de revisita (261), Node em degradação + aviso no sino
+(262), e a troca de login desliga o registro antigo (259). Baterias 35/35 e 29/29.
+
+### Conferir com o tempo (não dá antes)
+- **Acerto da previsão do dia** — a caixa-preta começou em 12/11; o primeiro dia medido é 13/11 (Previsão do dia ›
+  "A previsão acerta?").
+- **Risco de revisita** — sinal, LOG, evidência e técnico entram na régua sozinhos a partir de ~02/12; instalação sai
+  de "sem histórico" em meados de dezembro. Medir de novo se a faixa MÉDIO passa a separar (hoje ≈ 1× a base).
+- **Node em degradação** — o indício "2 com sinal inicial irregular" não é validado; o 1º alerta de Manaus (CNVAWA,
+  12/11) veio por ele com contratos "queimado". Conferir com 30 dias de portal e tirar o indício se não separar.
+
+### Próximos passos aprovados
+- **Fase 3:** a fila "O que fazer agora" (junta TEC1 em risco, previsão, risco de revisita e node, por impacto).
+- **Fase 4 (resto):** boletim das 07h/18h e causa raiz da revisita com IA — chave do Gemini (plano grátis) já gravada
+  na VPS em `/opt/supabase/segredos/gemini_api_key` (só root). No teste, os modelos "flash" deram "alta demanda" e o
+  "flash-lite" respondeu: usar lite como principal e cair para texto por regra se a IA falhar.
+
+### Depende do Emanuel
+- Excluir no AI Studio a chave que foi colada na conversa em 12/11 (a gravada na VPS é outra).
+- Quem age sobre o risco de revisita ALTO, e como (ligar, supervisor conferir, pedir nova validação) — a tela só lista.
+- "Queimado" concentrado no node vira um alerta de "evento elétrico"? (fica fora por ora.)
+- Prova para contestar AT1/revisita com a CLARO precisa de relatório/exportação do node em degradação?
+
 ## Pendente em 11/11/2026 — sinal, Revisita Técnica e equipes atrasadas (255–258; D-369 a D-372)
 
 Feito e publicado: ver HANDOFF.md (11/11). Nenhuma mudança de RLS, papel ou permissão (`definir_marcos_vt` é

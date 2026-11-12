@@ -13878,3 +13878,33 @@ carga do ngestor não tem sinal, LOG, técnico nem início — esses fatores ent
 **Verificado:** ensaio desfeito em Manaus e São Luís (670 ms na 1ª leitura do dia, que calcula a régua; ~430 ms
 depois); anon não executa nenhuma das 7 funções e só `risco_revisita_do_dia` é de `authenticated`; baterias 35/35 e
 29/29; nenhuma tabela sem RLS. **Não verificado:** acerto nos dias de novembro (só a partir de dezembro).
+
+### D-376 · Node em degradação: indício de falha de rede da CLARO — parte da fase 4 (262 — 12/11/2026)
+
+Inteligência › Node em degradação, e aviso no sino. Desenhado e medido por um agente em paralelo (a pedido do Emanuel),
+revisado e ajustado antes de aplicar.
+
+**O histórico mudou a ideia original** (fev–11/11, Manaus e São Luís, ~45 mil VT na conta): **volume de VT no node,
+sozinho, não é rede** — nos picos a baixa INFRA CLARO dos 3 dias seguintes foi a da cidade (Manaus 4,3% × 3,7%). O
+sinal inicial irregular também não separa (é o normal da VT: 58–69% dos lidos). O que separa é **outro contrato do
+mesmo node baixado INFRA CLARO** em ±2 dias (3,6× mais que uma VT qualquer em Manaus): a rede quebra para vários.
+
+**A regra** (`nodes_em_degradacao`): R1 = 2+ contratos INFRA CLARO no node em 72 h, improvável por acaso (Poisson
+p<0,01 contra a taxa da cidade); R2 = 3+ VT em 48 h acima do normal do próprio node (p<0,01) E um indício (1 INFRA
+CLARO em 72 h, ou 2 com sinal inicial irregular em 48 h). Universo = a "conta" do Dashboard VT. No histórico: 0,46
+alerta/dia em Manaus e 1,03 em São Luís; INFRA CLARO no node nos 3 dias seguintes 15,8% × 3,4% da cidade (Manaus) e
+17,3% × 7,4% (São Luís).
+
+**Respostas do Emanuel (12/11), entre opções:** exigir indício (volume não basta); o **573** (Data Center / Headend)
+conta como INFRA CLARO **só neste alerta** — o agrupamento global da quebra (D-254) não mudou; "queimado" (522, 517,
+510) fica fora por ora; **GPONA01..05 de São Luís são agrupador do GPON**, saem do alerta e da régua; a tela é da
+gestão e o **aviso no sino só para quem vê a cidade inteira**, gravado pelo relógio de hora em hora
+(`registrar_nodes_em_degradacao`, pg_cron `node-em-degradacao`, 07h20–18h20) — a conta (~100–250 ms) não pesa na
+abertura do sino (D-248). `sinais_do_dia` ganhou só duas linhas (o tipo novo vigente o dia todo e a visibilidade);
+`sinal.tipo` ganhou `NODE_DEGRADACAO` no CHECK.
+
+**Verificado:** ensaio desfeito com `sinais_do_dia()` como authenticated (traps: o cron engole erro) — 3 avisos
+gravados, o de Manaus vigente no sino; GPONA fora em 11/11; 126 ms Manaus, 66 ms São Luís; anon fechado; baterias
+35/35 e 29/29. **A medir:** o indício "2 com sinal inicial irregular" não tem validação (portal só desde 06/11). O
+único alerta de Manaus em 12/11 (CNVAWA) veio por ele, e os contratos são quase todos "queimado" (522/517) — pode ser
+surto elétrico, não rede. Conferir com 30 dias de leitura do portal; se não separar, tirar esse indício.

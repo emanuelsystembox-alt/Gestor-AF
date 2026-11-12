@@ -95,6 +95,8 @@ const INTELIGENCIA: Modulo = {
     { para: '/controle/risco-quebra', rotulo: 'Risco de quebra', icone: 'indicadores', busca: 'risco quebra improdutivo cliente ausente agendamento despacho' },
     // 261 (D-375): quem tem cara de voltar, no dia da baixa.
     { para: '/controle/risco-revisita', rotulo: 'Risco de revisita', icone: 'indicadores', busca: 'risco revisita voltar 30 dias vt retorno baixa sinal validacao' },
+    // 262 (D-376): VT acumulando no node com indício de rede da CLARO.
+    { para: '/controle/node-degradacao', rotulo: 'Node em degradação', icone: 'indicadores', busca: 'node rede degradacao infra claro massiva pico vt sinal irregular contestar at1 revisita' },
     // 180: a revisita agrupada pela causa provável.
     { para: '/controle/revisita', rotulo: 'Revisita por causa', icone: 'sincronismo', busca: 'revisita retorno vt modelo decoder emta equipamento tecnico area bairro taxa' },
   ],
