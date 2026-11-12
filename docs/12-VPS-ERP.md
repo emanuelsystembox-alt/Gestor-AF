@@ -654,3 +654,17 @@ direto; o login é `docker exec tunel-portal tailscale up --hostname=vps-erp-por
 (o TOA e o resto continuam). O app Tailscale fica em "Não restrito" na bateria. Trocar de aparelho:
 `docker exec tunel-portal tailscale set --exit-node=<aparelho>`. A liberação do IP pela Claro (D-341)
 continua sendo o caminho sem dependência — o Emanuel não tem contato lá hoje.
+
+**12/11/2026 — a saída passou a ser um PC.** O celular saía da rede ("selected but offline") e o portal caía
+junto. O Emanuel ligou um PC Windows que fica ligado: `desktop-oqlhjsd` (`100.101.182.52`), Tailscale 1.104.6,
+"Run exit node" no ícone e "Use as exit node" aprovado no painel. Na VPS:
+`docker exec tunel-portal tailscale set --exit-node=desktop-oqlhjsd` (gravado em `/opt/tunel-portal/estado`,
+sobrevive a reinício). Medido de dentro do Edge, **um pedido só**: a Claro vê **Manaus, AS28573 Claro NXT**
+(internet residencial, `179.222.121.137`) e o portal respondeu **200** em 1,2 s. A ligação vai por relé do
+Tailscale (DERP São Paulo, ~88 ms), não direta — basta para o ritmo da extensão (D-342).
+- **O celular ficou de reserva:** se o PC cair, `tailscale set --exit-node=s26-ultra-de-emanuel`.
+- **O PC precisa:** ficar ligado, sem suspender, com internet, e com "Run unattended" no Tailscale.
+- **A chave do PC vence em 11/05/2027** (a do celular em 07/05/2027): sem "Disable key expiry" no painel, o
+  túnel para nessa data até alguém logar de novo.
+- **O risco da D-342 agora é dessa internet:** se o FortiWeb da Claro bloquear o IP por rajada, quem usa a mesma
+  conexão do PC fica sem o portal até o bloqueio passar. Não diagnostique o portal em rajada pelo túnel.
