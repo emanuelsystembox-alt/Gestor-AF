@@ -187,6 +187,8 @@ nunca guardado; vazio é "não informada", não "0 dias" (D-178).
 HOJE em diante mudam. O roteamento (`cadastrar_login_da_equipe`) também vale de hoje — *"o
 espelhamento da rota é so pra hoje, não é para mudar os donos das baixas de dias anteriores"*
 (Emanuel, 04/11).
+**E o registro do login antigo é desligado na troca** (259, D-373): a mesma pessoa não aparece duas vezes nas
+listas; o histórico fica nele, e voltar ao login antigo o reativa.
 
 **Técnico se desliga, não se apaga.** DELETE em `tecnico`/`equipe` é só
 para ADMIN (policy), e trigger recusa quem tem histórico — inclusive

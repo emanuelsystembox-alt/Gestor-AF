@@ -437,12 +437,15 @@ export function EditarUsuarioModal({
       if (el) recados.push(`login TOA não alterado: ${traduzir(el.message)}`)
       else {
         const r = data as { acao: string; login?: string; login_anterior?: string | null
-                            aposentado?: boolean; contratos_de_hoje?: number; em_campo?: boolean }
+                            aposentado?: boolean; contratos_de_hoje?: number; em_campo?: boolean
+                            /** 259 (D-373): o registro do login antigo desta pessoa foi desligado */
+                            desligado_anterior?: number }
         if (r.acao === 'tirado') recados.push(`login TOA ${r.login_anterior ?? ''} tirado deste acesso`)
         else if (r.acao === 'trocado') {
           recados.push(`login TOA agora é ${r.login}`
             + (r.contratos_de_hoje ? ` (${r.contratos_de_hoje} contrato(s) de hoje vieram junto)` : '')
             + (r.aposentado ? '; o histórico dos dias anteriores ficou com quem tinha o login' : '')
+            + (r.desligado_anterior && r.login_anterior ? `; o registro ${r.login_anterior} foi desligado (o histórico continua nele)` : '')
             + (r.em_campo ? '; em campo, roteando para a equipe própria' : ''))
         }
         // 254 (D-368): "igual" = a tela achou que o login mudou, mas o banco já tinha

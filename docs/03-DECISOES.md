@@ -13779,3 +13779,23 @@ régua é a que ele quer cobrar. Evidência 01–11/11: 388 de 827 encerradas (4
 **Alinhamento** (só tela): o Painel ganhou `dicaLinhas` — título numa linha e dica em duas, sempre (inteiras no
 mouse). Na fileira Carga os gráficos começavam em 419, 434 e 498 px; agora todos na mesma linha. A régua do topo,
 com 8 números, virou grade: 2 fileiras de 4 até 1800 px, 8 lado a lado acima disso.
+
+### D-373 · Trocar o login TOA do acesso desliga o registro antigo da pessoa (259 — 12/11/2026)
+
+> "por que tem dois logins? o correto é esse marcado no cadastrado do nosso sistema" … "pode fazer" — Emanuel, 12/11
+
+A matrícula do técnico é o login do TOA, então login novo = registro novo. `definir_login_toa_do_usuario` (206,
+D-301) soltava o registro anterior do acesso mas o deixava **ATIVO** — a mesma pessoa aparecia duas vezes nas listas
+(Técnicos deste supervisor, transferência). Medido em 12/11, todas as cidades: ELIECER JESUS ARZOLAY (Z124567, de
+03/11, e Z702775, trocado pela tela em 09/11) e Marcos Antônio Rodrigues Reis, São Luís (Z000000, Z013453, Z124521).
+Os três registros velhos foram **desligados à mão** em 12/11 (`mudar_situacao_tecnico`, autor Emanuel), escolha dele
+entre desligar, juntar os contratos no registro novo ou não mexer.
+
+**Agora a troca desliga o registro que o acesso deixa.** Não apaga e não move contrato: o histórico fica no registro
+antigo (D-090, D-301 — juntar foi recusado, mudaria o passado). Voltar a um login antigo reativa o registro dele (ramo
+que já existia). "Tirar o login" sem pôr outro **não** desliga: a pessoa pode seguir no TOA sem acesso. A tela de
+Editar usuário diz "o registro <login> foi desligado (o histórico continua nele)".
+
+**Verificado:** ensaio desfeito com o acesso do ELIECER (troca para um login fictício desliga o Z702775; voltar o
+reativa); baterias 35/35 e 29/29; anon sem EXECUTE. **Não coberto:** registro duplicado que nasce por OUTRO caminho
+(importação de cadastro, técnico avulso) sem acesso ligado — esse continua dependendo de alguém desligar.
