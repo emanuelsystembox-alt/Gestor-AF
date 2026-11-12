@@ -1,4 +1,4 @@
-import { CHAVE, lerEstado, type BucketDisponivel, type Estado, type Importacao, type Intervalo, type OQueVarrer, type Pedido } from './estado'
+import { CHAVE, agoraManaus, fimFeito, janelaAgora, lerEstado, type BucketDisponivel, type Estado, type Importacao, type Intervalo, type OQueVarrer, type Pedido } from './estado'
 
 /**
  * O painel da extensão (clique no ícone) — D-193.
@@ -94,6 +94,20 @@ function mostrarAba(a: Aba) {
   try { localStorage.setItem('af_aba', a) } catch { /* sem armazenamento: só não lembra */ }
 }
 
+/**
+ * O selo de uma importação LIGADA e parada no momento, conforme o horário
+ * (D-374): no horário, o intervalo; antes, quando começa; depois da hora fim,
+ * se a última rodada do dia já foi feita.
+ */
+function seloLigado(e: Estado, qual: Importacao, min: number): [string, '' | 'ligado'] {
+  const c = e.config
+  switch (janelaAgora(c)) {
+    case 'ANTES': return [`começa ${c.horaInicio}`, '']
+    case 'DEPOIS': return fimFeito(e, qual) ? ['encerrada hoje', ''] : ['última rodada', 'ligado']
+    default: return [`a cada ${cada(min)}`, 'ligado']
+  }
+}
+
 /** O selo do cartão: o que a importação está fazendo agora. */
 function estado(id: string, texto: string, classe: '' | 'ligado' | 'rodando' | 'pausa') {
   const s = $(id); s.textContent = texto; s.className = `estado ${classe}`
@@ -144,10 +158,23 @@ function desenharImportar(e: Estado) {
   $('dia-hoje').hidden = !outro
   $('dia-rotulo').textContent = outro ? `importa só ${dataBR(dia)}, uma vez` : 'hoje'
 
+  // ── o horário (D-374) ──
+  const inicio = $('hora-inicio') as HTMLInputElement
+  const fimH = $('hora-fim') as HTMLInputElement
+  if (document.activeElement !== inicio) inicio.value = c.horaInicio ?? ''
+  if (document.activeElement !== fimH) fimH.value = c.horaFim ?? ''
+  const { hhmm } = agoraManaus()
+  const jan = janelaAgora(c)
+  $('horario-rotulo').textContent = `Manaus ${hhmm} · ` + (
+    jan === 'SEM_HORARIO' ? 'o dia inteiro'
+    : jan === 'ANTES' ? `começa às ${c.horaInicio}`
+    : jan === 'DEPOIS' ? `encerrado${c.horaInicio ? `; volta amanhã às ${c.horaInicio}` : ''}`
+    : c.horaFim ? `até ${c.horaFim}` : 'no horário')
+
   // ── rota ──
   const b = e.baixa
   if (b.rodando) estado('rota-estado', 'importando', 'rodando')
-  else if (c.rotaLigada) estado('rota-estado', `a cada ${cada(c.rotaMin)}`, 'ligado')
+  else if (c.rotaLigada) estado('rota-estado', ...seloLigado(e, 'ROTA', c.rotaMin))
   else estado('rota-estado', 'parada', '')
   ;($('rota-min') as HTMLSelectElement).value = String(c.rotaMin)
   ;($('rota-iniciar') as HTMLButtonElement).textContent = outro ? `Importar ${dataBR(dia)}` : 'Iniciar'
@@ -160,7 +187,7 @@ function desenharImportar(e: Estado) {
   const pct = v.total ? Math.floor((v.feitos / v.total) * 100) : 0
   if (v.rodando && v.pausada) estado('var-estado', 'pausada', 'pausa')
   else if (v.rodando) estado('var-estado', `${pct}%`, 'rodando')
-  else if (c.varreduraLigada) estado('var-estado', `a cada ${cada(c.varreduraMin)}`, 'ligado')
+  else if (c.varreduraLigada) estado('var-estado', ...seloLigado(e, 'EQUIPAMENTOS', c.varreduraMin))
   else estado('var-estado', 'parada', '')
   ;($('var-min') as HTMLSelectElement).value = String(c.varreduraMin)
   ;($('var-oque') as HTMLSelectElement).value = e.escolha.oQue
@@ -181,7 +208,7 @@ function desenharImportar(e: Estado) {
   const pausado = !!po.pausaAte && Date.now() < po.pausaAte
   if (pausado) estado('portal-estado', `pausa até ${hora(po.pausaAte)}`, 'pausa')
   else if (po.rodando) estado('portal-estado', po.total ? `${po.feitos} de ${po.total}` : 'lendo', 'rodando')
-  else if (c.portalLigado) estado('portal-estado', `a cada ${cada(c.portalMin)}`, 'ligado')
+  else if (c.portalLigado) estado('portal-estado', ...seloLigado(e, 'NIVEIS', c.portalMin))
   else estado('portal-estado', 'parado', '')
   ;($('portal-min') as HTMLSelectElement).value = String(c.portalMin)
   ;($('portal-iniciar') as HTMLButtonElement).textContent = outro ? `Ler ${dataBR(dia)}` : 'Iniciar'
@@ -337,6 +364,9 @@ async function iniciar() {
   $('rota-min').addEventListener('change', ev => configurar({ rotaMin: Number((ev.target as HTMLSelectElement).value) as Intervalo }))
   $('var-min').addEventListener('change', ev => configurar({ varreduraMin: Number((ev.target as HTMLSelectElement).value) as Intervalo }))
   $('portal-min').addEventListener('change', ev => configurar({ portalMin: Number((ev.target as HTMLSelectElement).value) as Intervalo }))
+  // vazio = sem limite daquele lado; o fundo recusa início depois do fim
+  $('hora-inicio').addEventListener('change', ev => configurar({ horaInicio: (ev.target as HTMLInputElement).value || null }))
+  $('hora-fim').addEventListener('change', ev => configurar({ horaFim: (ev.target as HTMLInputElement).value || null }))
   $('var-oque').addEventListener('change', ev => pedir({ tipo: 'escolher-varredura', oQue: (ev.target as HTMLSelectElement).value as OQueVarrer }))
   $('portal-retomar').addEventListener('click', () => {
     if (confirm('A Claro bloqueou o acesso há pouco. Tentar de novo antes da hora pode estender o bloqueio. Retomar mesmo assim?')) {

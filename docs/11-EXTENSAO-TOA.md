@@ -310,6 +310,31 @@ ao abrir o painel; aberto de um dia para o outro (no Edge da VPS, sempre), ele
 continuava no dia anterior e "Ler o portal" lia ontem inteiro. Agora "hoje" é
 a falta de escolha e é recalculado a cada 10 s.
 
+## O horário do dia (0.11.0, D-374)
+
+> "agora eu quero hora inicio start e hora fim, em que momento ela para de
+> rodar (...) quando der a hora fim o sistema deve fazer a ultima atualização
+> independente de quantos minutos faltem" — Emanuel, 12/11
+
+Na aba **Importar**, abaixo do Dia: **Horário [início] até [fim]**, deste
+computador, valendo para as três importações (rota, equipamentos, níveis).
+
+- **Relógio de Manaus**, o mesmo do "hoje" (`hoje_local()`) — não o do
+  computador: o Edge da VPS não está em Manaus. O painel mostra "Manaus HH:MM".
+- **Antes do início**: nada roda sozinho (selo "começa 08:00").
+- **No horário**: cada uma no seu intervalo, como antes.
+- **Na hora fim**: cada importação **ligada** roda **uma última vez**, sem
+  esperar o intervalo, e para até o início do dia seguinte (selo "última
+  rodada" → "encerrada hoje"). A rota não reimporta planilha igual — só não
+  espera o intervalo. Se o computador estava desligado na hora fim, a última
+  rodada sai quando ele voltar, no mesmo dia.
+- Mudar a hora fim abre uma nova "última rodada" para a hora nova.
+- Campo vazio = sem limite daquele lado; os dois vazios = o dia inteiro (o
+  padrão, igual à 0.10). Início tem de ser antes do fim (sem virada de noite).
+- O **Iniciar** do cartão continua valendo a qualquer hora: quem opera decide.
+- Fora do horário o computador **continua batendo o pulso** e segura a vez dos
+  buckets.
+
 ## O dia (0.9.0, D-332)
 
 O painel tem um **seletor de dia**: hoje (o normal) ou até **31 dias para

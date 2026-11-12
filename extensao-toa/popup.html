@@ -45,7 +45,7 @@
     footer button { border: 0; padding: 2px 0; color: var(--suave); background: none; }
     footer button:hover { color: var(--af); }
     select { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); }
-    input[type=date] { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; }
+    input[type=date], input[type=time] { font: inherit; padding: 4px 6px; border: 1px solid var(--borda); border-radius: 6px; }
     a { color: var(--af); }
     [hidden] { display: none !important; }
 
@@ -128,6 +128,14 @@
           <input id="dia" type="date">
           <button id="dia-hoje" hidden>Voltar para hoje</button>
           <span id="dia-rotulo" class="pequeno" style="margin-left:auto"></span>
+        </div>
+        <!-- o horário em que as três rodam sozinhas; na hora fim, a última de cada (D-374) -->
+        <div id="horario-caixa" class="linha dia">
+          <label class="pequeno" for="hora-inicio"><strong>Horário</strong></label>
+          <input id="hora-inicio" type="time" aria-label="Hora início">
+          <span class="pequeno">até</span>
+          <input id="hora-fim" type="time" aria-label="Hora fim">
+          <span id="horario-rotulo" class="pequeno" style="margin-left:auto"></span>
         </div>
 
         <div class="cartao">

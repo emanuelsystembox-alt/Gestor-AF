@@ -620,6 +620,10 @@ A tela Sincronismo só acompanha.
   outra cidade, desligado, número diferente. Cadastrar é do ADMIN (Configurações › Buckets
   do TOA); o prefixo do TOA não diz a cidade com certeza (ARN é Araguaína) — pergunte.
 
+**O horário do dia é por computador, no relógio de Manaus** (0.11.0, D-374): fora dele nada roda sozinho;
+**na hora fim, cada importação ligada roda uma última vez sem esperar o intervalo** — *"quando der a hora fim o
+sistema deve fazer a ultima atualização independente de quantos minutos faltem"* (Emanuel, 12/11).
+
 ## A varredura lê o TOA direto, só leitura (D-250)
 
 A extensão pede ao TOA, de dentro da aba em que a pessoa entrou, o que as telas de

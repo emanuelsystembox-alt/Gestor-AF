@@ -48,7 +48,14 @@ export interface Estado {
     portalMin: Intervalo
     /** os ids marcados para sincronizar e varrer */
     buckets: string[]
+    /** 0.11.0 (D-374): o horário do dia em que as três rodam sozinhas, "HH:MM"
+     *  no relógio de Manaus. Nulo = sem limite daquele lado. */
+    horaInicio: string | null
+    horaFim: string | null
   }
+  /** A última rodada de cada importação, feita na hora fim — uma por dia e
+   *  por hora fim (mudar a hora fim abre uma nova). */
+  fimDoDia: { dia: string; fim: string; feitos: Importacao[] } | null
   /** O que o login pode sincronizar — lido da árvore do TOA na última vez que houve aba. */
   disponiveis: { em: number; itens: BucketDisponivel[]; fora: BucketFora[] } | null
   vezes: Record<string, VezDoBucket>
@@ -87,8 +94,9 @@ export const ESTADO_VAZIO: Estado = {
   ligado: false, usuario: null, maquina: null,
   config: {
     rotaLigada: true, rotaMin: 60, varreduraLigada: false, varreduraMin: 60,
-    portalLigado: true, portalMin: 60, buckets: [],
+    portalLigado: true, portalMin: 60, buckets: [], horaInicio: null, horaFim: null,
   },
+  fimDoDia: null,
   disponiveis: null, vezes: {}, toaSessao: null, pulsoEm: null,
   baixa: { rodando: false, atual: null, ultimaEm: null, ultima: null },
   varredura: {
@@ -119,7 +127,46 @@ function normalizarConfig(c: Record<string, unknown> | undefined): Estado['confi
     portalLigado: typeof c?.portalLigado === 'boolean' ? c.portalLigado : v.portalLigado,
     portalMin: Math.max(15, intervalo(c?.portalMin, v.portalMin)) as Intervalo,
     buckets: Array.isArray(c?.buckets) ? (c.buckets as string[]) : [],
+    horaInicio: horaValida(c?.horaInicio) ? c!.horaInicio as string : null,
+    horaFim: horaValida(c?.horaFim) ? c!.horaFim as string : null,
   }
+}
+
+// ── o horário do dia (0.11.0, D-374) ──────────────────────────────────────
+/**
+ * ┌─ a hora fim faz a ÚLTIMA rodada, não só para ─────────────────────┐
+ * │ > "quando der a hora fim o sistema deve fazer a ultima atualização │
+ * │ >  independente de quantos minutos faltem" — Emanuel, 12/11       │
+ * │ Rota a cada 1 h com fim às 18:00: a das 17:20 não seria a última. │
+ * │ Ao dar a hora fim, cada importação ligada roda UMA vez mais, fora  │
+ * │ do intervalo, e então para até a hora início do dia seguinte. O    │
+ * │ relógio é o de Manaus — o mesmo do "hoje" (hoje_local, D-084) —,   │
+ * │ e não o do computador: o Edge da VPS não está em Manaus.           │
+ * └────────────────────────────────────────────────────────────────────┘
+ */
+export const horaValida = (x: unknown): x is string => typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x)
+
+/** Agora em Manaus: o dia ("AAAA-MM-DD") e a hora ("HH:MM"). */
+export function agoraManaus(): { dia: string; hhmm: string } {
+  const d = new Date()
+  const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Manaus' }).format(d)
+  const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Manaus', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d)
+  return { dia, hhmm }
+}
+
+/** Onde o relógio está em relação ao horário: SEM_HORARIO = o dia inteiro. */
+export type Janela = 'SEM_HORARIO' | 'ANTES' | 'DENTRO' | 'DEPOIS'
+export function janelaAgora(c: Pick<Estado['config'], 'horaInicio' | 'horaFim'>, hhmm = agoraManaus().hhmm): Janela {
+  if (!c.horaInicio && !c.horaFim) return 'SEM_HORARIO'
+  if (c.horaFim && hhmm >= c.horaFim) return 'DEPOIS'
+  if (c.horaInicio && hhmm < c.horaInicio) return 'ANTES'
+  return 'DENTRO'
+}
+
+/** A última rodada desta importação, na hora fim de hoje, já foi feita? */
+export function fimFeito(e: Estado, qual: Importacao): boolean {
+  const f = e.fimDoDia
+  return !!f && f.dia === agoraManaus().dia && f.fim === e.config.horaFim && f.feitos.includes(qual)
 }
 
 export async function lerEstado(): Promise<Estado> {
@@ -130,6 +177,7 @@ export async function lerEstado(): Promise<Estado> {
     baixa: { ...ESTADO_VAZIO.baixa, ...(e?.baixa ?? {}) },
     varredura: { ...ESTADO_VAZIO.varredura, ...(e?.varredura ?? {}) },
     portal: { ...ESTADO_VAZIO.portal, ...(e?.portal ?? {}) },
+    fimDoDia: e?.fimDoDia ?? null,
     escolha: { ...ESTADO_VAZIO.escolha, oQue: e?.escolha?.oQue ?? 'TUDO' } }
 }
 

@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { lerPlanilhaTOA, validarPlanilha, type LinhaTOA } from '../src/lib/toa'
 import { importarLinhasToa, impressaoDasLinhas, ErroImportacao } from '../src/lib/importarToaNucleo'
 import { bucketDoNome, nomePadrao } from '../src/lib/toaNomes'
-import { CHAVE, ESTADO_VAZIO, INTERVALOS, lerEstado, type BucketDisponivel, type BucketFora, type Estado, type LinhaLog, type OQueVarrer, type Pedido, type VezDoBucket } from './estado'
+import { CHAVE, ESTADO_VAZIO, INTERVALOS, agoraManaus, fimFeito, horaValida, janelaAgora, lerEstado, type Importacao, type BucketDisponivel, type BucketFora, type Estado, type LinhaLog, type OQueVarrer, type Pedido, type VezDoBucket } from './estado'
 
 /**
  * O fundo da extensão "AFLINE — ponte com o TOA" (0.3.0, D-193).
@@ -225,6 +225,17 @@ async function soltarBuckets() {
   await mudar(x => { x.vezes = {} })
 }
 
+/** A última rodada do dia desta importação foi feita (D-374): não repete até amanhã. */
+async function marcarFim(qual: Importacao, texto: string | null) {
+  const { dia } = agoraManaus()
+  await mudar(x => {
+    const f = x.fimDoDia
+    const mesma = f && f.dia === dia && f.fim === x.config.horaFim
+    x.fimDoDia = { dia, fim: x.config.horaFim ?? '', feitos: [...new Set([...(mesma ? f!.feitos : []), qual])] }
+  })
+  if (texto) await anotar(texto, 'ok')
+}
+
 /** "Parar" pedido no painel: quem está rodando confere entre um passo e outro. */
 async function pararPedido(chave: 'rota_parar' | 'portal_parar'): Promise<boolean> {
   return !!(await chrome.storage.session.get(chave))[chave]
@@ -265,21 +276,35 @@ async function ciclo(rota: boolean, assumir: string[] = []) {
     // do dia o bucket vence na hora, sem esperar o intervalo.
     const agora = new Date(o.agora).getTime()
     const passo = e.config.rotaMin * 60_000 - 30_000
-    if (rota || e.config.rotaLigada) {
-      const vencidos = o.buckets.filter(b => b.vez && (rota || !b.ultima || agora - new Date(b.ultima).getTime() >= passo))
+    // 0.11.0 (D-374): fora do horário nada roda sozinho; na hora fim, a última
+    // rodada de cada importação, sem esperar o intervalo. O Iniciar do painel
+    // (`rota`) continua valendo a qualquer hora: quem opera decide.
+    const janela = janelaAgora(e.config)
+    const noHorario = janela === 'SEM_HORARIO' || janela === 'DENTRO'
+    const rotaFinal = janela === 'DEPOIS' && e.config.rotaLigada && !fimFeito(e, 'ROTA')
+    if (rota || rotaFinal || (e.config.rotaLigada && noHorario)) {
+      const vencidos = o.buckets.filter(b => b.vez && (rota || rotaFinal || !b.ultima || agora - new Date(b.ultima).getTime() >= passo))
       if (vencidos.length) await chrome.storage.session.remove('rota_parar')
       for (const b of vencidos) {
         if (await pararPedido('rota_parar')) { await anotar('Rota: parada a pedido; os outros buckets ficaram para depois.'); break }
+        // a última rodada não força reimportar a planilha IGUAL: só não espera o intervalo
         await rodarBucket(b, o.hoje, rota, e.usuario!.id)
       }
+      if (rotaFinal) await marcarFim('ROTA', vencidos.length
+        ? `Rota: hora fim (${e.config.horaFim}) — feita a última importação do dia.` : null)
     }
 
     // A varredura sozinha, no ritmo que este computador escolheu.
     const x = await lerEstado()
     const minhas = o.buckets.filter(b => b.vez).map(b => b.id)
     if (x.config.varreduraLigada && minhas.length && !x.varredura.rodando) {
-      const ult = (await chrome.storage.local.get('varredura_tentativa')).varredura_tentativa as number | undefined
-      if (!ult || Date.now() - ult >= x.config.varreduraMin * 60_000 - 30_000) await varrer(minhas)
+      if (janela === 'DEPOIS' && !fimFeito(x, 'EQUIPAMENTOS')) {
+        await marcarFim('EQUIPAMENTOS', `Equipamentos: hora fim (${x.config.horaFim}) — começando a última varredura do dia.`)
+        await varrer(minhas)
+      } else if (noHorario) {
+        const ult = (await chrome.storage.local.get('varredura_tentativa')).varredura_tentativa as number | undefined
+        if (!ult || Date.now() - ult >= x.config.varreduraMin * 60_000 - 30_000) await varrer(minhas)
+      }
     }
   } catch (err) {
     await anotar(`Falha no ciclo: ${String((err as Error)?.message ?? err)}`, 'erro')
@@ -759,9 +784,13 @@ async function lerPortal(agora: boolean, diaPedido?: string) {
     await mudar(x => { x.portal.pausaAte = null; x.portal.pausaMotivo = null })
     chrome.action.getBadgeText({}).then(t => { if (t === 'II') selo('') })
   }
-  if (!agora && (!e.config.portalLigado
+  // 0.11.0 (D-374): fora do horário, só a última leitura da hora fim
+  const janela = janelaAgora(e.config)
+  const final = !agora && e.config.portalLigado && janela === 'DEPOIS' && !fimFeito(e, 'NIVEIS')
+  if (!agora && !final && (!e.config.portalLigado || janela === 'ANTES' || janela === 'DEPOIS'
       || (e.portal.ultimaEm && Date.now() - e.portal.ultimaEm < e.config.portalMin * 60_000 - 30_000))) return
   if (!(await travar('trava_portal', 15))) return
+  if (final) await marcarFim('NIVEIS', `Portal Claro: hora fim (${e.config.horaFim}) — começando a última leitura do dia.`)
   await chrome.storage.session.remove('portal_parar')
   const login = e.portal.login
   // Só HOJE sozinho; um dia para trás, só pelo Iniciar com o dia escolhido.
@@ -1006,8 +1035,16 @@ async function tratar(p: Pedido): Promise<{ ok: boolean; mensagem?: string }> {
         if (c[k] !== undefined && !INTERVALOS.includes(c[k]!)) return { ok: false, mensagem: 'Intervalo inválido.' }
       }
       if (c.portalMin !== undefined && c.portalMin < 15) return { ok: false, mensagem: 'O portal da Claro: no mínimo a cada 15 min.' }
+      for (const k of ['horaInicio', 'horaFim'] as const) {
+        if (c[k] !== undefined && c[k] !== null && !horaValida(c[k])) return { ok: false, mensagem: 'Hora inválida.' }
+      }
       const e = await lerEstado()
       const novo = { ...e.config }
+      if (c.horaInicio !== undefined) novo.horaInicio = c.horaInicio
+      if (c.horaFim !== undefined) novo.horaFim = c.horaFim
+      if (novo.horaInicio && novo.horaFim && novo.horaInicio >= novo.horaFim) {
+        return { ok: false, mensagem: 'A hora início tem de ser antes da hora fim.' }
+      }
       if (c.rotaMin !== undefined) novo.rotaMin = c.rotaMin
       if (c.varreduraMin !== undefined) novo.varreduraMin = c.varreduraMin
       if (c.portalMin !== undefined) novo.portalMin = c.portalMin

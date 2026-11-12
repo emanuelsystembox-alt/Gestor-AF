@@ -13799,3 +13799,27 @@ Editar usuário diz "o registro <login> foi desligado (o histórico continua nel
 **Verificado:** ensaio desfeito com o acesso do ELIECER (troca para um login fictício desliga o Z702775; voltar o
 reativa); baterias 35/35 e 29/29; anon sem EXECUTE. **Não coberto:** registro duplicado que nasce por OUTRO caminho
 (importação de cadastro, técnico avulso) sem acesso ligado — esse continua dependendo de alguém desligar.
+
+### D-374 · Extensão 0.11.0: horário do dia, com a última rodada na hora fim (12/11/2026)
+
+> "agora eu quero hora inicio start e hora fim, em que momento ela para de rodar ok, quando der a hora fim o sistema
+> dever fazer a ultima atualização indepenente de quantos minutos faltem ok?" — Emanuel, 12/11
+
+Até a 0.10 a extensão rodava o dia inteiro, cada importação no seu intervalo. Agora cada computador tem **hora início
+e hora fim** (aba Importar), valendo para rota, equipamentos e níveis. Fora do horário nada roda sozinho. **Na hora fim
+cada importação ligada roda uma última vez, sem esperar o intervalo** — com a rota a cada 1 h e fim às 18:00, a das
+17:20 não seria a última; o que o TOA fechou entre 17:20 e 18:00 ficaria de fora até o dia seguinte.
+
+- **Relógio de Manaus** (`agoraManaus()` em `app/extensao/estado.ts`), o mesmo do "hoje" — o relógio do computador
+  foi descartado porque o Edge da VPS não está em Manaus.
+- A última rodada é marcada em `fimDoDia` (dia + hora fim + quais já rodaram): uma por dia; trocar a hora fim abre
+  outra. Computador desligado na hora fim faz a última quando voltar, no mesmo dia.
+- A última rodada da rota **não** força reimportar planilha igual (a impressão continua valendo); só ignora o intervalo.
+- O Iniciar manual vale a qualquer hora. Fora do horário o pulso continua (segura a vez dos buckets).
+- **Escolhas minhas, sem pergunta** (mudam fácil se o Emanuel quiser outra): um horário só para as três importações
+  (não um por cartão); vazio = sem limite; sem horário atravessando a meia-noite.
+
+**Verificado:** `tsc` da extensão e da web limpos; a regra do horário com 8 casos (antes, no início, no fim, depois,
+sem horário, só fim, só início) e a marca da última rodada (feita hoje, hora fim trocada, ontem); o painel desenhado a
+360 px. **Não verificado:** a extensão carregada num navegador de verdade passando pela hora fim — isso só se vê no Edge
+da VPS (ou num Chrome com a extensão) às 18:00.
