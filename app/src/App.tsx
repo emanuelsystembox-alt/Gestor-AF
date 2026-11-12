@@ -38,6 +38,7 @@ const RevisitaCausa = lazy(() => import('./pages/RevisitaCausa'))
 const Auditoria = lazy(() => import('./pages/Auditoria'))
 // 181: o risco de quebra dos contratos de hoje, com os motivos (D-262).
 const RiscoQuebra = lazy(() => import('./pages/RiscoQuebra'))
+const PrevisaoDia = lazy(() => import('./pages/PrevisaoDia'))
 import { Carregando } from './components/ui'
 
 /** Só entra quem está logado. Papel exigido é opcional.
@@ -195,6 +196,8 @@ function Rotas() {
         <Route path="/controle/auditoria" element={
           <Protegida exige="GESTAO"><Auditoria /></Protegida>} />
         {/* 181: risco de quebra antes do despacho — sugestão, nada muda sozinho. */}
+        <Route path="/controle/previsao" element={
+          <Protegida exige="GESTAO"><PrevisaoDia /></Protegida>} />
         <Route path="/controle/risco-quebra" element={
           <Protegida exige="GESTAO"><RiscoQuebra /></Protegida>} />
         <Route path="/controle/administracao" element={

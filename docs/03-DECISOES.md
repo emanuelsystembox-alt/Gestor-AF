@@ -13823,3 +13823,28 @@ cada importação ligada roda uma última vez, sem esperar o intervalo** — com
 sem horário, só fim, só início) e a marca da última rodada (feita hoje, hora fim trocada, ontem); o painel desenhado a
 360 px. **Não verificado:** a extensão carregada num navegador de verdade passando pela hora fim — isso só se vê no Edge
 da VPS (ou num Chrome com a extensão) às 18:00.
+
+### D-374 · Previsão do fechamento do dia e a caixa-preta — fase 1 do pacote preditivo (260 — 12/11/2026)
+
+> "quero deixar esse sistema ultra inteligente (...) mais preditivo" — Emanuel, 12/11. Das ideias propostas ele
+> aprovou 4 fases, nesta ordem: (1) caixa-preta + fechamento do dia; (2) risco de revisita na baixa; (3) a fila "O
+> que fazer agora"; (4) node em degradação + boletim com IA (a chave da API da Anthropic, ele cria). Caixa-preta a
+> cada 30 min, 06h–21h (escolha dele).
+
+**Previsão** (`previsao_do_dia`, Inteligência › Previsão do dia): nenhuma regra nova. TEC1 no fechamento = o REAL do
+que o TOA já encerrou (`tec1_da_os`, D-187) + o PREVISTO do que falta pela fila de cada técnico (`fila_do_dia`, a
+régua do TEC1 em risco, D-264): O.S. que conta no TEC1 de contrato que a fila prevê "vai estourar", "perdido" ou que
+começou depois da janela vira SEM PADRÃO; o resto, COM PADRÃO. "A salvar" = quantas O.S. previstas fora do prazo
+precisam entrar no prazo para chegar a 94%. "Não cabe" = previsão de fim depois do fim da jornada (`ritmo_jornada`,
+18:00, D-167). Cancelamento e reagendamento que ainda vão acontecer não são previstos (o TEC1 deles se decide no
+fechamento).
+
+**Caixa-preta** (`foto_do_dia`): o relógio (pg_cron `foto-do-dia`, `*/30 10-23,0,1` UTC) tira a foto pela porta única
+`rodar_por_cidade` (D-263): os números da previsão e só os IDs das visitas apontadas — nada de assinante. Leitura:
+gestão da cidade visível (RLS); escrita só pelo relógio. **Acerto** (`acerto_da_previsao`): por dia fechado, a
+primeira foto a partir das 10h contra o TEC1 real, e contrato a contrato (apontados que estouraram; estourados que
+tinham sido apontados). O primeiro dia inteiro medido é 13/11.
+
+**Medido** (Manaus, 12/11 às 18h07, como `authenticated`): 79 ms; TEC1 real 96,8% (442 O.S.), previsto 95,5%, 6
+contratos decidindo, 22 abertos sem caber até 18:00, fim previsto da operação 20:26. Cada cidade só vê a própria foto.
+**Não verificado:** o acerto (começa a ter dado amanhã); São Luís na tela; o fuso de São Luís (a fila usa Manaus).

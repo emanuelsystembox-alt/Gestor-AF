@@ -86,6 +86,8 @@ const OPERACAO: Modulo = {
 /** 177 em diante: o que o sistema confere e resume sozinho (D-262). */
 const INTELIGENCIA: Modulo = {
   chave: 'inteligencia', titulo: 'Inteligência', icone: 'indicadores', itens: [
+    // 260 (D-374): como o dia vai terminar, e se a previsão acerta.
+    { para: '/controle/previsao', rotulo: 'Previsão do dia', icone: 'indicadores', busca: 'previsao fechamento tec1 previsto meta salvar nao cabe jornada caixa preta acerto' },
     { para: '/controle/resumo', rotulo: 'Resumo do dia', icone: 'relatorios', busca: 'resumo 18h fechamento dia tec1 quebras revisita ritmo humor' },
     // 179: a fila do que é suspeito na baixa.
     { para: '/controle/auditoria', rotulo: 'Auditoria da baixa', icone: 'administracao', busca: 'auditoria fraude suspeito baixa curta serial galeria longe endereco nota' },
