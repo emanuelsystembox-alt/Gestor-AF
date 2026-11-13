@@ -13912,3 +13912,29 @@ gravados, o de Manaus vigente no sino; GPONA fora em 11/11; 126 ms Manaus, 66 ms
 35/35 e 29/29. **A medir:** o indício "2 com sinal inicial irregular" não tem validação (portal só desde 06/11). O
 único alerta de Manaus em 12/11 (CNVAWA) veio por ele, e os contratos são quase todos "queimado" (522/517) — pode ser
 surto elétrico, não rede. Conferir com 30 dias de leitura do portal; se não separar, tirar esse indício.
+
+### D-378 · A fila "O que fazer agora" — fase 3 do pacote preditivo (263 — 13/11/2026)
+
+> "o gestor não procura o problema, o problema chega na ordem certa" — a proposta de 12/11, aprovada pelo Emanuel.
+
+Inteligência › **O que fazer agora**, e um cartão no topo do Dashboard INST (os 3 primeiros, as contagens e "ver todos").
+**Nenhuma regra nova:** cada item sai da função que já decide aquilo — `previsao_do_dia` (TEC1, D-377),
+`dashboard_visita_tecnica` (bloco `atraso`, D-372), `risco_revisita_do_dia` (D-375) — e do sino (`sinais_do_dia`, com a
+vigência e a dispensa dele). O banco monta a sua parte (`o_que_fazer_agora`, INVOKER — o `dashboard_visita_tecnica` é
+INVOKER e confia no RLS; dentro de uma DEFINER veria tudo); a tela junta com o sino em `lib/filaAgora.ts`, uma vez só.
+
+**Escolhas do Emanuel (13/11), entre opções:**
+- **A ordem:** 1 pessoa esperando (suporte, GPS anormal, sumiu do TOA, dois em andamento) → 2 TEC1 que ainda dá para
+  salvar e o de folga curta (o perdido e o que começou tarde não têm o que fazer) → 3 equipe de VT atrasada na régua
+  agora → 4 node em degradação → 5 concluído hoje com risco ALTO de revisita que ainda não voltou → 6 o que não cabe na
+  jornada e o sincronismo. Dentro do grupo, o mais urgente primeiro (prazo; falta; fator; no sino, quem espera há mais).
+- **Onde:** página própria + cartão no Dashboard INST (é do DIA, não do período filtrado do painel).
+- **Tratado:** o item some sozinho quando a situação resolve, e cada um pode **dispensar** o seu (`fila_dispensa`,
+  carimbada pelo servidor; do sino, a dispensa do sino). A chave carrega o estado — "em risco" que vira "vai estourar",
+  a equipe abaixo de um marco NOVO, mais contratos fora do dia —, então o que piora volta.
+
+**Medido** (Manaus, 13/11 às 10h28, como authenticated): 683 ms; 48 itens (12 TEC1 a salvar, 13 com folga curta, 11
+equipes de VT atrasadas, 12 técnicos com contrato fora da jornada) + 1 node do sino. Dispensa conferida no banco
+(autor = quem clicou) e desfeita depois do teste. Baterias 35/35 e 29/29.
+**Não verificado:** São Luís; o volume é alto (48) — se a gestão achar que a folga curta (grupo 2) é ruído, é ali que
+se corta primeiro. A régua da VT foi trocada em Configurações para 09:20…17:30 (alguém usou a tela da D-372).

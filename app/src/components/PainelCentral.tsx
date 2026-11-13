@@ -63,7 +63,7 @@ const COR: Record<Sinal['tipo'], string> = {
 const hora = (ts: string) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 /** Para onde o sinal leva, quando leva a algum lugar. */
-function destino(s: Sinal): string | null {
+export function destino(s: Sinal): string | null {
   if (s.visita_id) return `/controle/visita/${s.visita_id}`
   // 160a: quebrado de UM contrato abre o contrato direto (Emanuel, 31/10);
   // de vários, abre o técnico em Equipes e os contratos vão como etiquetas.

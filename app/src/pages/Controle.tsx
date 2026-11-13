@@ -15,6 +15,7 @@ import { SeletorBuckets, opcoesDeBucket } from '../components/SeletorBuckets'
 import { SEM_BUCKET } from '../lib/filtroContratos'
 import { QuebraPorAgrupamento, tabelaQuebra } from '../components/QuebraPorAgrupamento'
 import { LinkContrato } from '../components/LinkContrato'
+import { CartaoFilaAgora } from '../components/FilaAgora'
 
 /**
  * O Dashboard — a primeira tela do controle.
@@ -486,6 +487,9 @@ export default function Controle() {
             />
           </div>
         )}
+
+        {/* 263 (D-378): a fila do que pede ação agora — é do DIA, não do período filtrado */}
+        <CartaoFilaAgora />
 
         {!carregando && m.produtivas > 0 && (
           <>
