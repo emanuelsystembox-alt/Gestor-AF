@@ -431,29 +431,47 @@ falta o olho de quem usa.
 
 ---
 
-## Pendente em 12/11/2026 — pacote preditivo, fases 1, 2 e parte da 4 (259–262; D-373, D-375 a D-377)
+## Pendente em 12–13/11/2026 — pacote preditivo completo, segurança e cadastro (259–265; D-373, D-375 a D-380)
 
-Feito e publicado: Previsão do dia + caixa-preta (260), Risco de revisita (261), Node em degradação + aviso no sino
-(262), e a troca de login desliga o registro antigo (259). Baterias 35/35 e 29/29.
+Feito e publicado (ver HANDOFF.md, 12–13/11): Previsão do dia + caixa-preta (260), Risco de revisita (261), Node em
+degradação (262), O que fazer agora (263), TRUNCATE & cia. fechados (264), Boletim com IA (265), troca de login desliga
+o registro antigo (259), túnel do portal num PC. Baterias 35/35 e 29/29 depois de cada mudança de permissão.
 
 ### Conferir com o tempo (não dá antes)
-- **Acerto da previsão do dia** — a caixa-preta começou em 12/11; o primeiro dia medido é 13/11 (Previsão do dia ›
-  "A previsão acerta?").
-- **Risco de revisita** — sinal, LOG, evidência e técnico entram na régua sozinhos a partir de ~02/12; instalação sai
-  de "sem histórico" em meados de dezembro. Medir de novo se a faixa MÉDIO passa a separar (hoje ≈ 1× a base).
-- **Node em degradação** — o indício "2 com sinal inicial irregular" não é validado; o 1º alerta de Manaus (CNVAWA,
-  12/11) veio por ele com contratos "queimado". Conferir com 30 dias de portal e tirar o indício se não separar.
+- **14/11, 07h/08h e 18h10:** o boletim saindo sozinho pelo relógio, e o texto da IA (`/var/log/afline-boletim.log`;
+  `select dia, momento, fonte, ia_erro from boletim_dia order by dia desc`).
+- **A partir de 14/11:** o acerto da previsão do dia (Previsão do dia › "A previsão acerta?"; o 1º dia inteiro é 13/11).
+- **~02/12:** o risco de revisita passa a usar sinal, LOG, evidência e técnico; medir de novo se o ALTO e o MÉDIO
+  separam. A instalação sai de "sem histórico" em meados de dezembro.
+- **Node em degradação:** o indício "2 com sinal inicial irregular" não é validado (o 1º alerta de Manaus, CNVAWA,
+  veio por ele com contratos "queimado"). Com 30 dias de portal, tirar o indício se não separar.
+- **A fila:** 48 itens às 10h28 de 13/11 — se o grupo "TEC1 com folga curta" virar ruído, é o primeiro a cortar.
 
-### Próximos passos aprovados
-- **Fase 3:** a fila "O que fazer agora" (junta TEC1 em risco, previsão, risco de revisita e node, por impacto).
-- **Fase 4 (resto):** ~~boletim com IA~~ feito (265, D-380). Falta a **causa raiz da revisita com IA**.
-- **Conferir 14/11:** o boletim das 07h/08h e o das 18h10 saindo sozinhos (log em `/var/log/afline-boletim.log`).
+### Próximo passo aprovado (não começado)
+- **Causa raiz da revisita com IA** — o último item da fase 4: a IA lê código, sub-falha, observação, sinal antes e
+  depois e o pós-ativo de cada revisita e classifica a causa (técnica, rede, cliente, processo). Mesmas fronteiras do
+  boletim (lista branca, sem nome nem cliente).
+
+### Não verificado
+- São Luís na Previsão do dia, no Risco de revisita e na fila (só Manaus foi aberto na tela).
+- O fuso de São Luís: a previsão e a régua da VT usam o relógio de Manaus para todas as cidades.
+- O modelo de reserva do Gemini e a cota estourada no plano grátis; o boletim num domingo e numa cidade sem rota
+  até as 07h (fica sem o da manhã até as 08h).
+- O aplicativo do campo e a extensão depois da 264 (não usam TRUNCATE; só procurado no código).
 
 ### Depende do Emanuel
-- Excluir no AI Studio a chave que foi colada na conversa em 12/11 (a gravada na VPS é outra).
+- **Excluir no AI Studio a chave colada na conversa em 12/11** (a gravada na VPS é outra e fica).
 - Quem age sobre o risco de revisita ALTO, e como (ligar, supervisor conferir, pedir nova validação) — a tela só lista.
 - "Queimado" concentrado no node vira um alerta de "evento elétrico"? (fica fora por ora.)
 - Prova para contestar AT1/revisita com a CLARO precisa de relatório/exportação do node em degradação?
+- A régua das equipes atrasadas foi trocada em Configurações para 09:20…17:30 em 12–13/11 — confirmar que foi de
+  propósito.
+
+### Ação na operação
+- **O PC do túnel do portal** (`desktop-oqlhjsd`) precisa ficar ligado, sem suspender, com "Run unattended" no
+  Tailscale; a chave dele vence em **11/05/2027** se a expiração não for desligada no painel.
+- **Supervisor no cadastro do técnico** (D-134): continua faltando para a maioria — o "supervisor ofensor" da Revisita
+  Técnica fica vazio sem ele.
 
 ## Pendente em 11/11/2026 — sinal, Revisita Técnica e equipes atrasadas (255–258; D-369 a D-372)
 

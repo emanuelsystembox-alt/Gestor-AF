@@ -1,5 +1,31 @@
 # Passagem de bastão — leia isto primeiro
 
+> **12–13/11/2026 — o pacote PREDITIVO (4 fases), o túnel do portal num PC e duas correções de cadastro e
+> segurança** (D-373, D-375 a D-380; migrations 259 a 265; site publicado e conferido no ar; baterias 35/35 e 29/29):
+> - **Previsão do dia + caixa-preta** (260, D-377 — era D-374, renumerada: outra sessão pegou o número): TEC1 no
+>   fechamento = real do que o TOA encerrou + previsto pela fila de cada técnico; O.S. a salvar; o que não cabe na
+>   jornada. A caixa-preta (`foto_do_dia`, a cada 30 min) mede se a previsão acerta — tela "A previsão acerta?".
+> - **Risco de revisita na baixa** (261, D-375): concluídos do dia com faixa e motivos (método do Risco de quebra).
+>   Só concluído tem nota; VT reagendada/cancelada vai num quadro "Vai voltar". Fraco até ~02/12: sinal e LOG entram
+>   sozinhos quando novembro fechar 30 dias (a carga do ngestor não tem esses campos — `traps.md`).
+> - **Node em degradação** (262, D-376): só alerta com indício de rede da CLARO (volume sozinho não é rede, medido em
+>   9 meses); aviso no sino para quem vê a cidade, gravado de hora em hora.
+> - **O que fazer agora** (263, D-378): uma fila só, na ordem do Emanuel (pessoa → TEC1 → régua da VT → rede →
+>   revisita → jornada), com "dispensar" por pessoa; página em Inteligência + cartão no topo do Dashboard INST.
+> - **Boletim do dia com IA** (265, D-380): 07h (refeito às 08h) e 18h10, no Resumo do dia e na fila. O banco
+>   prepara por regra; o script do host (`/opt/afline/boletim`) pede o texto ao **Gemini** (plano grátis, chave em
+>   `/opt/supabase/segredos/gemini_api_key`, só root). Para a IA só números, códigos e equipe — nunca nome, contrato,
+>   cliente ou bairro. Conclusão = a do Dashboard INST.
+> - **Segurança** (264, D-379): `anon` e `authenticated` tinham TRUNCATE/TRIGGER/REFERENCES/MAINTAIN em ~107 tabelas
+>   (padrão do Supabase restaurado; o RLS não vale para TRUNCATE). Fechado no banco inteiro e no padrão do `postgres`.
+> - **Cadastro** (259, D-373): trocar o login TOA de um acesso desliga o registro antigo da pessoa (ELIECER e Marcos
+>   de São Luís apareciam em dobro; os três registros velhos foram desligados à mão).
+> - **Túnel do portal Claro:** a saída passou do celular para um PC Windows (`desktop-oqlhjsd`, internet residencial
+>   Claro NXT); o celular fica de reserva (`docs/12-VPS-ERP.md`).
+> - **Três agentes em paralelo** fizeram desenho e medida (risco de revisita, node, boletim) sem aplicar nada; tudo foi
+>   revisado, ajustado com as respostas do Emanuel e aplicado nesta sessão.
+> - **Pendências e perguntas** em `docs/08-ESTADO-DO-PROJETO.md`, "Pendente em 12–13/11/2026".
+
 > **11/11/2026 — hora do sinal, causa da revisita, indicador Revisita Técnica e equipes atrasadas** (D-369 a
 > D-372; migrations 255 a 258; site publicado e conferido no ar; nada de RLS/papel mexido — sem baterias):
 > - **Hora do sinal do portal Claro** (255): o `collectedDate` vem 3 h atrasado mesmo com `-03:00`;
