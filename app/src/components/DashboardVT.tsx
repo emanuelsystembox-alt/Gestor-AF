@@ -114,9 +114,17 @@ interface DadosVT {
                 lista_sem: { visita_id: string; contrato: string | null; dia: string; situacao: string
                              equipe: string | null; tecnico: string | null }[] }
   /** 257 (D-372): equipes em campo × atrasadas, pela régua 09:10 … 17:20 */
+  /** 266 (D-381): a 1ª W.O por turno — a regra é a do indicador Primeira WO */
+  primeira_wo?: { turnos: Partial<Record<'MANHA' | 'TARDE', { n: number; dentro: number; meta: string; media: string }>>
+                  lista: ItemWO[] }
   atraso?: { marcos: { k: number; hora: string }[]; em_campo: number; equipes_distintas: number
              julgadas: number; atrasadas: number; atrasadas_agora: number; hoje_no_periodo: boolean
              lista: ItemAtraso[] }
+}
+interface ItemWO {
+  tecnico: string | null; equipe: string | null; dia: string; turno: 'MANHA' | 'TARDE'
+  hora: string; meta: string; dentro: boolean; minutos_depois: number
+  visita_id: string; contrato: string | null; grupo: string | null
 }
 interface ItemAtraso {
   equipe_id: string; codigo: string | null; nome: string | null; dia: string; tecnico: string | null
@@ -369,7 +377,12 @@ function Conteudo({ d }: { d: DadosVT }) {
   const okAt5 = vAt5 == null ? null : vAt5 >= META_AT5
   const okAt1 = vAt1Proj == null ? null : vAt1Proj <= META_AT1
   // 241 (D-353): "da opção para o usuario clicar tanto no log como no TEC1" (Emanuel, 10/11)
-  type Card = 'LOG' | 'REV30' | 'TEC1' | 'MEDIA' | 'AT1' | 'EVID' | 'ATRASO'
+  type Card = 'LOG' | 'REV30' | 'TEC1' | 'MEDIA' | 'AT1' | 'EVID' | 'ATRASO' | 'WO'
+  // 266 (D-381): a 1ª W.O, manhã e tarde
+  const wo = d.primeira_wo
+  const woM = wo?.turnos.MANHA
+  const woT = wo?.turnos.TARDE
+  const woOk = (t?: { media: string; meta: string }) => t ? t.media <= t.meta : null
   // 257 (D-372): evidência (só o encerrado) e equipes atrasadas
   const evd = d.evidencia
   const pEvid = evd ? pct(evd.com, evd.encerradas) : null
@@ -396,6 +409,36 @@ function Conteudo({ d }: { d: DadosVT }) {
       {/* ===== 1. o julgamento: os cinco números, cada um abre a sua lista ===== */}
       <section className="card-controle sobe overflow-hidden" aria-label="Indicadores da visita técnica">
         <div className="regua-grade">
+          {/* 266 (D-381): "antes do TEC1 + 1 card, chamado w.o, qual a média que as equipes da
+              manhã chegaram no primeiro horário, e o time da tarde separado" (Emanuel, 13/11).
+              A régua é a do indicador Primeira WO: chegada ao 1º cliente, turno e meta dele. */}
+          {wo && (
+            <Indicador rotulo="1ª W.O · manhã" valor={woM?.media ?? null}
+              cor={woOk(woM) == null ? undefined : woOk(woM) ? COR.executado : COR.atencao}
+              meta={woM ? `meta ${woM.meta}` : undefined} atingiu={woOk(woM)}
+              dica="Média da hora em que o técnico com VT chegou ao primeiro cliente do dia, por turno (a régua do indicador Primeira WO)."
+              aoClicar={wo.lista.length ? () => alternar('WO') : undefined} aberto={ver === 'WO'}
+              chamada="ver quem chegou"
+              segundo={woT && (
+                <span className="tabular text-base font-semibold"
+                  style={{ color: woOk(woT) ? COR.executado : COR.atencao }}
+                  title={`Turno da tarde: meta ${woT.meta}`}>
+                  {woT.media}
+                  <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-graf-400">tarde</span>
+                </span>
+              )}
+              apoio={<>
+                {woM
+                  ? <><span className="tabular">{n0(woM.dentro)}</span> de <span className="tabular">{n0(woM.n)}</span> no horário de manhã</>
+                  : <>ninguém do turno da manhã com VT</>}
+                <span className="block">
+                  {woT
+                    ? <>tarde: <span className="tabular">{n0(woT.dentro)}</span> de <span className="tabular">{n0(woT.n)}</span> no horário (meta {woT.meta})</>
+                    : <>tarde: ninguém com VT</>}
+                </span>
+              </>} />
+          )}
+
           <Indicador rotulo="TEC1" valor={pTec1} sufixo="%"
             cor={medidasTec1 === 0 ? undefined : corMeta(naMeta)}
             meta={`meta ≥ ${META_TEC1}%`} atingiu={medidasTec1 === 0 ? null : naMeta}
@@ -627,6 +670,26 @@ function Conteudo({ d }: { d: DadosVT }) {
         {ver === 'MEDIA' && ev && (
           <div className="px-4 pb-3">
             <ListaEquipesVT e={ev} equipes={d.equipes} aoFechar={() => setVer(null)} />
+          </div>
+        )}
+        {ver === 'WO' && wo && (
+          <div className="px-4 pb-3">
+            <Detalhe titulo="1ª W.O · chegada ao primeiro cliente" contagem={`${wo.lista.length} técnico(s)-dia`}
+              aoFechar={() => setVer(null)}>
+              <TabelaItens agruparRua={false} cabecalho={['Turno', 'Chegou', 'Meta', 'Técnico · equipe']}
+                linhas={wo.lista.map(i => ({
+                  id: i.visita_id, contrato: i.contrato, dia: i.dia,
+                  cols: [
+                    i.turno === 'MANHA' ? 'manhã' : 'tarde',
+                    <span key="h" className="tabular font-semibold"
+                      style={{ color: i.dentro ? COR.executado : COR.atencao }}>
+                      {i.hora}{!i.dentro && <span className="font-normal text-graf-400"> (+{i.minutos_depois} min)</span>}
+                    </span>,
+                    <span key="m" className="tabular">{i.meta}</span>,
+                    quem(i.equipe, i.tecnico),
+                  ],
+                }))} />
+            </Detalhe>
           </div>
         )}
         {ver === 'EVID' && evd && (

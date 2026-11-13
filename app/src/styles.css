@@ -687,8 +687,10 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .regua-grade > * { background: var(--color-graf-850); padding: 0.75rem 1rem; }
-  @media (min-width: 768px) { .regua-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  @media (min-width: 1800px) { .regua-grade { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+  /* D-381: nove números (a 1ª W.O entrou): 3×3, depois 5+4, e os nove lado a lado só em tela larga */
+  @media (min-width: 768px) { .regua-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1280px) { .regua-grade { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  @media (min-width: 1800px) { .regua-grade { grid-template-columns: repeat(9, minmax(0, 1fr)); } }
 }
 
 /* ---------- Entrada escalonada ----------

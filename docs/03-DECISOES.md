@@ -13984,3 +13984,20 @@ preparar fechadas a anon/authenticated; caminho completo em produção em 13/11 
 das 11h): Manaus e São Luís escritos pela IA, ~4,4 s e ~2.000–2.400 tokens cada, nenhum número fora dos dados; conclusão
 de 12/11 pela regra nova = 89,7% (252 de 281 encerradas). **Não verificado:** os horários de verdade (o primeiro é 14/11
 às 07h), o modelo de reserva, a cota estourada, um domingo e cidade sem rota até 07h (fica sem boletim da manhã até as 08h).
+
+### D-381 · Dashboard VT: o card da 1ª W.O, manhã e tarde separados (266 — 13/11/2026)
+
+> "no dashboard da VT adicione antes do TEC1 + 1 card, chamado w.o, qual a média que as equipes da manhã chegaram no
+> primeiro horário, e o time da tarde separado" — Emanuel, 13/11
+
+**Nenhuma regra nova:** a chegada ao primeiro cliente, o turno (manhã/tarde, pelo padrão de 30 dias) e a meta
+(08:20 / 11:20, parâmetros `primeira_wo_*`) são os do indicador **Primeira WO** (`primeira_wo_dia`, 145/233). O painel
+recorta só o técnico com VT na conta do dia (área, bucket e supervisor aplicados) e tira a **média da hora de chegada
+por turno**, com quantos chegaram dentro da meta. O card vem antes do TEC1: o número grande é a manhã, a tarde vai ao
+lado; clicar abre quem chegou, a que horas e quanto passou da meta. A régua do topo, com 9 números, fica 3×3 até 1280 px,
+5+4 até 1800 px e numa fileira só acima disso.
+
+**Medido** (Manaus, como authenticated): hoje, manhã 08:36 (2 de 8 no horário), ninguém da tarde com VT; 01–13/11,
+manhã 08:40 (54 de 168), tarde 11:05 (10 de 18). O painel do dia foi a ~0,57 s e o do mês a ~2,1 s (a `primeira_wo_dia`
+lê 30 dias para decidir o turno). **Não verificado:** São Luís. Na lista, o primeiro contrato que não é VT aparece "sem
+endereço" (o painel só carrega o endereço das VT).
