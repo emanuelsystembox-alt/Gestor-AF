@@ -431,7 +431,7 @@ falta o olho de quem usa.
 
 ---
 
-## Pendente em 12/11/2026 — pacote preditivo, fases 1, 2 e parte da 4 (259–262; D-373 a D-376)
+## Pendente em 12/11/2026 — pacote preditivo, fases 1, 2 e parte da 4 (259–262; D-373, D-375 a D-377)
 
 Feito e publicado: Previsão do dia + caixa-preta (260), Risco de revisita (261), Node em degradação + aviso no sino
 (262), e a troca de login desliga o registro antigo (259). Baterias 35/35 e 29/29.

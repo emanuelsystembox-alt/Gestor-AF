@@ -1,4 +1,4 @@
--- 260 · Previsão do fechamento do dia e a caixa-preta (D-374) — fase 1 do pacote preditivo
+-- 260 · Previsão do fechamento do dia e a caixa-preta (D-377 — era D-374, renumerada) — fase 1 do pacote preditivo
 --
 -- > "quero deixar esse sistema ultra inteligente (...) mais preditivo" — Emanuel, 12/11.
 -- > Das ideias propostas, ele aprovou as 4 fases na ordem; a 1ª é a caixa-preta + o

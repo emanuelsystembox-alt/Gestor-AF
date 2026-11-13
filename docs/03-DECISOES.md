@@ -13824,7 +13824,11 @@ sem horário, só fim, só início) e a marca da última rodada (feita hoje, hor
 360 px. **Não verificado:** a extensão carregada num navegador de verdade passando pela hora fim — isso só se vê no Edge
 da VPS (ou num Chrome com a extensão) às 18:00.
 
-### D-374 · Previsão do fechamento do dia e a caixa-preta — fase 1 do pacote preditivo (260 — 12/11/2026)
+### D-377 · Previsão do fechamento do dia e a caixa-preta — fase 1 do pacote preditivo (260 — 12/11/2026)
+
+> **Renumerada** (era D-374): outra sessão commitou a D-374 da extensão 0.11.0 minutos antes, na mesma pasta
+> (a armadilha das duas sessões, `traps.md`). Vale o número citado primeiro; esta virou D-377. O commit 73e4cc1
+> diz D-374 — é esta.
 
 > "quero deixar esse sistema ultra inteligente (...) mais preditivo" — Emanuel, 12/11. Das ideias propostas ele
 > aprovou 4 fases, nesta ordem: (1) caixa-preta + fechamento do dia; (2) risco de revisita na baixa; (3) a fila "O

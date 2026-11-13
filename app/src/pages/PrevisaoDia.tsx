@@ -7,7 +7,7 @@ import { LinkContrato } from '../components/LinkContrato'
 import { dataBR } from '../lib/formato'
 
 /**
- * Previsão do dia (260, D-374) — fase 1 do pacote preditivo.
+ * Previsão do dia (260, D-377) — fase 1 do pacote preditivo.
  *
  * O painel diz como o dia ESTÁ; esta tela diz como ele vai TERMINAR: o TEC1 real do que o
  * TOA já encerrou somado ao previsto do que falta (a fila de cada técnico, a mesma régua do
