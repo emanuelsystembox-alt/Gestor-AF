@@ -1,0 +1,13 @@
+# /etc/cron.d/afline-boletim — boletim do dia com IA (migration 265).
+# O relógio do host é UTC. Manaus = UTC-4.
+# O BANCO prepara o boletim (texto por regra) pelo pg_cron: 07:00 e 18:10 de Manaus.
+# Aqui, minutos depois, o script tenta o texto da IA (até 3 vezes por boletim; depois fica a regra).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 07:02 a 07:32 de Manaus
+2-32/5 11 * * * root /opt/afline/boletim/boletim.sh
+# 08:02 a 08:32 de Manaus — a manhã refeita às 08h (D-380)
+2-32/5 12 * * * root /opt/afline/boletim/boletim.sh
+# 18:12 a 18:42 de Manaus
+12-42/5 22 * * * root /opt/afline/boletim/boletim.sh

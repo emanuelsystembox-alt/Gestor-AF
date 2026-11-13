@@ -446,9 +446,8 @@ Feito e publicado: Previsão do dia + caixa-preta (260), Risco de revisita (261)
 
 ### Próximos passos aprovados
 - **Fase 3:** a fila "O que fazer agora" (junta TEC1 em risco, previsão, risco de revisita e node, por impacto).
-- **Fase 4 (resto):** boletim das 07h/18h e causa raiz da revisita com IA — chave do Gemini (plano grátis) já gravada
-  na VPS em `/opt/supabase/segredos/gemini_api_key` (só root). No teste, os modelos "flash" deram "alta demanda" e o
-  "flash-lite" respondeu: usar lite como principal e cair para texto por regra se a IA falhar.
+- **Fase 4 (resto):** ~~boletim com IA~~ feito (265, D-380). Falta a **causa raiz da revisita com IA**.
+- **Conferir 14/11:** o boletim das 07h/08h e o das 18h10 saindo sozinhos (log em `/var/log/afline-boletim.log`).
 
 ### Depende do Emanuel
 - Excluir no AI Studio a chave que foi colada na conversa em 12/11 (a gravada na VPS é outra).

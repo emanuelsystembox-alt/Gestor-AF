@@ -13952,3 +13952,35 @@ muda o padrão do `postgres` para a tabela que nascer amanhã já nascer sem ele
 com o RLS decidindo; `service_role` não muda. Conferido: zero concessões depois; baterias 35/35 e 29/29; Serviços,
 Equipes e a fila abrem sem erro. **Não visto:** o aplicativo do campo e a extensão (só leem/escrevem por RPC e pelas
 policies — nenhum TRUNCATE no código, procurado).
+
+### D-380 · Boletim do dia com IA: 07h (refeito às 08h) e 18h10, por cidade — fase 4 (265 — 13/11/2026)
+
+O boletim curto da gestão, escrito pelo **Gemini** (plano grátis, `gemini-3.5-flash-lite`; reserva um "flash"). Desenhado,
+escrito e testado por um agente em paralelo (a pedido do Emanuel); revisado, ajustado e instalado aqui. Aparece no topo
+de **Resumo do dia** e de **O que fazer agora** (`BoletimDia`), dizendo se foi "escrito pela IA" ou "por regra".
+
+**O banco prepara, a VPS só escreve o texto.** O pg_cron (pela porta única `rodar_por_cidade`) roda
+`preparar_boletim_manha` às 07:00 e às 08:00 e `preparar_boletim_noite` às 18:10 (depois da foto das 18h): tira os
+números (`dados_do_boletim`), escreve o texto **por regra** e grava — o boletim existe mesmo com a IA, o script ou a rede
+mortos. O script do host (`/opt/afline/boletim`, cron `/etc/cron.d/afline-boletim`, a cada 5 min nas meias horas
+seguintes) troca pelo texto da IA quando ela responde. A chave fica em `/opt/supabase/segredos/gemini_api_key` (root),
+lida só na chamada e mandada no cabeçalho — não vai para o banco (o `pg_net` existe, mas exigiria a chave no vault de um
+banco sem backup: recusado). O script **recusa texto com número que não está nos dados** e cai no modelo de reserva e
+depois na regra.
+
+**O que vai para a IA é lista branca**, montada campo a campo em `dados_do_boletim` e gravada em `boletim_dia.dados`
+para auditoria: números, códigos de baixa/agrupamento, código de equipe, node e área. **Nunca** nome de técnico
+(escolha do Emanuel: o plano grátis pode treinar com o que recebe), número de contrato, dado de cliente — **nem bairro**
+(perguntado, "não").
+
+**Respostas do Emanuel (13/11):** a manhã sai às 07h e é **refeita às 08h** (às 07h a rota costuma não estar importada:
+Manaus 12/11 tinha 1 contrato de 335; 13/11, 61 de 294 — o boletim diz a cobertura); a **conclusão é a do Dashboard
+INST** (D-296: concluídas ÷ encerradas, sem as em aberto, sem cancelado pela central e sem Auditar — `_conclusao_do_dia`,
+a mesma conta de `origemCancelada` na web), não concluídos ÷ contratos; sem comparação de conclusão com a semana passada
+(lá só existiria a do fechamento, não a das 18h).
+
+**Verificado:** a 265 ensaiada e aplicada; baterias 35/35 e 29/29; `gravar_boletim`, `boletins_pendentes` e as de
+preparar fechadas a anon/authenticated; caminho completo em produção em 13/11 às 10h56 (preparado fora de hora, números
+das 11h): Manaus e São Luís escritos pela IA, ~4,4 s e ~2.000–2.400 tokens cada, nenhum número fora dos dados; conclusão
+de 12/11 pela regra nova = 89,7% (252 de 281 encerradas). **Não verificado:** os horários de verdade (o primeiro é 14/11
+às 07h), o modelo de reserva, a cota estourada, um domingo e cidade sem rota até 07h (fica sem boletim da manhã até as 08h).

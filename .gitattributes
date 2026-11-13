@@ -1,2 +1,4 @@
 # Scripts que rodam na VPS (Linux): quebra de linha LF sempre, mesmo no Windows.
 *.sh text eol=lf
+# Tudo o que roda na VPS (Linux): o cron recusa linha com \r (D-380).
+scripts-vps/** text eol=lf

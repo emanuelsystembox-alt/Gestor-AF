@@ -8,6 +8,7 @@ import { LinkContrato } from '../components/LinkContrato'
 import { ROTULO_SINAL } from '../components/PainelCentral'
 import type { Sinal } from '../lib/central'
 import { dataBR, isoLocal } from '../lib/formato'
+import { BoletimDia } from '../components/BoletimDia'
 
 /**
  * O resumo do dia (177): a foto das 18h, por cidade.
@@ -105,6 +106,9 @@ export default function ResumoDoDia() {
         </div>
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
+
+        {/* 265 (D-380): o boletim das 07h/08h e das 18h10, escrito pela IA ou por regra */}
+        <BoletimDia dia={dia} />
 
         {r === undefined && <CarregandoBloco className="py-10" />}
         {r === null && !erro && (

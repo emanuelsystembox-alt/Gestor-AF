@@ -668,3 +668,16 @@ Tailscale (DERP São Paulo, ~88 ms), não direta — basta para o ritmo da exten
   túnel para nessa data até alguém logar de novo.
 - **O risco da D-342 agora é dessa internet:** se o FortiWeb da Claro bloquear o IP por rajada, quem usa a mesma
   conexão do PC fica sem o portal até o bloqueio passar. Não diagnostique o portal em rajada pelo túnel.
+
+### O boletim do dia com IA (13/11/2026, D-380)
+
+| Peça | Onde |
+|---|---|
+| Script que pede o texto ao Gemini | `/opt/afline/boletim/boletim.py` + `boletim.sh` (root, 700/600), cópia de `scripts-vps/boletim/` |
+| Cron do host (UTC) | `/etc/cron.d/afline-boletim`: 07:02–07:32, 08:02–08:32 e 18:12–18:42 de Manaus |
+| Chave do Gemini | `/opt/supabase/segredos/gemini_api_key` (root, 600) — nunca no banco, nunca em log |
+| Log (sem texto e sem chave) | `/var/log/afline-boletim.log` |
+
+Quem prepara é o banco (pg_cron `boletim-manha`, `boletim-manha-08h`, `boletim-noite`); sem o script, o boletim sai por
+regra. Instalar, conferir, desligar e trocar o modelo: `scripts-vps/boletim/README.md`. **Arquivo para o host vai com
+LF** (`.gitattributes`: `scripts-vps/**`) — o cron recusa linha com ``.

@@ -1,6 +1,7 @@
 import { Shell } from '../components/Shell'
 import { Alerta, Metrica, Vazio, CarregandoBloco } from '../components/ui'
 import { ListaFila } from '../components/FilaAgora'
+import { BoletimDia } from '../components/BoletimDia'
 import { GRUPO_FILA, useFilaAgora, type GrupoFila } from '../lib/filaAgora'
 import { dataBR } from '../lib/formato'
 
@@ -39,6 +40,9 @@ export default function OQueFazer() {
 
         {erro && <Alerta tipo="erro">{erro}</Alerta>}
         {!banco && !erro && <CarregandoBloco className="py-10" />}
+
+        {/* 265 (D-380): o boletim do dia, em cima da fila */}
+        <BoletimDia />
 
         {banco && (<>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
