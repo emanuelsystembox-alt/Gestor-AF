@@ -84,6 +84,12 @@ padrão do Postgres e não traz a retirada. No ensaio de 31/10 as **250
 — e as duas baterias não pegariam isso. Depois de qualquer restauração: a
 conferência 2 abaixo, e `perm-conferir.sql` (ver `docs/12-VPS-ERP.md`).
 
+**E as TABELAS também nascem abertas demais** (D-379). O padrão do `postgres` restaurado dava a
+`anon` e `authenticated` TRUNCATE, TRIGGER, REFERENCES e MAINTAIN em toda tabela (107 de 112) — e o
+RLS não vale para TRUNCATE. A 264 fechou e mudou o padrão; quem recriar o banco ou restaurar um dump
+confere: `select count(*) from information_schema.role_table_grants where table_schema='public' and
+grantee in ('anon','authenticated') and privilege_type in ('TRUNCATE','TRIGGER','REFERENCES')` — zero.
+
 **`bases_visiveis()` é a cidade ATIVA, não todas as que a pessoa pode ver**
 (103, D-180). O que ela PODE ver é `bases_permitidas()`: ADMIN todas;
 os demais, `perfil.base_id` + `usuario_base`. O COP **não** é mais global.

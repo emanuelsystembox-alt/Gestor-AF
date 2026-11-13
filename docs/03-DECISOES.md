@@ -13938,3 +13938,17 @@ equipes de VT atrasadas, 12 técnicos com contrato fora da jornada) + 1 node do 
 (autor = quem clicou) e desfeita depois do teste. Baterias 35/35 e 29/29.
 **Não verificado:** São Luís; o volume é alto (48) — se a gestão achar que a folga curta (grupo 2) é ruído, é ali que
 se corta primeiro. A régua da VT foi trocada em Configurações para 09:20…17:30 (alguém usou a tela da D-372).
+
+### D-379 · Fora de anon e authenticated: TRUNCATE, TRIGGER, REFERENCES e MAINTAIN (264 — 13/11/2026)
+
+Achado em 13/11 pelo agente do boletim (na `foto_do_dia` da 260) e medido no banco inteiro: o padrão de permissões do
+Supabase restaurado (`pg_default_acl` do `postgres`: `arwdDxtm`) dava a quem está logado **TRUNCATE em 107 das 112
+tabelas**, e a quem NÃO está logado (`anon`) em 93 — e ainda TRIGGER, REFERENCES e MAINTAIN (Postgres 17). O RLS não
+vale para TRUNCATE. Não passava pela API (o PostgREST não oferece), mas era porta aberta num banco sem backup: bastaria
+uma função INVOKER com SQL dinâmico. *"Fechar em todo o banco"* — Emanuel, 13/11, entre fechar e só registrar.
+
+A 264 tira os quatro de `anon` e `authenticated` em todas as tabelas (e TRUNCATE/TRIGGER/REFERENCES das três views), e
+muda o padrão do `postgres` para a tabela que nascer amanhã já nascer sem eles. SELECT/INSERT/UPDATE/DELETE continuam
+com o RLS decidindo; `service_role` não muda. Conferido: zero concessões depois; baterias 35/35 e 29/29; Serviços,
+Equipes e a fila abrem sem erro. **Não visto:** o aplicativo do campo e a extensão (só leem/escrevem por RPC e pelas
+policies — nenhum TRUNCATE no código, procurado).
