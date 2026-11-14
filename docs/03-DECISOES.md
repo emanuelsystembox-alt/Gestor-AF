@@ -14001,3 +14001,26 @@ lado; clicar abre quem chegou, a que horas e quanto passou da meta. A régua do 
 manhã 08:40 (54 de 168), tarde 11:05 (10 de 18). O painel do dia foi a ~0,57 s e o do mês a ~2,1 s (a `primeira_wo_dia`
 lê 30 dias para decidir o turno). **Não verificado:** São Luís. Na lista, o primeiro contrato que não é VT aparece "sem
 endereço" (o painel só carrega o endereço das VT).
+
+### D-382 · O supervisor importa a planilha do TOA; a trava passa a ser a permissão (267 — 14/11/2026)
+
+> "Este usuário (...) está informando que não está conseguindo importar" — Emanuel, 14/11, com o FLAVIO (Supervisor,
+> São Luís) logado e uma planilha de teste. Perguntado (liberar para o perfil, só para ele, ou não liberar):
+> **"Liberar para o perfil Supervisor"**.
+
+**Não era a planilha** (formato certo do TOA, com o "ID da Atividade" nas 79 linhas, bucket SLS-AFLINE_02_VT cadastrado).
+Eram três travas: (1) o RLS de `importacao`/`importacao_linha` só aceitava gestor ou Controlador — o supervisor levava
+*"new row violates row-level security policy for table importacao"* já na primeira gravação, reproduzido como ele;
+(2) `importar_toa`/`reconciliar`/`desatribuir` exigem `importacao.executar`, que o perfil Supervisor não tinha; (3) a tela
+deixava escolher o arquivo e clicar para depois falhar.
+
+**Agora:** o RLS de `importacao` aceita também quem tem `importacao.executar` (o poder mora no perfil de acesso, em
+Administração › Perfis, não numa lista de papéis); `importacao_linha` ganhou uma regra própria amarrada à importação que
+a pessoa enxerga — a linha crua tem dado de assinante, e a regra antiga dela não filtrava cidade. O perfil Supervisor
+ganhou `importacao.ver` e `importacao.executar`. A tela avisa "seu perfil não inclui Importar TOA" e não oferece os
+botões a quem não tem.
+
+**Verificado** como o Flavio, em transação desfeita: grava a importação e as 54 linhas de uma importação real do mesmo
+bucket, e `importar_toa` em simulação deu 54 atualizadas, 0 erros; ele vê só importações e linhas de São Luís (47.896
+de 298.037, 1 cidade). Baterias 35/35 e 29/29. **Não verificado:** o upload dele pela tela de verdade (precisa ele
+tentar de novo, depois de recarregar a página para as permissões novas valerem).

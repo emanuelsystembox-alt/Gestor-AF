@@ -141,7 +141,10 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 let proximaChave = 1
 
 export default function Importacao() {
-  const { perfil } = useAuth()
+  const { perfil, temPapel, pode } = useAuth()
+  // 267 (D-382): a tela antecipa a recusa do banco. Sem a permissão, o supervisor levava
+  // "violates row-level security" depois de escolher o arquivo e clicar — sem saber por quê.
+  const podeImportar = temPapel('ADMIN') || pode('importacao.executar')
   const navegar = useNavigate()
   /**
    * A importação vai para a CIDADE ATIVA do topo — era `'MAN'` escrito à
@@ -342,6 +345,13 @@ export default function Importacao() {
           </p>
         </div>
 
+        {!podeImportar && (
+          <Alerta tipo="aviso">
+            Seu perfil de acesso não inclui <strong>Importar TOA</strong>. Peça ao administrador para
+            liberar em Administração › Perfis de acesso.
+          </Alerta>
+        )}
+
         {/* ---------- no alto: dia de atuação, arquivos e o botão (090) ---------- */}
         <div {...soltar}
           className={`card-controle p-4 transition ${
@@ -368,13 +378,13 @@ export default function Importacao() {
               ))}
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
-              <button onClick={() => inputRef.current?.click()} disabled={rodando}
+              <button onClick={() => inputRef.current?.click()} disabled={rodando || !podeImportar}
                 className="toque rounded-lg border border-graf-700 px-4 text-sm font-medium text-graf-200
                            hover:border-af-600 hover:text-af-300 disabled:opacity-50">
                 {arqs.length ? 'Mais arquivos' : 'Escolher arquivos'}
               </button>
               <button onClick={enviar}
-                disabled={rodando || lendo || prontos.length === 0 || !dia}
+                disabled={rodando || lendo || prontos.length === 0 || !dia || !podeImportar}
                 className="toque rounded-lg bg-af-600 px-6 font-semibold text-white
                            hover:bg-af-500 disabled:opacity-50">
                 {rotuloBotao}

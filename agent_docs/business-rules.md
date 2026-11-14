@@ -603,6 +603,8 @@ Mora em `revisita_30d_vt()`; não confunda com `revisita_dos_contratos` (anterio
 ## Sincronismo com o TOA: por computador, a vez por bucket (167, D-251)
 
 **Quem importa à mão é o usuário comum** (Importar TOA: baixa a planilha no TOA e sobe).
+Importar exige a permissão **`importacao.executar`** — é ela, não o papel, que o banco confere (267, D-382);
+os perfis Administrador, COP e **Supervisor** têm; o Controlador só vê.
 **Quem tem a extensão** escolhe no painel dela, **para aquele computador**, os buckets e
 os tempos — rota a cada 5/15/30/60 min; varredura a cada 5/15/30/60 min ou só no botão.
 A tela Sincronismo só acompanha.
