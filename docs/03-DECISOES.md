@@ -14024,3 +14024,26 @@ botões a quem não tem.
 bucket, e `importar_toa` em simulação deu 54 atualizadas, 0 erros; ele vê só importações e linhas de São Luís (47.896
 de 298.037, 1 cidade). Baterias 35/35 e 29/29. **Não verificado:** o upload dele pela tela de verdade (precisa ele
 tentar de novo, depois de recarregar a página para as permissões novas valerem).
+
+### D-383 · A Manutenção Indoor não entra na revisita (268 — 14/11/2026)
+
+> "não é para considerar como revisita, uma o.s de manutenção indoor, apesar de ser uma o.s de VT ela não causa
+> impacto (...) precisa corrigir em nossos medidores de revisita" — Emanuel, 14/11
+
+No grupo VISITA TECNICA o TOA usa vários tipos de atividade (Visita Técnica 53.422; Manut Drop 65; Manut Ruído 35;
+**Manutenção Indoor 32**; Atendimento Prioritário Manut 29; VT Cump Especial 2). **Respostas dele (14/11):** a Indoor
+**nunca é revisita**; como ANTERIOR ela é **pulada** (vale a visita antes dela, como o Auditar e o cancelado pela central
+na Revisita 30 D); ela **fica na base** (o "VT na conta", denominador da Revisita 30 D e da nota do técnico); **só a
+Indoor** sai — os outros tipos seguem como VT.
+
+O tipo não ficou escrito nas funções: **`tipo_atividade.fora_da_revisita`** (marcado na "Manutencao Indoor"); outro tipo
+que precise sair é marcar. Mudaram as três funções que decidem revisita, e todos os medidores seguem delas:
+`anteriores_dos_contratos` (a oficial → Revisita por causa, REV D-10, resumo das 18h, sinal do contrato, risco de quebra,
+janela do LOG, revisita ofensora do Dashboard VT), `revisita_30d_vt` (Revisita 30 D, indicador Revisita Técnica, risco
+de revisita) e `revisita_do_tecnico` (o card do aplicativo). O REV D-10 tira sozinho a marca do dia que deixou de valer
+("de hoje em diante"); dias passados ficam. A régua do risco de revisita de hoje foi recalculada.
+
+**Medido** (01–14/11, em transação desfeita antes de aplicar): Revisita 30 D 237 → 231 (5 Indoor como revisita e 3 como
+anterior; depois, 0 e 0); oficial 249 → 246; Dashboard VT do mês 190 → 184 com a base parada em 1.119. Baterias 35/35 e
+29/29; `sinais_do_dia` e `aplicar_rev_d10` rodados como authenticated depois (traps: o relógio engole erro). Só banco: o
+site não precisou ser republicado.

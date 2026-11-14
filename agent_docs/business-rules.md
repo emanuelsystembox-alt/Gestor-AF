@@ -595,6 +595,11 @@ anterior vale em QUALQUER situação, **menos Auditar e cancelado pela central**
 antes delas (*"Tudo menos Cancelada pela Central e Auditar"*, Emanuel, 10/11). Card = revisitas ÷ VT na conta.
 Mora em `revisita_30d_vt()`; não confunda com `revisita_dos_contratos` (anterior concluída).
 
+**A Manutenção Indoor não entra na revisita** (268, D-383): nunca é revisita, é pulada como anterior (vale a visita
+antes dela) e fica na base. *"apesar de ser uma o.s de VT ela não causa impacto"* (Emanuel, 14/11). Vale para TODA
+régua de revisita — mora em `tipo_atividade.fora_da_revisita`, lido pelas três funções (`anteriores_dos_contratos`,
+`revisita_30d_vt`, `revisita_do_tecnico`). Régua nova de revisita tem de respeitar a coluna.
+
 ## Mural Nexus (163, D-245)
 
 **Só o ADMIN publica; todo o time lê.** No banco (RLS de `mural_post` e do bucket
